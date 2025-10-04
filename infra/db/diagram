@@ -1,0 +1,265 @@
+erDiagram
+    %% ==========================
+    %% SECURITY SCHEMA
+    %% ==========================
+    security_user {
+        int id PK
+        uuid keycloak_id
+        text username
+        text email
+        timestamp created_at
+    }
+
+    security_project {
+        int id PK
+        text name
+        text description
+        boolean is_active
+        timestamp created_at
+    }
+
+    security_role {
+        int id PK
+        text name
+        text description
+        enum scope "GLOBAL, PROJECT"
+        timestamp created_at
+    }
+
+    security_permission {
+        int id PK
+        text resource_type
+        text action
+        timestamp created_at
+    }
+
+    security_role_permission {
+        int id PK
+        int role_id FK
+        int permission_id FK
+        text scope
+        timestamp created_at
+    }
+
+    security_user_project {
+        int id PK
+        int user_id FK
+        int project_id FK
+        timestamp created_at
+    }
+
+    security_project_role {
+        int id PK
+        int project_id FK
+        int role_id FK
+        timestamp created_at
+    }
+
+    security_project_permission {
+        int id PK
+        int project_id FK
+        int permission_id FK
+        text scope
+        boolean inherits_from_role_permission
+        timestamp created_at
+    }
+
+    security_access_condition {
+        int id PK
+        text resource_type
+        text dicom_tag
+        text operator
+        text value
+        enum resource_level "STUDY, SERIES, INSTANCE"
+        enum condition_type "ALLOW, DENY, LIMIT"
+        timestamp created_at
+    }
+
+    security_role_access_condition {
+        int id PK
+        int role_id FK
+        int access_condition_id FK
+        timestamp created_at
+    }
+
+    security_project_access_condition {
+        int id PK
+        int project_id FK
+        int access_condition_id FK
+        timestamp created_at
+    }
+
+    security_grant_log {
+        bigint id PK
+        int granted_by FK
+        int granted_to FK
+        int role_id FK
+        int project_id FK
+        text action
+        int via_group_id FK "nullable group path - if indirect"
+        timestamp logged_at
+    }
+
+    security_access_log {
+        bigint id PK
+        int user_id FK
+        int project_id FK
+        text resource_type
+        text study_uid
+        text series_uid
+        text instance_uid
+        text action
+        text result
+        text dicom_tag_check
+        text ae_title
+        text ip_address
+        text session_id
+        int via_group_id FK "nullable group path - if accessed via group role"
+        timestamp logged_at
+    }
+
+    %% ==========================
+    %% OPTIONAL GROUP EXTENSION
+    %% ==========================
+    security_group {
+        int id PK
+        int project_id FK
+        text name
+        text description
+        boolean is_active
+        timestamp created_at
+    }
+
+    security_user_group {
+        int id PK
+        int user_id FK
+        int group_id FK
+        timestamp created_at
+    }
+
+    security_group_role {
+        int id PK
+        int group_id FK
+        int role_id FK
+        timestamp created_at
+    }
+
+    %% ==========================
+    %% VIEWER SCHEMA
+    %% ==========================
+    viewer_hanging_protocol {
+        int id PK
+        int project_id FK
+        int owner_user_id FK
+        text name
+        boolean is_default
+        timestamp created_at
+    }
+
+    viewer_hp_condition {
+        int id PK
+        int protocol_id FK
+        text dicom_tag
+        text operator
+        text value
+        timestamp created_at
+    }
+
+    viewer_hp_layout {
+        int id PK
+        int protocol_id FK
+        int rows
+        int cols
+        timestamp created_at
+    }
+
+    viewer_hp_viewport {
+        int id PK
+        int layout_id FK
+        int position_row
+        int position_col
+        text selection_rule
+        text sort_order
+        timestamp created_at
+    }
+
+    %% ==========================
+    %% ANNOTATION SCHEMA
+    %% ==========================
+    annotation_annotation {
+        int id PK
+        int project_id FK
+        int user_id FK
+        text study_uid
+        text series_uid
+        text instance_uid
+        text tool_name
+        text tool_version
+        jsonb data
+        boolean is_shared
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    annotation_annotation_history {
+        int id PK
+        int annotation_id FK
+        int user_id FK
+        text action
+        jsonb data_before
+        jsonb data_after
+        timestamp action_at
+    }
+
+    %% ==========================
+    %% RELATIONSHIPS
+    %% ==========================
+
+    %% --- USER / PROJECT / ROLE BASE ---
+    security_user ||--o{ security_user_project : "member of"
+    security_project ||--o{ security_user_project : "has member"
+
+    security_project ||--o{ security_project_role : "has"
+    security_role ||--o{ security_project_role : "assigned to"
+
+    security_role ||--o{ security_role_permission : "has"
+    security_permission ||--o{ security_role_permission : "granted"
+
+    security_project ||--o{ security_project_permission : "grants"
+    security_permission ||--o{ security_project_permission : "granted"
+
+    %% --- ACCESS CONDITION ---
+    security_role ||--o{ security_role_access_condition : "has"
+    security_access_condition ||--o{ security_role_access_condition : "uses"
+
+    security_project ||--o{ security_project_access_condition : "has"
+    security_access_condition ||--o{ security_project_access_condition : "uses"
+
+    %% --- LOGGING ---
+    security_user ||--o{ security_grant_log : "grants"
+    security_project ||--o{ security_grant_log : "context"
+    security_role ||--o{ security_grant_log : "with"
+    security_group ||--o{ security_grant_log : "via (optional)"
+
+    security_user ||--o{ security_access_log : "executes"
+    security_project ||--o{ security_access_log : "in"
+    security_group ||--o{ security_access_log : "via (optional)"
+
+    %% --- GROUP EXTENSION ---
+    security_project ||--o{ security_group : "has group"
+    security_group ||--o{ security_user_group : "includes"
+    security_user ||--o{ security_user_group : "member of"
+    security_group ||--o{ security_group_role : "has"
+    security_role ||--o{ security_group_role : "assigned"
+
+    %% --- VIEWER ---
+    security_project ||--o{ viewer_hanging_protocol : "owns"
+    security_user ||--o{ viewer_hanging_protocol : "created_by"
+    viewer_hanging_protocol ||--o{ viewer_hp_condition : "defines"
+    viewer_hanging_protocol ||--o{ viewer_hp_layout : "has"
+    viewer_hp_layout ||--o{ viewer_hp_viewport : "contains"
+
+    %% --- ANNOTATION ---
+    security_project ||--o{ annotation_annotation : "linked"
+    security_user ||--o{ annotation_annotation : "created"
+    annotation_annotation ||--o{ annotation_annotation_history : "has history"
