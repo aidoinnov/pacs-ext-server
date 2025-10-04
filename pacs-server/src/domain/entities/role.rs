@@ -2,13 +2,22 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "text")]
 pub enum RoleScope {
     #[sqlx(rename = "GLOBAL")]
     Global,
     #[sqlx(rename = "PROJECT")]
     Project,
+}
+
+impl RoleScope {
+    pub fn as_str(&self) -> &str {
+        match self {
+            RoleScope::Global => "GLOBAL",
+            RoleScope::Project => "PROJECT",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

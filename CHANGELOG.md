@@ -33,6 +33,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `PermissionRepositoryImpl` - PostgreSQL 구현
   - `AccessLogRepositoryImpl` - PostgreSQL 구현
 
+#### Service Layer (Domain Services)
+- Domain Layer: Service Traits (비즈니스 로직 인터페이스)
+  - `UserService` - 사용자 관리 서비스
+    - 사용자 생성 (중복 체크, 이메일 검증)
+    - 사용자 조회 (ID, Keycloak ID, Username)
+    - 사용자 삭제 및 존재 여부 확인
+  - `ProjectService` - 프로젝트 관리 서비스
+    - 프로젝트 생성 (이름 중복 체크, 길이 검증)
+    - 프로젝트 조회 (ID, 이름, 전체, 활성)
+    - 프로젝트 활성화/비활성화, 삭제
+  - `PermissionService` - 권한 관리 서비스
+    - 역할 생성 (Global/Project scope)
+    - 역할 조회 (ID, scope별)
+    - 권한 존재 여부 검증
+  - `AccessControlService` - 접근 제어 서비스
+    - DICOM 리소스 접근 로그 기록
+    - 사용자/프로젝트/Study별 로그 조회
+    - 프로젝트 접근 권한 확인
+
+- Service Layer: Service Implementations
+  - `UserServiceImpl` - 사용자 서비스 구현체
+  - `ProjectServiceImpl` - 프로젝트 서비스 구현체
+  - `PermissionServiceImpl` - 권한 서비스 구현체
+  - `AccessControlServiceImpl` - 접근 제어 서비스 구현체
+  - `ServiceError` - 통합 에러 타입 (NotFound, AlreadyExists, ValidationError 등)
+
 #### Testing
 - 엔티티 단위 테스트 (22개)
   - User, Project, Role, Permission, AccessCondition 테스트
@@ -48,6 +74,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - AccessLogRepository: 로그 생성, 조회, 카운트 테스트
   - PostgreSQL 실제 DB 연동 테스트
   - 외래키 제약 고려한 cleanup 로직
+
+- 서비스 통합 테스트 (34개)
+  - UserService: 사용자 생성, 중복 검증, 조회, 삭제 테스트 (8개)
+  - ProjectService: 프로젝트 생성, 검증, 조회, 활성화 관리 테스트 (10개)
+  - PermissionService: 역할 생성, 검증, scope별 조회 테스트 (8개)
+  - AccessControlService: DICOM 로그 기록, 조회, 접근 권한 테스트 (8개)
+  - 비즈니스 로직 검증 (중복 체크, 유효성 검사)
+  - 에러 처리 및 서비스 간 통합 테스트
 
 #### Infrastructure
 - PostgreSQL 데이터베이스 스키마 설계 및 DDL 생성
