@@ -1,0 +1,26 @@
+# Production environment configuration
+
+[server]
+host = "0.0.0.0"
+port = 8080
+workers = 8
+
+[database]
+# Production values should be overridden by environment variables
+host = "db.production.local"
+port = 5432
+username = "pacs_user"
+password = "CHANGE_ME"
+database = "pacs_production"
+max_connections = 20
+min_connections = 5
+
+[keycloak]
+url = "https://keycloak.production.local"
+realm = "pacs"
+client_id = "pacs-server"
+client_secret = "CHANGE_ME"
+
+[logging]
+level = "warn"
+format = "json"

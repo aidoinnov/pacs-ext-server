@@ -1,0 +1,29 @@
+# Default configuration
+# These values can be overridden by:
+# 1. config/{environment}.toml
+# 2. .env file
+# 3. Environment variables with APP_ prefix (highest priority)
+
+[server]
+host = "0.0.0.0"
+port = 8080
+workers = 4
+
+[database]
+host = "localhost"
+port = 5432
+username = "admin"
+password = "admin123"
+database = "pacs_db"
+max_connections = 10
+min_connections = 2
+
+[keycloak]
+url = "http://localhost:8080"
+realm = "pacs"
+client_id = "pacs-server"
+client_secret = ""
+
+[logging]
+level = "info"
+format = "json"

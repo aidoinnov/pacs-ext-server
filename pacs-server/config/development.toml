@@ -1,0 +1,25 @@
+# Development environment configuration
+
+[server]
+host = "127.0.0.1"
+port = 8080
+workers = 2
+
+[database]
+host = "localhost"
+port = 5432
+username = "admin"
+password = "admin123"
+database = "pacs_db"
+max_connections = 5
+min_connections = 1
+
+[keycloak]
+url = "http://localhost:8080"
+realm = "pacs-dev"
+client_id = "pacs-server-dev"
+client_secret = "dev-secret"
+
+[logging]
+level = "debug"
+format = "pretty"

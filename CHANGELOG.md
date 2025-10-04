@@ -8,6 +8,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added - 2025-10-04
 
+#### Configuration System
+- 환경변수 우선 설정 시스템 구축
+  - `infrastructure/config/settings.rs` - 계층적 설정 로더
+  - 우선순위: 환경변수 (APP_) > .env > config/{env}.toml > default.toml
+  - `DATABASE_URL` 직접 지정 지원
+  - `config/default.toml` - 기본 설정
+  - `config/development.toml` - 개발 환경
+  - `config/production.toml` - 프로덕션 환경
+  - `.env.example` - 환경변수 예시
+
+#### Repository Layer (Clean Architecture)
+- Domain Layer: Repository Traits (인터페이스)
+  - `UserRepository` - 사용자 레포지토리 인터페이스
+  - `ProjectRepository` - 프로젝트 레포지토리 인터페이스
+  - `RoleRepository` - 역할 레포지토리 인터페이스
+  - `PermissionRepository` - 권한 레포지토리 인터페이스
+  - `AccessLogRepository` - 접근 로그 레포지토리 인터페이스
+
+- Infrastructure Layer: Repository Implementations
+  - `UserRepositoryImpl` - PostgreSQL 구현
+  - `ProjectRepositoryImpl` - PostgreSQL 구현
+  - `RoleRepositoryImpl` - PostgreSQL 구현
+  - `PermissionRepositoryImpl` - PostgreSQL 구현
+  - `AccessLogRepositoryImpl` - PostgreSQL 구현
+
+#### Testing
+- 엔티티 단위 테스트 (22개)
+  - User, Project, Role, Permission, AccessCondition 테스트
+  - Relations, Logs, Viewer, Annotation 테스트
+  - Enum 타입 매핑 테스트
+  - JSON 직렬화/역직렬화 테스트
+
+- 레포지토리 통합 테스트 (16개)
+  - UserRepository: CRUD 및 검색 기능 테스트
+  - ProjectRepository: CRUD, 활성화 상태 관리 테스트
+  - RoleRepository: CRUD, scope별 조회 테스트
+  - PermissionRepository: CRUD, 리소스별 조회 테스트
+  - AccessLogRepository: 로그 생성, 조회, 카운트 테스트
+  - PostgreSQL 실제 DB 연동 테스트
+  - 외래키 제약 고려한 cleanup 로직
+
 #### Infrastructure
 - PostgreSQL 데이터베이스 스키마 설계 및 DDL 생성
   - Security Schema: 사용자, 프로젝트, 역할, 권한 관리
@@ -41,6 +82,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - chrono 0.4 (날짜/시간 처리)
 - uuid 1.x (UUID 타입)
 - serde + serde_json (직렬화/역직렬화)
+- async-trait 0.1 (비동기 trait 지원)
+- config 0.14 (계층적 설정 관리)
+- dotenvy 0.15 (.env 파일 지원)
+- tokio-test 0.4 (비동기 테스트 지원)
 
 #### Documentation
 - `CLAUDE.md` - 프로젝트 개요 및 개발 가이드 (한글)
