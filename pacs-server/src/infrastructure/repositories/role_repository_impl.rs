@@ -105,4 +105,8 @@ impl RoleRepository for RoleRepositoryImpl {
 
         Ok(result.rows_affected() > 0)
     }
+
+    fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 }

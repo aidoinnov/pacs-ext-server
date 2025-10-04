@@ -27,3 +27,7 @@ client_secret = ""
 [logging]
 level = "info"
 format = "json"
+
+[jwt]
+secret = "your-secret-key-change-this-in-production"
+expiration_hours = 24

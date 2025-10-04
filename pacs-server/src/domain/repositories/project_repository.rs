@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use sqlx::PgPool;
 use crate::domain::entities::{Project, NewProject};
 
 #[async_trait]
@@ -11,4 +12,5 @@ pub trait ProjectRepository: Send + Sync {
     async fn update(&self, id: i32, new_project: NewProject) -> Result<Option<Project>, sqlx::Error>;
     async fn set_active(&self, id: i32, is_active: bool) -> Result<bool, sqlx::Error>;
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;
+    fn pool(&self) -> &PgPool;
 }

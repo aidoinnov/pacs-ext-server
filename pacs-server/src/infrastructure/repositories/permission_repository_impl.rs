@@ -80,4 +80,8 @@ impl PermissionRepository for PermissionRepositoryImpl {
 
         Ok(result.rows_affected() > 0)
     }
+
+    fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 }

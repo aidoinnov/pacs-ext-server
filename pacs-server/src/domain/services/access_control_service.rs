@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use crate::domain::entities::{AccessLog, NewAccessLog};
-use crate::domain::repositories::{AccessLogRepository, UserRepository, ProjectRepository};
+use crate::domain::entities::{AccessLog, NewAccessLog, Permission};
+use crate::domain::repositories::{AccessLogRepository, UserRepository, ProjectRepository, RoleRepository, PermissionRepository};
 use super::user_service::ServiceError;
 
 /// 접근 제어 및 로깅 도메인 서비스
@@ -36,40 +36,77 @@ pub trait AccessControlService: Send + Sync {
 
     /// 사용자가 프로젝트에 접근 가능한지 확인
     async fn can_access_project(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError>;
+
+    // === 권한 검증 ===
+
+    /// 사용자가 특정 권한을 가지고 있는지 확인 (프로젝트 컨텍스트)
+    async fn check_permission(
+        &self,
+        user_id: i32,
+        project_id: i32,
+        resource_type: &str,
+        action: &str,
+    ) -> Result<bool, ServiceError>;
+
+    /// 사용자가 가진 모든 권한 조회 (프로젝트 컨텍스트)
+    async fn get_user_permissions(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<Vec<Permission>, ServiceError>;
+
+    /// 사용자가 프로젝트의 멤버인지 확인
+    async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError>;
 }
 
-pub struct AccessControlServiceImpl<A, U, P>
+pub struct AccessControlServiceImpl<A, U, P, R, PE>
 where
     A: AccessLogRepository,
     U: UserRepository,
     P: ProjectRepository,
+    R: RoleRepository,
+    PE: PermissionRepository,
 {
     access_log_repository: A,
     user_repository: U,
     project_repository: P,
+    role_repository: R,
+    permission_repository: PE,
 }
 
-impl<A, U, P> AccessControlServiceImpl<A, U, P>
+impl<A, U, P, R, PE> AccessControlServiceImpl<A, U, P, R, PE>
 where
     A: AccessLogRepository,
     U: UserRepository,
     P: ProjectRepository,
+    R: RoleRepository,
+    PE: PermissionRepository,
 {
-    pub fn new(access_log_repository: A, user_repository: U, project_repository: P) -> Self {
+    pub fn new(
+        access_log_repository: A,
+        user_repository: U,
+        project_repository: P,
+        role_repository: R,
+        permission_repository: PE,
+    ) -> Self {
         Self {
             access_log_repository,
             user_repository,
             project_repository,
+            role_repository,
+            permission_repository,
         }
     }
 }
 
 #[async_trait]
-impl<A, U, P> AccessControlService for AccessControlServiceImpl<A, U, P>
+impl<A, U, P, R, PE> AccessControlService for AccessControlServiceImpl<A, U, P, R, PE>
 where
     A: AccessLogRepository,
     U: UserRepository,
     P: ProjectRepository,
+    R: RoleRepository,
+    PE: PermissionRepository,
 {
     async fn log_dicom_access(
         &self,
@@ -163,10 +200,131 @@ where
             return Ok(false);
         }
 
-        // TODO: 실제로는 security_user_project 테이블을 확인하여
-        // 사용자가 프로젝트의 멤버인지 확인해야 함
-        // 현재는 프로젝트가 활성화되어 있으면 접근 가능한 것으로 단순화
+        // security_user_project 테이블을 확인하여 사용자가 프로젝트의 멤버인지 확인
+        self.is_project_member(user_id, project_id).await
+    }
 
-        Ok(true)
+    // === 권한 검증 구현 ===
+
+    async fn check_permission(
+        &self,
+        user_id: i32,
+        project_id: i32,
+        resource_type: &str,
+        action: &str,
+    ) -> Result<bool, ServiceError> {
+        // 사용자 존재 확인
+        if self.user_repository.find_by_id(user_id).await?.is_none() {
+            return Err(ServiceError::NotFound("User not found".into()));
+        }
+
+        // 프로젝트 존재 확인
+        if self.project_repository.find_by_id(project_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Project not found".into()));
+        }
+
+        // 권한 존재 확인
+        let permission = match self.permission_repository
+            .find_by_resource_and_action(resource_type, action)
+            .await?
+        {
+            Some(perm) => perm,
+            None => return Ok(false), // 권한 자체가 정의되지 않음
+        };
+
+        // 사용자가 프로젝트의 멤버인지 확인
+        if !self.is_project_member(user_id, project_id).await? {
+            return Ok(false);
+        }
+
+        // 사용자의 역할을 통해 권한 확인
+        // 1. 사용자 → 프로젝트 → 역할 → 권한 경로
+        let has_permission = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM security_user_project up
+             INNER JOIN security_project_role pr ON up.project_id = pr.project_id
+             INNER JOIN security_role_permission rp ON pr.role_id = rp.role_id
+             WHERE up.user_id = $1 AND up.project_id = $2 AND rp.permission_id = $3"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(permission.id)
+        .fetch_one(self.user_repository.pool())
+        .await?;
+
+        if has_permission > 0 {
+            return Ok(true);
+        }
+
+        // 2. 프로젝트에 직접 할당된 권한 확인
+        let project_permission = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM security_project_permission pp
+             INNER JOIN security_user_project up ON pp.project_id = up.project_id
+             WHERE up.user_id = $1 AND pp.project_id = $2 AND pp.permission_id = $3"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(permission.id)
+        .fetch_one(self.user_repository.pool())
+        .await?;
+
+        Ok(project_permission > 0)
+    }
+
+    async fn get_user_permissions(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<Vec<Permission>, ServiceError> {
+        // 사용자 존재 확인
+        if self.user_repository.find_by_id(user_id).await?.is_none() {
+            return Err(ServiceError::NotFound("User not found".into()));
+        }
+
+        // 프로젝트 존재 확인
+        if self.project_repository.find_by_id(project_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Project not found".into()));
+        }
+
+        // 사용자가 프로젝트의 멤버인지 확인
+        if !self.is_project_member(user_id, project_id).await? {
+            return Err(ServiceError::Unauthorized("User is not a member of this project".into()));
+        }
+
+        // 사용자가 프로젝트에서 가진 모든 권한 조회 (역할을 통한 권한 + 프로젝트 직접 권한)
+        let permissions = sqlx::query_as::<_, Permission>(
+            "SELECT DISTINCT p.id, p.resource_type, p.action
+             FROM security_permission p
+             WHERE p.id IN (
+                 -- 역할을 통한 권한
+                 SELECT rp.permission_id FROM security_user_project up
+                 INNER JOIN security_project_role pr ON up.project_id = pr.project_id
+                 INNER JOIN security_role_permission rp ON pr.role_id = rp.role_id
+                 WHERE up.user_id = $1 AND up.project_id = $2
+                 UNION
+                 -- 프로젝트 직접 권한
+                 SELECT pp.permission_id FROM security_project_permission pp
+                 INNER JOIN security_user_project up ON pp.project_id = up.project_id
+                 WHERE up.user_id = $1 AND pp.project_id = $2
+             )
+             ORDER BY p.resource_type, p.action"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_all(self.user_repository.pool())
+        .await?;
+
+        Ok(permissions)
+    }
+
+    async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError> {
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1 AND project_id = $2"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_one(self.user_repository.pool())
+        .await?;
+
+        Ok(count > 0)
     }
 }

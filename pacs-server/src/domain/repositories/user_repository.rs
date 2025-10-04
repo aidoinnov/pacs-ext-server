@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use uuid::Uuid;
+use sqlx::PgPool;
 use crate::domain::entities::{User, NewUser};
 
 #[async_trait]
@@ -11,4 +12,5 @@ pub trait UserRepository: Send + Sync {
     async fn find_all(&self) -> Result<Vec<User>, sqlx::Error>;
     async fn create(&self, new_user: NewUser) -> Result<User, sqlx::Error>;
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;
+    fn pool(&self) -> &PgPool;
 }

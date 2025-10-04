@@ -8,6 +8,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added - 2025-10-04
 
+#### Service Layer Extensions (Domain Services - Phase 2)
+- **UserService 확장** - 프로젝트 멤버십 관리 (4개 메서드)
+  - `add_user_to_project()` - 프로젝트에 사용자 추가 (중복 검증)
+  - `remove_user_from_project()` - 프로젝트에서 사용자 제거
+  - `get_user_projects()` - 사용자가 속한 프로젝트 목록 조회
+  - `is_project_member()` - 프로젝트 멤버십 확인
+  - `security_user_project` 테이블 연동
+
+- **ProjectService 확장** - 역할 및 멤버 관리 (5개 메서드)
+  - `get_project_members()` - 프로젝트 멤버 목록 조회 (JOIN)
+  - `count_project_members()` - 프로젝트 멤버 수 조회
+  - `assign_role_to_project()` - 프로젝트에 역할 할당 (중복 검증)
+  - `remove_role_from_project()` - 프로젝트에서 역할 제거
+  - `get_project_roles()` - 프로젝트에 할당된 역할 목록 조회
+  - `security_project_role` 테이블 연동
+
+- **PermissionService 확장** - 권한 할당 관리 (6개 메서드)
+  - `assign_permission_to_role()` - 역할에 권한 할당 (중복 검증)
+  - `remove_permission_from_role()` - 역할에서 권한 제거
+  - `get_role_permissions()` - 역할이 가진 권한 목록 조회
+  - `assign_permission_to_project()` - 프로젝트에 권한 직접 할당
+  - `remove_permission_from_project()` - 프로젝트에서 권한 제거
+  - `get_project_permissions()` - 프로젝트에 할당된 권한 목록 조회
+  - `security_role_permission`, `security_project_permission` 테이블 연동
+
+- **AuthService 신규 생성** - JWT 통합 인증 서비스 (4개 메서드)
+  - `login()` - Keycloak ID 기반 로그인 (자동 사용자 생성)
+  - `verify_and_get_user()` - JWT 토큰 검증 및 사용자 조회
+  - `refresh_token()` - 토큰 갱신 (24시간 유효기간)
+  - `logout()` - 로그아웃 처리
+  - JwtService 통합, Claims 기반 사용자 정보 관리
+  - AuthResponse DTO 추가 (user + token)
+
+- **AccessControlService 확장** - 실제 권한 검증 시스템 (3개 메서드)
+  - `check_permission()` - 사용자의 특정 권한 보유 여부 확인
+    - 역할을 통한 권한 (User → Project → Role → Permission)
+    - 프로젝트 직접 권한 (User → Project → Permission)
+  - `get_user_permissions()` - 사용자가 프로젝트에서 가진 모든 권한 조회
+    - 역할 권한 + 프로젝트 직접 권한 통합 조회 (UNION)
+  - `is_project_member()` - 프로젝트 멤버십 확인
+  - `can_access_project()` - 실제 멤버십 확인으로 업데이트
+
+#### Repository Extensions
+- **모든 Repository에 `pool()` 메서드 추가**
+  - `UserRepository::pool()` - PgPool 접근
+  - `ProjectRepository::pool()` - PgPool 접근
+  - `RoleRepository::pool()` - PgPool 접근
+  - `PermissionRepository::pool()` - PgPool 접근
+  - Service에서 직접 SQL 쿼리 실행 가능 (관계 테이블 연동)
+
+#### Authentication & JWT
+- JWT 환경변수 설정 (`JWT_SECRET`, `JWT_EXPIRATION_HOURS`)
+- JwtConfig 계층적 설정 (ENV > .env > TOML)
+- Claims 구조체: user_id, keycloak_id, username, email, exp
+- JwtService: 토큰 생성, 검증, Bearer 추출
+- AuthMiddleware: HTTP 요청 인증 미들웨어
+
+### Added - 2025-10-04 (Phase 1)
+
 #### Configuration System
 - 환경변수 우선 설정 시스템 구축
   - `infrastructure/config/settings.rs` - 계층적 설정 로더
@@ -126,11 +185,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `pacs-server/README.md` - Rust 서버 클린 아키텍처 설명
 
 ### Changed
-- `security_user_project_role` 테이블을 `security_user_project`와 `security_project_role`로 분리
-- 모든 테이블에 `created_at` 타임스탬프 추가
-- `security_role`에 `scope` 필드 추가 (GLOBAL/PROJECT)
-- `security_access_condition`에 `resource_level` 필드 추가
-- `security_project_permission`에 `inherits_from_role_permission` 플래그 추가
+- **Service Layer 확장** (Phase 2)
+  - UserService: ProjectRepository 의존성 추가
+  - ProjectService: UserRepository, RoleRepository 의존성 추가
+  - PermissionService: 권한 할당 비즈니스 로직 추가
+  - AccessControlService: RoleRepository, PermissionRepository 의존성 추가
+  - 모든 Repository trait에 `pool()` 메서드 추가
+
+- **Database Schema** (Phase 1)
+  - `security_user_project_role` 테이블을 `security_user_project`와 `security_project_role`로 분리
+  - 모든 테이블에 `created_at` 타임스탬프 추가
+  - `security_role`에 `scope` 필드 추가 (GLOBAL/PROJECT)
+  - `security_access_condition`에 `resource_level` 필드 추가
+  - `security_project_permission`에 `inherits_from_role_permission` 플래그 추가
 
 ### Technical Details
 

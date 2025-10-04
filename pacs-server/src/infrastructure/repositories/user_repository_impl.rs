@@ -91,4 +91,8 @@ impl UserRepository for UserRepositoryImpl {
 
         Ok(result.rows_affected() > 0)
     }
+
+    fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 }

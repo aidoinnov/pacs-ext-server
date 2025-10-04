@@ -1,0 +1,119 @@
+use async_trait::async_trait;
+use uuid::Uuid;
+use crate::domain::entities::User;
+use crate::domain::repositories::UserRepository;
+use crate::infrastructure::auth::{JwtService, Claims};
+use super::user_service::ServiceError;
+
+/// 인증 도메인 서비스
+#[async_trait]
+pub trait AuthService: Send + Sync {
+    /// 사용자 로그인 (Keycloak ID로)
+    async fn login(&self, keycloak_id: Uuid, username: String, email: String) -> Result<AuthResponse, ServiceError>;
+
+    /// 토큰 검증 및 사용자 조회
+    async fn verify_and_get_user(&self, token: &str) -> Result<User, ServiceError>;
+
+    /// 토큰 갱신
+    async fn refresh_token(&self, user: &User) -> Result<String, ServiceError>;
+
+    /// 로그아웃 (토큰 무효화) - 현재는 단순히 성공 반환
+    async fn logout(&self, _token: &str) -> Result<(), ServiceError>;
+}
+
+pub struct AuthServiceImpl<U: UserRepository> {
+    user_repository: U,
+    jwt_service: JwtService,
+}
+
+impl<U: UserRepository> AuthServiceImpl<U> {
+    pub fn new(user_repository: U, jwt_service: JwtService) -> Self {
+        Self {
+            user_repository,
+            jwt_service,
+        }
+    }
+}
+
+#[async_trait]
+impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
+    async fn login(&self, keycloak_id: Uuid, username: String, email: String) -> Result<AuthResponse, ServiceError> {
+        // 기존 사용자 확인
+        let user = match self.user_repository.find_by_keycloak_id(keycloak_id).await? {
+            Some(user) => user,
+            None => {
+                // 사용자가 없으면 생성
+                let new_user = crate::domain::entities::NewUser {
+                    keycloak_id,
+                    username,
+                    email,
+                };
+                self.user_repository.create(new_user).await?
+            }
+        };
+
+        // JWT 토큰 생성
+        let claims = Claims::new(
+            user.id,
+            user.keycloak_id,
+            user.username.clone(),
+            user.email.clone(),
+            24, // 24시간 유효
+        );
+
+        let token = self.jwt_service
+            .create_token(&claims)
+            .map_err(|e| ServiceError::Unauthorized(format!("Failed to create token: {}", e)))?;
+
+        Ok(AuthResponse { user, token })
+    }
+
+    async fn verify_and_get_user(&self, token: &str) -> Result<User, ServiceError> {
+        // 토큰 검증
+        let claims = self.jwt_service
+            .validate_token(token)
+            .map_err(|e| ServiceError::Unauthorized(format!("Invalid token: {}", e)))?;
+
+        // Claims의 만료 여부 확인
+        if claims.is_expired() {
+            return Err(ServiceError::Unauthorized("Token has expired".into()));
+        }
+
+        // 사용자 ID로 사용자 조회
+        let user_id = claims.user_id()
+            .map_err(|e| ServiceError::ValidationError(format!("Invalid user ID in token: {}", e)))?;
+
+        self.user_repository
+            .find_by_id(user_id)
+            .await?
+            .ok_or(ServiceError::NotFound("User not found".into()))
+    }
+
+    async fn refresh_token(&self, user: &User) -> Result<String, ServiceError> {
+        // 새로운 토큰 생성
+        let claims = Claims::new(
+            user.id,
+            user.keycloak_id,
+            user.username.clone(),
+            user.email.clone(),
+            24, // 24시간 유효
+        );
+
+        self.jwt_service
+            .create_token(&claims)
+            .map_err(|e| ServiceError::Unauthorized(format!("Failed to refresh token: {}", e)))
+    }
+
+    async fn logout(&self, _token: &str) -> Result<(), ServiceError> {
+        // 실제 구현에서는 토큰 블랙리스트에 추가하거나 Redis 등에서 세션 제거
+        // 현재는 단순히 성공 반환
+        Ok(())
+    }
+}
+
+/// 인증 응답
+#[derive(Debug)]
+pub struct AuthResponse {
+    pub user: User,
+    pub token: String,
+}

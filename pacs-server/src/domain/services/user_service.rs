@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
-use crate::domain::entities::{User, NewUser};
-use crate::domain::repositories::UserRepository;
+use crate::domain::entities::{User, NewUser, Project};
+use crate::domain::repositories::{UserRepository, ProjectRepository};
 
 /// 사용자 관리 도메인 서비스
 #[async_trait]
@@ -23,20 +23,50 @@ pub trait UserService: Send + Sync {
 
     /// 사용자 존재 여부 확인
     async fn user_exists(&self, keycloak_id: Uuid) -> Result<bool, ServiceError>;
+
+    // === 프로젝트 멤버십 관리 ===
+
+    /// 사용자를 프로젝트에 추가
+    async fn add_user_to_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError>;
+
+    /// 프로젝트에서 사용자 제거
+    async fn remove_user_from_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError>;
+
+    /// 사용자가 속한 프로젝트 목록 조회
+    async fn get_user_projects(&self, user_id: i32) -> Result<Vec<Project>, ServiceError>;
+
+    /// 사용자가 프로젝트 멤버인지 확인
+    async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError>;
 }
 
-pub struct UserServiceImpl<R: UserRepository> {
-    user_repository: R,
+pub struct UserServiceImpl<U, P>
+where
+    U: UserRepository,
+    P: ProjectRepository,
+{
+    user_repository: U,
+    project_repository: P,
 }
 
-impl<R: UserRepository> UserServiceImpl<R> {
-    pub fn new(user_repository: R) -> Self {
-        Self { user_repository }
+impl<U, P> UserServiceImpl<U, P>
+where
+    U: UserRepository,
+    P: ProjectRepository,
+{
+    pub fn new(user_repository: U, project_repository: P) -> Self {
+        Self {
+            user_repository,
+            project_repository,
+        }
     }
 }
 
 #[async_trait]
-impl<R: UserRepository> UserService for UserServiceImpl<R> {
+impl<U, P> UserService for UserServiceImpl<U, P>
+where
+    U: UserRepository,
+    P: ProjectRepository,
+{
     async fn create_user(&self, username: String, email: String, keycloak_id: Uuid) -> Result<User, ServiceError> {
         // 중복 체크
         if let Some(_) = self.user_repository.find_by_keycloak_id(keycloak_id).await? {
@@ -93,6 +123,84 @@ impl<R: UserRepository> UserService for UserServiceImpl<R> {
 
     async fn user_exists(&self, keycloak_id: Uuid) -> Result<bool, ServiceError> {
         Ok(self.user_repository.find_by_keycloak_id(keycloak_id).await?.is_some())
+    }
+
+    // === 프로젝트 멤버십 관리 구현 ===
+
+    async fn add_user_to_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError> {
+        // 사용자 존재 확인
+        if self.user_repository.find_by_id(user_id).await?.is_none() {
+            return Err(ServiceError::NotFound("User not found".into()));
+        }
+
+        // 프로젝트 존재 확인
+        if self.project_repository.find_by_id(project_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Project not found".into()));
+        }
+
+        // 이미 멤버인지 확인
+        if self.is_project_member(user_id, project_id).await? {
+            return Err(ServiceError::AlreadyExists("User is already a member of this project".into()));
+        }
+
+        // security_user_project 테이블에 추가
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .execute(self.user_repository.pool())
+        .await?;
+
+        Ok(())
+    }
+
+    async fn remove_user_from_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError> {
+        let result = sqlx::query(
+            "DELETE FROM security_user_project WHERE user_id = $1 AND project_id = $2"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .execute(self.user_repository.pool())
+        .await?;
+
+        if result.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(ServiceError::NotFound("User is not a member of this project".into()))
+        }
+    }
+
+    async fn get_user_projects(&self, user_id: i32) -> Result<Vec<Project>, ServiceError> {
+        // 사용자 존재 확인
+        if self.user_repository.find_by_id(user_id).await?.is_none() {
+            return Err(ServiceError::NotFound("User not found".into()));
+        }
+
+        let projects = sqlx::query_as::<_, Project>(
+            "SELECT p.id, p.name, p.description, p.is_active, p.created_at
+             FROM security_project p
+             INNER JOIN security_user_project up ON p.id = up.project_id
+             WHERE up.user_id = $1
+             ORDER BY p.name"
+        )
+        .bind(user_id)
+        .fetch_all(self.user_repository.pool())
+        .await?;
+
+        Ok(projects)
+    }
+
+    async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError> {
+        let result = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1 AND project_id = $2"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_one(self.user_repository.pool())
+        .await?;
+
+        Ok(result > 0)
     }
 }
 

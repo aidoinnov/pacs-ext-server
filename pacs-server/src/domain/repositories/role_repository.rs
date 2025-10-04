@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use sqlx::PgPool;
 use crate::domain::entities::{Role, NewRole};
 
 #[async_trait]
@@ -10,4 +11,5 @@ pub trait RoleRepository: Send + Sync {
     async fn create(&self, new_role: NewRole) -> Result<Role, sqlx::Error>;
     async fn update(&self, id: i32, new_role: NewRole) -> Result<Option<Role>, sqlx::Error>;
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;
+    fn pool(&self) -> &PgPool;
 }

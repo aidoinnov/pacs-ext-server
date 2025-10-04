@@ -8,6 +8,7 @@ pub struct Settings {
     pub database: DatabaseConfig,
     pub keycloak: KeycloakConfig,
     pub logging: LoggingConfig,
+    pub jwt: JwtConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -40,6 +41,12 @@ pub struct KeycloakConfig {
 pub struct LoggingConfig {
     pub level: String,
     pub format: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct JwtConfig {
+    pub secret: String,
+    pub expiration_hours: i64,
 }
 
 impl Settings {
@@ -125,6 +132,10 @@ mod tests {
                 level: "info".to_string(),
                 format: "json".to_string(),
             },
+            jwt: JwtConfig {
+                secret: "test-secret".to_string(),
+                expiration_hours: 24,
+            },
         };
 
         let url = settings.database_url();
@@ -159,6 +170,10 @@ mod tests {
             logging: LoggingConfig {
                 level: "info".to_string(),
                 format: "json".to_string(),
+            },
+            jwt: JwtConfig {
+                secret: "test-secret".to_string(),
+                expiration_hours: 24,
             },
         };
 

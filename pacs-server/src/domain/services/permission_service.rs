@@ -26,6 +26,26 @@ pub trait PermissionService: Send + Sync {
 
     /// Project 역할만 조회
     async fn get_project_roles(&self) -> Result<Vec<Role>, ServiceError>;
+
+    // === 권한 할당 관리 ===
+
+    /// 역할에 권한 할당
+    async fn assign_permission_to_role(&self, role_id: i32, permission_id: i32) -> Result<(), ServiceError>;
+
+    /// 역할에서 권한 제거
+    async fn remove_permission_from_role(&self, role_id: i32, permission_id: i32) -> Result<(), ServiceError>;
+
+    /// 역할에 할당된 모든 권한 조회
+    async fn get_role_permissions(&self, role_id: i32) -> Result<Vec<Permission>, ServiceError>;
+
+    /// 프로젝트에 권한 할당
+    async fn assign_permission_to_project(&self, project_id: i32, permission_id: i32) -> Result<(), ServiceError>;
+
+    /// 프로젝트에서 권한 제거
+    async fn remove_permission_from_project(&self, project_id: i32, permission_id: i32) -> Result<(), ServiceError>;
+
+    /// 프로젝트에 할당된 모든 권한 조회
+    async fn get_project_permissions(&self, project_id: i32) -> Result<Vec<Permission>, ServiceError>;
 }
 
 pub struct PermissionServiceImpl<P: PermissionRepository, R: RoleRepository> {
@@ -96,5 +116,141 @@ impl<P: PermissionRepository, R: RoleRepository> PermissionService for Permissio
 
     async fn get_project_roles(&self) -> Result<Vec<Role>, ServiceError> {
         Ok(self.role_repository.find_by_scope(RoleScope::Project.as_str()).await?)
+    }
+
+    // === 권한 할당 관리 구현 ===
+
+    async fn assign_permission_to_role(&self, role_id: i32, permission_id: i32) -> Result<(), ServiceError> {
+        // 역할 존재 확인
+        if self.role_repository.find_by_id(role_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Role not found".into()));
+        }
+
+        // 권한 존재 확인
+        if self.permission_repository.find_by_id(permission_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Permission not found".into()));
+        }
+
+        // 이미 할당되었는지 확인
+        let exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM security_role_permission WHERE role_id = $1 AND permission_id = $2"
+        )
+        .bind(role_id)
+        .bind(permission_id)
+        .fetch_one(self.role_repository.pool())
+        .await?;
+
+        if exists > 0 {
+            return Err(ServiceError::AlreadyExists("Permission already assigned to this role".into()));
+        }
+
+        // security_role_permission 테이블에 추가
+        sqlx::query(
+            "INSERT INTO security_role_permission (role_id, permission_id) VALUES ($1, $2)"
+        )
+        .bind(role_id)
+        .bind(permission_id)
+        .execute(self.role_repository.pool())
+        .await?;
+
+        Ok(())
+    }
+
+    async fn remove_permission_from_role(&self, role_id: i32, permission_id: i32) -> Result<(), ServiceError> {
+        let result = sqlx::query(
+            "DELETE FROM security_role_permission WHERE role_id = $1 AND permission_id = $2"
+        )
+        .bind(role_id)
+        .bind(permission_id)
+        .execute(self.role_repository.pool())
+        .await?;
+
+        if result.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(ServiceError::NotFound("Permission is not assigned to this role".into()))
+        }
+    }
+
+    async fn get_role_permissions(&self, role_id: i32) -> Result<Vec<Permission>, ServiceError> {
+        // 역할 존재 확인
+        if self.role_repository.find_by_id(role_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Role not found".into()));
+        }
+
+        let permissions = sqlx::query_as::<_, Permission>(
+            "SELECT p.id, p.resource_type, p.action
+             FROM security_permission p
+             INNER JOIN security_role_permission rp ON p.id = rp.permission_id
+             WHERE rp.role_id = $1
+             ORDER BY p.resource_type, p.action"
+        )
+        .bind(role_id)
+        .fetch_all(self.role_repository.pool())
+        .await?;
+
+        Ok(permissions)
+    }
+
+    async fn assign_permission_to_project(&self, project_id: i32, permission_id: i32) -> Result<(), ServiceError> {
+        // 권한 존재 확인
+        if self.permission_repository.find_by_id(permission_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Permission not found".into()));
+        }
+
+        // 이미 할당되었는지 확인
+        let exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM security_project_permission WHERE project_id = $1 AND permission_id = $2"
+        )
+        .bind(project_id)
+        .bind(permission_id)
+        .fetch_one(self.permission_repository.pool())
+        .await?;
+
+        if exists > 0 {
+            return Err(ServiceError::AlreadyExists("Permission already assigned to this project".into()));
+        }
+
+        // security_project_permission 테이블에 추가
+        sqlx::query(
+            "INSERT INTO security_project_permission (project_id, permission_id) VALUES ($1, $2)"
+        )
+        .bind(project_id)
+        .bind(permission_id)
+        .execute(self.permission_repository.pool())
+        .await?;
+
+        Ok(())
+    }
+
+    async fn remove_permission_from_project(&self, project_id: i32, permission_id: i32) -> Result<(), ServiceError> {
+        let result = sqlx::query(
+            "DELETE FROM security_project_permission WHERE project_id = $1 AND permission_id = $2"
+        )
+        .bind(project_id)
+        .bind(permission_id)
+        .execute(self.permission_repository.pool())
+        .await?;
+
+        if result.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(ServiceError::NotFound("Permission is not assigned to this project".into()))
+        }
+    }
+
+    async fn get_project_permissions(&self, project_id: i32) -> Result<Vec<Permission>, ServiceError> {
+        let permissions = sqlx::query_as::<_, Permission>(
+            "SELECT p.id, p.resource_type, p.action
+             FROM security_permission p
+             INNER JOIN security_project_permission pp ON p.id = pp.permission_id
+             WHERE pp.project_id = $1
+             ORDER BY p.resource_type, p.action"
+        )
+        .bind(project_id)
+        .fetch_all(self.permission_repository.pool())
+        .await?;
+
+        Ok(permissions)
     }
 }
