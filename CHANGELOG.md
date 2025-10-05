@@ -6,6 +6,110 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-10-05
+
+#### Presentation Layer - HTTP Controllers (25 통합 테스트)
+- **AuthController** (`/auth`) - 인증 API (3개 테스트)
+  - `POST /auth/login` - Keycloak ID 기반 로그인
+  - `POST /auth/verify` - JWT 토큰 검증
+  - 자동 사용자 생성, JWT 토큰 발급
+
+- **UserController** (`/users`) - 사용자 관리 API (5개 테스트)
+  - `POST /users` - 사용자 생성
+  - `GET /users/{id}` - ID로 사용자 조회
+  - `GET /users/username/{username}` - Username으로 조회
+  - 중복 검증, 이메일 유효성 검사
+
+- **ProjectController** (`/projects`) - 프로젝트 관리 API (5개 테스트)
+  - `POST /projects` - 프로젝트 생성
+  - `GET /projects/{id}` - 프로젝트 조회
+  - `GET /projects` - 전체 프로젝트 목록
+  - `GET /projects/active` - 활성 프로젝트만 조회
+  - 프로젝트명 중복 검증
+
+- **PermissionController** (`/roles`) - 역할 관리 API (5개 테스트)
+  - `POST /roles` - 역할 생성 (Global/Project scope)
+  - `GET /roles/{id}` - 역할 조회
+  - `GET /roles/global` - 글로벌 역할 목록
+  - `GET /roles/project` - 프로젝트 역할 목록
+  - Scope별 역할 조회
+
+- **AccessControlController** (`/access-control`) - 접근 제어 API (7개 테스트)
+  - `POST /access-control/logs` - DICOM 접근 로그 기록
+  - `GET /access-control/logs/user/{user_id}` - 사용자별 접근 로그
+  - `GET /access-control/logs/project/{project_id}` - 프로젝트별 접근 로그
+  - `GET /access-control/logs/study/{study_uid}` - Study별 접근 로그
+  - `POST /access-control/permissions/check` - 권한 확인
+  - `GET /access-control/permissions/user/{user_id}/project/{project_id}` - 사용자 권한 목록
+  - `GET /access-control/access/user/{user_id}/project/{project_id}` - 프로젝트 접근 가능 여부
+
+#### Application Layer - Use Cases
+- **AuthUseCase** - 인증 유스케이스
+  - `login()`, `verify_token()`, `refresh_token()`, `logout()`
+
+- **UserUseCase** - 사용자 유스케이스
+  - `create_user()`, `get_user_by_id()`, `get_user_by_username()`
+  - `delete_user()`, `add_project_member()`, `remove_project_member()`
+  - `get_user_projects()`, `is_project_member()`
+
+- **ProjectUseCase** - 프로젝트 유스케이스
+  - `create_project()`, `get_project()`, `get_all_projects()`, `get_active_projects()`
+  - `activate_project()`, `deactivate_project()`, `delete_project()`
+  - `get_project_members()`, `assign_role()`, `remove_role()`, `get_project_roles()`
+
+- **PermissionUseCase** - 권한 유스케이스
+  - `create_role()`, `get_role()`, `get_global_roles()`, `get_project_roles()`
+  - `assign_permission_to_role()`, `remove_permission_from_role()`, `get_role_permissions()`
+  - `assign_permission_to_project()`, `remove_permission_from_project()`, `get_project_permissions()`
+  - `get_permissions_for_resource()`
+
+- **AccessControlUseCase** - 접근 제어 유스케이스
+  - `log_dicom_access()`, `get_user_access_logs()`, `get_project_access_logs()`, `get_study_access_logs()`
+  - `check_permission()`, `get_user_permissions()`, `can_access_project()`
+
+#### Application Layer - DTOs
+- **auth_dto.rs** - 인증 DTO
+  - LoginRequest, LoginResponse, VerifyTokenResponse
+  - RefreshTokenRequest, RefreshTokenResponse
+
+- **user_dto.rs** - 사용자 DTO
+  - CreateUserRequest, UpdateUserRequest, UserResponse, UserListResponse
+  - AddProjectMemberRequest, UserProjectsResponse, ProjectSummary
+
+- **project_dto.rs** - 프로젝트 DTO
+  - CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse
+  - ProjectAssignRoleRequest, ProjectMembersResponse, MemberInfo
+  - ProjectRolesResponse, RoleInfo
+
+- **permission_dto.rs** - 권한 DTO
+  - CreateRoleRequest, RoleResponse, PermissionResponse
+  - AssignPermissionRequest, RolePermissionsResponse
+  - ProjectPermissionsResponse, ResourcePermissionsResponse
+
+- **access_control_dto.rs** - 접근 제어 DTO
+  - LogDicomAccessRequest, AccessLogResponse, AccessLogListResponse
+  - CheckPermissionRequest, CheckPermissionResponse
+  - UserPermissionsResponse, PermissionInfo, ProjectAccessResponse
+
+#### Infrastructure - HTTP Server Setup
+- **main.rs** - Actix-web HTTP 서버 구성
+  - PostgreSQL 연결 풀 설정 (최대 5개 연결)
+  - Repository → Service → UseCase 의존성 주입
+  - 5개 컨트롤러 라우팅 설정
+  - JWT 서비스 통합
+  - Health check 엔드포인트 (`GET /health`)
+
+#### Dependencies
+- actix-web 4.9 - HTTP 웹 프레임워크
+- actix-rt 2.10 - Actix 런타임
+- actix-http 3 - HTTP 타입 (dev-dependencies)
+
+#### Repository Improvements
+- **Clone 트레잇 구현** - Repository 재사용성 개선
+  - UserRepositoryImpl, ProjectRepositoryImpl
+  - RoleRepositoryImpl, PermissionRepositoryImpl
+  - Service layer에서 Repository 복제 가능
+
 ### Changed - 2025-10-05
 
 #### Database Transaction Improvements

@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::domain::entities::{User, NewUser};
 use crate::domain::repositories::UserRepository;
 
+#[derive(Clone)]
 pub struct UserRepositoryImpl {
     pool: PgPool,
 }

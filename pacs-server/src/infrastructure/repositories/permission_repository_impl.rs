@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use crate::domain::entities::{Permission, NewPermission};
 use crate::domain::repositories::PermissionRepository;
 
+#[derive(Clone)]
 pub struct PermissionRepositoryImpl {
     pool: PgPool,
 }

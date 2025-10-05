@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use crate::domain::entities::{Project, NewProject};
 use crate::domain::repositories::ProjectRepository;
 
+#[derive(Clone)]
 pub struct ProjectRepositoryImpl {
     pool: PgPool,
 }

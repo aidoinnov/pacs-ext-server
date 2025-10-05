@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 async fn get_test_pool() -> PgPool {
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:password@localhost:5432/pacs_db".to_string());
+        .unwrap_or_else(|_| "postgres://admin:admin123@localhost:5432/pacs_db".to_string());
 
     PgPool::connect(&database_url)
         .await
@@ -26,6 +26,7 @@ async fn get_test_pool() -> PgPool {
 }
 
 async fn cleanup_test_data(pool: &PgPool) {
+    // 관계 테이블 먼저 삭제 (FK 제약)
     sqlx::query("DELETE FROM security_access_log").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_user_project").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_project_role").execute(pool).await.unwrap();
@@ -33,9 +34,12 @@ async fn cleanup_test_data(pool: &PgPool) {
     sqlx::query("DELETE FROM security_project_permission").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_role_access_condition").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_project_access_condition").execute(pool).await.unwrap();
+
+    // 기본 엔티티 테이블 삭제
     sqlx::query("DELETE FROM security_user").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_project").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_role").execute(pool).await.unwrap();
+    sqlx::query("DELETE FROM security_permission").execute(pool).await.unwrap();
 }
 
 // ========================================
@@ -48,7 +52,8 @@ async fn test_user_service_create_user() {
     cleanup_test_data(&pool).await;
 
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
 
     let keycloak_id = Uuid::new_v4();
     let user = user_service
@@ -69,7 +74,8 @@ async fn test_user_service_duplicate_keycloak_id() {
     cleanup_test_data(&pool).await;
 
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
 
     let keycloak_id = Uuid::new_v4();
     user_service
@@ -93,7 +99,8 @@ async fn test_user_service_duplicate_username() {
     cleanup_test_data(&pool).await;
 
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
 
     user_service
         .create_user("duplicate".to_string(), "user1@example.com".to_string(), Uuid::new_v4())
@@ -116,7 +123,8 @@ async fn test_user_service_invalid_email() {
     cleanup_test_data(&pool).await;
 
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
 
     let result = user_service
         .create_user("testuser".to_string(), "invalid-email".to_string(), Uuid::new_v4())
@@ -133,7 +141,8 @@ async fn test_user_service_get_user_by_id() {
     cleanup_test_data(&pool).await;
 
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
 
     let created = user_service
         .create_user("testuser".to_string(), "test@example.com".to_string(), Uuid::new_v4())
@@ -153,7 +162,8 @@ async fn test_user_service_get_user_by_username() {
     cleanup_test_data(&pool).await;
 
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
 
     user_service
         .create_user("findme".to_string(), "test@example.com".to_string(), Uuid::new_v4())
@@ -172,7 +182,8 @@ async fn test_user_service_delete_user() {
     cleanup_test_data(&pool).await;
 
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
 
     let user = user_service
         .create_user("deleteme".to_string(), "delete@example.com".to_string(), Uuid::new_v4())
@@ -193,7 +204,8 @@ async fn test_user_service_user_exists() {
     cleanup_test_data(&pool).await;
 
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
 
     let keycloak_id = Uuid::new_v4();
     user_service
@@ -220,7 +232,9 @@ async fn test_project_service_create_project() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     let project = project_service
         .create_project("Test Project".to_string(), Some("Description".to_string()))
@@ -240,7 +254,9 @@ async fn test_project_service_duplicate_name() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     project_service
         .create_project("Duplicate".to_string(), None)
@@ -262,7 +278,9 @@ async fn test_project_service_empty_name() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     let result = project_service
         .create_project("   ".to_string(), None)
@@ -279,7 +297,9 @@ async fn test_project_service_name_too_long() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     let long_name = "x".repeat(256);
     let result = project_service
@@ -297,7 +317,9 @@ async fn test_project_service_get_project() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     let created = project_service
         .create_project("Get Test".to_string(), None)
@@ -317,7 +339,9 @@ async fn test_project_service_get_project_by_name() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     project_service
         .create_project("FindByName".to_string(), None)
@@ -336,7 +360,9 @@ async fn test_project_service_get_all_projects() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     project_service.create_project("Project1".to_string(), None).await.unwrap();
     project_service.create_project("Project2".to_string(), None).await.unwrap();
@@ -354,7 +380,9 @@ async fn test_project_service_activate_deactivate() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     let project = project_service
         .create_project("Toggle".to_string(), None)
@@ -378,7 +406,9 @@ async fn test_project_service_get_active_projects() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     let p1 = project_service.create_project("Active1".to_string(), None).await.unwrap();
     let p2 = project_service.create_project("Active2".to_string(), None).await.unwrap();
@@ -402,7 +432,9 @@ async fn test_project_service_delete_project() {
     cleanup_test_data(&pool).await;
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
 
     let project = project_service
         .create_project("DeleteMe".to_string(), None)
@@ -622,7 +654,8 @@ async fn test_access_control_service_log_dicom_access() {
 
     // 먼저 사용자 생성
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
     let user = user_service
         .create_user("testuser".to_string(), "test@example.com".to_string(), Uuid::new_v4())
         .await
@@ -630,7 +663,9 @@ async fn test_access_control_service_log_dicom_access() {
 
     // 프로젝트 생성
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
     let project = project_service
         .create_project("TestProject".to_string(), None)
         .await
@@ -640,7 +675,9 @@ async fn test_access_control_service_log_dicom_access() {
     let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
     let user_repo2 = UserRepositoryImpl::new(pool.clone());
     let project_repo2 = ProjectRepositoryImpl::new(pool.clone());
-    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo2);
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo2, role_repo, permission_repo);
 
     let log = access_service
         .log_dicom_access(
@@ -671,10 +708,13 @@ async fn test_access_control_service_log_with_invalid_user() {
     let pool = get_test_pool().await;
     cleanup_test_data(&pool).await;
 
-    let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
-    let user_repo = UserRepositoryImpl::new(pool.clone());
-    let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo, project_repo);
+    let access_service = AccessControlServiceImpl::new(
+        AccessLogRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+        PermissionRepositoryImpl::new(pool.clone())
+    );
 
     let result = access_service
         .log_dicom_access(
@@ -703,17 +743,21 @@ async fn test_access_control_service_get_user_access_logs() {
 
     // 사용자 생성
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
     let user = user_service
         .create_user("loguser".to_string(), "log@example.com".to_string(), Uuid::new_v4())
         .await
         .unwrap();
 
     // AccessControlService 생성
-    let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
-    let user_repo2 = UserRepositoryImpl::new(pool.clone());
-    let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo);
+    let access_service = AccessControlServiceImpl::new(
+        AccessLogRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+        PermissionRepositoryImpl::new(pool.clone())
+    );
 
     // 로그 3개 생성
     for i in 0..3 {
@@ -747,14 +791,17 @@ async fn test_access_control_service_get_project_access_logs() {
 
     // 사용자 및 프로젝트 생성
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
     let user = user_service
         .create_user("projectuser".to_string(), "project@example.com".to_string(), Uuid::new_v4())
         .await
         .unwrap();
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
     let project = project_service
         .create_project("LogProject".to_string(), None)
         .await
@@ -764,7 +811,9 @@ async fn test_access_control_service_get_project_access_logs() {
     let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
     let user_repo2 = UserRepositoryImpl::new(pool.clone());
     let project_repo2 = ProjectRepositoryImpl::new(pool.clone());
-    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo2);
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo2, role_repo, permission_repo);
 
     // 프로젝트 관련 로그 생성
     for _ in 0..2 {
@@ -798,17 +847,21 @@ async fn test_access_control_service_count_user_access() {
 
     // 사용자 생성
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
     let user = user_service
         .create_user("countuser".to_string(), "count@example.com".to_string(), Uuid::new_v4())
         .await
         .unwrap();
 
     // AccessControlService
-    let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
-    let user_repo2 = UserRepositoryImpl::new(pool.clone());
-    let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo);
+    let access_service = AccessControlServiceImpl::new(
+        AccessLogRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+        PermissionRepositoryImpl::new(pool.clone())
+    );
 
     // 로그 5개 생성
     for _ in 0..5 {
@@ -842,14 +895,17 @@ async fn test_access_control_service_can_access_project() {
 
     // 사용자 및 프로젝트 생성
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
     let user = user_service
         .create_user("accessuser".to_string(), "access@example.com".to_string(), Uuid::new_v4())
         .await
         .unwrap();
 
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let project_service = ProjectServiceImpl::new(project_repo);
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
     let active_project = project_service
         .create_project("ActiveProject".to_string(), None)
         .await
@@ -862,11 +918,21 @@ async fn test_access_control_service_can_access_project() {
 
     project_service.deactivate_project(inactive_project.id).await.unwrap();
 
+    // 사용자를 두 프로젝트에 추가
+    let user_service2 = UserServiceImpl::new(
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone())
+    );
+    user_service2.add_user_to_project(user.id, active_project.id).await.unwrap();
+    user_service2.add_user_to_project(user.id, inactive_project.id).await.unwrap();
+
     // AccessControlService
     let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
     let user_repo2 = UserRepositoryImpl::new(pool.clone());
     let project_repo2 = ProjectRepositoryImpl::new(pool.clone());
-    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo2);
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo2, role_repo, permission_repo);
 
     // 활성 프로젝트 접근 가능
     let can_access_active = access_service
@@ -892,17 +958,21 @@ async fn test_access_control_service_get_study_access_logs() {
 
     // 사용자 생성
     let user_repo = UserRepositoryImpl::new(pool.clone());
-    let user_service = UserServiceImpl::new(user_repo);
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
     let user = user_service
         .create_user("studyuser".to_string(), "study@example.com".to_string(), Uuid::new_v4())
         .await
         .unwrap();
 
     // AccessControlService
-    let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
-    let user_repo2 = UserRepositoryImpl::new(pool.clone());
-    let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let access_service = AccessControlServiceImpl::new(access_log_repo, user_repo2, project_repo);
+    let access_service = AccessControlServiceImpl::new(
+        AccessLogRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+        PermissionRepositoryImpl::new(pool.clone())
+    );
 
     let study_uid = "1.2.840.113619.2.55.3.123456789";
 
@@ -928,6 +998,515 @@ async fn test_access_control_service_get_study_access_logs() {
     let logs = access_service.get_study_access_logs(study_uid, 10).await.unwrap();
     assert_eq!(logs.len(), 3);
     assert_eq!(logs[0].study_uid, Some(study_uid.to_string()));
+
+    cleanup_test_data(&pool).await;
+}
+
+// ========================================
+// UserService Extension Tests (멤버십 관리)
+// ========================================
+
+#[tokio::test]
+async fn test_user_service_add_user_to_project() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
+
+    // 사용자 생성
+    let user = user_service
+        .create_user("testuser".to_string(), "test@example.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    // 존재하지 않는 프로젝트에 추가 시도 - 에러
+    let result = user_service.add_user_to_project(user.id, 99999).await;
+    assert!(result.is_err());
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_user_service_project_membership() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let user_service = UserServiceImpl::new(
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone())
+    );
+    let project_service = ProjectServiceImpl::new(
+        ProjectRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+    );
+
+    // 사용자와 프로젝트 생성
+    let user = user_service
+        .create_user("member_test".to_string(), "member@example.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project = project_service
+        .create_project("Test Project".to_string(), Some("Description".to_string()))
+        .await
+        .unwrap();
+
+    // 멤버십 확인 (아직 멤버가 아님)
+    let is_member = user_service.is_project_member(user.id, project.id).await.unwrap();
+    assert!(!is_member);
+
+    // 프로젝트에 사용자 추가
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // 멤버십 확인 (이제 멤버임)
+    let is_member = user_service.is_project_member(user.id, project.id).await.unwrap();
+    assert!(is_member);
+
+    // 사용자 프로젝트 목록 조회
+    let projects = user_service.get_user_projects(user.id).await.unwrap();
+    assert_eq!(projects.len(), 1);
+    assert_eq!(projects[0].id, project.id);
+
+    // 프로젝트에서 사용자 제거
+    user_service.remove_user_from_project(user.id, project.id).await.unwrap();
+
+    // 멤버십 확인 (더 이상 멤버가 아님)
+    let is_member = user_service.is_project_member(user.id, project.id).await.unwrap();
+    assert!(!is_member);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_user_service_duplicate_membership() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let user_service = UserServiceImpl::new(
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone())
+    );
+    let project_service = ProjectServiceImpl::new(
+        ProjectRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+    );
+
+    let user = user_service
+        .create_user("dup_user".to_string(), "dup@example.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project = project_service
+        .create_project("Dup Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // 첫 번째 추가 성공
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // 중복 추가 시도 - 에러 발생
+    let result = user_service.add_user_to_project(user.id, project.id).await;
+    assert!(result.is_err());
+
+    cleanup_test_data(&pool).await;
+}
+
+// ========================================
+// ProjectService Extension Tests (역할/멤버 관리)
+// ========================================
+
+#[tokio::test]
+async fn test_project_service_get_members() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let user_service = UserServiceImpl::new(
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone())
+    );
+    let project_service = ProjectServiceImpl::new(
+        ProjectRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone())
+    );
+
+    // 프로젝트 생성
+    let project = project_service
+        .create_project("Members Test".to_string(), None)
+        .await
+        .unwrap();
+
+    // 사용자 3명 생성 및 추가
+    for i in 1..=3 {
+        let user = user_service
+            .create_user(format!("user{}", i), format!("user{}@test.com", i), Uuid::new_v4())
+            .await
+            .unwrap();
+
+        user_service.add_user_to_project(user.id, project.id).await.unwrap();
+    }
+
+    // 멤버 목록 조회
+    let members = project_service.get_project_members(project.id).await.unwrap();
+    assert_eq!(members.len(), 3);
+
+    // 멤버 수 조회
+    let count = project_service.count_project_members(project.id).await.unwrap();
+    assert_eq!(count, 3);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_project_service_role_assignment() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let project_service = ProjectServiceImpl::new(
+        ProjectRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+    );
+    let permission_service = PermissionServiceImpl::new(
+        PermissionRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone())
+    );
+
+    // 프로젝트와 역할 생성
+    let project = project_service
+        .create_project("Role Test".to_string(), None)
+        .await
+        .unwrap();
+
+    let role = permission_service
+        .create_role("Admin".to_string(), RoleScope::Project, Some("Admin role".to_string()))
+        .await
+        .unwrap();
+
+    // 역할 할당
+    project_service.assign_role_to_project(project.id, role.id).await.unwrap();
+
+    // 역할 목록 조회
+    let roles = project_service.get_project_roles(project.id).await.unwrap();
+    assert_eq!(roles.len(), 1);
+    assert_eq!(roles[0].id, role.id);
+
+    // 중복 할당 시도
+    let result = project_service.assign_role_to_project(project.id, role.id).await;
+    assert!(result.is_err());
+
+    // 역할 제거
+    project_service.remove_role_from_project(project.id, role.id).await.unwrap();
+
+    // 역할 목록 조회 (비어있음)
+    let roles = project_service.get_project_roles(project.id).await.unwrap();
+    assert_eq!(roles.len(), 0);
+
+    cleanup_test_data(&pool).await;
+}
+
+// ========================================
+// PermissionService Extension Tests (권한 할당)
+// ========================================
+
+#[tokio::test]
+async fn test_permission_service_role_permissions() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+    let permission_service = PermissionServiceImpl::new(
+        PermissionRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone())
+    );
+
+    // 역할 생성
+    let role = permission_service
+        .create_role("Viewer".to_string(), RoleScope::Global, None)
+        .await
+        .unwrap();
+
+    // 권한 생성
+    let perm1 = permission_repo.create(pacs_server::domain::entities::NewPermission {
+        resource_type: "STUDY".to_string(),
+        action: "READ".to_string(),
+    }).await.unwrap();
+
+    let perm2 = permission_repo.create(pacs_server::domain::entities::NewPermission {
+        resource_type: "SERIES".to_string(),
+        action: "READ".to_string(),
+    }).await.unwrap();
+
+    // 권한 할당
+    permission_service.assign_permission_to_role(role.id, perm1.id).await.unwrap();
+    permission_service.assign_permission_to_role(role.id, perm2.id).await.unwrap();
+
+    // 권한 목록 조회
+    let permissions = permission_service.get_role_permissions(role.id).await.unwrap();
+    assert_eq!(permissions.len(), 2);
+
+    // 중복 할당 시도
+    let result = permission_service.assign_permission_to_role(role.id, perm1.id).await;
+    assert!(result.is_err());
+
+    // 권한 제거
+    permission_service.remove_permission_from_role(role.id, perm1.id).await.unwrap();
+
+    // 권한 목록 조회
+    let permissions = permission_service.get_role_permissions(role.id).await.unwrap();
+    assert_eq!(permissions.len(), 1);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_permission_service_project_permissions() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+    let permission_service = PermissionServiceImpl::new(
+        PermissionRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+    );
+    let project_service = ProjectServiceImpl::new(
+        ProjectRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+    );
+
+    // 프로젝트 생성
+    let project = project_service
+        .create_project("Perm Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // 권한 생성
+    let perm = permission_repo.create(pacs_server::domain::entities::NewPermission {
+        resource_type: "STUDY".to_string(),
+        action: "WRITE".to_string(),
+    }).await.unwrap();
+
+    // 프로젝트에 권한 할당
+    permission_service.assign_permission_to_project(project.id, perm.id).await.unwrap();
+
+    // 프로젝트 권한 조회
+    let permissions = permission_service.get_project_permissions(project.id).await.unwrap();
+    assert_eq!(permissions.len(), 1);
+    assert_eq!(permissions[0].id, perm.id);
+
+    // 권한 제거
+    permission_service.remove_permission_from_project(project.id, perm.id).await.unwrap();
+
+    // 프로젝트 권한 조회 (비어있음)
+    let permissions = permission_service.get_project_permissions(project.id).await.unwrap();
+    assert_eq!(permissions.len(), 0);
+
+    cleanup_test_data(&pool).await;
+}
+
+// ========================================
+// AccessControlService Extension Tests (권한 검증)
+// ========================================
+
+#[tokio::test]
+async fn test_access_control_check_permission() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+
+    let user_service = UserServiceImpl::new(
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone())
+    );
+    let project_service = ProjectServiceImpl::new(
+        ProjectRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone())
+    );
+    let permission_service = PermissionServiceImpl::new(
+        PermissionRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone())
+    );
+    let access_service = AccessControlServiceImpl::new(
+        AccessLogRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+        PermissionRepositoryImpl::new(pool.clone()),
+    );
+
+    // 사용자, 프로젝트, 역할, 권한 생성
+    let user = user_service
+        .create_user("auth_user".to_string(), "auth@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project = project_service
+        .create_project("Auth Project".to_string(), None)
+        .await
+        .unwrap();
+
+    let role = permission_service
+        .create_role("Editor".to_string(), RoleScope::Project, None)
+        .await
+        .unwrap();
+
+    let perm = permission_repo.create(pacs_server::domain::entities::NewPermission {
+        resource_type: "STUDY".to_string(),
+        action: "READ".to_string(),
+    }).await.unwrap();
+
+    // 역할에 권한 할당
+    permission_service.assign_permission_to_role(role.id, perm.id).await.unwrap();
+
+    // 프로젝트에 역할 할당
+    project_service.assign_role_to_project(project.id, role.id).await.unwrap();
+
+    // 사용자를 프로젝트에 추가
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // 권한 검증 (성공)
+    let has_permission = access_service
+        .check_permission(user.id, project.id, "STUDY", "READ")
+        .await
+        .unwrap();
+    assert!(has_permission);
+
+    // 권한 검증 (실패 - 없는 권한)
+    let has_permission = access_service
+        .check_permission(user.id, project.id, "STUDY", "DELETE")
+        .await
+        .unwrap();
+    assert!(!has_permission);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_access_control_get_user_permissions() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+
+    let user_service = UserServiceImpl::new(
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone())
+    );
+    let project_service = ProjectServiceImpl::new(
+        ProjectRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone())
+    );
+    let permission_service = PermissionServiceImpl::new(
+        PermissionRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone())
+    );
+    let access_service = AccessControlServiceImpl::new(
+        AccessLogRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+        PermissionRepositoryImpl::new(pool.clone()),
+    );
+
+    // 사용자와 프로젝트 생성
+    let user = user_service
+        .create_user("perm_user".to_string(), "perm@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project = project_service
+        .create_project("Perm Check Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // 역할 생성 및 권한 할당
+    let role = permission_service
+        .create_role("Reader".to_string(), RoleScope::Project, None)
+        .await
+        .unwrap();
+
+    // 권한 2개 생성
+    let perm1 = permission_repo.create(pacs_server::domain::entities::NewPermission {
+        resource_type: "STUDY".to_string(),
+        action: "READ".to_string(),
+    }).await.unwrap();
+
+    let perm2 = permission_repo.create(pacs_server::domain::entities::NewPermission {
+        resource_type: "SERIES".to_string(),
+        action: "READ".to_string(),
+    }).await.unwrap();
+
+    permission_service.assign_permission_to_role(role.id, perm1.id).await.unwrap();
+    permission_service.assign_permission_to_role(role.id, perm2.id).await.unwrap();
+
+    // 프로젝트에 역할 할당
+    project_service.assign_role_to_project(project.id, role.id).await.unwrap();
+
+    // 사용자를 프로젝트에 추가
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // 사용자 권한 조회
+    let permissions = access_service
+        .get_user_permissions(user.id, project.id)
+        .await
+        .unwrap();
+
+    assert_eq!(permissions.len(), 2);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_access_control_is_project_member() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let access_service = AccessControlServiceImpl::new(
+        AccessLogRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+        PermissionRepositoryImpl::new(pool.clone()),
+    );
+
+    let user_service = UserServiceImpl::new(
+        UserRepositoryImpl::new(pool.clone()),
+        ProjectRepositoryImpl::new(pool.clone())
+    );
+    let project_service = ProjectServiceImpl::new(
+        ProjectRepositoryImpl::new(pool.clone()),
+        UserRepositoryImpl::new(pool.clone()),
+        RoleRepositoryImpl::new(pool.clone()),
+    );
+
+    let user = user_service
+        .create_user("member_check".to_string(), "member@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project = project_service
+        .create_project("Member Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // 멤버가 아님
+    let is_member = access_service.is_project_member(user.id, project.id).await.unwrap();
+    assert!(!is_member);
+
+    // 멤버 추가
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // 멤버임
+    let is_member = access_service.is_project_member(user.id, project.id).await.unwrap();
+    assert!(is_member);
 
     cleanup_test_data(&pool).await;
 }

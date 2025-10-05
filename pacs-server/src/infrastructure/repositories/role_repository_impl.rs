@@ -3,6 +3,7 @@ use sqlx::PgPool;
 use crate::domain::entities::{Role, NewRole, RoleScope};
 use crate::domain::repositories::RoleRepository;
 
+#[derive(Clone)]
 pub struct RoleRepositoryImpl {
     pool: PgPool,
 }
