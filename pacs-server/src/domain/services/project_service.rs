@@ -129,21 +129,35 @@ where
     }
 
     async fn activate_project(&self, id: i32) -> Result<Project, ServiceError> {
-        let updated = self.project_repository.set_active(id, true).await?;
-        if updated {
-            self.get_project(id).await
-        } else {
-            Err(ServiceError::NotFound("Project not found".into()))
-        }
+        // RETURNING 절로 원자적 처리
+        let project = sqlx::query_as::<_, Project>(
+            "UPDATE security_project
+             SET is_active = true
+             WHERE id = $1
+             RETURNING id, name, description, is_active, created_at"
+        )
+        .bind(id)
+        .fetch_optional(self.project_repository.pool())
+        .await?
+        .ok_or(ServiceError::NotFound("Project not found".into()))?;
+
+        Ok(project)
     }
 
     async fn deactivate_project(&self, id: i32) -> Result<Project, ServiceError> {
-        let updated = self.project_repository.set_active(id, false).await?;
-        if updated {
-            self.get_project(id).await
-        } else {
-            Err(ServiceError::NotFound("Project not found".into()))
-        }
+        // RETURNING 절로 원자적 처리
+        let project = sqlx::query_as::<_, Project>(
+            "UPDATE security_project
+             SET is_active = false
+             WHERE id = $1
+             RETURNING id, name, description, is_active, created_at"
+        )
+        .bind(id)
+        .fetch_optional(self.project_repository.pool())
+        .await?
+        .ok_or(ServiceError::NotFound("Project not found".into()))?;
+
+        Ok(project)
     }
 
     async fn delete_project(&self, id: i32) -> Result<(), ServiceError> {
@@ -196,39 +210,33 @@ where
     // === 역할 관리 구현 ===
 
     async fn assign_role_to_project(&self, project_id: i32, role_id: i32) -> Result<(), ServiceError> {
-        // 프로젝트 존재 확인
-        if self.project_repository.find_by_id(project_id).await?.is_none() {
-            return Err(ServiceError::NotFound("Project not found".into()));
-        }
-
-        // 역할 존재 확인
-        if self.role_repository.find_by_id(role_id).await?.is_none() {
-            return Err(ServiceError::NotFound("Role not found".into()));
-        }
-
-        // 이미 할당되었는지 확인
-        let exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM security_project_role WHERE project_id = $1 AND role_id = $2"
+        // INSERT with ON CONFLICT - Race condition 방지
+        let result = sqlx::query(
+            "INSERT INTO security_project_role (project_id, role_id)
+             SELECT $1, $2
+             WHERE EXISTS(SELECT 1 FROM security_project WHERE id = $1)
+               AND EXISTS(SELECT 1 FROM security_role WHERE id = $2)
+             ON CONFLICT (project_id, role_id) DO NOTHING
+             RETURNING project_id"
         )
         .bind(project_id)
         .bind(role_id)
-        .fetch_one(self.project_repository.pool())
+        .fetch_optional(self.project_repository.pool())
         .await?;
 
-        if exists > 0 {
-            return Err(ServiceError::AlreadyExists("Role already assigned to this project".into()));
+        match result {
+            Some(_) => Ok(()),
+            None => {
+                // 실패 원인 파악
+                if self.project_repository.find_by_id(project_id).await?.is_none() {
+                    return Err(ServiceError::NotFound("Project not found".into()));
+                }
+                if self.role_repository.find_by_id(role_id).await?.is_none() {
+                    return Err(ServiceError::NotFound("Role not found".into()));
+                }
+                Err(ServiceError::AlreadyExists("Role already assigned to this project".into()))
+            }
         }
-
-        // security_project_role 테이블에 추가
-        sqlx::query(
-            "INSERT INTO security_project_role (project_id, role_id) VALUES ($1, $2)"
-        )
-        .bind(project_id)
-        .bind(role_id)
-        .execute(self.project_repository.pool())
-        .await?;
-
-        Ok(())
     }
 
     async fn remove_role_from_project(&self, project_id: i32, role_id: i32) -> Result<(), ServiceError> {
@@ -254,7 +262,7 @@ where
         }
 
         let roles = sqlx::query_as::<_, Role>(
-            "SELECT r.id, r.name, r.description, r.created_at
+            "SELECT r.id, r.name, r.description, r.scope, r.created_at
              FROM security_role r
              INNER JOIN security_project_role pr ON r.id = pr.role_id
              WHERE pr.project_id = $1

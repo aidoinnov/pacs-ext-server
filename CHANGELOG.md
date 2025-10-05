@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed - 2025-10-05
+
+#### Database Transaction Improvements
+- **Race Condition 제거** - 모든 동시성 위험 패턴 수정
+  - `UserService.add_user_to_project` - INSERT ... ON CONFLICT 패턴 적용
+  - `ProjectService.assign_role_to_project` - INSERT ... ON CONFLICT 패턴 적용
+  - `PermissionService.assign_permission_to_role` - INSERT ... ON CONFLICT 패턴 적용
+  - `PermissionService.assign_permission_to_project` - INSERT ... ON CONFLICT 패턴 적용
+  - `AuthService.login` - UPSERT (ON CONFLICT DO UPDATE) 패턴으로 개선
+  - 동시 요청 시 하나만 성공하고 나머지는 적절한 에러 반환
+
+- **원자적 UPDATE 처리** - UPDATE 후 SELECT 제거
+  - `ProjectService.activate_project` - UPDATE ... RETURNING 절 사용
+  - `ProjectService.deactivate_project` - UPDATE ... RETURNING 절 사용
+  - UPDATE와 SELECT 사이 데이터 변경 가능성 제거
+
+- **권한 검증 쿼리 최적화** - 2개 쿼리 → 1개 쿼리
+  - `AccessControlService.check_permission` - CTE + UNION ALL로 통합
+  - 역할 기반 권한 + 프로젝트 직접 권한을 단일 쿼리로 처리
+  - 성능 향상: DB 왕복 50% 감소 (2회 → 1회)
+  - 일관성 보장: 단일 스냅샷 내에서 권한 확인
+
+#### Performance & Consistency
+- **트랜잭션 안정성 향상**: Race Condition 5건 제거
+- **쿼리 최적화**: 불필요한 DB 왕복 제거
+- **원자성 보장**: UPDATE-SELECT 패턴 개선
+- **동시성 안정성**: INSERT ... ON CONFLICT로 중복 방지
+
+#### Documentation
+- `TRANSACTION_OPTIMIZATION.md` - 1차 트랜잭션 검토 보고서
+- `TRANSACTION_REVIEW_FINAL.md` - 2차 트랜잭션 검토 및 추가 개선사항
+- 총 12개 이슈 식별 및 문서화 (심각 5건, 중요 3건, 권장 4건)
+- 배치 작업, Repository 개선, 성능 최적화 가이드 포함
+
 ### Added - 2025-10-04
 
 #### Service Layer Extensions (Domain Services - Phase 2)

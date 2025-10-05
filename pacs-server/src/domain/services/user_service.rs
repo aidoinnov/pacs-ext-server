@@ -128,31 +128,33 @@ where
     // === 프로젝트 멤버십 관리 구현 ===
 
     async fn add_user_to_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError> {
-        // 사용자 존재 확인
-        if self.user_repository.find_by_id(user_id).await?.is_none() {
-            return Err(ServiceError::NotFound("User not found".into()));
-        }
-
-        // 프로젝트 존재 확인
-        if self.project_repository.find_by_id(project_id).await?.is_none() {
-            return Err(ServiceError::NotFound("Project not found".into()));
-        }
-
-        // 이미 멤버인지 확인
-        if self.is_project_member(user_id, project_id).await? {
-            return Err(ServiceError::AlreadyExists("User is already a member of this project".into()));
-        }
-
-        // security_user_project 테이블에 추가
-        sqlx::query(
-            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        // INSERT with ON CONFLICT - Race condition 방지
+        let result = sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id)
+             SELECT $1, $2
+             WHERE EXISTS(SELECT 1 FROM security_user WHERE id = $1)
+               AND EXISTS(SELECT 1 FROM security_project WHERE id = $2)
+             ON CONFLICT (user_id, project_id) DO NOTHING
+             RETURNING user_id"
         )
         .bind(user_id)
         .bind(project_id)
-        .execute(self.user_repository.pool())
+        .fetch_optional(self.user_repository.pool())
         .await?;
 
-        Ok(())
+        match result {
+            Some(_) => Ok(()),
+            None => {
+                // 실패 원인 파악
+                if self.user_repository.find_by_id(user_id).await?.is_none() {
+                    return Err(ServiceError::NotFound("User not found".into()));
+                }
+                if self.project_repository.find_by_id(project_id).await?.is_none() {
+                    return Err(ServiceError::NotFound("Project not found".into()));
+                }
+                Err(ServiceError::AlreadyExists("User is already a member of this project".into()))
+            }
+        }
     }
 
     async fn remove_user_from_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError> {

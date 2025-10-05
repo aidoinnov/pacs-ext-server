@@ -121,39 +121,33 @@ impl<P: PermissionRepository, R: RoleRepository> PermissionService for Permissio
     // === 권한 할당 관리 구현 ===
 
     async fn assign_permission_to_role(&self, role_id: i32, permission_id: i32) -> Result<(), ServiceError> {
-        // 역할 존재 확인
-        if self.role_repository.find_by_id(role_id).await?.is_none() {
-            return Err(ServiceError::NotFound("Role not found".into()));
-        }
-
-        // 권한 존재 확인
-        if self.permission_repository.find_by_id(permission_id).await?.is_none() {
-            return Err(ServiceError::NotFound("Permission not found".into()));
-        }
-
-        // 이미 할당되었는지 확인
-        let exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM security_role_permission WHERE role_id = $1 AND permission_id = $2"
+        // INSERT with ON CONFLICT - Race condition 방지
+        let result = sqlx::query(
+            "INSERT INTO security_role_permission (role_id, permission_id)
+             SELECT $1, $2
+             WHERE EXISTS(SELECT 1 FROM security_role WHERE id = $1)
+               AND EXISTS(SELECT 1 FROM security_permission WHERE id = $2)
+             ON CONFLICT (role_id, permission_id) DO NOTHING
+             RETURNING role_id"
         )
         .bind(role_id)
         .bind(permission_id)
-        .fetch_one(self.role_repository.pool())
+        .fetch_optional(self.role_repository.pool())
         .await?;
 
-        if exists > 0 {
-            return Err(ServiceError::AlreadyExists("Permission already assigned to this role".into()));
+        match result {
+            Some(_) => Ok(()),
+            None => {
+                // 실패 원인 파악
+                if self.role_repository.find_by_id(role_id).await?.is_none() {
+                    return Err(ServiceError::NotFound("Role not found".into()));
+                }
+                if self.permission_repository.find_by_id(permission_id).await?.is_none() {
+                    return Err(ServiceError::NotFound("Permission not found".into()));
+                }
+                Err(ServiceError::AlreadyExists("Permission already assigned to this role".into()))
+            }
         }
-
-        // security_role_permission 테이블에 추가
-        sqlx::query(
-            "INSERT INTO security_role_permission (role_id, permission_id) VALUES ($1, $2)"
-        )
-        .bind(role_id)
-        .bind(permission_id)
-        .execute(self.role_repository.pool())
-        .await?;
-
-        Ok(())
     }
 
     async fn remove_permission_from_role(&self, role_id: i32, permission_id: i32) -> Result<(), ServiceError> {
@@ -193,34 +187,42 @@ impl<P: PermissionRepository, R: RoleRepository> PermissionService for Permissio
     }
 
     async fn assign_permission_to_project(&self, project_id: i32, permission_id: i32) -> Result<(), ServiceError> {
-        // 권한 존재 확인
-        if self.permission_repository.find_by_id(permission_id).await?.is_none() {
-            return Err(ServiceError::NotFound("Permission not found".into()));
-        }
-
-        // 이미 할당되었는지 확인
-        let exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM security_project_permission WHERE project_id = $1 AND permission_id = $2"
+        // INSERT with ON CONFLICT - Race condition 방지
+        let result = sqlx::query(
+            "INSERT INTO security_project_permission (project_id, permission_id)
+             SELECT $1, $2
+             WHERE EXISTS(SELECT 1 FROM security_project WHERE id = $1)
+               AND EXISTS(SELECT 1 FROM security_permission WHERE id = $2)
+             ON CONFLICT (project_id, permission_id) DO NOTHING
+             RETURNING project_id"
         )
         .bind(project_id)
         .bind(permission_id)
-        .fetch_one(self.permission_repository.pool())
+        .fetch_optional(self.permission_repository.pool())
         .await?;
 
-        if exists > 0 {
-            return Err(ServiceError::AlreadyExists("Permission already assigned to this project".into()));
+        match result {
+            Some(_) => Ok(()),
+            None => {
+                // 실패 원인 파악
+                let project_exists = sqlx::query_scalar::<_, bool>(
+                    "SELECT EXISTS(SELECT 1 FROM security_project WHERE id = $1)"
+                )
+                .bind(project_id)
+                .fetch_one(self.permission_repository.pool())
+                .await?;
+
+                if !project_exists {
+                    return Err(ServiceError::NotFound("Project not found".into()));
+                }
+
+                if self.permission_repository.find_by_id(permission_id).await?.is_none() {
+                    return Err(ServiceError::NotFound("Permission not found".into()));
+                }
+
+                Err(ServiceError::AlreadyExists("Permission already assigned to this project".into()))
+            }
         }
-
-        // security_project_permission 테이블에 추가
-        sqlx::query(
-            "INSERT INTO security_project_permission (project_id, permission_id) VALUES ($1, $2)"
-        )
-        .bind(project_id)
-        .bind(permission_id)
-        .execute(self.permission_repository.pool())
-        .await?;
-
-        Ok(())
     }
 
     async fn remove_permission_from_project(&self, project_id: i32, permission_id: i32) -> Result<(), ServiceError> {

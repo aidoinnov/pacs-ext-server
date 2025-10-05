@@ -213,61 +213,52 @@ where
         resource_type: &str,
         action: &str,
     ) -> Result<bool, ServiceError> {
-        // 사용자 존재 확인
-        if self.user_repository.find_by_id(user_id).await?.is_none() {
-            return Err(ServiceError::NotFound("User not found".into()));
-        }
+        // 단일 쿼리로 통합 - 성능 향상 및 일관성 보장
+        let has_permission = sqlx::query_scalar::<_, bool>(
+            "WITH permission_id AS (
+                SELECT id FROM security_permission
+                WHERE resource_type = $3 AND action = $4
+                LIMIT 1
+            ),
+            user_membership AS (
+                SELECT 1 FROM security_user_project
+                WHERE user_id = $1 AND project_id = $2
+                LIMIT 1
+            )
+            SELECT EXISTS(
+                SELECT 1 FROM user_membership
+                WHERE EXISTS(
+                    -- 역할 기반 권한
+                    SELECT 1
+                    FROM security_role_permission rp
+                    INNER JOIN security_project_role pr ON rp.role_id = pr.role_id
+                    INNER JOIN security_user_project up ON pr.project_id = up.project_id
+                    WHERE up.user_id = $1
+                      AND up.project_id = $2
+                      AND rp.permission_id = (SELECT id FROM permission_id)
 
-        // 프로젝트 존재 확인
-        if self.project_repository.find_by_id(project_id).await?.is_none() {
-            return Err(ServiceError::NotFound("Project not found".into()));
-        }
+                    UNION ALL
 
-        // 권한 존재 확인
-        let permission = match self.permission_repository
-            .find_by_resource_and_action(resource_type, action)
-            .await?
-        {
-            Some(perm) => perm,
-            None => return Ok(false), // 권한 자체가 정의되지 않음
-        };
+                    -- 프로젝트 직접 권한
+                    SELECT 1
+                    FROM security_project_permission pp
+                    INNER JOIN security_user_project up ON pp.project_id = up.project_id
+                    WHERE up.user_id = $1
+                      AND pp.project_id = $2
+                      AND pp.permission_id = (SELECT id FROM permission_id)
 
-        // 사용자가 프로젝트의 멤버인지 확인
-        if !self.is_project_member(user_id, project_id).await? {
-            return Ok(false);
-        }
-
-        // 사용자의 역할을 통해 권한 확인
-        // 1. 사용자 → 프로젝트 → 역할 → 권한 경로
-        let has_permission = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM security_user_project up
-             INNER JOIN security_project_role pr ON up.project_id = pr.project_id
-             INNER JOIN security_role_permission rp ON pr.role_id = rp.role_id
-             WHERE up.user_id = $1 AND up.project_id = $2 AND rp.permission_id = $3"
+                    LIMIT 1
+                )
+            )"
         )
         .bind(user_id)
         .bind(project_id)
-        .bind(permission.id)
+        .bind(resource_type)
+        .bind(action)
         .fetch_one(self.user_repository.pool())
         .await?;
 
-        if has_permission > 0 {
-            return Ok(true);
-        }
-
-        // 2. 프로젝트에 직접 할당된 권한 확인
-        let project_permission = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM security_project_permission pp
-             INNER JOIN security_user_project up ON pp.project_id = up.project_id
-             WHERE up.user_id = $1 AND pp.project_id = $2 AND pp.permission_id = $3"
-        )
-        .bind(user_id)
-        .bind(project_id)
-        .bind(permission.id)
-        .fetch_one(self.user_repository.pool())
-        .await?;
-
-        Ok(project_permission > 0)
+        Ok(has_permission)
     }
 
     async fn get_user_permissions(

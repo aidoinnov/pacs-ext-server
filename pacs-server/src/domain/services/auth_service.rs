@@ -38,19 +38,20 @@ impl<U: UserRepository> AuthServiceImpl<U> {
 #[async_trait]
 impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
     async fn login(&self, keycloak_id: Uuid, username: String, email: String) -> Result<AuthResponse, ServiceError> {
-        // 기존 사용자 확인
-        let user = match self.user_repository.find_by_keycloak_id(keycloak_id).await? {
-            Some(user) => user,
-            None => {
-                // 사용자가 없으면 생성
-                let new_user = crate::domain::entities::NewUser {
-                    keycloak_id,
-                    username,
-                    email,
-                };
-                self.user_repository.create(new_user).await?
-            }
-        };
+        // UPSERT 패턴으로 동시 로그인 Race condition 방지
+        let user = sqlx::query_as::<_, crate::domain::entities::User>(
+            "INSERT INTO security_user (keycloak_id, username, email)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (keycloak_id) DO UPDATE
+             SET username = EXCLUDED.username,
+                 email = EXCLUDED.email
+             RETURNING id, keycloak_id, username, email, created_at"
+        )
+        .bind(keycloak_id)
+        .bind(&username)
+        .bind(&email)
+        .fetch_one(self.user_repository.pool())
+        .await?;
 
         // JWT 토큰 생성
         let claims = Claims::new(
