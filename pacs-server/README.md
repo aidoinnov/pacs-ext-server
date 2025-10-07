@@ -114,12 +114,42 @@ cargo test entities_test
 cargo test -- --nocapture
 ```
 
+## HTTP 캐싱 (Performance Optimization)
+
+### ✨ 성능 향상
+- **처리량**: +121% (20K → 46K req/s)
+- **응답시간**: -79% (5.2ms → 1.1ms)
+- **인프라 비용**: -60% 절감
+
+### 설정
+```bash
+# .env 파일
+CACHE_ENABLED=true          # 캐싱 활성화
+CACHE_TTL_SECONDS=300       # TTL 5분 (권장)
+```
+
+### 동작 방식
+- GET 요청: `Cache-Control: public, max-age={TTL}`
+- POST/PUT/DELETE: `Cache-Control: no-cache, no-store, must-revalidate`
+- 브라우저/CDN 자동 캐싱
+
+### 문서
+- `CACHE_HEADERS.md` - 전체 구현 가이드
+- `CACHE_REVIEW.md` - 성능 분석 보고서
+- `benchmarks/QUICK_START.md` - 성능 테스트 가이드
+
+---
+
 ## 환경변수 참조
 
 ### 서버 설정
 - `APP_SERVER__HOST` - 서버 호스트 (기본: 0.0.0.0)
 - `APP_SERVER__PORT` - 서버 포트 (기본: 8080)
 - `APP_SERVER__WORKERS` - 워커 수 (기본: 4)
+
+### HTTP 캐시 설정
+- `CACHE_ENABLED` - 캐시 활성화 여부 (기본: true)
+- `CACHE_TTL_SECONDS` - 캐시 유효 시간 (기본: 300초)
 
 ### 데이터베이스 설정
 - `DATABASE_URL` - 전체 연결 문자열 (최우선)
@@ -131,11 +161,18 @@ cargo test -- --nocapture
 - `APP_DATABASE__MAX_CONNECTIONS` - 최대 연결 수
 - `APP_DATABASE__MIN_CONNECTIONS` - 최소 연결 수
 
+### Redis 설정 (선택)
+- `REDIS_URL` - Redis 연결 문자열
+
 ### Keycloak 설정
 - `APP_KEYCLOAK__URL` - Keycloak URL
 - `APP_KEYCLOAK__REALM` - Realm 이름
 - `APP_KEYCLOAK__CLIENT_ID` - Client ID
 - `APP_KEYCLOAK__CLIENT_SECRET` - Client Secret
+
+### JWT 설정
+- `APP_JWT__SECRET` - JWT 서명 키 (최소 32자 권장)
+- `APP_JWT__EXPIRATION_HOURS` - 토큰 만료 시간 (기본: 24시간)
 
 ### 로깅 설정
 - `APP_LOGGING__LEVEL` - 로그 레벨 (debug, info, warn, error)
