@@ -123,10 +123,18 @@ cargo test -- --nocapture
 - `PUT /api/annotations/{id}` - 어노테이션 수정
 - `DELETE /api/annotations/{id}` - 어노테이션 삭제
 
-### 기타 API
-- `GET /health` - 헬스 체크
+### Project API (프로젝트 관리)
+- `POST /api/projects` - 프로젝트 생성
+- `GET /api/projects` - 프로젝트 목록 조회
+- `GET /api/projects/active` - 활성 프로젝트 조회
+- `GET /api/projects/{id}` - 특정 프로젝트 조회
+
+### Authentication API (인증)
 - `POST /api/auth/login` - 로그인
 - `GET /api/auth/verify/{token}` - 토큰 검증
+
+### 기타 API
+- `GET /health` - 헬스 체크
 
 ### API 문서
 - **Swagger UI**: http://localhost:8080/swagger-ui/

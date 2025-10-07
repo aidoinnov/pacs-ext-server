@@ -1,6 +1,7 @@
 use utoipa::OpenApi;
 use crate::presentation::controllers::auth_controller_docs::*;
 use crate::presentation::controllers::annotation_controller::*;
+use crate::presentation::controllers::project_controller::*;
 use crate::application::dto::auth_dto::*;
 use crate::application::dto::user_dto::*;
 use crate::application::dto::project_dto::*;
@@ -18,6 +19,11 @@ use crate::application::dto::annotation_dto::*;
         list_annotations,
         update_annotation,
         delete_annotation,
+        // Project endpoints
+        create_project,
+        get_project,
+        list_projects,
+        get_active_projects,
     ),
     components(
         schemas(

@@ -41,7 +41,7 @@ impl From<crate::domain::entities::project::Project> for ProjectResponse {
 }
 
 /// 프로젝트 목록 응답 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct ProjectListResponse {
     pub projects: Vec<ProjectResponse>,
     pub total: usize,
