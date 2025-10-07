@@ -114,6 +114,47 @@ cargo test entities_test
 cargo test -- --nocapture
 ```
 
+## API 엔드포인트
+
+### Annotation API (DICOM 이미지 어노테이션)
+- `POST /api/annotations` - 어노테이션 생성
+- `GET /api/annotations` - 어노테이션 목록 조회 (필터링 지원)
+- `GET /api/annotations/{id}` - 특정 어노테이션 조회
+- `PUT /api/annotations/{id}` - 어노테이션 수정
+- `DELETE /api/annotations/{id}` - 어노테이션 삭제
+
+### 기타 API
+- `GET /health` - 헬스 체크
+- `POST /api/auth/login` - 로그인
+- `GET /api/auth/verify/{token}` - 토큰 검증
+
+### API 문서
+- **Swagger UI**: http://localhost:8080/swagger-ui/
+- **OpenAPI JSON**: http://localhost:8080/api-docs/openapi.json
+
+## 테스트
+
+### 테스트 실행
+```bash
+# 전체 테스트
+cargo test
+
+# 특정 테스트
+cargo test annotation_controller_test
+cargo test annotation_repository_test
+cargo test annotation_service_test
+
+# 테스트 출력 보기
+cargo test -- --nocapture
+```
+
+### 테스트 커버리지
+- **Controller Tests**: 5개 (annotation CRUD + 에러 처리)
+- **Repository Tests**: 8개 (DB 연동 테스트)
+- **Service Tests**: 8개 (비즈니스 로직 테스트)
+- **Use Case Tests**: 8개 (통합 테스트)
+- **총 29개 테스트** - 100% 통과
+
 ## HTTP 캐싱 (Performance Optimization)
 
 ### ✨ 성능 향상

@@ -1,15 +1,16 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use chrono::NaiveDateTime;
 
 /// 프로젝트 생성 요청 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
 }
 
 /// 프로젝트 업데이트 요청 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateProjectRequest {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -17,12 +18,13 @@ pub struct UpdateProjectRequest {
 }
 
 /// 프로젝트 응답 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct ProjectResponse {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
     pub is_active: bool,
+    #[schema(value_type = String, example = "2024-01-01T00:00:00")]
     pub created_at: NaiveDateTime,
 }
 

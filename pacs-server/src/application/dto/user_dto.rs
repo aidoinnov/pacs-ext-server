@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use chrono::NaiveDateTime;
 
 /// 사용자 생성 요청 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateUserRequest {
     pub keycloak_id: Uuid,
     pub username: String,
@@ -11,18 +12,19 @@ pub struct CreateUserRequest {
 }
 
 /// 사용자 업데이트 요청 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateUserRequest {
     pub email: Option<String>,
 }
 
 /// 사용자 응답 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UserResponse {
     pub id: i32,
     pub keycloak_id: Uuid,
     pub username: String,
     pub email: String,
+    #[schema(value_type = String, example = "2024-01-01T00:00:00")]
     pub created_at: NaiveDateTime,
 }
 

@@ -3,6 +3,7 @@ use pacs_server::domain::repositories::*;
 use pacs_server::infrastructure::repositories::*;
 use sqlx::postgres::PgPoolOptions;
 use uuid::Uuid;
+use serde_json::json;
 
 // Helper function to get test database pool
 async fn get_test_pool() -> sqlx::PgPool {
@@ -518,5 +519,289 @@ mod access_log_repository_tests {
             .await
             .unwrap();
         user_repo.delete(user.id).await.unwrap();
+    }
+}
+
+#[cfg(test)]
+mod annotation_repository_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_create_and_find_annotation() {
+        let pool = get_test_pool().await;
+        let repo = AnnotationRepositoryImpl::new(pool.clone());
+
+        // First create a user and project
+        let user_repo = UserRepositoryImpl::new(pool.clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+
+        let new_user = NewUser {
+            keycloak_id: Uuid::new_v4(),
+            username: format!("testuser_{}", Uuid::new_v4()),
+            email: format!("test_{}@example.com", Uuid::new_v4()),
+        };
+        let user = user_repo.create(new_user).await.unwrap();
+
+        let new_project = NewProject {
+            name: format!("Test Project {}", Uuid::new_v4()),
+            description: Some("Test Description".to_string()),
+        };
+        let project = project_repo.create(new_project).await.unwrap();
+
+        // Add user to project
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user.id)
+        .bind(project.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let new_annotation = NewAnnotation {
+            project_id: project.id,
+            user_id: user.id,
+            study_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
+            series_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string()),
+            instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
+            tool_name: "test_tool".to_string(),
+            tool_version: Some("1.0.0".to_string()),
+            data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+            is_shared: false,
+        };
+
+        // Create annotation
+        let created = repo.create(new_annotation.clone()).await.unwrap();
+        assert_eq!(created.project_id, new_annotation.project_id);
+        assert_eq!(created.user_id, new_annotation.user_id);
+        assert_eq!(created.study_uid, new_annotation.study_uid);
+        assert_eq!(created.tool_name, new_annotation.tool_name);
+        assert_eq!(created.is_shared, new_annotation.is_shared);
+
+        // Find by ID
+        let found = repo.find_by_id(created.id).await.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, created.id);
+
+        // Find by user ID
+        let found = repo.find_by_user_id(user.id).await.unwrap();
+        assert!(found.len() > 0);
+        assert!(found.iter().any(|a| a.id == created.id));
+
+        // Find by project ID
+        let found = repo.find_by_project_id(project.id).await.unwrap();
+        assert!(found.len() > 0);
+        assert!(found.iter().any(|a| a.id == created.id));
+
+        // Find by study UID
+        let found = repo.find_by_study_uid(&new_annotation.study_uid).await.unwrap();
+        assert!(found.len() > 0);
+        assert!(found.iter().any(|a| a.id == created.id));
+
+        // Cleanup
+        repo.delete(created.id).await.unwrap();
+        sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
+            .bind(user.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        user_repo.delete(user.id).await.unwrap();
+        project_repo.delete(project.id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_update_annotation() {
+        let pool = get_test_pool().await;
+        let repo = AnnotationRepositoryImpl::new(pool.clone());
+
+        // Create user and project
+        let user_repo = UserRepositoryImpl::new(pool.clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+
+        let new_user = NewUser {
+            keycloak_id: Uuid::new_v4(),
+            username: format!("testuser_{}", Uuid::new_v4()),
+            email: format!("test_{}@example.com", Uuid::new_v4()),
+        };
+        let user = user_repo.create(new_user).await.unwrap();
+
+        let new_project = NewProject {
+            name: format!("Test Project {}", Uuid::new_v4()),
+            description: Some("Test Description".to_string()),
+        };
+        let project = project_repo.create(new_project).await.unwrap();
+
+        // Add user to project
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user.id)
+        .bind(project.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let new_annotation = NewAnnotation {
+            project_id: project.id,
+            user_id: user.id,
+            study_uid: "1.2.3.4.5".to_string(),
+            series_uid: Some("1.2.3.4.6".to_string()),
+            instance_uid: Some("1.2.3.4.7".to_string()),
+            tool_name: "test_tool".to_string(),
+            tool_version: Some("1.0.0".to_string()),
+            data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+            is_shared: false,
+        };
+
+        let created = repo.create(new_annotation).await.unwrap();
+
+        // Update annotation
+        let updated_data = json!({"type": "rectangle", "x": 200, "y": 300, "width": 100, "height": 80});
+        let updated = repo.update(created.id, updated_data.clone(), false).await.unwrap();
+        assert_eq!(updated.unwrap().data, updated_data);
+
+        // Cleanup
+        repo.delete(created.id).await.unwrap();
+        sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
+            .bind(user.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        user_repo.delete(user.id).await.unwrap();
+        project_repo.delete(project.id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_delete_annotation() {
+        let pool = get_test_pool().await;
+        let repo = AnnotationRepositoryImpl::new(pool.clone());
+
+        // Create user and project
+        let user_repo = UserRepositoryImpl::new(pool.clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+
+        let new_user = NewUser {
+            keycloak_id: Uuid::new_v4(),
+            username: format!("testuser_{}", Uuid::new_v4()),
+            email: format!("test_{}@example.com", Uuid::new_v4()),
+        };
+        let user = user_repo.create(new_user).await.unwrap();
+
+        let new_project = NewProject {
+            name: format!("Test Project {}", Uuid::new_v4()),
+            description: Some("Test Description".to_string()),
+        };
+        let project = project_repo.create(new_project).await.unwrap();
+
+        // Add user to project
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user.id)
+        .bind(project.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let new_annotation = NewAnnotation {
+            project_id: project.id,
+            user_id: user.id,
+            study_uid: "1.2.3.4.5".to_string(),
+            series_uid: Some("1.2.3.4.6".to_string()),
+            instance_uid: Some("1.2.3.4.7".to_string()),
+            tool_name: "test_tool".to_string(),
+            tool_version: Some("1.0.0".to_string()),
+            data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+            is_shared: false,
+        };
+
+        let created = repo.create(new_annotation).await.unwrap();
+        let deleted = repo.delete(created.id).await.unwrap();
+        assert!(deleted);
+
+        let found = repo.find_by_id(created.id).await.unwrap();
+        assert!(found.is_none());
+
+        // Cleanup
+        sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
+            .bind(user.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        user_repo.delete(user.id).await.unwrap();
+        project_repo.delete(project.id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_annotation_history() {
+        let pool = get_test_pool().await;
+        let repo = AnnotationRepositoryImpl::new(pool.clone());
+
+        // Create user and project
+        let user_repo = UserRepositoryImpl::new(pool.clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+
+        let new_user = NewUser {
+            keycloak_id: Uuid::new_v4(),
+            username: format!("testuser_{}", Uuid::new_v4()),
+            email: format!("test_{}@example.com", Uuid::new_v4()),
+        };
+        let user = user_repo.create(new_user).await.unwrap();
+
+        let new_project = NewProject {
+            name: format!("Test Project {}", Uuid::new_v4()),
+            description: Some("Test Description".to_string()),
+        };
+        let project = project_repo.create(new_project).await.unwrap();
+
+        // Add user to project
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user.id)
+        .bind(project.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let new_annotation = NewAnnotation {
+            project_id: project.id,
+            user_id: user.id,
+            study_uid: "1.2.3.4.5".to_string(),
+            series_uid: Some("1.2.3.4.6".to_string()),
+            instance_uid: Some("1.2.3.4.7".to_string()),
+            tool_name: "test_tool".to_string(),
+            tool_version: Some("1.0.0".to_string()),
+            data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+            is_shared: false,
+        };
+
+        let created = repo.create(new_annotation).await.unwrap();
+
+        // Create history entry
+        let created_history = repo.create_history(
+            created.id,
+            user.id,
+            "CREATE",
+            None,
+            Some(created.data.clone())
+        ).await.unwrap();
+        assert_eq!(created_history.annotation_id, created.id);
+        assert_eq!(created_history.action, "CREATE");
+
+        // Find history by annotation ID
+        let history_entries = repo.get_history(created.id).await.unwrap();
+        assert!(history_entries.len() > 0);
+        assert!(history_entries.iter().any(|h| h.id == created_history.id));
+
+        // Cleanup
+        repo.delete(created.id).await.unwrap();
+        sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
+            .bind(user.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        user_repo.delete(user.id).await.unwrap();
+        project_repo.delete(project.id).await.unwrap();
     }
 }

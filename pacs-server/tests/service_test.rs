@@ -1,20 +1,22 @@
-use pacs_server::domain::entities::{RoleScope};
+use pacs_server::domain::entities::{RoleScope, NewAnnotation};
 use pacs_server::domain::repositories::{
     UserRepository, ProjectRepository, RoleRepository,
-    PermissionRepository, AccessLogRepository
+    PermissionRepository, AccessLogRepository, AnnotationRepository
 };
 use pacs_server::domain::services::{
     UserService, UserServiceImpl,
     ProjectService, ProjectServiceImpl,
     PermissionService, PermissionServiceImpl,
     AccessControlService, AccessControlServiceImpl,
+    AnnotationService, AnnotationServiceImpl,
 };
 use pacs_server::infrastructure::repositories::{
     UserRepositoryImpl, ProjectRepositoryImpl, RoleRepositoryImpl,
-    PermissionRepositoryImpl, AccessLogRepositoryImpl,
+    PermissionRepositoryImpl, AccessLogRepositoryImpl, AnnotationRepositoryImpl,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
+use serde_json::json;
 
 async fn get_test_pool() -> PgPool {
     let database_url = std::env::var("DATABASE_URL")
@@ -1507,6 +1509,402 @@ async fn test_access_control_is_project_member() {
     // 멤버임
     let is_member = access_service.is_project_member(user.id, project.id).await.unwrap();
     assert!(is_member);
+
+    cleanup_test_data(&pool).await;
+}
+
+// ========================================
+// AnnotationService Tests
+// ========================================
+
+#[tokio::test]
+async fn test_annotation_service_create_annotation() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    // Create user and project
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
+    let user = user_service
+        .create_user("annotation_user".to_string(), "annotation@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
+    let project = project_service
+        .create_project("Annotation Project".to_string(), Some("Description".to_string()))
+        .await
+        .unwrap();
+
+    // Add user to project
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // Create annotation service
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+
+    let new_annotation = NewAnnotation {
+        project_id: project.id,
+        user_id: user.id,
+        study_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
+        series_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string()),
+        instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
+        tool_name: "test_tool".to_string(),
+        tool_version: Some("1.0.0".to_string()),
+        data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+        is_shared: false,
+    };
+
+    let annotation = annotation_service.create_annotation(new_annotation).await.unwrap();
+    assert_eq!(annotation.project_id, project.id);
+    assert_eq!(annotation.user_id, user.id);
+    assert_eq!(annotation.tool_name, "test_tool");
+    assert_eq!(annotation.is_shared, false);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_annotation_service_get_annotation() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    // Create user and project
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
+    let user = user_service
+        .create_user("get_annotation_user".to_string(), "get@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
+    let project = project_service
+        .create_project("Get Annotation Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // Add user to project
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // Create annotation service
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+
+    let new_annotation = NewAnnotation {
+        project_id: project.id,
+        user_id: user.id,
+        study_uid: "1.2.3.4.5".to_string(),
+        series_uid: Some("1.2.3.4.6".to_string()),
+        instance_uid: Some("1.2.3.4.7".to_string()),
+        tool_name: "test_tool".to_string(),
+        tool_version: Some("1.0.0".to_string()),
+        data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+        is_shared: false,
+    };
+
+    let created = annotation_service.create_annotation(new_annotation).await.unwrap();
+    let found = annotation_service.get_annotation_by_id(created.id).await.unwrap();
+    assert_eq!(found.id, created.id);
+    assert_eq!(found.tool_name, "test_tool");
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_annotation_service_get_annotation_not_found() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+
+    let result = annotation_service.get_annotation_by_id(99999).await;
+    assert!(result.is_err());
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_annotation_service_update_annotation() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    // Create user and project
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
+    let user = user_service
+        .create_user("update_annotation_user".to_string(), "update@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
+    let project = project_service
+        .create_project("Update Annotation Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // Add user to project
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // Create annotation service
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+
+    let new_annotation = NewAnnotation {
+        project_id: project.id,
+        user_id: user.id,
+        study_uid: "1.2.3.4.5".to_string(),
+        series_uid: Some("1.2.3.4.6".to_string()),
+        instance_uid: Some("1.2.3.4.7".to_string()),
+        tool_name: "test_tool".to_string(),
+        tool_version: Some("1.0.0".to_string()),
+        data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+        is_shared: false,
+    };
+
+    let created = annotation_service.create_annotation(new_annotation).await.unwrap();
+
+    // Update annotation
+    let updated_data = json!({"type": "rectangle", "x": 200, "y": 300, "width": 100, "height": 80});
+    let updated = annotation_service.update_annotation(created.id, updated_data.clone(), false).await.unwrap();
+    assert_eq!(updated.data, updated_data);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_annotation_service_delete_annotation() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    // Create user and project
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
+    let user = user_service
+        .create_user("delete_annotation_user".to_string(), "delete@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
+    let project = project_service
+        .create_project("Delete Annotation Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // Add user to project
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // Create annotation service
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+
+    let new_annotation = NewAnnotation {
+        project_id: project.id,
+        user_id: user.id,
+        study_uid: "1.2.3.4.5".to_string(),
+        series_uid: Some("1.2.3.4.6".to_string()),
+        instance_uid: Some("1.2.3.4.7".to_string()),
+        tool_name: "test_tool".to_string(),
+        tool_version: Some("1.0.0".to_string()),
+        data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+        is_shared: false,
+    };
+
+    let created = annotation_service.create_annotation(new_annotation).await.unwrap();
+    annotation_service.delete_annotation(created.id).await.unwrap();
+
+    let result = annotation_service.get_annotation_by_id(created.id).await;
+    assert!(result.is_err());
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_annotation_service_get_user_annotations() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    // Create user and project
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
+    let user = user_service
+        .create_user("list_annotation_user".to_string(), "list@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
+    let project = project_service
+        .create_project("List Annotation Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // Add user to project
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // Create annotation service
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+
+    // Create multiple annotations
+    for i in 0..3 {
+        let new_annotation = NewAnnotation {
+            project_id: project.id,
+            user_id: user.id,
+            study_uid: format!("1.2.3.4.{}", i),
+            series_uid: Some(format!("1.2.3.5.{}", i)),
+            instance_uid: Some(format!("1.2.3.6.{}", i)),
+            tool_name: "test_tool".to_string(),
+            tool_version: Some("1.0.0".to_string()),
+            data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
+            is_shared: false,
+        };
+        annotation_service.create_annotation(new_annotation).await.unwrap();
+    }
+
+    let annotations = annotation_service.get_annotations_by_user(user.id).await.unwrap();
+    assert_eq!(annotations.len(), 3);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_annotation_service_get_project_annotations() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    // Create user and project
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
+    let user = user_service
+        .create_user("project_annotation_user".to_string(), "project@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
+    let project = project_service
+        .create_project("Project Annotation Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // Add user to project
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // Create annotation service
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+
+    // Create multiple annotations
+    for i in 0..2 {
+        let new_annotation = NewAnnotation {
+            project_id: project.id,
+            user_id: user.id,
+            study_uid: format!("1.2.3.4.{}", i),
+            series_uid: Some(format!("1.2.3.5.{}", i)),
+            instance_uid: Some(format!("1.2.3.6.{}", i)),
+            tool_name: "test_tool".to_string(),
+            tool_version: Some("1.0.0".to_string()),
+            data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
+            is_shared: false,
+        };
+        annotation_service.create_annotation(new_annotation).await.unwrap();
+    }
+
+    let annotations = annotation_service.get_annotations_by_project(project.id).await.unwrap();
+    assert_eq!(annotations.len(), 2);
+
+    cleanup_test_data(&pool).await;
+}
+
+#[tokio::test]
+async fn test_annotation_service_get_study_annotations() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    // Create user and project
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_service = UserServiceImpl::new(user_repo, project_repo);
+    let user = user_service
+        .create_user("study_annotation_user".to_string(), "study@test.com".to_string(), Uuid::new_v4())
+        .await
+        .unwrap();
+
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let project_service = ProjectServiceImpl::new(project_repo, user_repo, role_repo);
+    let project = project_service
+        .create_project("Study Annotation Project".to_string(), None)
+        .await
+        .unwrap();
+
+    // Add user to project
+    user_service.add_user_to_project(user.id, project.id).await.unwrap();
+
+    // Create annotation service
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+
+    let study_uid = "1.2.840.113619.2.55.3.123456789";
+
+    // Create multiple annotations for the same study
+    for i in 0..2 {
+        let new_annotation = NewAnnotation {
+            project_id: project.id,
+            user_id: user.id,
+            study_uid: study_uid.to_string(),
+            series_uid: Some(format!("1.2.3.5.{}", i)),
+            instance_uid: Some(format!("1.2.3.6.{}", i)),
+            tool_name: "test_tool".to_string(),
+            tool_version: Some("1.0.0".to_string()),
+            data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
+            is_shared: false,
+        };
+        annotation_service.create_annotation(new_annotation).await.unwrap();
+    }
+
+    let annotations = annotation_service.get_annotations_by_study(study_uid).await.unwrap();
+    assert_eq!(annotations.len(), 2);
 
     cleanup_test_data(&pool).await;
 }

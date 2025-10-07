@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// 로그인 요청 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct LoginRequest {
     pub keycloak_id: Uuid,
     pub username: String,
@@ -10,7 +11,7 @@ pub struct LoginRequest {
 }
 
 /// 로그인 응답 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct LoginResponse {
     pub user_id: i32,
     pub keycloak_id: Uuid,
@@ -22,13 +23,13 @@ pub struct LoginResponse {
 }
 
 /// 토큰 갱신 요청 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct RefreshTokenRequest {
     pub refresh_token: String,
 }
 
 /// 토큰 갱신 응답 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct RefreshTokenResponse {
     pub token: String,
     pub token_type: String,
@@ -36,7 +37,7 @@ pub struct RefreshTokenResponse {
 }
 
 /// 토큰 검증 응답 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct VerifyTokenResponse {
     pub user_id: i32,
     pub keycloak_id: Uuid,

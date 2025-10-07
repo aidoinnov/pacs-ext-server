@@ -17,6 +17,10 @@ jsonwebtoken = "9.2"
 base64 = "0.21"
 actix-web = "4.9"
 actix-rt = "2.10"
+futures = "0.3.31"
+redis = "0.32.7"
+utoipa = { version = "5.4.0", features = ["actix_extras", "uuid"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
