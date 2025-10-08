@@ -19,3 +19,4 @@ pub trait AnnotationRepository: Send + Sync {
     async fn get_history(&self, annotation_id: i32) -> Result<Vec<AnnotationHistory>, sqlx::Error>;
     fn pool(&self) -> &PgPool;
 }
+

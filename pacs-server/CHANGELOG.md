@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2025-10-07: Annotation API Developer Guide
+
+#### Documentation
+- **ANNOTATION_API_GUIDE.md** - Complete developer guide for annotation API
+  - Detailed API endpoint documentation (5 endpoints)
+  - Request/response examples with JSON payloads
+  - Annotation data type examples (circle, rectangle, point, polygon)
+  - Query parameter reference and usage
+  - HTTP status code guide
+  - cURL test commands for all endpoints
+  - Architecture and security considerations
+  - Performance optimization notes
+
+#### Features
+- **Comprehensive API Reference** - Complete guide for annotation management
+  - Step-by-step API usage instructions
+  - Real-world example payloads
+  - Multiple annotation type support documentation
+  - Filtering and querying examples
+- **Developer Experience** - Enhanced documentation for API consumers
+  - Copy-paste ready cURL commands
+  - Detailed error handling examples
+  - Swagger UI integration references
+
+---
+
 ### Added - 2025-10-07: Complete API Documentation & Testing Suite
 
 #### Features

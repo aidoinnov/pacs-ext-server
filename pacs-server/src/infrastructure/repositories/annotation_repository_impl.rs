@@ -196,3 +196,4 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         &self.pool
     }
 }
+
