@@ -9,6 +9,7 @@ pub struct Settings {
     pub keycloak: KeycloakConfig,
     pub logging: LoggingConfig,
     pub jwt: JwtConfig,
+    pub cors: CorsConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -47,6 +48,16 @@ pub struct LoggingConfig {
 pub struct JwtConfig {
     pub secret: String,
     pub expiration_hours: i64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CorsConfig {
+    pub enabled: bool,
+    pub allowed_origins: Vec<String>,
+    pub allowed_methods: Vec<String>,
+    pub allowed_headers: Vec<String>,
+    pub expose_headers: Vec<String>,
+    pub max_age: u64,
 }
 
 impl Settings {
@@ -136,6 +147,14 @@ mod tests {
                 secret: "test-secret".to_string(),
                 expiration_hours: 24,
             },
+            cors: CorsConfig {
+                enabled: false,
+                allowed_origins: vec!["http://localhost:3000".to_string()],
+                allowed_methods: vec!["GET".to_string(), "POST".to_string()],
+                allowed_headers: vec!["Content-Type".to_string()],
+                expose_headers: vec!["Content-Length".to_string()],
+                max_age: 3600,
+            },
         };
 
         let url = settings.database_url();
@@ -174,6 +193,14 @@ mod tests {
             jwt: JwtConfig {
                 secret: "test-secret".to_string(),
                 expiration_hours: 24,
+            },
+            cors: CorsConfig {
+                enabled: false,
+                allowed_origins: vec!["http://localhost:3000".to_string()],
+                allowed_methods: vec!["GET".to_string(), "POST".to_string()],
+                allowed_headers: vec!["Content-Type".to_string()],
+                expose_headers: vec!["Content-Length".to_string()],
+                max_age: 3600,
             },
         };
 

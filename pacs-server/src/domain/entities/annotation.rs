@@ -16,6 +16,8 @@ pub struct Annotation {
     pub is_shared: bool,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub viewer_software: Option<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -38,6 +40,8 @@ pub struct NewAnnotation {
     pub instance_uid: Option<String>,
     pub tool_name: String,
     pub tool_version: Option<String>,
+    pub viewer_software: Option<String>,
+    pub description: Option<String>,
     pub data: serde_json::Value,
     pub is_shared: bool,
 }

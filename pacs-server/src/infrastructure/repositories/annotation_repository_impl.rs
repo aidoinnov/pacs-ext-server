@@ -19,7 +19,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn find_by_id(&self, id: i32) -> Result<Option<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                    tool_name, tool_version, data, is_shared, created_at, updated_at
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
              FROM annotation_annotation
              WHERE id = $1"
         )
@@ -31,7 +32,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn find_by_project_id(&self, project_id: i32) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                    tool_name, tool_version, data, is_shared, created_at, updated_at
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
              FROM annotation_annotation
              WHERE project_id = $1
              ORDER BY created_at DESC"
@@ -44,7 +46,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn find_by_user_id(&self, user_id: i32) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                    tool_name, tool_version, data, is_shared, created_at, updated_at
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
              FROM annotation_annotation
              WHERE user_id = $1
              ORDER BY created_at DESC"
@@ -57,7 +60,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn find_by_study_uid(&self, study_uid: &str) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                    tool_name, tool_version, data, is_shared, created_at, updated_at
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
              FROM annotation_annotation
              WHERE study_uid = $1
              ORDER BY created_at DESC"
@@ -70,7 +74,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn find_by_series_uid(&self, series_uid: &str) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                    tool_name, tool_version, data, is_shared, created_at, updated_at
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
              FROM annotation_annotation
              WHERE series_uid = $1
              ORDER BY created_at DESC"
@@ -83,7 +88,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn find_by_instance_uid(&self, instance_uid: &str) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                    tool_name, tool_version, data, is_shared, created_at, updated_at
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
              FROM annotation_annotation
              WHERE instance_uid = $1
              ORDER BY created_at DESC"
@@ -96,7 +102,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn find_by_project_and_study(&self, project_id: i32, study_uid: &str) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                    tool_name, tool_version, data, is_shared, created_at, updated_at
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
              FROM annotation_annotation
              WHERE project_id = $1 AND study_uid = $2
              ORDER BY created_at DESC"
@@ -110,7 +117,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn find_shared_annotations(&self, project_id: i32) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                    tool_name, tool_version, data, is_shared, created_at, updated_at
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
              FROM annotation_annotation
              WHERE project_id = $1 AND is_shared = true
              ORDER BY created_at DESC"
@@ -123,10 +131,11 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     async fn create(&self, new_annotation: NewAnnotation) -> Result<Annotation, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
             "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid, 
-                                               tool_name, tool_version, data, is_shared)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                                               tool_name, tool_version, data, is_shared, viewer_software, description)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
              RETURNING id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                       tool_name, tool_version, data, is_shared, created_at, updated_at"
+                       tool_name, tool_version, data, is_shared, created_at, updated_at,
+                       viewer_software, description"
         )
         .bind(new_annotation.project_id)
         .bind(new_annotation.user_id)
@@ -137,6 +146,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         .bind(new_annotation.tool_version)
         .bind(new_annotation.data)
         .bind(new_annotation.is_shared)
+        .bind(new_annotation.viewer_software)
+        .bind(new_annotation.description)
         .fetch_one(&self.pool)
         .await
     }
@@ -147,7 +158,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
              SET data = $2, is_shared = $3, updated_at = CURRENT_TIMESTAMP
              WHERE id = $1
              RETURNING id, project_id, user_id, study_uid, series_uid, instance_uid, 
-                       tool_name, tool_version, data, is_shared, created_at, updated_at"
+                       tool_name, tool_version, data, is_shared, created_at, updated_at,
+                       viewer_software, description"
         )
         .bind(id)
         .bind(data)

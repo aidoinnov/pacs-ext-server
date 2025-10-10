@@ -31,3 +31,11 @@ format = "json"
 [jwt]
 secret = "your-secret-key-change-this-in-production"
 expiration_hours = 24
+
+[cors]
+enabled = false
+allowed_origins = ["http://localhost:3000", "http://localhost:8080"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allowed_headers = ["Content-Type", "Authorization", "X-Requested-With"]
+expose_headers = ["Content-Length", "X-Total-Count"]
+max_age = 3600

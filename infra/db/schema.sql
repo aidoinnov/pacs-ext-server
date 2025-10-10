@@ -206,6 +206,8 @@ CREATE TABLE annotation_annotation (
     instance_uid TEXT,
     tool_name TEXT NOT NULL,
     tool_version TEXT,
+    viewer_software TEXT,
+    description TEXT,
     data JSONB NOT NULL,
     is_shared BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

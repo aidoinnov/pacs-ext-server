@@ -23,8 +23,8 @@ use infrastructure::repositories::{
     AccessLogRepositoryImpl, AnnotationRepositoryImpl,
 };
 use infrastructure::auth::JwtService;
-use infrastructure::config::JwtConfig;
-use infrastructure::middleware::CacheHeaders;
+use infrastructure::config::{JwtConfig, Settings};
+use infrastructure::middleware::{CacheHeaders, configure_cors};
 use presentation::controllers::{
     auth_controller, user_controller, project_controller, permission_controller,
     access_control_controller, annotation_controller,
@@ -46,13 +46,26 @@ async fn main() -> std::io::Result<()> {
     println!("🚀 PACS Extension Server - Initialization");
     println!("{}\n", "=".repeat(80));
 
+    // Load configuration
+    print!("⚙️  Loading configuration... ");
+    let settings = Settings::new().expect("Failed to load configuration");
+    println!("✅ Done");
+
+    // CORS configuration
+    print!("🌐 Configuring CORS... ");
+    let cors_enabled = settings.cors.enabled;
+    println!("✅ {} (Origins: {:?})", 
+        if cors_enabled { "Enabled" } else { "Disabled" }, 
+        settings.cors.allowed_origins
+    );
+
     // Database connection
     print!("📦 Connecting to PostgreSQL... ");
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://admin:admin123@localhost:5432/pacs_db".to_string());
+    let database_url = settings.database_url();
 
     let pool = PgPoolOptions::new()
-        .max_connections(5)
+        .max_connections(settings.database.max_connections)
+        .min_connections(settings.database.min_connections)
         .connect(&database_url)
         .await
         .expect("Failed to connect to database");
@@ -83,12 +96,8 @@ async fn main() -> std::io::Result<()> {
 
     // Initialize JWT service
     print!("🔐 Initializing JWT service... ");
-    let jwt_config = JwtConfig {
-        secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "default_secret_key".to_string()),
-        expiration_hours: 24,
-    };
-    let jwt_service = JwtService::new(&jwt_config);
-    println!("✅ Done (TTL: {}h)", jwt_config.expiration_hours);
+    let jwt_service = JwtService::new(&settings.jwt);
+    println!("✅ Done (TTL: {}h)", settings.jwt.expiration_hours);
 
     // Initialize services
     print!("⚙️  Initializing domain services... ");
@@ -145,6 +154,8 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            // CORS middleware
+            .wrap(configure_cors(&settings.cors))
             // Cache headers middleware
             .wrap(CacheHeaders::new(cache_enabled, cache_ttl))
             // Swagger UI (commented out for now)
@@ -165,7 +176,8 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
             )
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind((settings.server.host.as_str(), settings.server.port))?
+    .workers(settings.server.workers)
     .run()
     .await
 }
