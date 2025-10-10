@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2025-10-07: Annotation Field Extensions & Test Improvements
+
+#### New Features
+- **Extended Annotation Fields** - Added new metadata fields to annotation system
+  - `viewer_software`: Optional field to track which viewer software created the annotation
+  - `description`: Optional field for additional annotation descriptions and notes
+  - Enhanced `tool_name` and `tool_version` fields with proper validation
+  - All new fields are properly integrated into DTOs, entities, and database schema
+
+#### Database Schema Updates
+- **annotation_annotation table** - Added new columns
+  - `viewer_software TEXT` - Viewer software information
+  - `description TEXT` - Annotation description field
+  - Updated all repository implementations to handle new fields
+
+#### Testing Infrastructure
+- **Comprehensive Integration Tests** - Enhanced annotation controller tests
+  - Added tests for new field creation and validation
+  - Added tests for partial field submission scenarios
+  - Added database persistence verification for all new fields
+  - All 9 annotation controller tests now passing
+- **Unit Tests** - Added annotation DTO serialization/deserialization tests
+  - Tests for various annotation data types (circle, rectangle, point)
+  - Tests for optional field handling
+  - Tests for JSON payload validation
+
+#### CORS Support
+- **CORS Middleware** - Added configurable CORS support
+  - `actix-cors` dependency integration
+  - Configurable CORS settings via `default.toml`
+  - Support for allowed origins, methods, headers, and max age
+  - CORS disabled by default for security
+
+#### Technical Improvements
+- **Repository Layer** - Fixed missing column handling
+  - Updated `annotation_repository_impl.rs` INSERT/SELECT statements
+  - Fixed field order alignment with actual database schema
+  - Proper error handling for database operations
+- **Use Case Layer** - Enhanced annotation business logic
+  - Updated `annotation_use_case.rs` to handle new fields
+  - Proper mapping between DTOs and entities
+  - Maintained backward compatibility
+
+#### Documentation
+- **CORS Development Guide** - Added comprehensive CORS documentation
+  - CORS concepts and implementation details
+  - Configuration management and security considerations
+  - Testing strategies and operational guidelines
+  - Troubleshooting common CORS issues
+- **Technical Documentation TODO** - Created comprehensive documentation roadmap
+  - 11 categories of technical documentation planned
+  - Priority-based organization (High/Medium/Low)
+  - Detailed task breakdown for future development
+  - Documentation quality guidelines and management strategy
+
 ### Added - 2025-10-07: Annotation API Developer Guide
 
 #### Documentation
