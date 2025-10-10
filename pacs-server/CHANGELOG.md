@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2025-10-07: Mask Upload System Foundation
+
+#### Database Schema
+- **annotation_mask_group table** - New table for managing mask groups
+  - `id`, `annotation_id`, `group_name`, `model_name`, `version`, `modality`
+  - `slice_count`, `mask_type`, `description`, `created_by`, `created_at`
+  - Foreign key constraint to `annotation_annotation` with CASCADE delete
+  - Index on `annotation_id` for performance optimization
+
+- **annotation_mask table** - New table for individual mask files
+  - `id`, `mask_group_id`, `slice_index`, `sop_instance_uid`, `label_name`
+  - `file_path`, `mime_type`, `file_size`, `checksum`, `width`, `height`, `created_at`
+  - Foreign key constraint to `annotation_mask_group` with CASCADE delete
+  - Indexes on `mask_group_id`, `sop_instance_uid`, and `label_name`
+
+#### Data Transfer Objects (DTOs)
+- **Mask Group DTOs** - Complete set of DTOs for mask group operations
+  - `CreateMaskGroupRequest` - Mask group creation with AI model metadata
+  - `MaskGroupResponse` - Complete mask group information
+  - `UpdateMaskGroupRequest` - Mask group update operations
+  - `SignedUrlRequest/Response` - S3 signed URL generation for direct uploads
+  - `CompleteUploadRequest/Response` - Upload completion processing
+  - `MaskGroupListResponse` - Paginated mask group listings
+  - `MaskGroupDetailResponse` - Detailed mask group with statistics
+
+- **Mask DTOs** - Complete set of DTOs for individual mask operations
+  - `MaskResponse` - Individual mask file information
+  - `CreateMaskRequest` - Mask file creation with metadata
+  - `UpdateMaskRequest` - Mask file update operations
+  - `ListMasksRequest` - Filtered mask listing with pagination
+  - `MaskListResponse` - Paginated mask listings with metadata
+  - `DownloadUrlRequest/Response` - Secure download URL generation
+  - `MaskStatsResponse` - Statistical analysis of mask collections
+
+#### Technical Implementation
+- **Database Migration** - `003_add_mask_tables.sql` migration script
+  - Comprehensive table creation with proper constraints
+  - Performance-optimized indexing strategy
+  - Detailed column comments for documentation
+  - CASCADE delete relationships for data integrity
+
+- **Swagger Documentation** - Full OpenAPI 3.0 schema support
+  - All DTOs implement `ToSchema` trait for automatic documentation
+  - Detailed field descriptions and examples
+  - Proper JSON schema generation for client SDKs
+
+#### Architecture Design
+- **Clean Architecture Compliance** - Proper layer separation
+  - DTOs in Application layer for API contracts
+  - Database schema designed for scalability
+  - Foreign key relationships maintain data integrity
+  - Indexed fields optimized for common query patterns
+
 ### Added - 2025-10-07: Annotation Field Extensions & Test Improvements
 
 #### New Features

@@ -27,6 +27,26 @@ src/
     └── routes/          # 라우트 정의
 ```
 
+## 주요 기능
+
+### 1. DICOM 이미지 어노테이션
+- 원형, 사각형, 점, 다각형 등 다양한 어노테이션 타입 지원
+- 실시간 어노테이션 생성, 수정, 삭제
+- 어노테이션 공유 및 협업 기능
+- 상세한 메타데이터 관리 (도구명, 버전, 뷰어 정보 등)
+
+### 2. 마스크 업로드 시스템 (개발 중)
+- **AI 세그멘테이션 결과 업로드**: AI 모델이 생성한 마스크 데이터를 안전하게 저장
+- **직접 업로드**: 클라이언트가 S3/MinIO에 직접 업로드하여 서버 부하 최소화
+- **Signed URL 기반 보안**: 시간 제한된 업로드 URL로 보안성 확보
+- **메타데이터 관리**: 슬라이스 인덱스, 라벨명, SOP Instance UID 등 DICOM 표준 준수
+- **확장 가능한 구조**: 3D 볼륨, 다중 라벨, 버전 관리 지원
+
+### 3. 프로젝트 기반 접근 제어
+- 사용자별 프로젝트 멤버십 관리
+- 역할 기반 권한 시스템
+- 세밀한 리소스 접근 제어
+
 ## 클린 아키텍처 원칙
 
 1. **의존성 규칙**: 외부 계층 → 내부 계층 (domain은 어떤 계층도 의존하지 않음)
@@ -127,6 +147,15 @@ cargo test -- --nocapture
 - `POST /api/projects` - 프로젝트 생성
 - `GET /api/projects` - 프로젝트 목록 조회
 - `GET /api/projects/active` - 활성 프로젝트 조회
+
+### Mask Upload API (마스크 업로드 시스템) - 개발 중
+- `POST /api/annotations/{annotation_id}/mask-groups` - 마스크 그룹 생성
+- `GET /api/annotations/{annotation_id}/mask-groups` - 마스크 그룹 목록 조회
+- `GET /api/annotations/{annotation_id}/mask-groups/{group_id}` - 마스크 그룹 상세 조회
+- `POST /api/annotations/{annotation_id}/mask-groups/{group_id}/signed-url` - 업로드용 Signed URL 발급
+- `POST /api/annotations/{annotation_id}/mask-groups/{group_id}/complete` - 업로드 완료 처리
+- `DELETE /api/annotations/{annotation_id}/mask-groups/{group_id}` - 마스크 그룹 삭제
+- `GET /api/annotations/{annotation_id}/mask-groups/{group_id}/masks` - 마스크 목록 조회
 - `GET /api/projects/{id}` - 특정 프로젝트 조회
 
 ### Authentication API (인증)
@@ -218,6 +247,18 @@ CACHE_TTL_SECONDS=300       # TTL 5분 (권장)
 - `APP_KEYCLOAK__REALM` - Realm 이름
 - `APP_KEYCLOAK__CLIENT_ID` - Client ID
 - `APP_KEYCLOAK__CLIENT_SECRET` - Client Secret
+
+### Object Storage 설정 (마스크 업로드용)
+- `APP_OBJECT_STORAGE__PROVIDER` - 스토리지 제공자 (s3, minio)
+- `APP_OBJECT_STORAGE__BUCKET_NAME` - 버킷 이름
+- `APP_OBJECT_STORAGE__REGION` - AWS 리전
+- `APP_OBJECT_STORAGE__ENDPOINT` - MinIO 엔드포인트 (MinIO 사용시)
+- `APP_OBJECT_STORAGE__ACCESS_KEY` - 액세스 키
+- `APP_OBJECT_STORAGE__SECRET_KEY` - 시크릿 키
+
+### Signed URL 설정
+- `APP_SIGNED_URL__DEFAULT_TTL` - 기본 만료 시간 (초, 기본: 600)
+- `APP_SIGNED_URL__MAX_TTL` - 최대 만료 시간 (초, 기본: 3600)
 
 ### JWT 설정
 - `APP_JWT__SECRET` - JWT 서명 키 (최소 32자 권장)
