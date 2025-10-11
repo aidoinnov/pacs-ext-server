@@ -4,6 +4,8 @@ mod role_repository;
 mod permission_repository;
 mod access_log_repository;
 mod annotation_repository;
+mod mask_group_repository;
+mod mask_repository;
 
 pub use user_repository::*;
 pub use project_repository::*;
@@ -11,3 +13,5 @@ pub use role_repository::*;
 pub use permission_repository::*;
 pub use access_log_repository::*;
 pub use annotation_repository::*;
+pub use mask_group_repository::*;
+pub use mask_repository::*;

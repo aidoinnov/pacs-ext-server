@@ -8,6 +8,8 @@ pub mod relations;
 pub mod logs;
 pub mod viewer;
 pub mod annotation;
+pub mod mask_group;
+pub mod mask;
 
 pub use user::*;
 pub use project::*;
@@ -19,3 +21,5 @@ pub use relations::*;
 pub use logs::*;
 pub use viewer::*;
 pub use annotation::*;
+pub use mask_group::*;
+pub use mask::*;

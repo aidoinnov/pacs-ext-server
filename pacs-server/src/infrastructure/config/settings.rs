@@ -173,6 +173,18 @@ mod tests {
                 expose_headers: vec!["Content-Length".to_string()],
                 max_age: 3600,
             },
+            object_storage: ObjectStorageConfig {
+                provider: "s3".to_string(),
+                bucket_name: "test-bucket".to_string(),
+                region: "us-east-1".to_string(),
+                endpoint: "".to_string(),
+                access_key: "test-key".to_string(),
+                secret_key: "test-secret".to_string(),
+            },
+            signed_url: SignedUrlConfig {
+                default_ttl: 600,
+                max_ttl: 3600,
+            },
         };
 
         let url = settings.database_url();
@@ -219,6 +231,18 @@ mod tests {
                 allowed_headers: vec!["Content-Type".to_string()],
                 expose_headers: vec!["Content-Length".to_string()],
                 max_age: 3600,
+            },
+            object_storage: ObjectStorageConfig {
+                provider: "s3".to_string(),
+                bucket_name: "test-bucket".to_string(),
+                region: "us-east-1".to_string(),
+                endpoint: "".to_string(),
+                access_key: "test-key".to_string(),
+                secret_key: "test-secret".to_string(),
+            },
+            signed_url: SignedUrlConfig {
+                default_ttl: 600,
+                max_ttl: 3600,
             },
         };
 

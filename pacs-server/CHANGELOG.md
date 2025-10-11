@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2025-01-15: Mask Upload System Implementation
+
+#### Complete Mask Upload System
+- **Domain Layer Implementation** - Full entity and repository design
+  - `MaskGroup` entity - 마스크 그룹 관리 (AI 모델, 수동 생성 지원)
+  - `Mask` entity - 개별 마스크 파일 관리 (PNG, JPEG, DICOM 지원)
+  - `MaskGroupRepository` trait - 마스크 그룹 데이터 접근 인터페이스
+  - `MaskRepository` trait - 마스크 파일 데이터 접근 인터페이스
+  - 통계 정보 구조체 (`MaskGroupStats`, `MaskStats`)
+
+#### Database Schema & Migration
+- **Mask Tables** - 완전한 데이터베이스 스키마
+  - `annotation_mask_group` 테이블 - 마스크 그룹 정보 저장
+  - `annotation_mask` 테이블 - 개별 마스크 파일 정보 저장
+  - `sop_instance_uid` 필드 - DICOM SOP Instance UID 지원
+  - 인덱스 최적화 및 외래키 제약조건
+  - `003_add_mask_tables.sql` 마이그레이션 파일
+
+#### DTOs & API Contracts
+- **Comprehensive DTOs** - 완전한 API 계약 정의
+  - `CreateMaskGroupRequest` - 마스크 그룹 생성 요청
+  - `MaskGroupResponse` - 마스크 그룹 응답
+  - `CreateMaskRequest` - 마스크 생성 요청
+  - `MaskResponse` - 마스크 응답
+  - `SignedUrlRequest/Response` - Signed URL 생성 및 응답
+  - Swagger/OpenAPI 문서화 지원
+
+#### Object Storage Service
+- **Unified Storage Interface** - 통합 스토리지 서비스
+  - `ObjectStorageService` trait - 스토리지 서비스 인터페이스
+  - `S3ObjectStorageService` - AWS S3 구현체
+  - `MinIOObjectStorageService` - MinIO 구현체
+  - `ObjectStorageError` - 통합 에러 처리
+  - `UploadedFile` - 파일 메타데이터 구조체
+
+#### Signed URL Service
+- **Secure URL Generation** - 보안 URL 생성 서비스
+  - `SignedUrlService` trait - Signed URL 서비스 인터페이스
+  - `SignedUrlServiceImpl` - 실제 구현체
+  - PUT URL 생성 (업로드용) - TTL 설정 (기본 10분, 최대 1시간)
+  - GET URL 생성 (다운로드용) - 보안 다운로드 지원
+  - 파일 경로 검증 및 TTL 검증
+  - 메타데이터 자동 추가 (어노테이션 ID, 사용자 ID, 마스크 그룹 ID)
+
+#### Configuration & Environment
+- **Object Storage Configuration** - 스토리지 설정 관리
+  - `ObjectStorageConfig` - S3/MinIO 설정 구조체
+  - `SignedUrlConfig` - Signed URL 설정 구조체
+  - 환경변수 지원 (`APP_OBJECT_STORAGE__` prefix)
+  - 개발/운영 환경 분리
+
+#### Testing & Quality Assurance
+- **Comprehensive Testing** - 포괄적인 테스트 커버리지
+  - Unit tests for entities and services
+  - Mock Object Storage Service for testing
+  - Integration tests for annotation controller
+  - 9/9 tests passing successfully
+  - Error handling and edge case testing
+
+#### Technical Documentation
+- **Complete Documentation** - 완전한 기술 문서화
+  - `MASK_UPLOAD_SYSTEM_IMPLEMENTATION.md` - 시스템 구현 가이드
+  - API 엔드포인트 문서화
+  - 보안 기능 및 성능 최적화 가이드
+  - 배포 및 운영 가이드
+  - 향후 계획 및 로드맵
+
+#### File Path Structure
+- **Organized File Management** - 체계적인 파일 관리
+  - 마스크 파일: `masks/annotation_{id}/group_{id}/{filename}`
+  - 어노테이션 데이터: `annotations/annotation_{id}/{filename}`
+  - 메타데이터 자동 추가 및 검증
+
 ### Added - 2025-10-07: AWS S3 Integration & Object Storage
 
 #### AWS S3 Integration
