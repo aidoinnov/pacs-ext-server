@@ -11,12 +11,13 @@ pub struct Mask {
     pub sop_instance_uid: Option<String>,
     pub label_name: Option<String>,
     pub file_path: String,
-    pub mime_type: String,
+    pub mime_type: Option<String>,
     pub file_size: Option<i64>,
     pub checksum: Option<String>,
     pub width: Option<i32>,
     pub height: Option<i32>,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// 새로운 마스크 생성용 구조체
@@ -27,7 +28,7 @@ pub struct NewMask {
     pub sop_instance_uid: Option<String>,
     pub label_name: Option<String>,
     pub file_path: String,
-    pub mime_type: String,
+    pub mime_type: Option<String>,
     pub file_size: Option<i64>,
     pub checksum: Option<String>,
     pub width: Option<i32>,
@@ -54,7 +55,7 @@ impl NewMask {
             sop_instance_uid,
             label_name,
             file_path,
-            mime_type,
+            mime_type: Some(mime_type),
             file_size,
             checksum,
             width,
@@ -70,7 +71,7 @@ impl NewMask {
             sop_instance_uid: None,
             label_name: None,
             file_path,
-            mime_type: "image/png".to_string(),
+            mime_type: Some("image/png".to_string()),
             file_size: None,
             checksum: None,
             width: None,
@@ -95,7 +96,7 @@ impl NewMask {
             sop_instance_uid,
             label_name,
             file_path,
-            mime_type: "image/png".to_string(),
+            mime_type: Some("image/png".to_string()),
             file_size,
             checksum: None,
             width,
@@ -120,7 +121,7 @@ impl NewMask {
             sop_instance_uid,
             label_name,
             file_path,
-            mime_type: "image/jpeg".to_string(),
+            mime_type: Some("image/jpeg".to_string()),
             file_size,
             checksum: None,
             width,
@@ -145,7 +146,7 @@ impl NewMask {
             sop_instance_uid: Some(sop_instance_uid),
             label_name,
             file_path,
-            mime_type: "application/dicom".to_string(),
+            mime_type: Some("application/dicom".to_string()),
             file_size,
             checksum: None,
             width,
@@ -193,6 +194,7 @@ impl From<Mask> for NewMask {
 /// 마스크 업데이트용 구조체
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UpdateMask {
+    pub id: i32,
     pub slice_index: Option<i32>,
     pub sop_instance_uid: Option<String>,
     pub label_name: Option<String>,
@@ -206,8 +208,9 @@ pub struct UpdateMask {
 
 impl UpdateMask {
     /// 빈 업데이트 구조체 생성
-    pub fn new() -> Self {
+    pub fn new(id: i32) -> Self {
         Self {
+            id,
             slice_index: None,
             sop_instance_uid: None,
             label_name: None,
@@ -272,7 +275,7 @@ impl UpdateMask {
 
 impl Default for UpdateMask {
     fn default() -> Self {
-        Self::new()
+        Self::new(0) // Default ID, should be set properly when used
     }
 }
 
@@ -280,7 +283,7 @@ impl Default for UpdateMask {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MaskStats {
     pub total_masks: i64,
-    pub total_size: i64,
+    pub total_size_bytes: i64,
     pub mime_types: std::collections::HashMap<String, i64>,
     pub label_names: std::collections::HashMap<String, i64>,
     pub average_file_size: f64,
@@ -293,7 +296,7 @@ impl MaskStats {
     pub fn new() -> Self {
         Self {
             total_masks: 0,
-            total_size: 0,
+            total_size_bytes: 0,
             mime_types: std::collections::HashMap::new(),
             label_names: std::collections::HashMap::new(),
             average_file_size: 0.0,
@@ -315,7 +318,7 @@ impl MaskStats {
     /// 평균 파일 크기 계산
     pub fn calculate_average_file_size(&mut self) {
         if self.total_masks > 0 {
-            self.average_file_size = self.total_size as f64 / self.total_masks as f64;
+            self.average_file_size = self.total_size_bytes as f64 / self.total_masks as f64;
         }
     }
 }
@@ -330,7 +333,7 @@ impl Default for MaskStats {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MaskFileInfo {
     pub file_name: String,
-    pub mime_type: String,
+    pub mime_type: Option<String>,
     pub file_size: i64,
     pub checksum: Option<String>,
     pub width: Option<i32>,
@@ -355,7 +358,7 @@ impl MaskFileInfo {
     ) -> Self {
         Self {
             file_name,
-            mime_type,
+            mime_type: Some(mime_type),
             file_size,
             checksum,
             width,
@@ -378,7 +381,7 @@ impl MaskFileInfo {
     ) -> Self {
         Self {
             file_name,
-            mime_type: "image/png".to_string(),
+            mime_type: Some("image/png".to_string()),
             file_size,
             checksum: None,
             width: Some(width),
@@ -401,7 +404,7 @@ impl MaskFileInfo {
     ) -> Self {
         Self {
             file_name,
-            mime_type: "image/jpeg".to_string(),
+            mime_type: Some("image/jpeg".to_string()),
             file_size,
             checksum: None,
             width: Some(width),
@@ -434,7 +437,7 @@ mod tests {
 
         assert_eq!(mask.mask_group_id, 123);
         assert_eq!(mask.file_path, "mask/group123/slice_001.png");
-        assert_eq!(mask.mime_type, "image/png");
+        assert_eq!(mask.mime_type, Some("image/png".to_string()));
         assert_eq!(mask.slice_index, Some(1));
         assert_eq!(mask.sop_instance_uid, Some("1.2.3.4.5.6.7.8.9.10".to_string()));
         assert_eq!(mask.label_name, Some("liver".to_string()));
@@ -450,7 +453,7 @@ mod tests {
 
         assert_eq!(mask.mask_group_id, 123);
         assert_eq!(mask.file_path, "mask/group123/slice_001.png");
-        assert_eq!(mask.mime_type, "image/png");
+        assert_eq!(mask.mime_type, Some("image/png".to_string()));
         assert_eq!(mask.slice_index, None);
         assert_eq!(mask.sop_instance_uid, None);
         assert_eq!(mask.label_name, None);
@@ -475,7 +478,7 @@ mod tests {
 
         assert_eq!(mask.mask_group_id, 123);
         assert_eq!(mask.file_path, "mask/group123/slice_001.png");
-        assert_eq!(mask.mime_type, "image/png");
+        assert_eq!(mask.mime_type, Some("image/png".to_string()));
         assert_eq!(mask.slice_index, Some(1));
         assert_eq!(mask.sop_instance_uid, Some("1.2.3.4.5.6.7.8.9.10".to_string()));
         assert_eq!(mask.label_name, Some("liver".to_string()));
@@ -499,7 +502,7 @@ mod tests {
 
         assert_eq!(mask.mask_group_id, 123);
         assert_eq!(mask.file_path, "mask/group123/slice_001.dcm");
-        assert_eq!(mask.mime_type, "application/dicom");
+        assert_eq!(mask.mime_type, Some("application/dicom".to_string()));
         assert_eq!(mask.slice_index, Some(1));
         assert_eq!(mask.sop_instance_uid, Some("1.2.3.4.5.6.7.8.9.10".to_string()));
         assert_eq!(mask.label_name, Some("liver".to_string()));
@@ -523,7 +526,7 @@ mod tests {
 
     #[test]
     fn test_update_mask_creation() {
-        let update = UpdateMask::new()
+        let update = UpdateMask::new(1)
             .with_slice_index(5)
             .with_sop_instance_uid("1.2.3.4.5.6.7.8.9.10".to_string())
             .with_label_name("spleen".to_string())
@@ -548,7 +551,7 @@ mod tests {
     fn test_mask_stats() {
         let mut stats = MaskStats::new();
         stats.total_masks = 10;
-        stats.total_size = 10240;
+        stats.total_size_bytes = 10240;
         stats.add_mime_type_count("image/png".to_string(), 8);
         stats.add_mime_type_count("image/jpeg".to_string(), 2);
         stats.add_label_name_count("liver".to_string(), 6);
@@ -556,7 +559,7 @@ mod tests {
         stats.calculate_average_file_size();
 
         assert_eq!(stats.total_masks, 10);
-        assert_eq!(stats.total_size, 10240);
+        assert_eq!(stats.total_size_bytes, 10240);
         assert_eq!(stats.average_file_size, 1024.0);
         assert_eq!(stats.mime_types.get("image/png"), Some(&8));
         assert_eq!(stats.mime_types.get("image/jpeg"), Some(&2));
@@ -577,7 +580,7 @@ mod tests {
         );
 
         assert_eq!(file_info.file_name, "slice_001.png");
-        assert_eq!(file_info.mime_type, "image/png");
+        assert_eq!(file_info.mime_type, Some("image/png".to_string()));
         assert_eq!(file_info.file_size, 1024);
         assert_eq!(file_info.width, Some(512));
         assert_eq!(file_info.height, Some(512));
@@ -595,12 +598,13 @@ mod tests {
             sop_instance_uid: Some("1.2.3.4.5.6.7.8.9.10".to_string()),
             label_name: Some("liver".to_string()),
             file_path: "mask/group123/slice_001.png".to_string(),
-            mime_type: "image/png".to_string(),
+            mime_type: Some("image/png".to_string()),
             file_size: Some(1024),
             checksum: Some("abc123".to_string()),
             width: Some(512),
             height: Some(512),
             created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
 
         let new_mask: NewMask = mask.into();
@@ -610,7 +614,7 @@ mod tests {
         assert_eq!(new_mask.sop_instance_uid, Some("1.2.3.4.5.6.7.8.9.10".to_string()));
         assert_eq!(new_mask.label_name, Some("liver".to_string()));
         assert_eq!(new_mask.file_path, "mask/group123/slice_001.png");
-        assert_eq!(new_mask.mime_type, "image/png");
+        assert_eq!(new_mask.mime_type, Some("image/png".to_string()));
         assert_eq!(new_mask.file_size, Some(1024));
         assert_eq!(new_mask.checksum, Some("abc123".to_string()));
         assert_eq!(new_mask.width, Some(512));

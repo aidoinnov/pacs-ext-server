@@ -15,7 +15,8 @@ CREATE TABLE annotation_mask_group (
     mask_type TEXT DEFAULT 'segmentation', -- 마스크 타입 (segmentation, detection 등)
     description TEXT,                      -- 그룹 설명
     created_by INTEGER,                    -- 생성자 ID
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- annotation_mask 테이블 생성
@@ -32,7 +33,8 @@ CREATE TABLE annotation_mask (
     checksum TEXT,                         -- 파일 체크섬 (무결성 검증용)
     width INTEGER,                         -- 이미지 너비
     height INTEGER,                        -- 이미지 높이
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 인덱스 생성

@@ -20,7 +20,7 @@ use domain::services::{
 };
 use infrastructure::repositories::{
     UserRepositoryImpl, ProjectRepositoryImpl, RoleRepositoryImpl, PermissionRepositoryImpl,
-    AccessLogRepositoryImpl, AnnotationRepositoryImpl,
+    AccessLogRepositoryImpl, AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
 };
 use infrastructure::auth::JwtService;
 use infrastructure::config::{JwtConfig, Settings};
@@ -92,6 +92,8 @@ async fn main() -> std::io::Result<()> {
     let permission_repo = PermissionRepositoryImpl::new(pool.clone());
     let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
     let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    let mask_group_repo = MaskGroupRepositoryImpl::new(pool.clone());
+    let mask_repo = MaskRepositoryImpl::new(pool.clone());
     println!("✅ Done");
 
     // Initialize JWT service

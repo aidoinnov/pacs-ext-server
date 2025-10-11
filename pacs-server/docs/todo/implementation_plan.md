@@ -8,12 +8,16 @@
 - ✅ PostgreSQL 데이터베이스 설정 완료
 - ✅ Rust + Actix Web 기반 API 서버 구축
 - ✅ Swagger/OpenAPI 문서화 완료
-- ❌ Object Storage (S3/MinIO) 연동 미구현
-- ❌ 마스크 업로드 관련 테이블 미생성
+- ✅ Object Storage (S3/MinIO) 연동 구현 완료
+- ✅ 마스크 업로드 관련 테이블 생성 완료
+- ✅ Repository 구현체 완료
+- ✅ DTO 설계 및 구현 완료
+- ❌ Use Case 및 Service 레이어 미구현
+- ❌ API 엔드포인트 미구현
 
 ## 🏗️ 구현 단계별 계획
 
-### Phase 1: 데이터베이스 스키마 구현 (1-2일)
+### Phase 1: 데이터베이스 스키마 구현 (1-2일) ✅ **완료**
 **목표**: 마스크 관련 테이블 생성 및 마이그레이션
 
 #### 1.1 데이터베이스 마이그레이션 스크립트 작성
@@ -63,7 +67,7 @@ CREATE INDEX idx_mask_mask_group_id ON annotation_mask(mask_group_id);
 - `SignedUrlRequest` DTO
 - `SignedUrlResponse` DTO
 
-### Phase 2: Object Storage 연동 (2-3일)
+### Phase 2: Object Storage 연동 (2-3일) ✅ **완료**
 **목표**: S3/MinIO 연동 및 Signed URL 발급
 
 #### 2.1 의존성 추가
@@ -101,13 +105,13 @@ tokio-util = { version = "0.7", features = ["codec"] }
 - `GET /api/annotations/{annotation_id}/mask-groups/{group_id}/masks` - 마스크 목록 조회
 - `GET /api/annotations/{annotation_id}/mask-groups/{group_id}/masks/{mask_id}` - 마스크 상세 조회
 
-### Phase 4: 서비스 레이어 구현 (1-2일)
+### Phase 4: 서비스 레이어 구현 (1-2일) 🚧 **진행 중**
 **목표**: 비즈니스 로직 및 유스케이스 구현
 
-#### 4.1 Repository 구현
-- `MaskGroupRepository` trait
-- `MaskRepository` trait
-- PostgreSQL 구현체
+#### 4.1 Repository 구현 ✅ **완료**
+- `MaskGroupRepository` trait ✅
+- `MaskRepository` trait ✅
+- PostgreSQL 구현체 ✅
 
 #### 4.2 Use Case 구현
 - `CreateMaskGroupUseCase`

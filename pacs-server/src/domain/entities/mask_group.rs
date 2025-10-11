@@ -12,11 +12,12 @@ pub struct MaskGroup {
     pub model_name: Option<String>,
     pub version: Option<String>,
     pub modality: Option<String>,
-    pub slice_count: i32,
-    pub mask_type: String,
+    pub slice_count: Option<i32>,
+    pub mask_type: Option<String>,
     pub description: Option<String>,
     pub created_by: Option<i32>,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// 새로운 마스크 그룹 생성용 구조체
@@ -27,8 +28,8 @@ pub struct NewMaskGroup {
     pub model_name: Option<String>,
     pub version: Option<String>,
     pub modality: Option<String>,
-    pub slice_count: i32,
-    pub mask_type: String,
+    pub slice_count: Option<i32>,
+    pub mask_type: Option<String>,
     pub description: Option<String>,
     pub created_by: Option<i32>,
 }
@@ -52,8 +53,8 @@ impl NewMaskGroup {
             model_name,
             version,
             modality,
-            slice_count,
-            mask_type,
+            slice_count: Some(slice_count),
+            mask_type: Some(mask_type),
             description,
             created_by,
         }
@@ -67,8 +68,8 @@ impl NewMaskGroup {
             model_name: None,
             version: None,
             modality: None,
-            slice_count: 1,
-            mask_type: "segmentation".to_string(),
+            slice_count: Some(1),
+            mask_type: Some("segmentation".to_string()),
             description: None,
             created_by,
         }
@@ -90,8 +91,8 @@ impl NewMaskGroup {
             model_name: Some(model_name),
             version: Some(version),
             modality: Some(modality),
-            slice_count,
-            mask_type: "segmentation".to_string(),
+            slice_count: Some(slice_count),
+            mask_type: Some("segmentation".to_string()),
             description: None,
             created_by,
         }
@@ -112,8 +113,8 @@ impl NewMaskGroup {
             model_name: None,
             version: None,
             modality: Some(modality),
-            slice_count,
-            mask_type: "manual".to_string(),
+            slice_count: Some(slice_count),
+            mask_type: Some("manual".to_string()),
             description,
             created_by,
         }
@@ -139,6 +140,7 @@ impl From<MaskGroup> for NewMaskGroup {
 /// 마스크 그룹 업데이트용 구조체
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UpdateMaskGroup {
+    pub id: i32,
     pub group_name: Option<String>,
     pub model_name: Option<String>,
     pub version: Option<String>,
@@ -150,8 +152,9 @@ pub struct UpdateMaskGroup {
 
 impl UpdateMaskGroup {
     /// 빈 업데이트 구조체 생성
-    pub fn new() -> Self {
+    pub fn new(id: i32) -> Self {
         Self {
+            id,
             group_name: None,
             model_name: None,
             version: None,
@@ -202,7 +205,7 @@ impl UpdateMaskGroup {
 
 impl Default for UpdateMaskGroup {
     fn default() -> Self {
-        Self::new()
+        Self::new(0) // Default ID, should be set properly when used
     }
 }
 
@@ -211,7 +214,7 @@ impl Default for UpdateMaskGroup {
 pub struct MaskGroupStats {
     pub total_groups: i64,
     pub total_masks: i64,
-    pub total_size: i64,
+    pub total_size_bytes: i64,
     pub modalities: HashMap<String, i64>,
     pub mask_types: HashMap<String, i64>,
 }
@@ -222,7 +225,7 @@ impl MaskGroupStats {
         Self {
             total_groups: 0,
             total_masks: 0,
-            total_size: 0,
+            total_size_bytes: 0,
             modalities: HashMap::new(),
             mask_types: HashMap::new(),
         }
@@ -268,8 +271,8 @@ mod tests {
         assert_eq!(mask_group.model_name, Some("UNet".to_string()));
         assert_eq!(mask_group.version, Some("1.0.0".to_string()));
         assert_eq!(mask_group.modality, Some("CT".to_string()));
-        assert_eq!(mask_group.slice_count, 50);
-        assert_eq!(mask_group.mask_type, "segmentation");
+        assert_eq!(mask_group.slice_count, Some(50));
+        assert_eq!(mask_group.mask_type, Some("segmentation".to_string()));
         assert_eq!(mask_group.description, Some("Liver segmentation for surgical planning".to_string()));
         assert_eq!(mask_group.created_by, Some(456));
     }
@@ -283,8 +286,8 @@ mod tests {
         assert_eq!(mask_group.model_name, None);
         assert_eq!(mask_group.version, None);
         assert_eq!(mask_group.modality, None);
-        assert_eq!(mask_group.slice_count, 1);
-        assert_eq!(mask_group.mask_type, "segmentation");
+        assert_eq!(mask_group.slice_count, Some(1));
+        assert_eq!(mask_group.mask_type, Some("segmentation".to_string()));
         assert_eq!(mask_group.description, None);
         assert_eq!(mask_group.created_by, Some(456));
     }
@@ -306,8 +309,8 @@ mod tests {
         assert_eq!(mask_group.model_name, Some("UNet".to_string()));
         assert_eq!(mask_group.version, Some("1.0.0".to_string()));
         assert_eq!(mask_group.modality, Some("CT".to_string()));
-        assert_eq!(mask_group.slice_count, 50);
-        assert_eq!(mask_group.mask_type, "segmentation");
+        assert_eq!(mask_group.slice_count, Some(50));
+        assert_eq!(mask_group.mask_type, Some("segmentation".to_string()));
         assert_eq!(mask_group.created_by, Some(456));
     }
 
@@ -327,15 +330,15 @@ mod tests {
         assert_eq!(mask_group.model_name, None);
         assert_eq!(mask_group.version, None);
         assert_eq!(mask_group.modality, Some("CT".to_string()));
-        assert_eq!(mask_group.slice_count, 30);
-        assert_eq!(mask_group.mask_type, "manual");
+        assert_eq!(mask_group.slice_count, Some(30));
+        assert_eq!(mask_group.mask_type, Some("manual".to_string()));
         assert_eq!(mask_group.description, Some("Manually created liver segmentation".to_string()));
         assert_eq!(mask_group.created_by, Some(456));
     }
 
     #[test]
     fn test_update_mask_group_creation() {
-        let update = UpdateMaskGroup::new()
+        let update = UpdateMaskGroup::new(1)
             .with_group_name("Updated_Group".to_string())
             .with_model_info("UpdatedModel".to_string(), "2.0.0".to_string())
             .with_modality("MR".to_string())
@@ -357,7 +360,7 @@ mod tests {
         let mut stats = MaskGroupStats::new();
         stats.total_groups = 5;
         stats.total_masks = 150;
-        stats.total_size = 1024000;
+        stats.total_size_bytes = 1024000;
         stats.add_modality_count("CT".to_string(), 3);
         stats.add_modality_count("MR".to_string(), 2);
         stats.add_mask_type_count("segmentation".to_string(), 4);
@@ -365,7 +368,7 @@ mod tests {
 
         assert_eq!(stats.total_groups, 5);
         assert_eq!(stats.total_masks, 150);
-        assert_eq!(stats.total_size, 1024000);
+        assert_eq!(stats.total_size_bytes, 1024000);
         assert_eq!(stats.modalities.get("CT"), Some(&3));
         assert_eq!(stats.modalities.get("MR"), Some(&2));
         assert_eq!(stats.mask_types.get("segmentation"), Some(&4));
@@ -381,11 +384,12 @@ mod tests {
             model_name: Some("TestModel".to_string()),
             version: Some("1.0.0".to_string()),
             modality: Some("CT".to_string()),
-            slice_count: 50,
-            mask_type: "segmentation".to_string(),
+            slice_count: Some(50),
+            mask_type: Some("segmentation".to_string()),
             description: Some("Test description".to_string()),
             created_by: Some(456),
             created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
 
         let new_mask_group: NewMaskGroup = mask_group.into();
@@ -395,8 +399,8 @@ mod tests {
         assert_eq!(new_mask_group.model_name, Some("TestModel".to_string()));
         assert_eq!(new_mask_group.version, Some("1.0.0".to_string()));
         assert_eq!(new_mask_group.modality, Some("CT".to_string()));
-        assert_eq!(new_mask_group.slice_count, 50);
-        assert_eq!(new_mask_group.mask_type, "segmentation");
+        assert_eq!(new_mask_group.slice_count, Some(50));
+        assert_eq!(new_mask_group.mask_type, Some("segmentation".to_string()));
         assert_eq!(new_mask_group.description, Some("Test description".to_string()));
         assert_eq!(new_mask_group.created_by, Some(456));
     }
