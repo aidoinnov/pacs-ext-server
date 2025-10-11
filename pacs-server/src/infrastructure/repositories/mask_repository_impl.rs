@@ -59,8 +59,8 @@ impl MaskRepository for MaskRepositoryImpl {
             checksum: result.checksum,
             width: result.width,
             height: result.height,
-            created_at: DateTime::from_naive_utc_and_offset(result.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(result.updated_at.unwrap_or_default(), Utc),
+            created_at: result.created_at.unwrap_or_default(),
+            updated_at: result.updated_at.unwrap_or_default(),
         })
     }
 
@@ -91,8 +91,8 @@ impl MaskRepository for MaskRepositoryImpl {
             width: row.width,
             height: row.height,
             file_size: row.file_size,
-            created_at: DateTime::from_naive_utc_and_offset(row.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(row.updated_at.unwrap_or_default(), Utc),
+            created_at: row.created_at.unwrap_or_default(),
+            updated_at: row.updated_at.unwrap_or_default(),
         }))
     }
 
@@ -142,8 +142,8 @@ impl MaskRepository for MaskRepositoryImpl {
             checksum: result.checksum,
             width: result.width,
             height: result.height,
-            created_at: DateTime::from_naive_utc_and_offset(result.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(result.updated_at.unwrap_or_default(), Utc),
+            created_at: result.created_at.unwrap_or_default(),
+            updated_at: result.updated_at.unwrap_or_default(),
         })
     }
 
@@ -206,8 +206,8 @@ impl MaskRepository for MaskRepositoryImpl {
             checksum: row.checksum,
             width: row.width,
             height: row.height,
-            created_at: DateTime::from_naive_utc_and_offset(row.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(row.updated_at.unwrap_or_default(), Utc),
+            created_at: row.created_at.unwrap_or_default(),
+            updated_at: row.updated_at.unwrap_or_default(),
         }).collect())
     }
 

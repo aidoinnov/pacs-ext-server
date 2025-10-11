@@ -129,6 +129,9 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     }
 
     async fn create(&self, new_annotation: NewAnnotation) -> Result<Annotation, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        // annotation 생성
         let annotation = sqlx::query_as::<_, Annotation>(
             "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid, 
                                                tool_name, tool_version, data, is_shared, viewer_software, description)
@@ -148,22 +151,30 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         .bind(new_annotation.is_shared)
         .bind(new_annotation.viewer_software)
         .bind(new_annotation.description)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
-        // history 생성
-        let _ = self.create_history(
-            annotation.id,
-            annotation.user_id,
-            "create",
-            None,
-            Some(annotation.data.clone())
-        ).await;
+        // history 생성 (같은 트랜잭션 내에서)
+        let _ = sqlx::query_as::<_, AnnotationHistory>(
+            "INSERT INTO annotation_annotation_history (annotation_id, user_id, action, data_before, data_after)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, annotation_id, user_id, action, data_before, data_after, action_at"
+        )
+        .bind(annotation.id)
+        .bind(annotation.user_id)
+        .bind("create")
+        .bind(None::<serde_json::Value>)
+        .bind(Some(annotation.data.clone()))
+        .fetch_one(&mut *tx)
+        .await?;
 
+        tx.commit().await?;
         Ok(annotation)
     }
 
     async fn update(&self, id: i32, data: serde_json::Value, is_shared: bool) -> Result<Option<Annotation>, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
         // 기존 annotation 데이터를 가져와서 history에 저장
         let old_annotation = sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
@@ -172,7 +183,7 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
              FROM annotation_annotation WHERE id = $1"
         )
         .bind(id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?;
 
         let old_data = old_annotation.as_ref().map(|a| a.data.clone());
@@ -190,24 +201,32 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         .bind(id)
         .bind(data)
         .bind(is_shared)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?;
 
-        // history 생성
+        // history 생성 (같은 트랜잭션 내에서)
         if let Some(annotation) = &updated_annotation {
-            let _ = self.create_history(
-                annotation.id,
-                user_id,
-                "update",
-                old_data,
-                Some(annotation.data.clone())
-            ).await;
+            let _ = sqlx::query_as::<_, AnnotationHistory>(
+                "INSERT INTO annotation_annotation_history (annotation_id, user_id, action, data_before, data_after)
+                 VALUES ($1, $2, $3, $4, $5)
+                 RETURNING id, annotation_id, user_id, action, data_before, data_after, action_at"
+            )
+            .bind(annotation.id)
+            .bind(user_id)
+            .bind("update")
+            .bind(old_data)
+            .bind(Some(annotation.data.clone()))
+            .fetch_one(&mut *tx)
+            .await?;
         }
 
+        tx.commit().await?;
         Ok(updated_annotation)
     }
 
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
         // 기존 annotation 데이터를 가져와서 history에 저장
         let old_annotation = sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
@@ -216,27 +235,34 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
              FROM annotation_annotation WHERE id = $1"
         )
         .bind(id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?;
 
         if let Some(annotation) = old_annotation {
-            // history 생성
-            let _ = self.create_history(
-                annotation.id,
-                annotation.user_id,
-                "delete",
-                Some(annotation.data.clone()),
-                None
-            ).await;
+            // history 생성 (같은 트랜잭션 내에서)
+            let _ = sqlx::query_as::<_, AnnotationHistory>(
+                "INSERT INTO annotation_annotation_history (annotation_id, user_id, action, data_before, data_after)
+                 VALUES ($1, $2, $3, $4, $5)
+                 RETURNING id, annotation_id, user_id, action, data_before, data_after, action_at"
+            )
+            .bind(annotation.id)
+            .bind(annotation.user_id)
+            .bind("delete")
+            .bind(Some(annotation.data.clone()))
+            .bind(None::<serde_json::Value>)
+            .fetch_one(&mut *tx)
+            .await?;
 
             // annotation 삭제
             let result = sqlx::query("DELETE FROM annotation_annotation WHERE id = $1")
                 .bind(id)
-                .execute(&self.pool)
+                .execute(&mut *tx)
                 .await?;
 
+            tx.commit().await?;
             Ok(result.rows_affected() > 0)
         } else {
+            tx.commit().await?;
             Ok(false)
         }
     }

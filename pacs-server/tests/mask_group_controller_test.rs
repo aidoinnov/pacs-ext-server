@@ -288,7 +288,12 @@ use sqlx::Row;
             .to_request();
 
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 201);
+        let status = resp.status();
+        if status != 201 {
+            let body = test::read_body(resp).await;
+            let body_str = String::from_utf8_lossy(&body);
+            panic!("Expected status 201, got {}: {}", status, body_str);
+        }
 
         // Cleanup
         cleanup_test_data(&pool, user_id).await;

@@ -58,8 +58,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             mask_type: result.mask_type,
             description: result.description,
             created_by: result.created_by,
-            created_at: DateTime::from_naive_utc_and_offset(result.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(result.updated_at.unwrap_or_default(), Utc),
+            created_at: result.created_at.unwrap_or_default(),
+            updated_at: result.updated_at.unwrap_or_default(),
         })
     }
 
@@ -89,8 +89,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             mask_type: row.mask_type,
             description: row.description,
             created_by: row.created_by,
-            created_at: DateTime::from_naive_utc_and_offset(row.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(row.updated_at.unwrap_or_default(), Utc),
+            created_at: row.created_at.unwrap_or_default(),
+            updated_at: row.updated_at.unwrap_or_default(),
         }))
     }
 
@@ -135,8 +135,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             mask_type: result.mask_type,
             description: result.description,
             created_by: result.created_by,
-            created_at: DateTime::from_naive_utc_and_offset(result.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(result.updated_at.unwrap_or_default(), Utc),
+            created_at: result.created_at.unwrap_or_default(),
+            updated_at: result.updated_at.unwrap_or_default(),
         })
     }
 
@@ -198,8 +198,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             mask_type: row.mask_type,
             description: row.description,
             created_by: row.created_by,
-            created_at: DateTime::from_naive_utc_and_offset(row.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(row.updated_at.unwrap_or_default(), Utc),
+            created_at: row.created_at.unwrap_or_default(),
+            updated_at: row.updated_at.unwrap_or_default(),
         }).collect())
     }
 
@@ -231,8 +231,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             checksum: row.checksum,
             width: row.width,
             height: row.height,
-            created_at: DateTime::from_naive_utc_and_offset(row.created_at.unwrap_or_default(), Utc),
-            updated_at: DateTime::from_naive_utc_and_offset(row.updated_at.unwrap_or_default(), Utc),
+            created_at: row.created_at.unwrap_or_default(),
+            updated_at: row.updated_at.unwrap_or_default(),
         }).collect())
     }
 

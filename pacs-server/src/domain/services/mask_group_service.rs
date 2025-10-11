@@ -95,26 +95,63 @@ where
     UR: UserRepository + Send + Sync,
 {
     async fn create_mask_group(&self, new_mask_group: &NewMaskGroup) -> Result<MaskGroup, ServiceError> {
-        // 어노테이션이 존재하는지 확인
-        let annotation = self.annotation_repository
-            .find_by_id(new_mask_group.annotation_id)
-            .await
-            .map_err(|e| ServiceError::DatabaseError(format!("Failed to find annotation: {}", e)))?
-            .ok_or_else(|| ServiceError::NotFound(format!("Annotation with id {} not found", new_mask_group.annotation_id)))?;
+        // 트랜잭션을 사용하여 원자적 처리
+        let mut tx = self.annotation_repository.pool().begin().await
+            .map_err(|e| ServiceError::DatabaseError(format!("Failed to begin transaction: {}", e)))?;
+
+        // 어노테이션이 존재하는지 확인 (트랜잭션 내에서)
+        let annotation = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM annotation_annotation WHERE id = $1)"
+        )
+        .bind(new_mask_group.annotation_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(format!("Failed to check annotation existence: {}", e)))?;
+
+        if !annotation {
+            tx.rollback().await.ok();
+            return Err(ServiceError::NotFound(format!("Annotation with id {} not found", new_mask_group.annotation_id)));
+        }
 
         // 사용자가 존재하는지 확인 (created_by가 있는 경우)
         if let Some(created_by) = new_mask_group.created_by {
-            let user = self.user_repository
-                .find_by_id(created_by)
-                .await
-                .map_err(|e| ServiceError::DatabaseError(format!("Failed to find user: {}", e)))?
-                .ok_or_else(|| ServiceError::NotFound(format!("User with id {} not found", created_by)))?;
+            let user_exists = sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS(SELECT 1 FROM security_user WHERE id = $1)"
+            )
+            .bind(created_by)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(format!("Failed to check user existence: {}", e)))?;
+
+            if !user_exists {
+                tx.rollback().await.ok();
+                return Err(ServiceError::NotFound(format!("User with id {} not found", created_by)));
+            }
         }
 
-        // 마스크 그룹 생성
-        self.mask_group_repository
-            .create(new_mask_group)
-            .await
+        // 마스크 그룹 생성 (트랜잭션 내에서)
+        let mask_group = sqlx::query_as::<_, MaskGroup>(
+            "INSERT INTO annotation_mask_group (annotation_id, group_name, model_name, version, modality, slice_count, mask_type, description, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING id, annotation_id, group_name, model_name, version, modality, slice_count, mask_type, description, created_by, created_at, updated_at"
+        )
+        .bind(new_mask_group.annotation_id)
+        .bind(&new_mask_group.group_name)
+        .bind(&new_mask_group.model_name)
+        .bind(&new_mask_group.version)
+        .bind(&new_mask_group.modality)
+        .bind(new_mask_group.slice_count)
+        .bind(&new_mask_group.mask_type)
+        .bind(&new_mask_group.description)
+        .bind(new_mask_group.created_by)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(format!("Failed to create mask group: {}", e)))?;
+
+        tx.commit().await
+            .map_err(|e| ServiceError::DatabaseError(format!("Failed to commit transaction: {}", e)))?;
+
+        Ok(mask_group)
     }
 
     async fn get_mask_group_by_id(&self, id: i32) -> Result<Option<MaskGroup>, ServiceError> {

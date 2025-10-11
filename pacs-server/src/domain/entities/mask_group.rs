@@ -2,10 +2,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::ToSchema;
+use sqlx::FromRow;
 
 /// 마스크 그룹 엔티티
 /// 여러 개의 마스크 파일을 하나의 그룹으로 관리
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, FromRow)]
 pub struct MaskGroup {
     pub id: i32,
     pub annotation_id: i32,
