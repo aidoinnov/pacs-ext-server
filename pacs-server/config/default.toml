@@ -39,3 +39,15 @@ allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 allowed_headers = ["Content-Type", "Authorization", "X-Requested-With"]
 expose_headers = ["Content-Length", "X-Total-Count"]
 max_age = 3600
+
+[object_storage]
+provider = "s3"  # "s3" or "minio"
+bucket_name = "pacs-masks"
+region = "us-east-1"
+endpoint = ""  # MinIO endpoint (leave empty for AWS S3)
+access_key = ""
+secret_key = ""
+
+[signed_url]
+default_ttl = 600  # 10 minutes
+max_ttl = 3600     # 1 hour

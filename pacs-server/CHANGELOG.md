@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2025-10-07: AWS S3 Integration & Object Storage
+
+#### AWS S3 Integration
+- **AWS SDK Integration** - Complete S3 client integration
+  - `aws-sdk-s3 = "1.0"` - S3 client for direct uploads
+  - `aws-config = "1.0"` - AWS configuration management
+  - `tokio-util = "0.7"` - Async utilities for file handling
+  - Full async/await support with tokio runtime
+
+#### Object Storage Configuration
+- **Flexible Storage Provider** - Support for both AWS S3 and MinIO
+  - `ObjectStorageConfig` - Unified configuration structure
+  - `SignedUrlConfig` - Time-limited URL generation settings
+  - Environment variable support with `APP_OBJECT_STORAGE__` prefix
+  - Development and production environment separation
+
+#### Security & Access Control
+- **IAM Policy Design** - Minimal privilege access control
+  - S3 bucket access limited to `mask/*` path only
+  - Separate IAM user for mask upload operations
+  - Time-limited signed URLs (10 minutes default, 1 hour max)
+  - CORS configuration for secure cross-origin uploads
+
+#### Technical Architecture
+- **Direct Upload Pattern** - Client-to-S3 direct upload
+  - Server generates signed URLs for client uploads
+  - No file I/O on application server
+  - Bandwidth efficiency and scalability
+  - Reduced server load and resource usage
+
+#### Configuration Management
+- **Environment-based Configuration** - Multiple deployment environments
+  - `.env` file support for local development
+  - `config/production.toml` for production deployment
+  - AWS region support (ap-northeast-2, us-east-1, etc.)
+  - MinIO support for local development and testing
+
+#### Documentation & Guides
+- **AWS_S3_INTEGRATION_GUIDE.md** - Comprehensive technical documentation
+  - Step-by-step AWS setup instructions
+  - IAM policy templates and security best practices
+  - Troubleshooting guide and common issues
+  - Performance optimization and monitoring setup
+  - Migration strategies and deployment checklists
+
 ### Added - 2025-10-07: Mask Upload System Foundation
 
 #### Database Schema

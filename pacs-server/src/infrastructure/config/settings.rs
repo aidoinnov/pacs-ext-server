@@ -10,6 +10,8 @@ pub struct Settings {
     pub logging: LoggingConfig,
     pub jwt: JwtConfig,
     pub cors: CorsConfig,
+    pub object_storage: ObjectStorageConfig,
+    pub signed_url: SignedUrlConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -58,6 +60,22 @@ pub struct CorsConfig {
     pub allowed_headers: Vec<String>,
     pub expose_headers: Vec<String>,
     pub max_age: u64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ObjectStorageConfig {
+    pub provider: String,  // "s3" or "minio"
+    pub bucket_name: String,
+    pub region: String,
+    pub endpoint: String,  // MinIO endpoint (empty for AWS S3)
+    pub access_key: String,
+    pub secret_key: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct SignedUrlConfig {
+    pub default_ttl: u64,  // Default TTL in seconds
+    pub max_ttl: u64,      // Maximum TTL in seconds
 }
 
 impl Settings {
