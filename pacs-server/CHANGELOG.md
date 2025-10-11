@@ -49,6 +49,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Object Storage 서비스는 현재 구현되어 있으나, 실제 사용을 위해서는 환경 설정이 필요합니다
 - 마스크 관련 API 엔드포인트는 Object Storage 설정 후 활성화 가능합니다
 
+### Object Storage 설정 완료
+- **설정 파일**: `config/development.toml`, `config/production.toml`에 Object Storage 설정 추가
+- **환경 변수**: `APP_OBJECT_STORAGE__*` 환경 변수 지원
+- **MinIO 개발 환경**: 로컬 개발을 위한 MinIO 설정 기본값 제공
+- **AWS S3 프로덕션**: 프로덕션 환경을 위한 AWS S3 설정 지원
+- **설정 가이드**: `docs/technical/object_storage_setup_guide.md` 상세 설정 가이드 작성
+
+### 현재 상태
+- Object Storage 서비스 초기화 코드 구현 완료
+- 마스크 관련 Use Case 및 Controller 구현 완료
+- 환경 설정 후 서버 시작 시 Object Storage 자동 초기화
+- MinIO/AWS S3 프로바이더 자동 선택
+
 ### Dependencies
 - `aws-sdk-s3`: ^1.0.0
 - `tokio-util`: ^0.7.0

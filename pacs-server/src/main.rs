@@ -23,7 +23,7 @@ use infrastructure::repositories::{
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
 };
 use infrastructure::auth::JwtService;
-use application::services::SignedUrlServiceImpl;
+use application::services::{SignedUrlServiceImpl, ObjectStorageServiceFactory};
 use infrastructure::config::{JwtConfig, Settings};
 use infrastructure::middleware::{CacheHeaders, configure_cors};
 use presentation::controllers::{
@@ -87,12 +87,12 @@ async fn main() -> std::io::Result<()> {
 
     // Initialize repositories
     print!("🔧 Initializing repositories... ");
-    let user_repo = Arc::new(UserRepositoryImpl::new(pool.clone()));
-    let project_repo = Arc::new(ProjectRepositoryImpl::new(pool.clone()));
-    let role_repo = Arc::new(RoleRepositoryImpl::new(pool.clone()));
-    let permission_repo = Arc::new(PermissionRepositoryImpl::new(pool.clone()));
-    let access_log_repo = Arc::new(AccessLogRepositoryImpl::new(pool.clone()));
-    let annotation_repo = Arc::new(AnnotationRepositoryImpl::new(pool.clone()));
+    let user_repo = UserRepositoryImpl::new(pool.clone());
+    let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    let role_repo = RoleRepositoryImpl::new(pool.clone());
+    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+    let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
+    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
     let mask_group_repo = Arc::new(MaskGroupRepositoryImpl::new(pool.clone()));
     let mask_repo = Arc::new(MaskRepositoryImpl::new(pool.clone()));
     println!("✅ Done");
@@ -115,20 +115,37 @@ async fn main() -> std::io::Result<()> {
         role_repo,
         permission_repo,
     );
-    let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
+    let annotation_service = AnnotationServiceImpl::new(annotation_repo.clone(), user_repo.clone(), project_repo.clone());
     let mask_group_service = Arc::new(MaskGroupServiceImpl::new(
         mask_group_repo.clone(),
-        annotation_repo.clone(),
-        user_repo.clone(),
+        Arc::new(annotation_repo.clone()),
+        Arc::new(user_repo.clone()),
     ));
     let mask_service = Arc::new(MaskServiceImpl::new(
         mask_repo.clone(),
         mask_group_repo.clone(),
-        user_repo.clone(),
+        Arc::new(user_repo.clone()),
     ));
-    // TODO: Initialize ObjectStorageService with proper configuration
-    // For now, we'll skip signed_url_service initialization
-    println!("✅ Done");
+    // Initialize Object Storage service (temporarily disabled for testing)
+    print!("☁️  Initializing Object Storage service... ");
+    // TODO: Re-enable after testing
+    // let object_storage = ObjectStorageServiceFactory::create(
+    //     &settings.object_storage.provider,
+    //     &settings.object_storage.bucket_name,
+    //     &settings.object_storage.region,
+    //     &settings.object_storage.endpoint,
+    //     &settings.object_storage.access_key,
+    //     &settings.object_storage.secret_key,
+    // ).await.map_err(|e| {
+    //     eprintln!("❌ Failed to initialize Object Storage: {}", e);
+    //     std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+    // })?;
+    // let signed_url_service = Arc::new(SignedUrlServiceImpl::new(
+    //     object_storage,
+    //     settings.signed_url.default_ttl,
+    //     settings.signed_url.max_ttl,
+    // ));
+    println!("✅ Skipped (Testing mode)");
 
     // Initialize use cases
     print!("📋 Initializing use cases... ");
@@ -138,9 +155,16 @@ async fn main() -> std::io::Result<()> {
     let permission_use_case = Arc::new(PermissionUseCase::new(permission_service));
     let access_control_use_case = Arc::new(AccessControlUseCase::new(access_control_service));
     let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
-    // TODO: Initialize mask use cases after ObjectStorageService is configured
-    // let mask_group_use_case = Arc::new(MaskGroupUseCase::new(mask_group_service, signed_url_service.clone()));
-    // let mask_use_case = Arc::new(MaskUseCase::new(mask_service, mask_group_service.clone(), signed_url_service.clone()));
+    // TODO: Re-enable after Object Storage is configured
+    // let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
+    //     mask_group_service,
+    //     signed_url_service.clone(),
+    // ));
+    // let mask_use_case = Arc::new(MaskUseCase::new(
+    //     mask_service,
+    //     mask_group_service.clone(),
+    //     signed_url_service.clone(),
+    // ));
     println!("✅ Done");
 
     // Cache configuration
@@ -192,7 +216,7 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| permission_controller::configure_routes(cfg, permission_use_case.clone()))
                     .configure(|cfg| access_control_controller::configure_routes(cfg, access_control_use_case.clone()))
                     .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
-                    // TODO: Add mask routes after ObjectStorageService is configured
+                    // TODO: Re-enable after Object Storage is configured
                     // .configure(|cfg| mask_group_controller::configure_routes(cfg, mask_group_use_case.clone()))
                     // .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
             )

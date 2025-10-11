@@ -23,3 +23,15 @@ client_secret = "dev-secret"
 [logging]
 level = "debug"
 format = "pretty"
+
+[object_storage]
+provider = "minio"  # Use MinIO for local development
+bucket_name = "pacs-masks-dev"
+region = "us-east-1"
+endpoint = "http://localhost:9000"  # MinIO default endpoint
+access_key = "minioadmin"
+secret_key = "minioadmin"
+
+[signed_url]
+default_ttl = 600   # 10 minutes
+max_ttl = 3600      # 1 hour
