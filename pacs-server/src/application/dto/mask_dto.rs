@@ -48,11 +48,19 @@ pub struct MaskResponse {
     
     /// 생성 시간
     pub created_at: String,
+    
+    /// 수정 시간
+    pub updated_at: String,
 }
 
 /// 마스크 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateMaskRequest {
+    /// 마스크 그룹 ID
+    /// 마스크가 속할 그룹의 ID
+    #[schema(example = 1)]
+    pub mask_group_id: i32,
+    
     /// 슬라이스 인덱스
     /// 볼륨 내 슬라이스의 인덱스
     #[schema(example = 1)]
@@ -172,6 +180,12 @@ pub struct MaskListResponse {
     /// 전체 개수
     pub total_count: i64,
     
+    /// 오프셋
+    pub offset: i64,
+    
+    /// 제한 개수
+    pub limit: i64,
+    
     /// 현재 페이지
     pub current_page: i32,
     
@@ -185,6 +199,16 @@ pub struct MaskListResponse {
 /// 마스크 다운로드 URL 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct DownloadUrlRequest {
+    /// 마스크 ID
+    /// 다운로드할 마스크의 ID
+    #[schema(example = 1)]
+    pub mask_id: i32,
+    
+    /// 파일 경로
+    /// 다운로드할 파일의 경로
+    #[schema(example = "mask/123/17/0001_liver.png")]
+    pub file_path: String,
+    
     /// 만료 시간 (초)
     /// 다운로드 URL의 만료 시간 (기본값: 3600초)
     #[schema(example = 3600)]
@@ -208,6 +232,11 @@ pub struct DownloadUrlResponse {
     /// 다운로드 URL의 만료 시간
     #[schema(example = 3600)]
     pub expires_in: u64,
+    
+    /// 만료 시간 (ISO 8601)
+    /// 다운로드 URL의 만료 시간
+    #[schema(example = "2024-01-01T12:00:00Z")]
+    pub expires_at: String,
 }
 
 /// 마스크 통계 응답 DTO
@@ -216,14 +245,14 @@ pub struct MaskStatsResponse {
     /// 전체 마스크 수
     pub total_masks: i64,
     
-    /// 라벨별 마스크 수
-    pub masks_by_label: std::collections::HashMap<String, i64>,
-    
     /// 총 파일 크기 (바이트)
-    pub total_size: i64,
+    pub total_size_bytes: i64,
     
     /// 평균 파일 크기 (바이트)
-    pub average_size: f64,
+    pub average_file_size: f64,
+    
+    /// 라벨별 마스크 수
+    pub masks_by_label: std::collections::HashMap<String, i64>,
     
     /// MIME 타입별 분포
     pub mime_type_distribution: std::collections::HashMap<String, i64>,

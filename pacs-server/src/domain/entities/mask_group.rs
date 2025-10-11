@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 /// 마스크 그룹 엔티티
 /// 여러 개의 마스크 파일을 하나의 그룹으로 관리
@@ -210,7 +211,7 @@ impl Default for UpdateMaskGroup {
 }
 
 /// 마스크 그룹 통계 정보
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct MaskGroupStats {
     pub total_groups: i64,
     pub total_masks: i64,

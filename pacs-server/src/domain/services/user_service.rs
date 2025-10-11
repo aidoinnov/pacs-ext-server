@@ -221,6 +221,12 @@ impl From<sqlx::Error> for ServiceError {
     }
 }
 
+impl From<crate::application::services::SignedUrlError> for ServiceError {
+    fn from(err: crate::application::services::SignedUrlError) -> Self {
+        ServiceError::DatabaseError(err.to_string())
+    }
+}
+
 impl std::fmt::Display for ServiceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

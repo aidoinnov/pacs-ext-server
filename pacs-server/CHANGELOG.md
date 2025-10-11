@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Signed URL 서비스: 업로드/다운로드용 서명된 URL 생성
   - Repository 구현체: PostgreSQL 기반 `MaskGroupRepositoryImpl`, `MaskRepositoryImpl`
   - Service 레이어: `MaskGroupService`, `MaskService` 비즈니스 로직 구현
+  - Use Case 레이어: `MaskGroupUseCase`, `MaskUseCase` 비즈니스 워크플로우 구현
   - 단위 테스트: 엔티티, 서비스, 리포지토리 테스트 코드 작성
 
 ### Technical Details

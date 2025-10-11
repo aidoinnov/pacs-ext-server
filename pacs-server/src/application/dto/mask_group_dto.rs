@@ -1,10 +1,16 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use serde_json::json;
+use crate::domain::entities::mask_group::MaskGroupStats;
 
 /// 마스크 그룹 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateMaskGroupRequest {
+    /// 어노테이션 ID
+    /// 마스크 그룹이 속할 어노테이션의 ID
+    #[schema(example = 1)]
+    pub annotation_id: i32,
+    
     /// 그룹 이름
     /// 마스크 그룹을 식별하는 이름 (예: Liver_Segmentation_v2)
     #[schema(example = "Liver_Segmentation_v2")]
@@ -76,6 +82,9 @@ pub struct MaskGroupResponse {
     
     /// 생성 시간
     pub created_at: String,
+    
+    /// 수정 시간
+    pub updated_at: String,
 }
 
 /// 마스크 그룹 업데이트 요청 DTO
@@ -113,6 +122,11 @@ pub struct UpdateMaskGroupRequest {
 /// Signed URL 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct SignedUrlRequest {
+    /// 마스크 그룹 ID
+    /// 업로드할 마스크가 속할 그룹의 ID
+    #[schema(example = 1)]
+    pub mask_group_id: i32,
+    
     /// 파일명
     /// 업로드할 파일의 이름 (확장자 포함)
     #[schema(example = "0001_liver.png")]
@@ -142,6 +156,11 @@ pub struct SignedUrlRequest {
     /// 마스크의 라벨 이름 (예: liver, spleen)
     #[schema(example = "liver")]
     pub label_name: Option<String>,
+    
+    /// TTL (Time To Live) 초
+    /// Signed URL의 유효 시간 (초 단위)
+    #[schema(example = 3600)]
+    pub ttl_seconds: Option<u64>,
 }
 
 /// Signed URL 응답 DTO
@@ -152,6 +171,11 @@ pub struct SignedUrlResponse {
     #[schema(example = "https://s3.example.com/mask/123/17/0001_liver.png?X-Amz-Algorithm=...")]
     pub upload_url: String,
     
+    /// 다운로드용 Signed URL
+    /// 파일을 다운로드할 수 있는 서명된 URL
+    #[schema(example = "https://s3.example.com/mask/123/17/0001_liver.png?X-Amz-Algorithm=...")]
+    pub download_url: String,
+    
     /// S3 파일 경로
     /// 업로드될 파일의 S3 경로
     #[schema(example = "mask/123/17/0001_liver.png")]
@@ -161,11 +185,21 @@ pub struct SignedUrlResponse {
     /// Signed URL의 만료 시간
     #[schema(example = 600)]
     pub expires_in: u64,
+    
+    /// 만료 시간 (ISO 8601)
+    /// Signed URL의 만료 시간
+    #[schema(example = "2024-01-01T12:00:00Z")]
+    pub expires_at: String,
 }
 
 /// 업로드 완료 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CompleteUploadRequest {
+    /// 마스크 그룹 ID
+    /// 업로드가 완료된 마스크 그룹의 ID
+    #[schema(example = 1)]
+    pub mask_group_id: i32,
+    
     /// 실제 업로드된 슬라이스 수
     /// 업로드가 완료된 슬라이스의 실제 개수
     #[schema(example = 120)]
@@ -175,11 +209,20 @@ pub struct CompleteUploadRequest {
     /// 업로드된 마스크에 포함된 라벨들의 목록
     #[schema(example = json!(["liver", "spleen"]))]
     pub labels: Vec<String>,
+    
+    /// 업로드된 파일 목록
+    /// 업로드가 완료된 파일들의 목록
+    #[schema(example = json!(["0001_liver.png", "0002_liver.png"]))]
+    pub uploaded_files: Vec<String>,
 }
 
 /// 업로드 완료 응답 DTO
 #[derive(Debug, Serialize, ToSchema)]
 pub struct CompleteUploadResponse {
+    /// 성공 여부
+    #[schema(example = true)]
+    pub success: bool,
+    
     /// 처리 상태
     #[schema(example = "success")]
     pub status: String,
@@ -187,6 +230,11 @@ pub struct CompleteUploadResponse {
     /// 처리된 마스크 수
     #[schema(example = 120)]
     pub processed_masks: i32,
+    
+    /// 업로드된 파일 목록
+    /// 업로드가 완료된 파일들의 목록
+    #[schema(example = json!(["0001_liver.png", "0002_liver.png"]))]
+    pub uploaded_files: Vec<String>,
     
     /// 메시지
     #[schema(example = "Upload completed successfully")]
@@ -201,17 +249,53 @@ pub struct MaskGroupListResponse {
     
     /// 전체 개수
     pub total_count: i64,
+    
+    /// 오프셋
+    pub offset: i64,
+    
+    /// 제한 개수
+    pub limit: i64,
 }
 
 /// 마스크 그룹 상세 응답 DTO
 #[derive(Debug, Serialize, ToSchema)]
 pub struct MaskGroupDetailResponse {
-    /// 마스크 그룹 정보
-    pub mask_group: MaskGroupResponse,
+    /// 마스크 그룹 ID
+    pub id: i32,
     
-    /// 포함된 마스크 수
-    pub mask_count: i64,
+    /// 어노테이션 ID
+    pub annotation_id: i32,
     
-    /// 총 파일 크기 (바이트)
-    pub total_size: i64,
+    /// 그룹 이름
+    pub group_name: Option<String>,
+    
+    /// AI 모델 이름
+    pub model_name: Option<String>,
+    
+    /// 버전 정보
+    pub version: Option<String>,
+    
+    /// 의료 영상 모달리티
+    pub modality: Option<String>,
+    
+    /// 슬라이스 수
+    pub slice_count: Option<i32>,
+    
+    /// 마스크 타입
+    pub mask_type: Option<String>,
+    
+    /// 설명
+    pub description: Option<String>,
+    
+    /// 생성자 ID
+    pub created_by: Option<i32>,
+    
+    /// 생성 시간
+    pub created_at: String,
+    
+    /// 수정 시간
+    pub updated_at: String,
+    
+    /// 통계 정보
+    pub stats: MaskGroupStats,
 }
