@@ -84,12 +84,12 @@ where
 {
     async fn create_annotation(&self, new_annotation: NewAnnotation) -> Result<Annotation, ServiceError> {
         // 사용자 존재 확인
-        if self.user_repository.find_by_id(new_annotation.user_id).await?.is_none() {
+        if self.user_repository.find_by_id(new_annotation.user_id).await.map_err(|e| ServiceError::DatabaseError(e.to_string()))?.is_none() {
             return Err(ServiceError::NotFound("User not found".into()));
         }
 
         // 프로젝트 존재 확인
-        if self.project_repository.find_by_id(new_annotation.project_id).await?.is_none() {
+        if self.project_repository.find_by_id(new_annotation.project_id).await.map_err(|e| ServiceError::DatabaseError(e.to_string()))?.is_none() {
             return Err(ServiceError::NotFound("Project not found".into()));
         }
 
@@ -100,7 +100,8 @@ where
         .bind(new_annotation.user_id)
         .bind(new_annotation.project_id)
         .fetch_one(self.annotation_repository.pool())
-        .await?;
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
         if is_member == 0 {
             return Err(ServiceError::Unauthorized("User is not a member of this project".into()));
@@ -219,7 +220,8 @@ where
         .bind(user_id)
         .bind(annotation.project_id)
         .fetch_one(self.annotation_repository.pool())
-        .await?;
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
         Ok(is_member > 0)
     }

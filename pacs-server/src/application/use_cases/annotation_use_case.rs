@@ -17,6 +17,17 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
 
     /// Annotation 생성
     pub async fn create_annotation(&self, request: CreateAnnotationRequest, user_id: i32, project_id: i32) -> Result<AnnotationResponse, ServiceError> {
+        // Validation
+        if request.study_instance_uid.trim().is_empty() {
+            return Err(ServiceError::ValidationError("Study Instance UID cannot be empty".to_string()));
+        }
+        if request.series_instance_uid.trim().is_empty() {
+            return Err(ServiceError::ValidationError("Series Instance UID cannot be empty".to_string()));
+        }
+        if request.sop_instance_uid.trim().is_empty() {
+            return Err(ServiceError::ValidationError("SOP Instance UID cannot be empty".to_string()));
+        }
+
         let new_annotation = NewAnnotation {
             project_id,
             user_id,

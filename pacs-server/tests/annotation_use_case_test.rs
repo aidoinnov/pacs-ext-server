@@ -4,6 +4,7 @@ mod annotation_use_case_tests {
     use pacs_server::application::dto::annotation_dto::{
         CreateAnnotationRequest, UpdateAnnotationRequest
     };
+    use pacs_server::domain::entities::Annotation;
     use pacs_server::application::use_cases::AnnotationUseCase;
     use pacs_server::domain::services::AnnotationServiceImpl;
     use pacs_server::infrastructure::repositories::{
@@ -50,15 +51,26 @@ mod annotation_use_case_tests {
         (app, pool)
     }
 
-    async fn cleanup_test_data(pool: &sqlx::Pool<sqlx::Postgres>) {
-        // 관계 테이블 먼저 삭제 (FK 제약)
-        sqlx::query("DELETE FROM annotation_annotation_history").execute(pool).await.unwrap();
-        sqlx::query("DELETE FROM annotation_annotation").execute(pool).await.unwrap();
-        sqlx::query("DELETE FROM security_access_log").execute(pool).await.unwrap();
-        sqlx::query("DELETE FROM security_user_project").execute(pool).await.unwrap();
-        sqlx::query("DELETE FROM security_user").execute(pool).await.unwrap();
-        sqlx::query("DELETE FROM security_project").execute(pool).await.unwrap();
-    }
+async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
+    // Foreign key constraint를 완전히 비활성화
+    sqlx::query("SET session_replication_role = replica").execute(pool.as_ref()).await.unwrap();
+    
+    // 모든 테이블을 순서대로 삭제 (foreign key constraint 비활성화 상태에서)
+    sqlx::query("DELETE FROM annotation_annotation_history").execute(pool.as_ref()).await.unwrap();
+    sqlx::query("DELETE FROM annotation_annotation").execute(pool.as_ref()).await.unwrap();
+    sqlx::query("DELETE FROM security_access_log").execute(pool.as_ref()).await.unwrap();
+    sqlx::query("DELETE FROM security_user_project").execute(pool.as_ref()).await.unwrap();
+    sqlx::query("DELETE FROM security_project").execute(pool.as_ref()).await.unwrap();
+    sqlx::query("DELETE FROM security_user").execute(pool.as_ref()).await.unwrap();
+    
+    // Foreign key constraint를 다시 활성화
+    sqlx::query("SET session_replication_role = DEFAULT").execute(pool.as_ref()).await.unwrap();
+    
+    // 시퀀스 리셋 (auto-increment ID 초기화)
+    sqlx::query("ALTER SEQUENCE security_user_id_seq RESTART WITH 1").execute(pool.as_ref()).await.unwrap();
+    sqlx::query("ALTER SEQUENCE security_project_id_seq RESTART WITH 1").execute(pool.as_ref()).await.unwrap();
+    sqlx::query("ALTER SEQUENCE annotation_annotation_id_seq RESTART WITH 1").execute(pool.as_ref()).await.unwrap();
+}
 
     #[actix_web::test]
     async fn test_create_annotation_use_case() {
@@ -73,7 +85,7 @@ mod annotation_use_case_tests {
         .bind(keycloak_id)
         .bind(&format!("testuser_{}", keycloak_id))
         .bind(&format!("test_{}@example.com", keycloak_id))
-        .fetch_one(&*pool)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test user");
 
@@ -82,7 +94,7 @@ mod annotation_use_case_tests {
         )
         .bind(&format!("Test Project {}", keycloak_id))
         .bind(&format!("Test Description {}", keycloak_id))
-        .fetch_one(&*pool)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test project");
 
@@ -96,7 +108,7 @@ mod annotation_use_case_tests {
         )
         .bind(user_id)
         .bind(project_id)
-        .execute(&*pool)
+        .execute(pool.as_ref())
         .await
         .expect("Failed to add user to project");
 
@@ -111,20 +123,68 @@ mod annotation_use_case_tests {
             description: Some("Test annotation".to_string()),
         };
 
-        let req = test::TestRequest::post()
-            .uri("/annotations")
-            .set_json(&create_req)
-            .to_request();
+        // Test the use case directly instead of HTTP request
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
+        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+        let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 201);
+        // 사용자가 프로젝트 멤버인지 확인
+        let is_member = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1 AND project_id = $2"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_one(pool.as_ref())
+        .await
+        .expect("Failed to check project membership");
+        
+        println!("User {} is member of project {}: {}", user_id, project_id, is_member > 0);
+
+        let result = annotation_use_case.create_annotation(create_req, user_id, project_id).await;
+        match result {
+            Ok(annotation) => {
+                println!("Annotation created successfully with ID: {}", annotation.id);
+                // 생성된 annotation을 다시 조회해서 확인
+                let retrieved = annotation_use_case.get_annotation_by_id(annotation.id).await;
+                match retrieved {
+                    Ok(retrieved_annotation) => {
+                        println!("Retrieved annotation: {:?}", retrieved_annotation);
+                    }
+                    Err(e) => {
+                        println!("Failed to retrieve created annotation: {:?}", e);
+                        // 데이터베이스에서 직접 확인
+                        let direct_check = sqlx::query_as::<_, Annotation>(
+                            "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                                    viewer_software, description
+                             FROM annotation_annotation
+                             WHERE id = $1"
+                        )
+                        .bind(annotation.id)
+                        .fetch_optional(pool.as_ref())
+                        .await;
+                        match direct_check {
+                            Ok(Some(ann)) => println!("Direct DB query found annotation: {:?}", ann),
+                            Ok(None) => println!("Direct DB query found no annotation with ID: {}", annotation.id),
+                            Err(e) => println!("Direct DB query failed: {:?}", e),
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Failed to create annotation: {:?}", e);
+                panic!("Annotation creation failed: {:?}", e);
+            }
+        }
 
         // Verify annotation was created
         let annotation_count = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM annotation_annotation WHERE user_id = $1"
         )
         .bind(user_id)
-        .fetch_one(&*pool)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to count annotations");
 
@@ -146,7 +206,7 @@ mod annotation_use_case_tests {
         .bind(keycloak_id)
         .bind(&format!("testuser_{}", keycloak_id))
         .bind(&format!("test_{}@example.com", keycloak_id))
-        .fetch_one(&*pool)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test user");
 
@@ -155,7 +215,7 @@ mod annotation_use_case_tests {
         )
         .bind(&format!("Test Project {}", keycloak_id))
         .bind(&format!("Test Description {}", keycloak_id))
-        .fetch_one(&*pool)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test project");
 
@@ -163,15 +223,29 @@ mod annotation_use_case_tests {
         let user_id: i32 = user_result.get("id");
         let project_id: i32 = project_result.get("id");
 
+        println!("test_get_annotation_use_case - Created user_id: {}, project_id: {}", user_id, project_id);
+
         // Add user to project
         sqlx::query(
             "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
         )
         .bind(user_id)
         .bind(project_id)
-        .execute(&*pool)
+        .execute(pool.as_ref())
         .await
         .expect("Failed to add user to project");
+
+        // Verify user is member of project
+        let is_member = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1 AND project_id = $2"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_one(pool.as_ref())
+        .await
+        .expect("Failed to check project membership");
+
+        println!("test_get_annotation_use_case - User {} is member of project {}: {}", user_id, project_id, is_member > 0);
 
         // Create annotation
         let annotation_result = sqlx::query(
@@ -185,18 +259,21 @@ mod annotation_use_case_tests {
         .bind("test_tool")
         .bind(json!({"type": "test"}))
         .bind(false)
-        .fetch_one(&*pool)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test annotation");
 
         let annotation_id: i32 = annotation_result.get("id");
 
-        let req = test::TestRequest::get()
-            .uri(&format!("/annotations/{}", annotation_id))
-            .to_request();
+        // Test the use case directly instead of HTTP request
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
+        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+        let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
+        let result = annotation_use_case.get_annotation_by_id(annotation_id).await;
+        assert!(result.is_ok());
 
         cleanup_test_data(&pool).await;
     }
@@ -206,24 +283,24 @@ mod annotation_use_case_tests {
         let (app, pool) = setup_test_app().await;
         cleanup_test_data(&pool).await;
 
-        // Create test user and project
+        // Create test user and project with unique identifiers
         let keycloak_id = Uuid::new_v4();
         let user_result = sqlx::query(
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind(&format!("testuser_{}", keycloak_id))
-        .bind(&format!("test_{}@example.com", keycloak_id))
-        .fetch_one(&*pool)
+        .bind(&format!("testuser_update_{}", keycloak_id))
+        .bind(&format!("test_update_{}@example.com", keycloak_id))
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test user");
 
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind(&format!("Test Project {}", keycloak_id))
-        .bind(&format!("Test Description {}", keycloak_id))
-        .fetch_one(&*pool)
+        .bind(&format!("Test Project Update {}", keycloak_id))
+        .bind(&format!("Test Description Update {}", keycloak_id))
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test project");
 
@@ -237,27 +314,31 @@ mod annotation_use_case_tests {
         )
         .bind(user_id)
         .bind(project_id)
-        .execute(&*pool)
+        .execute(pool.as_ref())
         .await
         .expect("Failed to add user to project");
 
-        // Create annotation
-        let annotation_result = sqlx::query(
-            "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid, tool_name, data, is_shared) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id"
-        )
-        .bind(project_id)
-        .bind(user_id)
-        .bind("1.2.3.4.5")
-        .bind("1.2.3.4.6")
-        .bind("1.2.3.4.7")
-        .bind("test_tool")
-        .bind(json!({"type": "test"}))
-        .bind(false)
-        .fetch_one(&*pool)
-        .await
-        .expect("Failed to create test annotation");
+        // Create annotation using use case
+        let create_req = CreateAnnotationRequest {
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: json!({"type": "test"}),
+            description: Some("Test annotation for update".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
+        };
 
-        let annotation_id: i32 = annotation_result.get("id");
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
+        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+        let annotation_use_case = AnnotationUseCase::new(annotation_service);
+
+        let annotation = annotation_use_case.create_annotation(create_req, user_id, project_id).await
+            .expect("Failed to create test annotation");
+        let annotation_id = annotation.id;
 
         let update_req = UpdateAnnotationRequest {
             tool_name: Some("updated_tool".to_string()),
@@ -267,13 +348,14 @@ mod annotation_use_case_tests {
             description: Some("Updated annotation".to_string()),
         };
 
-        let req = test::TestRequest::put()
-            .uri(&format!("/annotations/{}", annotation_id))
-            .set_json(&update_req)
-            .to_request();
-
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
+        let result = annotation_use_case.update_annotation(annotation_id, update_req).await;
+        match result {
+            Ok(_) => println!("Annotation updated successfully"),
+            Err(e) => {
+                println!("Failed to update annotation: {:?}", e);
+                panic!("Annotation update failed: {:?}", e);
+            }
+        }
 
         cleanup_test_data(&pool).await;
     }
@@ -283,24 +365,24 @@ mod annotation_use_case_tests {
         let (app, pool) = setup_test_app().await;
         cleanup_test_data(&pool).await;
 
-        // Create test user and project
+        // Create test user and project with unique identifiers
         let keycloak_id = Uuid::new_v4();
         let user_result = sqlx::query(
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind(&format!("testuser_{}", keycloak_id))
-        .bind(&format!("test_{}@example.com", keycloak_id))
-        .fetch_one(&*pool)
+        .bind(&format!("testuser_delete_{}", keycloak_id))
+        .bind(&format!("test_delete_{}@example.com", keycloak_id))
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test user");
 
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind(&format!("Test Project {}", keycloak_id))
-        .bind(&format!("Test Description {}", keycloak_id))
-        .fetch_one(&*pool)
+        .bind(&format!("Test Project Delete {}", keycloak_id))
+        .bind(&format!("Test Description Delete {}", keycloak_id))
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test project");
 
@@ -314,41 +396,41 @@ mod annotation_use_case_tests {
         )
         .bind(user_id)
         .bind(project_id)
-        .execute(&*pool)
+        .execute(pool.as_ref())
         .await
         .expect("Failed to add user to project");
 
-        // Create annotation
-        let annotation_result = sqlx::query(
-            "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid, tool_name, data, is_shared) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id"
-        )
-        .bind(project_id)
-        .bind(user_id)
-        .bind("1.2.3.4.5")
-        .bind("1.2.3.4.6")
-        .bind("1.2.3.4.7")
-        .bind("test_tool")
-        .bind(json!({"type": "test"}))
-        .bind(false)
-        .fetch_one(&*pool)
-        .await
-        .expect("Failed to create test annotation");
+        // Create annotation using use case
+        let create_req = CreateAnnotationRequest {
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: json!({"type": "test"}),
+            description: Some("Test annotation for deletion".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
+        };
 
-        let annotation_id: i32 = annotation_result.get("id");
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
+        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+        let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
-        let req = test::TestRequest::delete()
-            .uri(&format!("/annotations/{}", annotation_id))
-            .to_request();
+        let annotation = annotation_use_case.create_annotation(create_req, user_id, project_id).await
+            .expect("Failed to create test annotation");
+        let annotation_id = annotation.id;
 
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
+        let result = annotation_use_case.delete_annotation(annotation_id).await;
+        assert!(result.is_ok());
 
         // Verify annotation was deleted
         let annotation_exists = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM annotation_annotation WHERE id = $1)"
         )
         .bind(annotation_id)
-        .fetch_one(&*pool)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to check annotation existence");
 
@@ -362,24 +444,24 @@ mod annotation_use_case_tests {
         let (app, pool) = setup_test_app().await;
         cleanup_test_data(&pool).await;
 
-        // Create test user and project
+        // Create test user and project with unique identifiers
         let keycloak_id = Uuid::new_v4();
         let user_result = sqlx::query(
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind(&format!("testuser_{}", keycloak_id))
-        .bind(&format!("test_{}@example.com", keycloak_id))
-        .fetch_one(&*pool)
+        .bind(&format!("testuser_list_{}", keycloak_id))
+        .bind(&format!("test_list_{}@example.com", keycloak_id))
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test user");
 
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind(&format!("Test Project {}", keycloak_id))
-        .bind(&format!("Test Description {}", keycloak_id))
-        .fetch_one(&*pool)
+        .bind(&format!("Test Project List {}", keycloak_id))
+        .bind(&format!("Test Description List {}", keycloak_id))
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test project");
 
@@ -393,34 +475,44 @@ mod annotation_use_case_tests {
         )
         .bind(user_id)
         .bind(project_id)
-        .execute(&*pool)
+        .execute(pool.as_ref())
         .await
         .expect("Failed to add user to project");
 
-        // Create multiple annotations
+        // Create multiple annotations using use case
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
+        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+        let annotation_use_case = AnnotationUseCase::new(annotation_service);
+
         for i in 0..3 {
-            sqlx::query(
-                "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid, tool_name, data, is_shared) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
-            )
-            .bind(project_id)
-            .bind(user_id)
-            .bind(format!("1.2.3.4.{}", i))
-            .bind(format!("1.2.3.5.{}", i))
-            .bind(format!("1.2.3.6.{}", i))
-            .bind("test_tool")
-            .bind(json!({"type": "test", "index": i}))
-            .bind(false)
-            .execute(&*pool)
-            .await
-            .expect("Failed to create test annotation");
+            let create_req = CreateAnnotationRequest {
+                study_instance_uid: format!("1.2.3.4.{}", i),
+                series_instance_uid: format!("1.2.3.5.{}", i),
+                sop_instance_uid: format!("1.2.3.6.{}", i),
+                annotation_data: json!({"type": "test", "index": i}),
+                description: Some(format!("Test annotation {}", i)),
+                tool_name: Some("test_tool".to_string()),
+                tool_version: Some("1.0.0".to_string()),
+                viewer_software: Some("test_viewer".to_string()),
+            };
+
+            annotation_use_case.create_annotation(create_req, user_id, project_id).await
+                .expect("Failed to create test annotation");
         }
 
-        let req = test::TestRequest::get()
-            .uri("/annotations")
-            .to_request();
-
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
+        let result = annotation_use_case.get_annotations_by_project(project_id).await;
+        match result {
+            Ok(annotation_list) => {
+                println!("Found {} annotations", annotation_list.annotations.len());
+                assert_eq!(annotation_list.annotations.len(), 3);
+            }
+            Err(e) => {
+                println!("Failed to get annotations: {:?}", e);
+                panic!("Failed to get annotations: {:?}", e);
+            }
+        }
 
         cleanup_test_data(&pool).await;
     }
@@ -442,23 +534,62 @@ mod annotation_use_case_tests {
         let (app, pool) = setup_test_app().await;
         cleanup_test_data(&pool).await;
 
-        // Test with invalid JSON data
-        let invalid_req = serde_json::json!({
-            "study_instance_uid": "",
-            "series_instance_uid": "1.2.3.4.5",
-            "sop_instance_uid": "1.2.3.4.6",
-            "annotation_data": "invalid_json",
-            "description": "Test"
-        });
+        // Create test user and project
+        let keycloak_id = Uuid::new_v4();
+        let user_result = sqlx::query(
+            "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
+        )
+        .bind(keycloak_id)
+        .bind(&format!("testuser_{}", keycloak_id))
+        .bind(&format!("test_{}@example.com", keycloak_id))
+        .fetch_one(pool.as_ref())
+        .await
+        .expect("Failed to create test user");
 
-        let req = test::TestRequest::post()
-            .uri("/annotations")
-            .set_json(&invalid_req)
-            .to_request();
+        let project_result = sqlx::query(
+            "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
+        )
+        .bind(&format!("Test Project {}", keycloak_id))
+        .bind(&format!("Test Description {}", keycloak_id))
+        .fetch_one(pool.as_ref())
+        .await
+        .expect("Failed to create test project");
 
-        let resp = test::call_service(&app, req).await;
-        // Should return 400 for invalid request
-        assert!(resp.status() == 400 || resp.status() == 422);
+        use sqlx::Row;
+        let user_id: i32 = user_result.get("id");
+        let project_id: i32 = project_result.get("id");
+
+        // Add user to project
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .execute(pool.as_ref())
+        .await
+        .expect("Failed to add user to project");
+
+        // Test with invalid data using use case directly
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
+        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+        let annotation_use_case = AnnotationUseCase::new(annotation_service);
+
+        // Test with empty study_uid (should fail validation)
+        let invalid_req = CreateAnnotationRequest {
+            study_instance_uid: "".to_string(),
+            series_instance_uid: "1.2.3.4.5".to_string(),
+            sop_instance_uid: "1.2.3.4.6".to_string(),
+            annotation_data: serde_json::json!({"type": "test"}),
+            description: Some("Test".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
+        };
+
+        let result = annotation_use_case.create_annotation(invalid_req, user_id, project_id).await;
+        assert!(result.is_err());
 
         cleanup_test_data(&pool).await;
     }

@@ -58,8 +58,13 @@ where
     let mut request = req.into_inner();
     request.annotation_id = annotation_id;
 
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // X-User-ID 헤더에서 user_id 추출
+    let user_id = _http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.create_mask_group(request, user_id).await {
         Ok(mask_group) => HttpResponse::Created().json(mask_group),
@@ -113,8 +118,13 @@ where
 {
     let (annotation_id, group_id) = path.into_inner();
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // X-User-ID 헤더에서 user_id 추출
+    let user_id = _http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.get_mask_group(group_id, user_id).await {
         Ok(mask_group) => HttpResponse::Ok().json(mask_group),
@@ -165,8 +175,13 @@ where
 {
     let annotation_id = path.into_inner();
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // X-User-ID 헤더에서 user_id 추출
+    let user_id = _http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     // Query parameters 추출
     let offset = query.get("offset").and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
@@ -223,8 +238,13 @@ where
 {
     let (annotation_id, group_id) = path.into_inner();
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // X-User-ID 헤더에서 user_id 추출
+    let user_id = _http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.update_mask_group(group_id, req.into_inner(), user_id).await {
         Ok(mask_group) => HttpResponse::Ok().json(mask_group),
@@ -282,8 +302,13 @@ where
 {
     let (annotation_id, group_id) = path.into_inner();
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // X-User-ID 헤더에서 user_id 추출
+    let user_id = _http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.delete_mask_group(group_id, user_id).await {
         Ok(_) => HttpResponse::NoContent().finish(),
@@ -338,8 +363,13 @@ where
     let mut request = req.into_inner();
     request.mask_group_id = group_id;
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // X-User-ID 헤더에서 user_id 추출
+    let user_id = _http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.generate_upload_url(request, user_id).await {
         Ok(signed_url) => HttpResponse::Ok().json(signed_url),
@@ -402,8 +432,13 @@ where
     let mut request = req.into_inner();
     request.mask_group_id = group_id;
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // X-User-ID 헤더에서 user_id 추출
+    let user_id = _http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.complete_upload(request, user_id).await {
         Ok(response) => HttpResponse::Ok().json(response),

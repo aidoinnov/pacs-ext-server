@@ -169,10 +169,8 @@ use sqlx::Row;
         let username = format!("testuser_{}", keycloak_id);
         let email = format!("test_{}@example.com", keycloak_id);
         let user_result = sqlx::query(
-            "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
+            "INSERT INTO users (email) VALUES ($1) RETURNING id"
         )
-        .bind(keycloak_id)
-        .bind(&username)
         .bind(&email)
         .fetch_one(pool)
         .await
@@ -185,7 +183,7 @@ use sqlx::Row;
         let project_name = format!("Test Project {}", keycloak_id);
         let project_description = format!("Test Description {}", keycloak_id);
         let project_result = sqlx::query(
-            "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
+            "INSERT INTO projects (name, description) VALUES ($1, $2) RETURNING id"
         )
         .bind(&project_name)
         .bind(&project_description)
@@ -195,31 +193,22 @@ use sqlx::Row;
 
         let project_id: i32 = project_result.get("id");
 
-        // Add user to project
-        sqlx::query(
-            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
-        )
-        .bind(user_id)
-        .bind(project_id)
-        .execute(pool)
-        .await
-        .expect("Failed to add user to project");
+        // Note: User-project relationship is handled by application logic
+        // No direct database relationship table needed for this test
 
         // Create test annotation
         let annotation_result = sqlx::query(
-            "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid, tool_name, tool_version, viewer_software, data, description, is_shared) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id"
+            "INSERT INTO annotations (study_instance_uid, series_instance_uid, sop_instance_uid, annotation_data, tool_name, tool_version, viewer_software, description, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id"
         )
-        .bind(project_id)
-        .bind(user_id)
         .bind("1.2.840.113619.2.55.3.604688119.868.1234567890.1")
         .bind("1.2.840.113619.2.55.3.604688119.868.1234567890.2")
         .bind("1.2.840.113619.2.55.3.604688119.868.1234567890.3")
+        .bind(serde_json::json!({"type": "circle", "x": 100, "y": 200, "radius": 50}))
         .bind("test_tool")
         .bind("1.0.0")
         .bind("test_viewer")
-        .bind(serde_json::json!({"type": "circle", "x": 100, "y": 200, "radius": 50}))
         .bind("Test annotation")
-        .bind(false)
+        .bind(user_id)
         .fetch_one(pool)
         .await
         .expect("Failed to create test annotation");
@@ -269,19 +258,13 @@ use sqlx::Row;
             .await
             .ok();
         
-        sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
+        sqlx::query("DELETE FROM users WHERE id = $1")
             .bind(user_id)
             .execute(pool)
             .await
             .ok();
         
-        sqlx::query("DELETE FROM security_user WHERE id = $1")
-            .bind(user_id)
-            .execute(pool)
-            .await
-            .ok();
-        
-        sqlx::query("DELETE FROM security_project WHERE id = $1")
+        sqlx::query("DELETE FROM projects WHERE id = $1")
             .bind(project_id)
             .execute(pool)
             .await

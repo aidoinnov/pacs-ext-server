@@ -129,7 +129,7 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
     }
 
     async fn create(&self, new_annotation: NewAnnotation) -> Result<Annotation, sqlx::Error> {
-        sqlx::query_as::<_, Annotation>(
+        let annotation = sqlx::query_as::<_, Annotation>(
             "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid, 
                                                tool_name, tool_version, data, is_shared, viewer_software, description)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -149,11 +149,37 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         .bind(new_annotation.viewer_software)
         .bind(new_annotation.description)
         .fetch_one(&self.pool)
-        .await
+        .await?;
+
+        // history 생성
+        let _ = self.create_history(
+            annotation.id,
+            annotation.user_id,
+            "create",
+            None,
+            Some(annotation.data.clone())
+        ).await;
+
+        Ok(annotation)
     }
 
     async fn update(&self, id: i32, data: serde_json::Value, is_shared: bool) -> Result<Option<Annotation>, sqlx::Error> {
-        sqlx::query_as::<_, Annotation>(
+        // 기존 annotation 데이터를 가져와서 history에 저장
+        let old_annotation = sqlx::query_as::<_, Annotation>(
+            "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
+             FROM annotation_annotation WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let old_data = old_annotation.as_ref().map(|a| a.data.clone());
+        let user_id = old_annotation.as_ref().map(|a| a.user_id).unwrap_or(0);
+
+        // annotation 업데이트
+        let updated_annotation = sqlx::query_as::<_, Annotation>(
             "UPDATE annotation_annotation 
              SET data = $2, is_shared = $3, updated_at = CURRENT_TIMESTAMP
              WHERE id = $1
@@ -165,16 +191,54 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         .bind(data)
         .bind(is_shared)
         .fetch_optional(&self.pool)
-        .await
+        .await?;
+
+        // history 생성
+        if let Some(annotation) = &updated_annotation {
+            let _ = self.create_history(
+                annotation.id,
+                user_id,
+                "update",
+                old_data,
+                Some(annotation.data.clone())
+            ).await;
+        }
+
+        Ok(updated_annotation)
     }
 
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM annotation_annotation WHERE id = $1")
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
+        // 기존 annotation 데이터를 가져와서 history에 저장
+        let old_annotation = sqlx::query_as::<_, Annotation>(
+            "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description
+             FROM annotation_annotation WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
 
-        Ok(result.rows_affected() > 0)
+        if let Some(annotation) = old_annotation {
+            // history 생성
+            let _ = self.create_history(
+                annotation.id,
+                annotation.user_id,
+                "delete",
+                Some(annotation.data.clone()),
+                None
+            ).await;
+
+            // annotation 삭제
+            let result = sqlx::query("DELETE FROM annotation_annotation WHERE id = $1")
+                .bind(id)
+                .execute(&self.pool)
+                .await?;
+
+            Ok(result.rows_affected() > 0)
+        } else {
+            Ok(false)
+        }
     }
 
     async fn create_history(&self, annotation_id: i32, user_id: i32, action: &str, data_before: Option<serde_json::Value>, data_after: Option<serde_json::Value>) -> Result<AnnotationHistory, sqlx::Error> {

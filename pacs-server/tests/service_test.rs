@@ -28,7 +28,14 @@ async fn get_test_pool() -> PgPool {
 }
 
 async fn cleanup_test_data(pool: &PgPool) {
-    // 관계 테이블 먼저 삭제 (FK 제약)
+    // Foreign key constraint를 비활성화하고 모든 데이터를 삭제
+    sqlx::query("SET session_replication_role = replica").execute(pool).await.unwrap();
+    
+    // 모든 테이블을 순서대로 삭제
+    sqlx::query("DELETE FROM annotation_annotation_history").execute(pool).await.unwrap();
+    sqlx::query("DELETE FROM annotation_annotation").execute(pool).await.unwrap();
+    sqlx::query("DELETE FROM annotation_mask").execute(pool).await.unwrap();
+    sqlx::query("DELETE FROM annotation_mask_group").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_access_log").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_user_project").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_project_role").execute(pool).await.unwrap();
@@ -36,12 +43,20 @@ async fn cleanup_test_data(pool: &PgPool) {
     sqlx::query("DELETE FROM security_project_permission").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_role_access_condition").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_project_access_condition").execute(pool).await.unwrap();
-
-    // 기본 엔티티 테이블 삭제
     sqlx::query("DELETE FROM security_user").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_project").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_role").execute(pool).await.unwrap();
     sqlx::query("DELETE FROM security_permission").execute(pool).await.unwrap();
+    
+    // Foreign key constraint를 다시 활성화
+    sqlx::query("SET session_replication_role = DEFAULT").execute(pool).await.unwrap();
+    
+    // 시퀀스 리셋 (auto-increment ID 초기화)
+    sqlx::query("ALTER SEQUENCE security_user_id_seq RESTART WITH 1").execute(pool).await.unwrap();
+    sqlx::query("ALTER SEQUENCE security_project_id_seq RESTART WITH 1").execute(pool).await.unwrap();
+    sqlx::query("ALTER SEQUENCE security_role_id_seq RESTART WITH 1").execute(pool).await.unwrap();
+    sqlx::query("ALTER SEQUENCE security_permission_id_seq RESTART WITH 1").execute(pool).await.unwrap();
+    sqlx::query("ALTER SEQUENCE annotation_annotation_id_seq RESTART WITH 1").execute(pool).await.unwrap();
 }
 
 // ========================================

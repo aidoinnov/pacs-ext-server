@@ -53,8 +53,17 @@ mod error_handling_tests {
         
         // Initialize services
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
-        let mask_group_service = MaskGroupServiceImpl::new(mask_group_repo, user_repo.clone(), project_repo.clone());
-        let mask_service = MaskServiceImpl::new(mask_repo, mask_group_repo.clone());
+        let mask_group_service = MaskGroupServiceImpl::new(
+            Arc::new(mask_group_repo), 
+            Arc::new(user_repo), 
+            Arc::new(project_repo),
+            Arc::new(annotation_repo)
+        );
+        let mask_service = MaskServiceImpl::new(
+            Arc::new(mask_repo), 
+            Arc::new(mask_group_repo), 
+            Arc::new(user_repo)
+        );
         
         // Mock SignedUrlService for testing
         let signed_url_service = Arc::new(MockSignedUrlService::new());
@@ -112,7 +121,9 @@ mod error_handling_tests {
             _request: pacs_server::application::services::SignedUrlRequest,
         ) -> Result<SignedUrlResponse, SignedUrlError> {
             if *self.should_fail.lock().unwrap() {
-                return Err(SignedUrlError::StorageError("Mock storage error".to_string()));
+                return Err(SignedUrlError::ObjectStorageError(
+                    pacs_server::application::services::ObjectStorageError::S3Error("Mock storage error".to_string())
+                ));
             }
             Ok(SignedUrlResponse::new(
                 "https://mock-s3.amazonaws.com/upload".to_string(),
@@ -127,7 +138,9 @@ mod error_handling_tests {
             _request: pacs_server::application::services::SignedUrlRequest,
         ) -> Result<SignedUrlResponse, SignedUrlError> {
             if *self.should_fail.lock().unwrap() {
-                return Err(SignedUrlError::StorageError("Mock storage error".to_string()));
+                return Err(SignedUrlError::ObjectStorageError(
+                    pacs_server::application::services::ObjectStorageError::S3Error("Mock storage error".to_string())
+                ));
             }
             Ok(SignedUrlResponse::new(
                 "https://mock-s3.amazonaws.com/download".to_string(),
@@ -147,7 +160,9 @@ mod error_handling_tests {
             _user_id: Option<i32>,
         ) -> Result<SignedUrlResponse, SignedUrlError> {
             if *self.should_fail.lock().unwrap() {
-                return Err(SignedUrlError::StorageError("Mock storage error".to_string()));
+                return Err(SignedUrlError::ObjectStorageError(
+                    pacs_server::application::services::ObjectStorageError::S3Error("Mock storage error".to_string())
+                ));
             }
             Ok(SignedUrlResponse::new(
                 "https://mock-s3.amazonaws.com/mask-upload".to_string(),
@@ -163,7 +178,9 @@ mod error_handling_tests {
             _ttl_seconds: Option<u64>,
         ) -> Result<SignedUrlResponse, SignedUrlError> {
             if *self.should_fail.lock().unwrap() {
-                return Err(SignedUrlError::StorageError("Mock storage error".to_string()));
+                return Err(SignedUrlError::ObjectStorageError(
+                    pacs_server::application::services::ObjectStorageError::S3Error("Mock storage error".to_string())
+                ));
             }
             Ok(SignedUrlResponse::new(
                 "https://mock-s3.amazonaws.com/mask-download".to_string(),
@@ -182,7 +199,9 @@ mod error_handling_tests {
             _user_id: Option<i32>,
         ) -> Result<SignedUrlResponse, SignedUrlError> {
             if *self.should_fail.lock().unwrap() {
-                return Err(SignedUrlError::StorageError("Mock storage error".to_string()));
+                return Err(SignedUrlError::ObjectStorageError(
+                    pacs_server::application::services::ObjectStorageError::S3Error("Mock storage error".to_string())
+                ));
             }
             Ok(SignedUrlResponse::new(
                 "https://mock-s3.amazonaws.com/annotation-upload".to_string(),
@@ -198,7 +217,9 @@ mod error_handling_tests {
             _ttl_seconds: Option<u64>,
         ) -> Result<SignedUrlResponse, SignedUrlError> {
             if *self.should_fail.lock().unwrap() {
-                return Err(SignedUrlError::StorageError("Mock storage error".to_string()));
+                return Err(SignedUrlError::ObjectStorageError(
+                    pacs_server::application::services::ObjectStorageError::S3Error("Mock storage error".to_string())
+                ));
             }
             Ok(SignedUrlResponse::new(
                 "https://mock-s3.amazonaws.com/annotation-download".to_string(),
@@ -380,6 +401,7 @@ mod error_handling_tests {
 
         // Test 2: Invalid mask group data
         let invalid_mask_group_req = CreateMaskGroupRequest {
+            annotation_id: 1,
             group_name: Some("".to_string()), // Empty group name
             model_name: Some("".to_string()), // Empty model name
             version: Some("invalid-version".to_string()), // Invalid version format
@@ -401,7 +423,7 @@ mod error_handling_tests {
         let invalid_mask_req = CreateMaskRequest {
             mask_group_id: 1, // Valid mask group ID
             file_path: "".to_string(), // Empty file path
-            mime_type: Some("invalid/mime".to_string()), // Invalid MIME type
+            mime_type: "invalid/mime".to_string(), // Invalid MIME type
             slice_index: Some(-1), // Negative slice index
             sop_instance_uid: Some("invalid-uid".to_string()), // Invalid UID format
             label_name: Some("".to_string()), // Empty label name
@@ -413,6 +435,7 @@ mod error_handling_tests {
 
         // First create a valid mask group
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id: 1,
             group_name: Some("Error Test Group".to_string()),
             model_name: Some("ErrorModel".to_string()),
             version: Some("1.0.0".to_string()),
@@ -464,6 +487,7 @@ mod error_handling_tests {
 
         // Test 2: Try to create mask group for non-existent annotation
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id: 1,
             group_name: Some("Unauthorized Test Group".to_string()),
             model_name: Some("UnauthorizedModel".to_string()),
             version: Some("1.0.0".to_string()),
@@ -492,6 +516,7 @@ mod error_handling_tests {
 
         // Test 1: Try to create duplicate mask group
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id: 1,
             group_name: Some("Duplicate Test Group".to_string()),
             model_name: Some("DuplicateModel".to_string()),
             version: Some("1.0.0".to_string()),
@@ -531,6 +556,7 @@ mod error_handling_tests {
 
         // Test 1: Try to create mask group with invalid foreign key
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id: 1,
             group_name: Some("Database Error Test Group".to_string()),
             model_name: Some("DatabaseErrorModel".to_string()),
             version: Some("1.0.0".to_string()),
@@ -553,7 +579,7 @@ mod error_handling_tests {
         let mask_req = CreateMaskRequest {
             mask_group_id: 1, // Valid mask group ID
             file_path: "masks/database_error.png".to_string(),
-            mime_type: Some("image/png".to_string()),
+            mime_type: "image/png".to_string(),
             slice_index: Some(1),
             sop_instance_uid: Some("1.2.3.4.5.6.7.8.9.1.1".to_string()),
             label_name: Some("database_error_label".to_string()),
@@ -582,6 +608,7 @@ mod error_handling_tests {
 
         // Create mask group first
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id: 1,
             group_name: Some("Storage Error Test Group".to_string()),
             model_name: Some("StorageErrorModel".to_string()),
             version: Some("1.0.0".to_string()),

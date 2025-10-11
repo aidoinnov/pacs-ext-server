@@ -40,7 +40,11 @@ use sqlx::Row;
         let project_repo = ProjectRepositoryImpl::new(pool.clone());
 
         let pool = Arc::new(pool);
-        let mask_group_service = MaskGroupServiceImpl::new(Arc::new(mask_group_repo), Arc::new(annotation_repo), Arc::new(user_repo));
+        let mask_group_service = MaskGroupServiceImpl::new(
+            Arc::new(mask_group_repo), 
+            Arc::new(annotation_repo), 
+            Arc::new(user_repo)
+        );
         
         // Mock SignedUrlService for testing
         let signed_url_service = Arc::new(MockSignedUrlService::new());
@@ -189,7 +193,7 @@ use sqlx::Row;
 
         let project_id: i32 = project_result.get("id");
 
-        // Add user to project
+        // Create user-project relationship
         sqlx::query(
             "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
         )
@@ -197,23 +201,22 @@ use sqlx::Row;
         .bind(project_id)
         .execute(pool)
         .await
-        .expect("Failed to add user to project");
+        .expect("Failed to create user-project relationship");
 
         // Create test annotation
         let annotation_result = sqlx::query(
-            "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid, tool_name, tool_version, viewer_software, data, description, is_shared) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id"
+            "INSERT INTO annotation_annotation (study_uid, series_uid, instance_uid, data, tool_name, tool_version, viewer_software, description, user_id, project_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id"
         )
-        .bind(project_id)
-        .bind(user_id)
         .bind("1.2.840.113619.2.55.3.604688119.868.1234567890.1")
         .bind("1.2.840.113619.2.55.3.604688119.868.1234567890.2")
         .bind("1.2.840.113619.2.55.3.604688119.868.1234567890.3")
+        .bind(serde_json::json!({"type": "circle", "x": 100, "y": 200, "radius": 50}))
         .bind("test_tool")
         .bind("1.0.0")
         .bind("test_viewer")
-        .bind(serde_json::json!({"type": "circle", "x": 100, "y": 200, "radius": 50}))
         .bind("Test annotation")
-        .bind(false)
+        .bind(user_id)
+        .bind(project_id)
         .fetch_one(pool)
         .await
         .expect("Failed to create test annotation");
@@ -249,13 +252,13 @@ use sqlx::Row;
             .await
             .ok();
         
-        sqlx::query("DELETE FROM security_user WHERE id = $1")
+        sqlx::query("DELETE FROM security_project WHERE id IN (SELECT project_id FROM annotation_annotation WHERE user_id = $1)")
             .bind(user_id)
             .execute(pool)
             .await
             .ok();
         
-        sqlx::query("DELETE FROM security_project WHERE id IN (SELECT project_id FROM annotation_annotation WHERE user_id = $1)")
+        sqlx::query("DELETE FROM security_user WHERE id = $1")
             .bind(user_id)
             .execute(pool)
             .await
@@ -280,6 +283,7 @@ use sqlx::Row;
 
         let req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&create_req)
             .to_request();
 
@@ -309,15 +313,21 @@ use sqlx::Row;
 
         let create_req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&create_req)
             .to_request();
 
         let create_resp = test::call_service(&app, create_req).await;
         assert_eq!(create_resp.status(), 201);
 
+        // Extract the created mask group ID
+        let body: serde_json::Value = test::read_body_json(create_resp).await;
+        let mask_group_id = body["id"].as_i64().unwrap() as i32;
+
         // Get the created mask group
         let req = test::TestRequest::get()
-            .uri(&format!("/api/annotations/{}/mask-groups/1", annotation_id))
+            .uri(&format!("/api/annotations/{}/mask-groups/{}", annotation_id, mask_group_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .to_request();
 
         let resp = test::call_service(&app, req).await;
@@ -334,6 +344,7 @@ use sqlx::Row;
 
         let req = test::TestRequest::get()
             .uri(&format!("/api/annotations/{}/mask-groups/999999", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .to_request();
 
         let resp = test::call_service(&app, req).await;
@@ -362,11 +373,16 @@ use sqlx::Row;
 
         let create_req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&create_req)
             .to_request();
 
         let create_resp = test::call_service(&app, create_req).await;
         assert_eq!(create_resp.status(), 201);
+
+        // Extract the created mask group ID
+        let body: serde_json::Value = test::read_body_json(create_resp).await;
+        let mask_group_id = body["id"].as_i64().unwrap() as i32;
 
         // Update the mask group
         let update_req = UpdateMaskGroupRequest {
@@ -380,7 +396,8 @@ use sqlx::Row;
         };
 
         let req = test::TestRequest::put()
-            .uri(&format!("/api/annotations/{}/mask-groups/1", annotation_id))
+            .uri(&format!("/api/annotations/{}/mask-groups/{}", annotation_id, mask_group_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&update_req)
             .to_request();
 
@@ -410,19 +427,25 @@ use sqlx::Row;
 
         let create_req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&create_req)
             .to_request();
 
         let create_resp = test::call_service(&app, create_req).await;
         assert_eq!(create_resp.status(), 201);
 
+        // Extract the created mask group ID
+        let body: serde_json::Value = test::read_body_json(create_resp).await;
+        let mask_group_id = body["id"].as_i64().unwrap() as i32;
+
         // Delete the mask group
         let req = test::TestRequest::delete()
-            .uri(&format!("/api/annotations/{}/mask-groups/1", annotation_id))
+            .uri(&format!("/api/annotations/{}/mask-groups/{}", annotation_id, mask_group_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .to_request();
 
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
+        assert_eq!(resp.status(), 204);
 
         // Cleanup
         cleanup_test_data(&pool, user_id).await;
@@ -447,6 +470,7 @@ use sqlx::Row;
 
         let create_req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&create_req)
             .to_request();
 
@@ -456,6 +480,7 @@ use sqlx::Row;
         // List mask groups
         let req = test::TestRequest::get()
             .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .to_request();
 
         let resp = test::call_service(&app, req).await;
@@ -484,6 +509,7 @@ use sqlx::Row;
 
         let create_req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&create_req)
             .to_request();
 
@@ -507,6 +533,7 @@ use sqlx::Row;
 
         let req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups/1/upload-url", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&upload_req)
             .to_request();
 
@@ -536,6 +563,7 @@ use sqlx::Row;
 
         let create_req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&create_req)
             .to_request();
 
@@ -555,6 +583,7 @@ use sqlx::Row;
 
         let req = test::TestRequest::post()
             .uri(&format!("/api/annotations/{}/mask-groups/1/complete-upload", annotation_id))
+            .insert_header(("X-User-ID", user_id.to_string()))
             .set_json(&complete_req)
             .to_request();
 

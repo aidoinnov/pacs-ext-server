@@ -52,27 +52,32 @@ mod annotation_controller_tests {
     async fn create_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) -> (i32, i32) {
         use sqlx::Row;
         
-        // Create test user
+        // Create test user with unique username and email
         let keycloak_id = Uuid::new_v4();
+        let unique_suffix = keycloak_id.to_string()[..8].to_string();
+        let username = format!("testuser_{}", unique_suffix);
+        let email = format!("test_{}@example.com", unique_suffix);
+        
         let user_result = sqlx::query(
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind("testuser")
-        .bind("test@example.com")
-        .fetch_one(pool)
+        .bind(&username)
+        .bind(&email)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test user");
 
         let user_id: i32 = user_result.get("id");
 
-        // Create test project
+        // Create test project with unique name
+        let project_name = format!("Test Project {}", unique_suffix);
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind("Test Project")
+        .bind(&project_name)
         .bind("Test Description")
-        .fetch_one(pool)
+        .fetch_one(pool.as_ref())
         .await
         .expect("Failed to create test project");
 
@@ -84,7 +89,7 @@ mod annotation_controller_tests {
         )
         .bind(user_id)
         .bind(project_id)
-        .execute(pool)
+        .execute(pool.as_ref())
         .await
         .expect("Failed to add user to project");
 
@@ -95,25 +100,25 @@ mod annotation_controller_tests {
         // Clean up in reverse order of dependencies
         sqlx::query("DELETE FROM annotation_annotation WHERE user_id = $1")
             .bind(user_id)
-            .execute(pool)
+            .execute(pool.as_ref())
             .await
             .ok();
         
         sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
             .bind(user_id)
-            .execute(pool)
+            .execute(pool.as_ref())
             .await
             .ok();
         
         sqlx::query("DELETE FROM security_user WHERE id = $1")
             .bind(user_id)
-            .execute(pool)
+            .execute(pool.as_ref())
             .await
             .ok();
         
         sqlx::query("DELETE FROM security_project WHERE id = $1")
             .bind(project_id)
-            .execute(pool)
+            .execute(pool.as_ref())
             .await
             .ok();
     }
@@ -124,9 +129,9 @@ mod annotation_controller_tests {
         let (user_id, project_id) = create_test_data(&pool).await;
 
         // Test the use case directly
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
         let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
@@ -154,9 +159,9 @@ mod annotation_controller_tests {
         let (user_id, project_id) = create_test_data(&pool).await;
 
         // Test the use case directly
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
         let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
@@ -192,9 +197,9 @@ mod annotation_controller_tests {
         let (user_id, project_id) = create_test_data(&pool).await;
 
         // Test the use case directly
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
         let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
@@ -227,9 +232,9 @@ mod annotation_controller_tests {
         let (user_id, project_id) = create_test_data(&pool).await;
 
         // Test the use case directly
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
         let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
