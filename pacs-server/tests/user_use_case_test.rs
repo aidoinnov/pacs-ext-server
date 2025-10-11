@@ -7,7 +7,8 @@ use pacs_server::application::dto::user_dto::{
 };
 use pacs_server::application::use_cases::UserUseCase;
 use pacs_server::domain::entities::{User, Project};
-use pacs_server::domain::services::{UserService, ServiceError};
+use pacs_server::domain::services::UserService;
+use pacs_server::domain::ServiceError;
 
 // Mock UserService for testing
 #[derive(Clone)]

@@ -9,7 +9,8 @@ use pacs_server::application::dto::mask_group_dto::{
     CompleteUploadRequest
 };
 use pacs_server::domain::entities::{MaskGroup, NewMaskGroup, UpdateMaskGroup, MaskGroupStats, Mask};
-use pacs_server::domain::services::{MaskGroupService, ServiceError};
+use pacs_server::domain::services::MaskGroupService;
+use pacs_server::domain::ServiceError;
 use pacs_server::application::services::{SignedUrlService, SignedUrlError};
 
 // Create mock for MaskGroupService

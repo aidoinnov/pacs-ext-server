@@ -74,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Signed URL 보안**: TTL 제한 및 권한 기반 접근 제어
 - **데이터베이스 최적화**: 인덱스 및 외래키 제약 조건 최적화
 - **에러 처리**: 일관된 에러 응답 및 로깅 시스템
+- **기술문서 완성**: 마스크 통계 API, 부하 테스트, 성능 최적화 가이드 추가
 
 ### Dependencies
 - `aws-sdk-s3`: ^1.0.0

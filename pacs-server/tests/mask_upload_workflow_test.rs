@@ -1,0 +1,560 @@
+#[cfg(test)]
+mod mask_upload_workflow_tests {
+    use actix_web::{test, web, App};
+    use pacs_server::application::dto::{
+        annotation_dto::CreateAnnotationRequest,
+        mask_group_dto::{CreateMaskGroupRequest, SignedUrlRequest, CompleteUploadRequest},
+        mask_dto::CreateMaskRequest
+    };
+    use pacs_server::application::use_cases::{AnnotationUseCase, MaskGroupUseCase, MaskUseCase};
+    use pacs_server::domain::services::{
+        AnnotationServiceImpl, MaskGroupServiceImpl, MaskServiceImpl
+    };
+    use pacs_server::infrastructure::repositories::{
+        AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
+        UserRepositoryImpl, ProjectRepositoryImpl
+    };
+    use pacs_server::presentation::controllers::{
+        annotation_controller::configure_routes as configure_annotation_routes,
+        mask_group_controller::configure_routes as configure_mask_group_routes,
+        mask_controller::configure_routes as configure_mask_routes,
+    };
+    use sqlx::postgres::PgPoolOptions;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    async fn setup_test_app() -> (
+        impl actix_web::dev::Service<
+            actix_http::Request,
+            Response = actix_web::dev::ServiceResponse,
+            Error = actix_web::Error,
+        >,
+        Arc<sqlx::Pool<sqlx::Postgres>>,
+    ) {
+        dotenvy::dotenv().ok();
+
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://admin:admin123@localhost:5432/pacs_db".to_string());
+
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect(&database_url)
+            .await
+            .expect("Failed to connect to test database");
+
+        // Initialize repositories
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+        let mask_group_repo = MaskGroupRepositoryImpl::new(pool.clone());
+        let mask_repo = MaskRepositoryImpl::new(pool.clone());
+        let user_repo = UserRepositoryImpl::new(pool.clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+
+        let pool = Arc::new(pool);
+        
+        // Initialize services
+        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
+        let mask_group_service = MaskGroupServiceImpl::new(mask_group_repo, user_repo.clone(), project_repo.clone());
+        let mask_service = MaskServiceImpl::new(mask_repo, mask_group_repo.clone());
+        
+        // Mock SignedUrlService for testing
+        let signed_url_service = Arc::new(MockSignedUrlService::new());
+        
+        // Initialize use cases
+        let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
+        let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
+            Arc::new(mask_group_service),
+            signed_url_service.clone(),
+        ));
+        let mask_use_case = Arc::new(MaskUseCase::new(
+            Arc::new(mask_service),
+            Arc::new(mask_group_service),
+            signed_url_service,
+        ));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(annotation_use_case.clone()))
+                .app_data(web::Data::new(mask_group_use_case.clone()))
+                .app_data(web::Data::new(mask_use_case.clone()))
+                .configure(|cfg| configure_annotation_routes(cfg, annotation_use_case.clone()))
+                .configure(|cfg| configure_mask_group_routes(cfg, mask_group_use_case.clone()))
+                .configure(|cfg| configure_mask_routes(cfg, mask_use_case.clone())),
+        )
+        .await;
+
+        (app, pool)
+    }
+
+    // Mock SignedUrlService for testing
+    use pacs_server::application::services::{SignedUrlService, SignedUrlError, SignedUrlResponse};
+    use async_trait::async_trait;
+
+    struct MockSignedUrlService;
+
+    impl MockSignedUrlService {
+        fn new() -> Self {
+            Self
+        }
+    }
+
+    #[async_trait]
+    impl SignedUrlService for MockSignedUrlService {
+        async fn generate_upload_url(
+            &self,
+            _request: pacs_server::application::services::SignedUrlRequest,
+        ) -> Result<SignedUrlResponse, SignedUrlError> {
+            Ok(SignedUrlResponse::new(
+                "https://mock-s3.amazonaws.com/upload".to_string(),
+                "test/file.png".to_string(),
+                3600,
+                "PUT".to_string(),
+            ))
+        }
+
+        async fn generate_download_url(
+            &self,
+            _request: pacs_server::application::services::SignedUrlRequest,
+        ) -> Result<SignedUrlResponse, SignedUrlError> {
+            Ok(SignedUrlResponse::new(
+                "https://mock-s3.amazonaws.com/download".to_string(),
+                "test/file.png".to_string(),
+                3600,
+                "GET".to_string(),
+            ))
+        }
+
+        async fn generate_mask_upload_url(
+            &self,
+            _annotation_id: i32,
+            _mask_group_id: i32,
+            _file_name: String,
+            _content_type: String,
+            _ttl_seconds: Option<u64>,
+            _user_id: Option<i32>,
+        ) -> Result<SignedUrlResponse, SignedUrlError> {
+            Ok(SignedUrlResponse::new(
+                "https://mock-s3.amazonaws.com/mask-upload".to_string(),
+                "masks/test.png".to_string(),
+                3600,
+                "PUT".to_string(),
+            ))
+        }
+
+        async fn generate_mask_download_url(
+            &self,
+            _file_path: String,
+            _ttl_seconds: Option<u64>,
+        ) -> Result<SignedUrlResponse, SignedUrlError> {
+            Ok(SignedUrlResponse::new(
+                "https://mock-s3.amazonaws.com/mask-download".to_string(),
+                "masks/test.png".to_string(),
+                3600,
+                "GET".to_string(),
+            ))
+        }
+
+        async fn generate_annotation_upload_url(
+            &self,
+            _annotation_id: i32,
+            _file_name: String,
+            _content_type: String,
+            _ttl_seconds: Option<u64>,
+            _user_id: Option<i32>,
+        ) -> Result<SignedUrlResponse, SignedUrlError> {
+            Ok(SignedUrlResponse::new(
+                "https://mock-s3.amazonaws.com/annotation-upload".to_string(),
+                "annotations/test.json".to_string(),
+                3600,
+                "PUT".to_string(),
+            ))
+        }
+
+        async fn generate_annotation_download_url(
+            &self,
+            _file_path: String,
+            _ttl_seconds: Option<u64>,
+        ) -> Result<SignedUrlResponse, SignedUrlError> {
+            Ok(SignedUrlResponse::new(
+                "https://mock-s3.amazonaws.com/annotation-download".to_string(),
+                "annotations/test.json".to_string(),
+                3600,
+                "GET".to_string(),
+            ))
+        }
+    }
+
+    async fn create_test_data(pool: &sqlx::Pool<sqlx::Postgres>) -> (i32, i32, i32) {
+        // Create test user
+        let keycloak_id = Uuid::new_v4();
+        let user_result = sqlx::query(
+            "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
+        )
+        .bind(keycloak_id)
+        .bind("testuser")
+        .bind("test@example.com")
+        .fetch_one(pool)
+        .await
+        .expect("Failed to create test user");
+
+        let user_id: i32 = user_result.get("id");
+
+        // Create test project
+        let project_result = sqlx::query(
+            "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
+        )
+        .bind("Test Project")
+        .bind("Test Description")
+        .fetch_one(pool)
+        .await
+        .expect("Failed to create test project");
+
+        let project_id: i32 = project_result.get("id");
+
+        // Add user to project
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .execute(pool)
+        .await
+        .expect("Failed to add user to project");
+
+        (project_id, user_id, keycloak_id)
+    }
+
+    async fn cleanup_test_data(pool: &sqlx::Pool<sqlx::Postgres>, user_id: i32, project_id: i32) {
+        // Clean up in reverse order of dependencies
+        sqlx::query("DELETE FROM annotation_mask WHERE mask_group_id IN (SELECT id FROM annotation_mask_group WHERE annotation_id IN (SELECT id FROM annotation_annotation WHERE user_id = $1))")
+            .bind(user_id)
+            .execute(pool)
+            .await
+            .ok();
+        
+        sqlx::query("DELETE FROM annotation_mask_group WHERE annotation_id IN (SELECT id FROM annotation_annotation WHERE user_id = $1)")
+            .bind(user_id)
+            .execute(pool)
+            .await
+            .ok();
+        
+        sqlx::query("DELETE FROM annotation_annotation WHERE user_id = $1")
+            .bind(user_id)
+            .execute(pool)
+            .await
+            .ok();
+        
+        sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
+            .bind(user_id)
+            .execute(pool)
+            .await
+            .ok();
+        
+        sqlx::query("DELETE FROM security_user WHERE id = $1")
+            .bind(user_id)
+            .execute(pool)
+            .await
+            .ok();
+        
+        sqlx::query("DELETE FROM security_project WHERE id = $1")
+            .bind(project_id)
+            .execute(pool)
+            .await
+            .ok();
+    }
+
+    #[actix_web::test]
+    async fn test_complete_mask_upload_workflow() {
+        let (app, pool) = setup_test_app().await;
+        let (project_id, user_id, _keycloak_id) = create_test_data(&pool).await;
+
+        // Step 1: Create annotation
+        let annotation_req = CreateAnnotationRequest {
+            study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
+            series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
+            sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
+            annotation_data: serde_json::json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+            viewer_software: Some("OHIF Viewer".to_string()),
+            tool_name: Some("Circle Tool".to_string()),
+            tool_version: Some("2.1.0".to_string()),
+            description: Some("Test annotation for mask upload workflow".to_string()),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/annotations")
+            .set_json(&annotation_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+
+        // Extract annotation ID from response
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let annotation_id = body["id"].as_i64().unwrap() as i32;
+
+        // Step 2: Create mask group
+        let mask_group_req = CreateMaskGroupRequest {
+            group_name: Some("Liver Segmentation v1.0".to_string()),
+            model_name: Some("UNet3D".to_string()),
+            version: Some("1.0.0".to_string()),
+            modality: Some("CT".to_string()),
+            slice_count: 100,
+            mask_type: "segmentation".to_string(),
+            description: Some("간 분할을 위한 AI 모델 결과".to_string()),
+        };
+
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .set_json(&mask_group_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+
+        // Extract mask group ID from response
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let mask_group_id = body["id"].as_i64().unwrap() as i32;
+
+        // Step 3: Generate upload URL
+        let upload_url_req = SignedUrlRequest {
+            filename: "liver_mask_001.png".to_string(),
+            mime_type: "image/png".to_string(),
+            ttl_seconds: Some(3600),
+        };
+
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/annotations/{}/mask-groups/{}/upload-url", annotation_id, mask_group_id))
+            .set_json(&upload_url_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+
+        // Verify upload URL response
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert!(body["upload_url"].is_string());
+        assert!(body["file_path"].is_string());
+        assert_eq!(body["expires_in"], 3600);
+
+        // Step 4: Simulate file upload (mock - in real scenario, file would be uploaded to S3)
+        // This step is simulated as we're using mock SignedUrlService
+
+        // Step 5: Complete upload
+        let complete_req = CompleteUploadRequest {
+            slice_count: 100,
+            labels: vec!["liver".to_string(), "spleen".to_string(), "kidney".to_string()],
+            uploaded_files: vec![
+                "liver_mask_001.png".to_string(),
+                "liver_mask_002.png".to_string(),
+                "liver_mask_003.png".to_string(),
+            ],
+        };
+
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/annotations/{}/mask-groups/{}/complete-upload", annotation_id, mask_group_id))
+            .set_json(&complete_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+
+        // Verify complete upload response
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["success"], true);
+        assert_eq!(body["status"], "success");
+        assert_eq!(body["processed_masks"], 100);
+        assert_eq!(body["uploaded_files"].as_array().unwrap().len(), 3);
+
+        // Step 6: Create mask metadata
+        let mask_req = CreateMaskRequest {
+            file_path: "masks/liver_mask_001.png".to_string(),
+            mime_type: Some("image/png".to_string()),
+            slice_index: Some(1),
+            sop_instance_uid: Some("1.2.3.4.5.6.7.8.9.1.1".to_string()),
+            label_name: Some("liver".to_string()),
+            file_size: Some(102400),
+            checksum: Some("md5-checksum-12345".to_string()),
+            width: Some(512),
+            height: Some(512),
+        };
+
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/annotations/{}/mask-groups/{}/masks", annotation_id, mask_group_id))
+            .set_json(&mask_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+
+        // Step 7: Generate download URL
+        let download_req = pacs_server::application::dto::mask_dto::DownloadUrlRequest {
+            file_path: "masks/liver_mask_001.png".to_string(),
+            expires_in: Some(3600),
+        };
+
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/annotations/{}/mask-groups/{}/masks/1/download-url", annotation_id, mask_group_id))
+            .set_json(&download_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+
+        // Verify download URL response
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert!(body["download_url"].is_string());
+        assert_eq!(body["file_path"], "masks/liver_mask_001.png");
+        assert_eq!(body["expires_in"], 3600);
+
+        // Step 8: Verify mask group details
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/annotations/{}/mask-groups/{}", annotation_id, mask_group_id))
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+
+        // Step 9: List masks in group
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/annotations/{}/mask-groups/{}/masks", annotation_id, mask_group_id))
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+
+        // Step 10: Get mask statistics
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/annotations/{}/mask-groups/{}/masks/stats", annotation_id, mask_group_id))
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+
+        // Cleanup
+        cleanup_test_data(&pool, user_id, project_id).await;
+    }
+
+    #[actix_web::test]
+    async fn test_mask_upload_workflow_with_multiple_groups() {
+        let (app, pool) = setup_test_app().await;
+        let (project_id, user_id, _keycloak_id) = create_test_data(&pool).await;
+
+        // Create annotation
+        let annotation_req = CreateAnnotationRequest {
+            study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
+            series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
+            sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
+            annotation_data: serde_json::json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+            viewer_software: Some("OHIF Viewer".to_string()),
+            tool_name: Some("Circle Tool".to_string()),
+            tool_version: Some("2.1.0".to_string()),
+            description: Some("Test annotation for multiple mask groups".to_string()),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/annotations")
+            .set_json(&annotation_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let annotation_id = body["id"].as_i64().unwrap() as i32;
+
+        // Create multiple mask groups
+        let mask_groups = vec![
+            ("Liver Segmentation", "UNet3D", "CT", "segmentation"),
+            ("Tumor Detection", "ResNet50", "MRI", "classification"),
+            ("Organ Classification", "VGG16", "CT", "classification"),
+        ];
+
+        let mut mask_group_ids = Vec::new();
+
+        for (group_name, model_name, modality, mask_type) in mask_groups {
+            let mask_group_req = CreateMaskGroupRequest {
+                group_name: Some(format!("{} v1.0", group_name)),
+                model_name: Some(model_name.to_string()),
+                version: Some("1.0.0".to_string()),
+                modality: Some(modality.to_string()),
+                slice_count: 50,
+                mask_type: mask_type.to_string(),
+                description: Some(format!("{}을 위한 AI 모델 결과", group_name)),
+            };
+
+            let req = test::TestRequest::post()
+                .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+                .set_json(&mask_group_req)
+                .to_request();
+
+            let resp = test::call_service(&app, req).await;
+            assert_eq!(resp.status(), 201);
+
+            let body: serde_json::Value = test::read_body_json(resp).await;
+            let mask_group_id = body["id"].as_i64().unwrap() as i32;
+            mask_group_ids.push(mask_group_id);
+        }
+
+        // Verify all mask groups were created
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/annotations/{}/mask-groups", annotation_id))
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body["mask_groups"].as_array().unwrap().len(), 3);
+
+        // Cleanup
+        cleanup_test_data(&pool, user_id, project_id).await;
+    }
+
+    #[actix_web::test]
+    async fn test_mask_upload_workflow_error_handling() {
+        let (app, pool) = setup_test_app().await;
+        let (project_id, user_id, _keycloak_id) = create_test_data(&pool).await;
+
+        // Test 1: Try to create mask group for non-existent annotation
+        let mask_group_req = CreateMaskGroupRequest {
+            group_name: Some("Test Group".to_string()),
+            model_name: Some("Test Model".to_string()),
+            version: Some("1.0.0".to_string()),
+            modality: Some("CT".to_string()),
+            slice_count: 100,
+            mask_type: "segmentation".to_string(),
+            description: Some("Test description".to_string()),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/annotations/999999/mask-groups")
+            .set_json(&mask_group_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 404);
+
+        // Test 2: Try to create mask for non-existent mask group
+        let mask_req = CreateMaskRequest {
+            file_path: "masks/test.png".to_string(),
+            mime_type: Some("image/png".to_string()),
+            slice_index: Some(1),
+            sop_instance_uid: Some("1.2.3.4.5.6.7.8.9.1.1".to_string()),
+            label_name: Some("test".to_string()),
+            file_size: Some(102400),
+            checksum: Some("md5-checksum-12345".to_string()),
+            width: Some(512),
+            height: Some(512),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/annotations/999999/mask-groups/999999/masks")
+            .set_json(&mask_req)
+            .to_request();
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 404);
+
+        // Cleanup
+        cleanup_test_data(&pool, user_id, project_id).await;
+    }
+}

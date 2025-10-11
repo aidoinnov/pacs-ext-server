@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use pacs_server::application::use_cases::MaskUseCase;
-use pacs_server::domain::services::{MaskService, MaskGroupService, ServiceError};
+use pacs_server::domain::services::{MaskService, MaskGroupService};
+use pacs_server::domain::ServiceError;
 use pacs_server::domain::entities::{Mask, MaskGroup, NewMask, UpdateMask, NewMaskGroup, UpdateMaskGroup, MaskStats, MaskGroupStats};
 use pacs_server::application::dto::mask_dto::{
     CreateMaskRequest, UpdateMaskRequest, DownloadUrlRequest

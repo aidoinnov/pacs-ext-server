@@ -24,6 +24,7 @@ PACS Extension Server의 모든 기술 문서와 가이드를 모아놓은 중�
 
 ### API 및 엔드포인트
 - [API 엔드포인트 참조](technical/API_ENDPOINTS_REFERENCE.md) - **NEW** ✅
+- [마스크 통계 API 가이드](technical/MASK_STATISTICS_API_GUIDE.md) - **NEW** ✅
 - [어노테이션 API 가이드](technical/ANNOTATION_API_GUIDE.md)
 - [CORS 개발 가이드](technical/CORS_DEVELOPMENT_GUIDE.md)
 
@@ -38,10 +39,12 @@ PACS Extension Server의 모든 기술 문서와 가이드를 모아놓은 중�
 
 ### 테스트
 - [테스트 가이드](technical/TESTING_GUIDE.md) - **NEW** ✅
+- [부하 테스트 가이드](technical/LOAD_TESTING_GUIDE.md) - **NEW** ✅
 - [캐시 헤더 테스트](technical/CACHE_HEADERS_TEST.md)
 - [캐시 정책 테스트](technical/CACHE_POLICY_TEST.md)
 
 ### 성능 및 벤치마크
+- [성능 최적화 가이드](technical/PERFORMANCE_OPTIMIZATION_GUIDE.md) - **NEW** ✅
 - [성능 비교 분석](performance-comparison.md)
 - [캐시 성능 분석](benchmarks/results/CACHE_PERFORMANCE_ANALYSIS.md)
 - [Redis 결정 문서](benchmarks/results/REDIS_DECISION.md)

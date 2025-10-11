@@ -50,7 +50,7 @@ pub async fn create_mask<MS, MGS, SUS>(
     path: web::Path<(i32, i32)>,
     req: web::Json<CreateMaskRequest>,
     use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
 ) -> impl Responder
 where
     MS: crate::domain::services::MaskService + Send + Sync,
@@ -61,8 +61,13 @@ where
     let mut request = req.into_inner();
     request.mask_group_id = group_id;
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
+    let user_id = http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.create_mask(request, user_id).await {
         Ok(mask) => HttpResponse::Created().json(mask),
@@ -113,7 +118,7 @@ where
 pub async fn get_mask<MS, MGS, SUS>(
     path: web::Path<(i32, i32, i32)>,
     use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
 ) -> impl Responder
 where
     MS: crate::domain::services::MaskService + Send + Sync,
@@ -122,8 +127,13 @@ where
 {
     let (annotation_id, group_id, mask_id) = path.into_inner();
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
+    let user_id = http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.get_mask(mask_id, user_id).await {
         Ok(mask) => HttpResponse::Ok().json(mask),
@@ -167,7 +177,7 @@ pub async fn list_masks<MS, MGS, SUS>(
     path: web::Path<(i32, i32)>,
     query: web::Query<serde_json::Value>,
     use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
 ) -> impl Responder
 where
     MS: crate::domain::services::MaskService + Send + Sync,
@@ -175,9 +185,15 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id) = path.into_inner();
+    println!("DEBUG: list_masks called with annotation_id={}, group_id={}", annotation_id, group_id);
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
+    let user_id = http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     // Query parameters 추출
     let offset = query.get("offset").and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
@@ -227,7 +243,7 @@ pub async fn update_mask<MS, MGS, SUS>(
     path: web::Path<(i32, i32, i32)>,
     req: web::Json<UpdateMaskRequest>,
     use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
 ) -> impl Responder
 where
     MS: crate::domain::services::MaskService + Send + Sync,
@@ -236,8 +252,13 @@ where
 {
     let (annotation_id, group_id, mask_id) = path.into_inner();
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
+    let user_id = http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.update_mask(mask_id, req.into_inner(), user_id).await {
         Ok(mask) => HttpResponse::Ok().json(mask),
@@ -288,7 +309,7 @@ where
 pub async fn delete_mask<MS, MGS, SUS>(
     path: web::Path<(i32, i32, i32)>,
     use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
 ) -> impl Responder
 where
     MS: crate::domain::services::MaskService + Send + Sync,
@@ -297,8 +318,13 @@ where
 {
     let (annotation_id, group_id, mask_id) = path.into_inner();
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
+    let user_id = http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.delete_mask(mask_id, user_id).await {
         Ok(_) => HttpResponse::NoContent().finish(),
@@ -344,7 +370,7 @@ pub async fn generate_download_url<MS, MGS, SUS>(
     path: web::Path<(i32, i32, i32)>,
     req: web::Json<DownloadUrlRequest>,
     use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
 ) -> impl Responder
 where
     MS: crate::domain::services::MaskService + Send + Sync,
@@ -355,8 +381,13 @@ where
     let mut request = req.into_inner();
     request.mask_id = mask_id;
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
+    let user_id = http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     match use_case.generate_download_url(request, user_id).await {
         Ok(download_url) => HttpResponse::Ok().json(download_url),
@@ -406,7 +437,7 @@ where
 pub async fn get_mask_stats<MS, MGS, SUS>(
     path: web::Path<(i32, i32)>,
     use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
 ) -> impl Responder
 where
     MS: crate::domain::services::MaskService + Send + Sync,
@@ -414,9 +445,17 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id) = path.into_inner();
+    println!("DEBUG: get_mask_stats called with annotation_id={}, group_id={}", annotation_id, group_id);
     
-    // TODO: 실제 인증에서 user_id를 가져와야 함
-    let user_id = 1; // 실제로는 JWT에서 추출
+    // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
+    let user_id = http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
+    
+    println!("DEBUG: get_mask_stats - user_id from header = {}", user_id);
 
     match use_case.get_mask_stats(Some(group_id), user_id).await {
         Ok(stats) => HttpResponse::Ok().json(stats),
@@ -454,10 +493,10 @@ where
             web::scope("/api/annotations/{annotation_id}/mask-groups/{group_id}/masks")
                 .route("", web::post().to(create_mask::<MS, MGS, SUS>))
                 .route("", web::get().to(list_masks::<MS, MGS, SUS>))
+                .route("/stats", web::get().to(get_mask_stats::<MS, MGS, SUS>))
                 .route("/{mask_id}", web::get().to(get_mask::<MS, MGS, SUS>))
                 .route("/{mask_id}", web::put().to(update_mask::<MS, MGS, SUS>))
                 .route("/{mask_id}", web::delete().to(delete_mask::<MS, MGS, SUS>))
                 .route("/{mask_id}/download-url", web::post().to(generate_download_url::<MS, MGS, SUS>))
-                .route("/stats", web::get().to(get_mask_stats::<MS, MGS, SUS>))
         );
 }

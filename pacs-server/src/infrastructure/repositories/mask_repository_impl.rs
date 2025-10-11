@@ -213,11 +213,15 @@ impl MaskRepository for MaskRepositoryImpl {
 
     /// 마스크 통계 조회
     async fn get_stats(&self, mask_group_id: Option<i32>) -> Result<MaskStats, ServiceError> {
-        let result = sqlx::query!(
+        // 기본 통계 조회
+        let basic_stats = sqlx::query!(
             r#"
             SELECT 
                 COUNT(*) as total_masks,
-                COALESCE(SUM(file_size), 0) as total_size_bytes
+                COALESCE(SUM(file_size), 0) as total_size_bytes,
+                COALESCE(AVG(file_size), 0) as average_file_size,
+                COALESCE(MAX(file_size), 0) as largest_file_size,
+                COALESCE(MIN(file_size), 0) as smallest_file_size
             FROM annotation_mask
             WHERE ($1::INTEGER IS NULL OR mask_group_id = $1)
             "#,
@@ -225,16 +229,61 @@ impl MaskRepository for MaskRepositoryImpl {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(format!("Failed to get mask stats: {}", e)))?;
+        .map_err(|e| ServiceError::DatabaseError(format!("Failed to get basic mask stats: {}", e)))?;
+
+        // MIME 타입 분포 조회
+        let mime_types = sqlx::query!(
+            r#"
+            SELECT mime_type, COUNT(*) as count
+            FROM annotation_mask
+            WHERE ($1::INTEGER IS NULL OR mask_group_id = $1)
+            AND mime_type IS NOT NULL
+            GROUP BY mime_type
+            "#,
+            mask_group_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(format!("Failed to get mime type stats: {}", e)))?;
+
+        // 라벨 이름 분포 조회
+        let label_names = sqlx::query!(
+            r#"
+            SELECT label_name, COUNT(*) as count
+            FROM annotation_mask
+            WHERE ($1::INTEGER IS NULL OR mask_group_id = $1)
+            AND label_name IS NOT NULL
+            GROUP BY label_name
+            "#,
+            mask_group_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(format!("Failed to get label name stats: {}", e)))?;
+
+        // HashMap으로 변환
+        let mut mime_types_map = std::collections::HashMap::new();
+        for row in mime_types {
+            if let Some(mime_type) = row.mime_type {
+                mime_types_map.insert(mime_type, row.count.unwrap_or(0) as i64);
+            }
+        }
+
+        let mut label_names_map = std::collections::HashMap::new();
+        for row in label_names {
+            if let Some(label_name) = row.label_name {
+                label_names_map.insert(label_name, row.count.unwrap_or(0) as i64);
+            }
+        }
 
         Ok(MaskStats {
-            total_masks: result.total_masks.unwrap_or(0),
-            total_size_bytes: result.total_size_bytes.unwrap_or_default().to_string().parse::<i64>().unwrap_or(0),
-            mime_types: std::collections::HashMap::new(),
-            label_names: std::collections::HashMap::new(),
-            average_file_size: 0.0,
-            largest_file_size: 0,
-            smallest_file_size: 0,
+            total_masks: basic_stats.total_masks.unwrap_or(0),
+            total_size_bytes: basic_stats.total_size_bytes.unwrap_or_default().to_string().parse::<i64>().unwrap_or(0),
+            mime_types: mime_types_map,
+            label_names: label_names_map,
+            average_file_size: basic_stats.average_file_size.unwrap_or_default().to_string().parse::<f64>().unwrap_or(0.0),
+            largest_file_size: basic_stats.largest_file_size.unwrap_or_default().to_string().parse::<i64>().unwrap_or(0),
+            smallest_file_size: basic_stats.smallest_file_size.unwrap_or_default().to_string().parse::<i64>().unwrap_or(0),
         })
     }
 

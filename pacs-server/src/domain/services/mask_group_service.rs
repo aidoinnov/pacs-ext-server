@@ -261,8 +261,17 @@ where
         };
 
         // 사용자가 어노테이션에 접근할 수 있는지 확인
-        // 여기서는 간단히 user_id로 확인 (실제로는 프로젝트 권한 확인 필요)
-        Ok(annotation.user_id == user_id)
+        // 어노테이션 소유자이거나 마스크 그룹 생성자인 경우 접근 허용
+        let annotation_owner = annotation.user_id == user_id;
+        let group_creator = mask_group.created_by == Some(user_id);
+        println!("DEBUG: can_access_mask_group - user_id={}, annotation.user_id={}, mask_group.created_by={:?}, annotation_owner={}, group_creator={}", 
+                 user_id, annotation.user_id, mask_group.created_by, annotation_owner, group_creator);
+        
+        if annotation_owner || group_creator {
+            Ok(true)
+        } else {
+            Err(ServiceError::Unauthorized("Access denied to mask group".to_string()))
+        }
     }
 
     async fn can_create_mask_group(&self, user_id: i32, annotation_id: i32) -> Result<bool, ServiceError> {

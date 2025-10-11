@@ -8,7 +8,8 @@ use pacs_server::application::dto::{
     RolePermissionsResponse, ProjectPermissionsResponse, ResourcePermissionsResponse,
 };
 use pacs_server::domain::entities::{Role, Permission, RoleScope};
-use pacs_server::domain::services::{PermissionService, ServiceError};
+use pacs_server::domain::services::PermissionService;
+use pacs_server::domain::ServiceError;
 
 // Mock PermissionService for testing
 #[derive(Clone)]

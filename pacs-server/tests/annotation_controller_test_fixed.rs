@@ -49,9 +49,7 @@ mod annotation_controller_tests {
         (app, pool)
     }
 
-    async fn create_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) -> (i32, i32) {
-        use sqlx::Row;
-        
+    async fn create_test_data(pool: &sqlx::Pool<sqlx::Postgres>) -> (i32, i32) {
         // Create test user
         let keycloak_id = Uuid::new_v4();
         let user_result = sqlx::query(
@@ -91,7 +89,7 @@ mod annotation_controller_tests {
         (user_id, project_id)
     }
 
-    async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>, user_id: i32, project_id: i32) {
+    async fn cleanup_test_data(pool: &sqlx::Pool<sqlx::Postgres>, user_id: i32, project_id: i32) {
         // Clean up in reverse order of dependencies
         sqlx::query("DELETE FROM annotation_annotation WHERE user_id = $1")
             .bind(user_id)
