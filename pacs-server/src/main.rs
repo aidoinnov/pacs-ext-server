@@ -12,22 +12,23 @@ mod presentation;
 
 use application::use_cases::{
     AuthUseCase, UserUseCase, ProjectUseCase, PermissionUseCase, AccessControlUseCase,
-    AnnotationUseCase,
+    AnnotationUseCase, MaskGroupUseCase, MaskUseCase,
 };
 use domain::services::{
     AuthServiceImpl, UserServiceImpl, ProjectServiceImpl, PermissionServiceImpl,
-    AccessControlServiceImpl, AnnotationServiceImpl,
+    AccessControlServiceImpl, AnnotationServiceImpl, MaskGroupServiceImpl, MaskServiceImpl,
 };
 use infrastructure::repositories::{
     UserRepositoryImpl, ProjectRepositoryImpl, RoleRepositoryImpl, PermissionRepositoryImpl,
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
 };
 use infrastructure::auth::JwtService;
+use application::services::SignedUrlServiceImpl;
 use infrastructure::config::{JwtConfig, Settings};
 use infrastructure::middleware::{CacheHeaders, configure_cors};
 use presentation::controllers::{
     auth_controller, user_controller, project_controller, permission_controller,
-    access_control_controller, annotation_controller,
+    access_control_controller, annotation_controller, mask_group_controller, mask_controller,
 };
 use presentation::openapi::ApiDoc;
 
@@ -86,14 +87,14 @@ async fn main() -> std::io::Result<()> {
 
     // Initialize repositories
     print!("🔧 Initializing repositories... ");
-    let user_repo = UserRepositoryImpl::new(pool.clone());
-    let project_repo = ProjectRepositoryImpl::new(pool.clone());
-    let role_repo = RoleRepositoryImpl::new(pool.clone());
-    let permission_repo = PermissionRepositoryImpl::new(pool.clone());
-    let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
-    let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-    let mask_group_repo = MaskGroupRepositoryImpl::new(pool.clone());
-    let mask_repo = MaskRepositoryImpl::new(pool.clone());
+    let user_repo = Arc::new(UserRepositoryImpl::new(pool.clone()));
+    let project_repo = Arc::new(ProjectRepositoryImpl::new(pool.clone()));
+    let role_repo = Arc::new(RoleRepositoryImpl::new(pool.clone()));
+    let permission_repo = Arc::new(PermissionRepositoryImpl::new(pool.clone()));
+    let access_log_repo = Arc::new(AccessLogRepositoryImpl::new(pool.clone()));
+    let annotation_repo = Arc::new(AnnotationRepositoryImpl::new(pool.clone()));
+    let mask_group_repo = Arc::new(MaskGroupRepositoryImpl::new(pool.clone()));
+    let mask_repo = Arc::new(MaskRepositoryImpl::new(pool.clone()));
     println!("✅ Done");
 
     // Initialize JWT service
@@ -115,6 +116,18 @@ async fn main() -> std::io::Result<()> {
         permission_repo,
     );
     let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
+    let mask_group_service = Arc::new(MaskGroupServiceImpl::new(
+        mask_group_repo.clone(),
+        annotation_repo.clone(),
+        user_repo.clone(),
+    ));
+    let mask_service = Arc::new(MaskServiceImpl::new(
+        mask_repo.clone(),
+        mask_group_repo.clone(),
+        user_repo.clone(),
+    ));
+    // TODO: Initialize ObjectStorageService with proper configuration
+    // For now, we'll skip signed_url_service initialization
     println!("✅ Done");
 
     // Initialize use cases
@@ -125,6 +138,9 @@ async fn main() -> std::io::Result<()> {
     let permission_use_case = Arc::new(PermissionUseCase::new(permission_service));
     let access_control_use_case = Arc::new(AccessControlUseCase::new(access_control_service));
     let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
+    // TODO: Initialize mask use cases after ObjectStorageService is configured
+    // let mask_group_use_case = Arc::new(MaskGroupUseCase::new(mask_group_service, signed_url_service.clone()));
+    // let mask_use_case = Arc::new(MaskUseCase::new(mask_service, mask_group_service.clone(), signed_url_service.clone()));
     println!("✅ Done");
 
     // Cache configuration
@@ -176,6 +192,9 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| permission_controller::configure_routes(cfg, permission_use_case.clone()))
                     .configure(|cfg| access_control_controller::configure_routes(cfg, access_control_use_case.clone()))
                     .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
+                    // TODO: Add mask routes after ObjectStorageService is configured
+                    // .configure(|cfg| mask_group_controller::configure_routes(cfg, mask_group_use_case.clone()))
+                    // .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

@@ -1,0 +1,453 @@
+use actix_web::{web, HttpResponse, Responder, HttpRequest};
+use serde_json::json;
+use std::sync::Arc;
+use crate::application::dto::mask_dto::{
+    CreateMaskRequest, UpdateMaskRequest, MaskResponse,
+    MaskListResponse, DownloadUrlRequest, DownloadUrlResponse, MaskStatsResponse
+};
+use crate::application::use_cases::MaskUseCase;
+use crate::domain::services::ServiceError;
+
+pub struct MaskController<MS, MGS, SUS> 
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    use_case: Arc<MaskUseCase<MS, MGS, SUS>>,
+}
+
+impl<MS, MGS, SUS> MaskController<MS, MGS, SUS>
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    pub fn new(use_case: Arc<MaskUseCase<MS, MGS, SUS>>) -> Self {
+        Self { use_case }
+    }
+}
+
+/// 마스크 생성
+#[utoipa::path(
+    post,
+    path = "/api/annotations/{annotation_id}/mask-groups/{group_id}/masks",
+    tag = "masks",
+    params(
+        ("annotation_id" = i32, Path, description = "Annotation ID"),
+        ("group_id" = i32, Path, description = "Mask Group ID")
+    ),
+    request_body = CreateMaskRequest,
+    responses(
+        (status = 201, description = "Mask created successfully", body = MaskResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Mask group not found"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+    )
+)]
+pub async fn create_mask<MS, MGS, SUS>(
+    path: web::Path<(i32, i32)>,
+    req: web::Json<CreateMaskRequest>,
+    use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
+    _http_req: HttpRequest,
+) -> impl Responder
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    let (annotation_id, group_id) = path.into_inner();
+    let mut request = req.into_inner();
+    request.mask_group_id = group_id;
+    
+    // TODO: 실제 인증에서 user_id를 가져와야 함
+    let user_id = 1; // 실제로는 JWT에서 추출
+
+    match use_case.create_mask(request, user_id).await {
+        Ok(mask) => HttpResponse::Created().json(mask),
+        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+            "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
+        Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+            "error": "Validation Error",
+            "message": msg
+        })),
+        Err(ServiceError::AlreadyExists(msg)) => HttpResponse::Conflict().json(json!({
+            "error": "Already Exists",
+            "message": msg
+        })),
+        Err(ServiceError::DatabaseError(msg)) => HttpResponse::InternalServerError().json(json!({
+            "error": "Database Error",
+            "message": msg
+        })),
+        _ => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred"
+        })),
+    }
+}
+
+/// 마스크 조회
+#[utoipa::path(
+    get,
+    path = "/api/annotations/{annotation_id}/mask-groups/{group_id}/masks/{mask_id}",
+    tag = "masks",
+    params(
+        ("annotation_id" = i32, Path, description = "Annotation ID"),
+        ("group_id" = i32, Path, description = "Mask Group ID"),
+        ("mask_id" = i32, Path, description = "Mask ID")
+    ),
+    responses(
+        (status = 200, description = "Mask retrieved successfully", body = MaskResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Mask not found"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+    )
+)]
+pub async fn get_mask<MS, MGS, SUS>(
+    path: web::Path<(i32, i32, i32)>,
+    use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
+    _http_req: HttpRequest,
+) -> impl Responder
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    let (annotation_id, group_id, mask_id) = path.into_inner();
+    
+    // TODO: 실제 인증에서 user_id를 가져와야 함
+    let user_id = 1; // 실제로는 JWT에서 추출
+
+    match use_case.get_mask(mask_id, user_id).await {
+        Ok(mask) => HttpResponse::Ok().json(mask),
+        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+            "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
+        Err(ServiceError::DatabaseError(msg)) => HttpResponse::InternalServerError().json(json!({
+            "error": "Database Error",
+            "message": msg
+        })),
+        _ => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred"
+        })),
+    }
+}
+
+/// 마스크 목록 조회
+#[utoipa::path(
+    get,
+    path = "/api/annotations/{annotation_id}/mask-groups/{group_id}/masks",
+    tag = "masks",
+    params(
+        ("annotation_id" = i32, Path, description = "Annotation ID"),
+        ("group_id" = i32, Path, description = "Mask Group ID"),
+        ("offset" = Option<i64>, Query, description = "Offset for pagination"),
+        ("limit" = Option<i64>, Query, description = "Limit for pagination")
+    ),
+    responses(
+        (status = 200, description = "Masks retrieved successfully", body = MaskListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Mask group not found"),
+    )
+)]
+pub async fn list_masks<MS, MGS, SUS>(
+    path: web::Path<(i32, i32)>,
+    query: web::Query<serde_json::Value>,
+    use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
+    _http_req: HttpRequest,
+) -> impl Responder
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    let (annotation_id, group_id) = path.into_inner();
+    
+    // TODO: 실제 인증에서 user_id를 가져와야 함
+    let user_id = 1; // 실제로는 JWT에서 추출
+
+    // Query parameters 추출
+    let offset = query.get("offset").and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
+    let limit = query.get("limit").and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
+
+    match use_case.list_masks(Some(group_id), user_id, offset, limit).await {
+        Ok(masks) => HttpResponse::Ok().json(masks),
+        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+            "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
+        Err(ServiceError::DatabaseError(msg)) => HttpResponse::InternalServerError().json(json!({
+            "error": "Database Error",
+            "message": msg
+        })),
+        _ => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred"
+        })),
+    }
+}
+
+/// 마스크 수정
+#[utoipa::path(
+    put,
+    path = "/api/annotations/{annotation_id}/mask-groups/{group_id}/masks/{mask_id}",
+    tag = "masks",
+    params(
+        ("annotation_id" = i32, Path, description = "Annotation ID"),
+        ("group_id" = i32, Path, description = "Mask Group ID"),
+        ("mask_id" = i32, Path, description = "Mask ID")
+    ),
+    request_body = UpdateMaskRequest,
+    responses(
+        (status = 200, description = "Mask updated successfully", body = MaskResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Mask not found"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+    )
+)]
+pub async fn update_mask<MS, MGS, SUS>(
+    path: web::Path<(i32, i32, i32)>,
+    req: web::Json<UpdateMaskRequest>,
+    use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
+    _http_req: HttpRequest,
+) -> impl Responder
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    let (annotation_id, group_id, mask_id) = path.into_inner();
+    
+    // TODO: 실제 인증에서 user_id를 가져와야 함
+    let user_id = 1; // 실제로는 JWT에서 추출
+
+    match use_case.update_mask(mask_id, req.into_inner(), user_id).await {
+        Ok(mask) => HttpResponse::Ok().json(mask),
+        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+            "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
+        Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+            "error": "Validation Error",
+            "message": msg
+        })),
+        Err(ServiceError::AlreadyExists(msg)) => HttpResponse::Conflict().json(json!({
+            "error": "Already Exists",
+            "message": msg
+        })),
+        Err(ServiceError::DatabaseError(msg)) => HttpResponse::InternalServerError().json(json!({
+            "error": "Database Error",
+            "message": msg
+        })),
+        _ => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred"
+        })),
+    }
+}
+
+/// 마스크 삭제
+#[utoipa::path(
+    delete,
+    path = "/api/annotations/{annotation_id}/mask-groups/{group_id}/masks/{mask_id}",
+    tag = "masks",
+    params(
+        ("annotation_id" = i32, Path, description = "Annotation ID"),
+        ("group_id" = i32, Path, description = "Mask Group ID"),
+        ("mask_id" = i32, Path, description = "Mask ID")
+    ),
+    responses(
+        (status = 204, description = "Mask deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Mask not found"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+    )
+)]
+pub async fn delete_mask<MS, MGS, SUS>(
+    path: web::Path<(i32, i32, i32)>,
+    use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
+    _http_req: HttpRequest,
+) -> impl Responder
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    let (annotation_id, group_id, mask_id) = path.into_inner();
+    
+    // TODO: 실제 인증에서 user_id를 가져와야 함
+    let user_id = 1; // 실제로는 JWT에서 추출
+
+    match use_case.delete_mask(mask_id, user_id).await {
+        Ok(_) => HttpResponse::NoContent().finish(),
+        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+            "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
+        Err(ServiceError::DatabaseError(msg)) => HttpResponse::InternalServerError().json(json!({
+            "error": "Database Error",
+            "message": msg
+        })),
+        _ => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred"
+        })),
+    }
+}
+
+/// 다운로드 URL 생성
+#[utoipa::path(
+    post,
+    path = "/api/annotations/{annotation_id}/mask-groups/{group_id}/masks/{mask_id}/download-url",
+    tag = "masks",
+    params(
+        ("annotation_id" = i32, Path, description = "Annotation ID"),
+        ("group_id" = i32, Path, description = "Mask Group ID"),
+        ("mask_id" = i32, Path, description = "Mask ID")
+    ),
+    request_body = DownloadUrlRequest,
+    responses(
+        (status = 200, description = "Download URL generated successfully", body = DownloadUrlResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Mask not found"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+    )
+)]
+pub async fn generate_download_url<MS, MGS, SUS>(
+    path: web::Path<(i32, i32, i32)>,
+    req: web::Json<DownloadUrlRequest>,
+    use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
+    _http_req: HttpRequest,
+) -> impl Responder
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    let (annotation_id, group_id, mask_id) = path.into_inner();
+    let mut request = req.into_inner();
+    request.mask_id = mask_id;
+    
+    // TODO: 실제 인증에서 user_id를 가져와야 함
+    let user_id = 1; // 실제로는 JWT에서 추출
+
+    match use_case.generate_download_url(request, user_id).await {
+        Ok(download_url) => HttpResponse::Ok().json(download_url),
+        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+            "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
+        Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+            "error": "Validation Error",
+            "message": msg
+        })),
+        Err(ServiceError::AlreadyExists(msg)) => HttpResponse::Conflict().json(json!({
+            "error": "Already Exists",
+            "message": msg
+        })),
+        Err(ServiceError::DatabaseError(msg)) => HttpResponse::InternalServerError().json(json!({
+            "error": "Database Error",
+            "message": msg
+        })),
+        _ => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred"
+        })),
+    }
+}
+
+/// 마스크 통계 조회
+#[utoipa::path(
+    get,
+    path = "/api/annotations/{annotation_id}/mask-groups/{group_id}/masks/stats",
+    tag = "masks",
+    params(
+        ("annotation_id" = i32, Path, description = "Annotation ID"),
+        ("group_id" = i32, Path, description = "Mask Group ID")
+    ),
+    responses(
+        (status = 200, description = "Mask statistics retrieved successfully", body = MaskStatsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Mask group not found"),
+        (status = 403, description = "Forbidden - insufficient permissions"),
+    )
+)]
+pub async fn get_mask_stats<MS, MGS, SUS>(
+    path: web::Path<(i32, i32)>,
+    use_case: web::Data<Arc<MaskUseCase<MS, MGS, SUS>>>,
+    _http_req: HttpRequest,
+) -> impl Responder
+where
+    MS: crate::domain::services::MaskService + Send + Sync,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync,
+    SUS: crate::application::services::SignedUrlService + Send + Sync,
+{
+    let (annotation_id, group_id) = path.into_inner();
+    
+    // TODO: 실제 인증에서 user_id를 가져와야 함
+    let user_id = 1; // 실제로는 JWT에서 추출
+
+    match use_case.get_mask_stats(Some(group_id), user_id).await {
+        Ok(stats) => HttpResponse::Ok().json(stats),
+        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+            "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
+        Err(ServiceError::DatabaseError(msg)) => HttpResponse::InternalServerError().json(json!({
+            "error": "Database Error",
+            "message": msg
+        })),
+        _ => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred"
+        })),
+    }
+}
+
+/// 라우트 설정
+pub fn configure_routes<MS, MGS, SUS>(
+    cfg: &mut web::ServiceConfig,
+    use_case: Arc<MaskUseCase<MS, MGS, SUS>>,
+)
+where
+    MS: crate::domain::services::MaskService + Send + Sync + 'static,
+    MGS: crate::domain::services::MaskGroupService + Send + Sync + 'static,
+    SUS: crate::application::services::SignedUrlService + Send + Sync + 'static,
+{
+    cfg.app_data(web::Data::new(use_case));
+}

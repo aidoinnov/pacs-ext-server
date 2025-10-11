@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Repository 구현체: PostgreSQL 기반 `MaskGroupRepositoryImpl`, `MaskRepositoryImpl`
   - Service 레이어: `MaskGroupService`, `MaskService` 비즈니스 로직 구현
   - Use Case 레이어: `MaskGroupUseCase`, `MaskUseCase` 비즈니스 워크플로우 구현
+  - Controller 레이어: `mask_group_controller`, `mask_controller` REST API 엔드포인트 구현
   - 단위 테스트: 엔티티, 서비스, 리포지토리 테스트 코드 작성
 
 ### Technical Details
@@ -41,8 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 리포지토리 통합 테스트 (실제 DB 연동)
 
 ### Changed
-- `src/main.rs`: 마스크 관련 리포지토리 초기화 추가
+- `src/main.rs`: 마스크 관련 리포지토리 및 서비스 초기화 추가 (Arc 래핑 적용)
 - `Cargo.toml`: Object Storage 관련 의존성 추가 (`aws-sdk-s3`, `tokio-util` 등)
+
+### Note
+- Object Storage 서비스는 현재 구현되어 있으나, 실제 사용을 위해서는 환경 설정이 필요합니다
+- 마스크 관련 API 엔드포인트는 Object Storage 설정 후 활성화 가능합니다
 
 ### Dependencies
 - `aws-sdk-s3`: ^1.0.0

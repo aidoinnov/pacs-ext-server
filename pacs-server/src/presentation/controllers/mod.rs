@@ -5,3 +5,5 @@ pub mod project_controller;
 pub mod permission_controller;
 pub mod access_control_controller;
 pub mod annotation_controller;
+pub mod mask_group_controller;
+pub mod mask_controller;
