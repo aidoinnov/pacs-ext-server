@@ -26,7 +26,7 @@ mod error_handling_tests {
     async fn setup_test_app() -> (
         impl actix_web::dev::Service<
             actix_http::Request,
-            Response = actix_web::dev::ServiceResponse,
+            Response = actix_web::dev::ServiceResponse<actix_web::body::BoxBody>,
             Error = actix_web::Error,
         >,
         Arc<sqlx::Pool<sqlx::Postgres>>,
@@ -43,11 +43,11 @@ mod error_handling_tests {
             .expect("Failed to connect to test database");
 
         // Initialize repositories
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let mask_group_repo = MaskGroupRepositoryImpl::new(pool.clone());
-        let mask_repo = MaskRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
+        let mask_group_repo = MaskGroupRepositoryImpl::new((*pool).clone());
+        let mask_repo = MaskRepositoryImpl::new((*pool).clone());
+        let user_repo = UserRepositoryImpl::new((*pool).clone());
+        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
 
         let pool = Arc::new(pool);
         
@@ -55,13 +55,12 @@ mod error_handling_tests {
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
         let mask_group_service = MaskGroupServiceImpl::new(
             Arc::new(mask_group_repo), 
-            Arc::new(user_repo), 
-            Arc::new(project_repo),
-            Arc::new(annotation_repo)
+            Arc::new(annotation_repo),
+            Arc::new(user_repo)
         );
         let mask_service = MaskServiceImpl::new(
             Arc::new(mask_repo), 
-            Arc::new(mask_group_repo), 
+            Arc::new(mask_group_service.clone()),
             Arc::new(user_repo)
         );
         
@@ -76,7 +75,7 @@ mod error_handling_tests {
         ));
         let mask_use_case = Arc::new(MaskUseCase::new(
             Arc::new(mask_service),
-            Arc::new(mask_group_service),
+            Arc::new(mask_group_service.clone()),
             signed_url_service,
         ));
 

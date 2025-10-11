@@ -63,6 +63,7 @@ mod object_storage_integration_tests {
         
         // Initialize object storage services
         let s3_config = ObjectStorageConfig {
+            provider: "minio".to_string(),
             endpoint: std::env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".to_string()),
             access_key: std::env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
             secret_key: std::env::var("S3_SECRET_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
@@ -71,6 +72,7 @@ mod object_storage_integration_tests {
         };
 
         let minio_config = ObjectStorageConfig {
+            provider: "minio".to_string(),
             endpoint: std::env::var("MINIO_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".to_string()),
             access_key: std::env::var("MINIO_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
             secret_key: std::env::var("MINIO_SECRET_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
@@ -296,6 +298,7 @@ mod object_storage_integration_tests {
 
         // Create mask group
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id,
             group_name: Some("S3 Storage Test Group".to_string()),
             model_name: Some("S3StorageModel".to_string()),
             version: Some("1.0.0".to_string()),
@@ -320,6 +323,11 @@ mod object_storage_integration_tests {
         let upload_req = SignedUrlRequest {
             filename: "s3_upload_test.png".to_string(),
             mime_type: "image/png".to_string(),
+            file_size: Some(102400),
+            label_name: Some("test_label".to_string()),
+            mask_group_id: mask_group_id,
+            slice_index: Some(0),
+            sop_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
             ttl_seconds: Some(3600),
         };
 
@@ -338,6 +346,7 @@ mod object_storage_integration_tests {
 
         // Test 2: Generate download URL
         let download_req = pacs_server::application::dto::mask_dto::DownloadUrlRequest {
+            mask_id: mask_id,
             file_path: "masks/s3_test.png".to_string(),
             expires_in: Some(3600),
         };
@@ -435,6 +444,7 @@ mod object_storage_integration_tests {
 
         // This should fail because we're using a different bucket name
         let error_config = ObjectStorageConfig {
+            provider: "s3".to_string(),
             endpoint: std::env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".to_string()),
             access_key: std::env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
             secret_key: std::env::var("S3_SECRET_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
@@ -532,6 +542,7 @@ mod object_storage_integration_tests {
     async fn test_storage_configuration_validation() {
         // Test 1: Invalid endpoint
         let invalid_config = ObjectStorageConfig {
+            provider: "s3".to_string(),
             endpoint: "invalid-endpoint".to_string(),
             access_key: "test".to_string(),
             secret_key: "test".to_string(),
@@ -545,6 +556,7 @@ mod object_storage_integration_tests {
 
         // Test 2: Invalid credentials
         let invalid_creds_config = ObjectStorageConfig {
+            provider: "s3".to_string(),
             endpoint: std::env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".to_string()),
             access_key: "invalid".to_string(),
             secret_key: "invalid".to_string(),

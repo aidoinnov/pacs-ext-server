@@ -192,6 +192,22 @@ async fn main() -> std::io::Result<()> {
     println!("🔌 API Endpoints: http://0.0.0.0:8080/api/");
     println!("{}\n", "=".repeat(80));
 
+    // Graceful shutdown을 위한 signal handler 설정
+    let pool_for_shutdown = pool.clone();
+    
+    // Signal handler for graceful shutdown
+    let shutdown_signal = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+        println!("\n🛑 Received shutdown signal, starting graceful shutdown...");
+        
+        // 데이터베이스 연결 풀 정리
+        println!("📦 Closing database connection pool...");
+        pool_for_shutdown.close().await;
+        println!("✅ Database connections closed");
+    };
+    
     HttpServer::new(move || {
         App::new()
             // CORS middleware
@@ -220,6 +236,11 @@ async fn main() -> std::io::Result<()> {
     })
     .bind((settings.server.host.as_str(), settings.server.port))?
     .workers(settings.server.workers)
+    .shutdown_timeout(30) // 30초 graceful shutdown timeout
     .run()
-    .await
+    .await?;
+    
+    // Graceful shutdown 완료
+    println!("✅ Server shutdown completed");
+    Ok(())
 }

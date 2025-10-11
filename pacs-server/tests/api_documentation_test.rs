@@ -10,9 +10,9 @@ mod api_documentation_tests {
     };
     use pacs_server::infrastructure::repositories::{
         AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
-        UserRepositoryImpl, ProjectRepositoryImpl
+        UserRepositoryImpl, ProjectRepositoryImpl, RoleRepositoryImpl
     };
-    use pacs_server::infrastructure::external::S3Service;
+    use pacs_server::infrastructure::external::s3_service::S3ObjectStorageService;
     use pacs_server::infrastructure::config::{ObjectStorageConfig, JwtConfig};
     use pacs_server::infrastructure::auth::JwtService;
     use pacs_server::presentation::controllers::{
@@ -23,14 +23,14 @@ mod api_documentation_tests {
         project_controller::configure_routes as configure_project_routes,
         auth_controller::configure_routes as configure_auth_routes,
     };
-    use pacs_server::ApiDoc;
+    use pacs_server::presentation::openapi::ApiDoc;
     use sqlx::postgres::PgPoolOptions;
     use std::sync::Arc;
     use serde_json::Value;
 
     async fn setup_documentation_test_app() -> impl actix_web::dev::Service<
         actix_http::Request,
-        Response = actix_web::dev::ServiceResponse,
+        Response = actix_web::dev::ServiceResponse<actix_web::middleware::logger::StreamLog<actix_web::body::BoxBody>>,
         Error = actix_web::Error,
     > {
         dotenvy::dotenv().ok();
@@ -47,21 +47,23 @@ mod api_documentation_tests {
         let pool = Arc::new(pool);
         
         // Initialize repositories
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let mask_group_repo = MaskGroupRepositoryImpl::new(pool.clone());
-        let mask_repo = MaskRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
+        let mask_group_repo = MaskGroupRepositoryImpl::new((*pool).clone());
+        let mask_repo = MaskRepositoryImpl::new((*pool).clone());
+        let user_repo = UserRepositoryImpl::new((*pool).clone());
+        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
+        let role_repo = RoleRepositoryImpl::new((*pool).clone());
         
         // Initialize services
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
-        let mask_group_service = MaskGroupServiceImpl::new(mask_group_repo, user_repo.clone(), project_repo.clone());
-        let mask_service = MaskServiceImpl::new(mask_repo, mask_group_repo.clone());
+        let mask_group_service = MaskGroupServiceImpl::new(Arc::new(mask_group_repo), Arc::new(annotation_repo.clone()), Arc::new(user_repo.clone()));
+        let mask_service = MaskServiceImpl::new(Arc::new(mask_repo), Arc::new(mask_group_repo.clone()), Arc::new(user_repo.clone()));
         let user_service = UserServiceImpl::new(user_repo.clone(), project_repo.clone());
-        let project_service = ProjectServiceImpl::new(project_repo, user_repo.clone());
+        let project_service = ProjectServiceImpl::new(project_repo, user_repo.clone(), role_repo);
         
         // Initialize object storage service
         let s3_config = ObjectStorageConfig {
+            provider: "minio".to_string(),
             endpoint: std::env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".to_string()),
             access_key: std::env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
             secret_key: std::env::var("S3_SECRET_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
@@ -69,15 +71,15 @@ mod api_documentation_tests {
             region: std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
         };
 
-        let s3_service = Arc::new(S3Service::new(s3_config));
+        let s3_service = Arc::new(S3ObjectStorageService::new(s3_config));
         
         // Initialize JWT service
         let jwt_config = JwtConfig {
             secret: "test_secret_key_for_documentation_testing".to_string(),
             expiration_hours: 24,
         };
-        let jwt_service = Arc::new(JwtService::new(jwt_config));
-        let auth_service = AuthServiceImpl::new(user_repo.clone(), jwt_service.clone());
+        let jwt_service = Arc::new(JwtService::new(&jwt_config));
+        let auth_service = AuthServiceImpl::new(user_repo.clone(), (*jwt_service).clone());
         
         // Initialize use cases
         let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));

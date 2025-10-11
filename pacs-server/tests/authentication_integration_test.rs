@@ -4,7 +4,6 @@ mod authentication_integration_tests {
     use pacs_server::application::dto::{
         annotation_dto::CreateAnnotationRequest,
         mask_group_dto::CreateMaskGroupRequest,
-        mask_dto::CreateMaskRequest
     };
     use pacs_server::application::use_cases::{AnnotationUseCase, MaskGroupUseCase, MaskUseCase};
     use pacs_server::domain::services::{
@@ -19,7 +18,8 @@ mod authentication_integration_tests {
         mask_group_controller::configure_routes as configure_mask_group_routes,
         mask_controller::configure_routes as configure_mask_routes,
     };
-    use pacs_server::infrastructure::auth::{JwtService, JwtConfig};
+    use pacs_server::infrastructure::auth::JwtService;
+    use pacs_server::infrastructure::config::JwtConfig;
     use sqlx::postgres::PgPoolOptions;
     use std::sync::Arc;
     use uuid::Uuid;
@@ -28,7 +28,7 @@ mod authentication_integration_tests {
     async fn setup_test_app() -> (
         impl actix_web::dev::Service<
             actix_http::Request,
-            Response = actix_web::dev::ServiceResponse,
+            Response = actix_web::dev::ServiceResponse<actix_web::body::BoxBody>,
             Error = actix_web::Error,
         >,
         Arc<sqlx::Pool<sqlx::Postgres>>,
@@ -46,18 +46,18 @@ mod authentication_integration_tests {
             .expect("Failed to connect to test database");
 
         // Initialize repositories
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let mask_group_repo = MaskGroupRepositoryImpl::new(pool.clone());
-        let mask_repo = MaskRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
+        let mask_group_repo = MaskGroupRepositoryImpl::new((*pool).clone());
+        let mask_repo = MaskRepositoryImpl::new((*pool).clone());
+        let user_repo = UserRepositoryImpl::new((*pool).clone());
+        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
 
         let pool = Arc::new(pool);
         
         // Initialize services
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
-        let mask_group_service = MaskGroupServiceImpl::new(mask_group_repo, user_repo.clone(), project_repo.clone());
-        let mask_service = MaskServiceImpl::new(mask_repo, mask_group_repo.clone());
+        let mask_group_service = MaskGroupServiceImpl::new(Arc::new(mask_group_repo), Arc::new(user_repo.clone()));
+        let mask_service = MaskServiceImpl::new(Arc::new(mask_repo), Arc::new(mask_group_repo.clone()), Arc::new(user_repo.clone()));
         
         // Mock SignedUrlService for testing
         let signed_url_service = Arc::new(MockSignedUrlService::new());
@@ -293,9 +293,11 @@ mod authentication_integration_tests {
         // Test 1: Generate valid JWT token
         let claims = pacs_server::infrastructure::auth::Claims {
             sub: user_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username.clone(),
             email: "test@example.com".to_string(),
-            exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::hours(24)).timestamp(),
         };
 
         let token_result = jwt_service.create_token(&claims);
@@ -315,9 +317,11 @@ mod authentication_integration_tests {
         // Test 3: Validate expired token
         let expired_claims = pacs_server::infrastructure::auth::Claims {
             sub: user_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username.clone(),
             email: "test@example.com".to_string(),
-            exp: (Utc::now() - Duration::hours(1)).timestamp() as usize, // Expired 1 hour ago
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() - Duration::hours(1)).timestamp(), // Expired 1 hour ago
         };
 
         let expired_token_result = jwt_service.create_token(&expired_claims);
@@ -358,9 +362,11 @@ mod authentication_integration_tests {
         // Create valid JWT token
         let claims = pacs_server::infrastructure::auth::Claims {
             sub: user_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username.clone(),
             email: "test@example.com".to_string(),
-            exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::hours(24)).timestamp(),
         };
 
         let token = jwt_service.create_token(&claims).unwrap();
@@ -435,9 +441,11 @@ mod authentication_integration_tests {
         // Create JWT token for the user
         let claims = pacs_server::infrastructure::auth::Claims {
             sub: user_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username.clone(),
             email: "test@example.com".to_string(),
-            exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::hours(24)).timestamp(),
         };
 
         let token = jwt_service.create_token(&claims).unwrap();
@@ -453,6 +461,7 @@ mod authentication_integration_tests {
 
         // Test 2: User can create mask group for their annotation
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id,
             group_name: Some("Auth Test Group".to_string()),
             model_name: Some("AuthModel".to_string()),
             version: Some("1.0.0".to_string()),
@@ -492,9 +501,11 @@ mod authentication_integration_tests {
         // Test 1: Create token that expires in 1 second
         let claims = pacs_server::infrastructure::auth::Claims {
             sub: user_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username.clone(),
             email: "test@example.com".to_string(),
-            exp: (Utc::now() + Duration::seconds(1)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::seconds(1)).timestamp(),
         };
 
         let token = jwt_service.create_token(&claims).unwrap();
@@ -513,9 +524,11 @@ mod authentication_integration_tests {
         // Test 2: Create token with very short expiration
         let short_claims = pacs_server::infrastructure::auth::Claims {
             sub: user_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username.clone(),
             email: "test@example.com".to_string(),
-            exp: (Utc::now() + Duration::milliseconds(100)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::milliseconds(100)).timestamp(),
         };
 
         let short_token = jwt_service.create_token(&short_claims).unwrap();
@@ -546,16 +559,20 @@ mod authentication_integration_tests {
         // Create JWT tokens for both users
         let claims1 = pacs_server::infrastructure::auth::Claims {
             sub: user1_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username1.clone(),
             email: "user1@example.com".to_string(),
-            exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::hours(24)).timestamp(),
         };
 
         let claims2 = pacs_server::infrastructure::auth::Claims {
             sub: user2_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username2.clone(),
             email: "user2@example.com".to_string(),
-            exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::hours(24)).timestamp(),
         };
 
         let token1 = jwt_service.create_token(&claims1).unwrap();
@@ -609,9 +626,11 @@ mod authentication_integration_tests {
         // Test 1: Create initial token
         let initial_claims = pacs_server::infrastructure::auth::Claims {
             sub: user_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username.clone(),
             email: "test@example.com".to_string(),
-            exp: (Utc::now() + Duration::hours(1)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::hours(1)).timestamp(),
         };
 
         let initial_token = jwt_service.create_token(&initial_claims).unwrap();
@@ -620,9 +639,11 @@ mod authentication_integration_tests {
         // Test 2: Create refreshed token with longer expiration
         let refreshed_claims = pacs_server::infrastructure::auth::Claims {
             sub: user_id.to_string(),
+            keycloak_id: uuid::Uuid::new_v4(),
             username: username.clone(),
             email: "test@example.com".to_string(),
-            exp: (Utc::now() + Duration::hours(24)).timestamp() as usize,
+            iat: Utc::now().timestamp(),
+            exp: (Utc::now() + Duration::hours(24)).timestamp(),
         };
 
         let refreshed_token = jwt_service.create_token(&refreshed_claims).unwrap();

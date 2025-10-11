@@ -18,7 +18,7 @@ mod database_cleanup_tests {
         AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
         UserRepositoryImpl, ProjectRepositoryImpl
     };
-    use pacs_server::infrastructure::external::S3Service;
+    use pacs_server::infrastructure::external::s3_service::S3ObjectStorageService;
     use pacs_server::infrastructure::config::ObjectStorageConfig;
     use pacs_server::presentation::controllers::{
         annotation_controller::configure_routes as configure_annotation_routes,
@@ -69,6 +69,7 @@ mod database_cleanup_tests {
         
         // Initialize object storage service
         let s3_config = ObjectStorageConfig {
+            provider: "minio".to_string(),
             endpoint: std::env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:9000".to_string()),
             access_key: std::env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
             secret_key: std::env::var("S3_SECRET_KEY").unwrap_or_else(|_| "minioadmin".to_string()),
@@ -76,7 +77,7 @@ mod database_cleanup_tests {
             region: std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
         };
 
-        let s3_service = Arc::new(S3Service::new(s3_config));
+        let s3_service = Arc::new(S3ObjectStorageService::new(s3_config));
         
         // Initialize use cases
         let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
@@ -541,15 +542,14 @@ mod database_cleanup_tests {
 
         // Try to create annotation with invalid data (should fail and rollback)
         let invalid_annotation_req = CreateAnnotationRequest {
-            study_uid: "".to_string(), // Invalid empty study UID
-            series_uid: "".to_string(), // Invalid empty series UID
-            instance_uid: "".to_string(), // Invalid empty instance UID
+            study_instance_uid: "".to_string(), // Invalid empty study UID
+            series_instance_uid: "".to_string(), // Invalid empty series UID
+            sop_instance_uid: "".to_string(), // Invalid empty instance UID
             tool_name: Some("".to_string()), // Invalid empty tool name
             tool_version: Some("".to_string()), // Invalid empty tool version
             viewer_software: Some("".to_string()), // Invalid empty viewer software
-            data: Some(serde_json::json!({})), // Invalid empty data
+            annotation_data: serde_json::json!({}), // Invalid empty data
             description: Some("".to_string()), // Invalid empty description
-            is_shared: Some(false),
         };
 
         let req = test::TestRequest::post()

@@ -293,6 +293,7 @@ mod mask_upload_workflow_tests {
 
         // Step 2: Create mask group
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id: annotation_id,
             group_name: Some("Liver Segmentation v1.0".to_string()),
             model_name: Some("UNet3D".to_string()),
             version: Some("1.0.0".to_string()),
@@ -340,6 +341,7 @@ mod mask_upload_workflow_tests {
 
         // Step 5: Complete upload
         let complete_req = CompleteUploadRequest {
+            mask_group_id: mask_group_id,
             slice_count: 100,
             labels: vec!["liver".to_string(), "spleen".to_string(), "kidney".to_string()],
             uploaded_files: vec![
@@ -366,8 +368,9 @@ mod mask_upload_workflow_tests {
 
         // Step 6: Create mask metadata
         let mask_req = CreateMaskRequest {
+            mask_group_id: mask_group_id,
             file_path: "masks/liver_mask_001.png".to_string(),
-            mime_type: Some("image/png".to_string()),
+            mime_type: "image/png".to_string(),
             slice_index: Some(1),
             sop_instance_uid: Some("1.2.3.4.5.6.7.8.9.1.1".to_string()),
             label_name: Some("liver".to_string()),
@@ -387,6 +390,7 @@ mod mask_upload_workflow_tests {
 
         // Step 7: Generate download URL
         let download_req = pacs_server::application::dto::mask_dto::DownloadUrlRequest {
+            mask_id: mask_id,
             file_path: "masks/liver_mask_001.png".to_string(),
             expires_in: Some(3600),
         };
@@ -472,6 +476,7 @@ mod mask_upload_workflow_tests {
 
         for (group_name, model_name, modality, mask_type) in mask_groups {
             let mask_group_req = CreateMaskGroupRequest {
+                annotation_id: annotation_id,
                 group_name: Some(format!("{} v1.0", group_name)),
                 model_name: Some(model_name.to_string()),
                 version: Some("1.0.0".to_string()),
@@ -516,6 +521,7 @@ mod mask_upload_workflow_tests {
 
         // Test 1: Try to create mask group for non-existent annotation
         let mask_group_req = CreateMaskGroupRequest {
+            annotation_id: annotation_id,
             group_name: Some("Test Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
@@ -535,8 +541,9 @@ mod mask_upload_workflow_tests {
 
         // Test 2: Try to create mask for non-existent mask group
         let mask_req = CreateMaskRequest {
+            mask_group_id: mask_group_id,
             file_path: "masks/test.png".to_string(),
-            mime_type: Some("image/png".to_string()),
+            mime_type: "image/png".to_string(),
             slice_index: Some(1),
             sop_instance_uid: Some("1.2.3.4.5.6.7.8.9.1.1".to_string()),
             label_name: Some("test".to_string()),

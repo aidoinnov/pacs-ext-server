@@ -31,9 +31,9 @@ mod annotation_controller_tests {
             .await
             .expect("Failed to connect to test database");
 
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
+        let user_repo = UserRepositoryImpl::new((*pool).clone());
+        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
 
         let pool = Arc::new(pool);
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
@@ -122,9 +122,9 @@ mod annotation_controller_tests {
         let (user_id, project_id) = create_test_data(&pool).await;
 
         // Test the use case directly
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
+        let user_repo = UserRepositoryImpl::new((*pool).clone());
+        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
         let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
@@ -152,9 +152,9 @@ mod annotation_controller_tests {
         let (user_id, project_id) = create_test_data(&pool).await;
 
         // Test the use case directly
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
+        let user_repo = UserRepositoryImpl::new((*pool).clone());
+        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
         let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
@@ -190,9 +190,9 @@ mod annotation_controller_tests {
         let (user_id, project_id) = create_test_data(&pool).await;
 
         // Test the use case directly
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
+        let user_repo = UserRepositoryImpl::new((*pool).clone());
+        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
         let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
@@ -225,9 +225,9 @@ mod annotation_controller_tests {
         let (user_id, project_id) = create_test_data(&pool).await;
 
         // Test the use case directly
-        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
-        let user_repo = UserRepositoryImpl::new(pool.clone());
-        let project_repo = ProjectRepositoryImpl::new(pool.clone());
+        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
+        let user_repo = UserRepositoryImpl::new((*pool).clone());
+        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
         let annotation_use_case = AnnotationUseCase::new(annotation_service);
 
