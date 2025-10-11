@@ -29,6 +29,12 @@ PACS (Picture Archiving and Communication System) Extension Server는 의료 영
 - **에러 처리**: 일관된 에러 응답
 - **로깅**: 구조화된 로그 시스템
 
+### 🔒 데이터 일관성
+- **원자적 트랜잭션**: 데이터베이스 작업의 원자성 보장
+- **자동 롤백**: 트랜잭션 실패 시 자동 복구
+- **동시성 제어**: Race condition 방지
+- **데이터 무결성**: 외래키 제약조건 및 비즈니스 규칙 준수
+
 ## 🏗️ 아키텍처
 
 ### Clean Architecture
@@ -226,8 +232,8 @@ cargo test --test annotation_use_case_test --test mask_group_controller_test --t
 
 ### 테스트 커버리지
 - **단위 테스트**: 43개 테스트, 100% 통과 ✅
-- **통합 테스트**: 75개 테스트, 100% 통과 ✅
-- **총 테스트**: 118개 테스트, 100% 통과 ✅
+- **통합 테스트**: 79개 테스트, 100% 통과 ✅
+- **총 테스트**: 122개 테스트, 100% 통과 ✅
 
 ### 테스트 카테고리
 - **Domain Entities**: 16개 테스트 (mask, mask_group)
@@ -236,6 +242,13 @@ cargo test --test annotation_use_case_test --test mask_group_controller_test --t
 - **API Controllers**: 20개 테스트 (annotation, mask_group, mask)
 - **Service Layer**: 52개 테스트 (user, project, permission, access_control, annotation)
 - **Use Cases**: 7개 테스트 (annotation business logic)
+
+### 통합 테스트 세부사항
+- **annotation_controller_test**: 4개 테스트 (API 엔드포인트)
+- **annotation_use_case_test**: 7개 테스트 (비즈니스 로직)
+- **mask_controller_test**: 8개 테스트 (마스크 API)
+- **mask_group_controller_test**: 8개 테스트 (마스크 그룹 API)
+- **service_test**: 52개 테스트 (서비스 레이어)
 
 ## 📊 성능
 
@@ -311,6 +324,7 @@ CMD ["pacs-server"]
 - [API 가이드](docs/technical/ANNOTATION_API_GUIDE.md)
 - [데이터베이스 스키마](docs/technical/DATABASE_SCHEMA_MASK_UPLOAD.md)
 - [Object Storage 연동](docs/technical/OBJECT_STORAGE_INTEGRATION.md)
+- [트랜잭션 처리 최적화](docs/technical/TRANSACTION_OPTIMIZATION_FINAL.md) ✨
 
 ### 개발 가이드
 - [구현 계획서](docs/todo/implementation_plan.md)
@@ -354,6 +368,12 @@ CMD ["pacs-server"]
 자세한 변경 이력은 [CHANGELOG.md](docs/technical/CHANGELOG.md)를 참조하세요.
 
 ### 주요 버전
+- **v1.0.0-beta.1**: 트랜잭션 처리 최적화 (2025-10-11) ✅
+  - 122개 테스트 모두 통과
+  - 원자적 트랜잭션 처리 구현
+  - 데이터 일관성 및 무결성 보장
+  - TIMESTAMPTZ 타입 지원
+
 - **v1.0.0-beta**: 베타 릴리스 (완전한 기능 구현) ✅
   - 118개 테스트 모두 통과
   - Annotation & Mask 관리 시스템 완성
@@ -368,4 +388,4 @@ CMD ["pacs-server"]
 ---
 **최종 업데이트**: 2025-10-11  
 **작성자**: AI Assistant  
-**버전**: 1.0.0-beta
+**버전**: 1.0.0-beta.1
