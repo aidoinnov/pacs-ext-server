@@ -7,7 +7,7 @@ use crate::application::dto::mask_group_dto::{
     SignedUrlResponse, CompleteUploadRequest, CompleteUploadResponse
 };
 use crate::application::use_cases::MaskGroupUseCase;
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 pub struct MaskGroupController<MGS, SUS> 
 where
@@ -443,5 +443,15 @@ where
     MGS: crate::domain::services::MaskGroupService + Send + Sync + 'static,
     SUS: crate::application::services::SignedUrlService + Send + Sync + 'static,
 {
-    cfg.app_data(web::Data::new(use_case));
+    cfg.app_data(web::Data::new(use_case))
+        .service(
+            web::scope("/api/annotations/{annotation_id}/mask-groups")
+                .route("", web::post().to(create_mask_group::<MGS, SUS>))
+                .route("", web::get().to(list_mask_groups::<MGS, SUS>))
+                .route("/{group_id}", web::get().to(get_mask_group::<MGS, SUS>))
+                .route("/{group_id}", web::put().to(update_mask_group::<MGS, SUS>))
+                .route("/{group_id}", web::delete().to(delete_mask_group::<MGS, SUS>))
+                .route("/{group_id}/upload-url", web::post().to(generate_upload_url::<MGS, SUS>))
+                .route("/{group_id}/complete-upload", web::post().to(complete_upload::<MGS, SUS>))
+        );
 }

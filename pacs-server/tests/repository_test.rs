@@ -74,7 +74,8 @@ mod user_repository_tests {
         let created = repo.create(new_user).await.unwrap();
 
         let all_users = repo.find_all().await.unwrap();
-        assert!(all_users.len() >= initial_count + 1);
+        // Verify the created user exists in the list
+        assert!(all_users.iter().any(|u| u.id == created.id));
 
         // Cleanup
         repo.delete(created.id).await.unwrap();
@@ -376,7 +377,8 @@ mod permission_repository_tests {
         let created = repo.create(new_permission).await.unwrap();
 
         let all_permissions = repo.find_all().await.unwrap();
-        assert_eq!(all_permissions.len(), initial_count + 1);
+        // Verify the created permission exists in the list
+        assert!(all_permissions.iter().any(|p| p.id == created.id));
 
         // Cleanup
         repo.delete(created.id).await.unwrap();
@@ -566,6 +568,8 @@ mod annotation_repository_tests {
             instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
             tool_name: "test_tool".to_string(),
             tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
+            description: Some("Test annotation".to_string()),
             data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             is_shared: false,
         };
@@ -649,6 +653,8 @@ mod annotation_repository_tests {
             instance_uid: Some("1.2.3.4.7".to_string()),
             tool_name: "test_tool".to_string(),
             tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
+            description: Some("Test annotation".to_string()),
             data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             is_shared: false,
         };
@@ -711,6 +717,8 @@ mod annotation_repository_tests {
             instance_uid: Some("1.2.3.4.7".to_string()),
             tool_name: "test_tool".to_string(),
             tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
+            description: Some("Test annotation".to_string()),
             data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             is_shared: false,
         };
@@ -772,6 +780,8 @@ mod annotation_repository_tests {
             instance_uid: Some("1.2.3.4.7".to_string()),
             tool_name: "test_tool".to_string(),
             tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
+            description: Some("Test annotation".to_string()),
             data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             is_shared: false,
         };

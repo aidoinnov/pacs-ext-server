@@ -5,7 +5,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use crate::domain::entities::{User, NewUser, Project};
 use crate::domain::repositories::{UserRepository, ProjectRepository};
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 #[async_trait]
 pub trait UserServiceWithTx {

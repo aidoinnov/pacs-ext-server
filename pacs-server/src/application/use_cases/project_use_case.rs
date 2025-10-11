@@ -2,7 +2,8 @@ use crate::application::dto::{
     CreateProjectRequest, ProjectResponse, ProjectListResponse, ProjectAssignRoleRequest,
     ProjectMembersResponse, MemberInfo, ProjectRolesResponse, RoleInfo,
 };
-use crate::domain::services::{ProjectService, ServiceError};
+use crate::domain::services::ProjectService;
+use crate::domain::ServiceError;
 
 /// 프로젝트 관리 유스케이스
 pub struct ProjectUseCase<P: ProjectService> {

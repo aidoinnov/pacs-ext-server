@@ -130,18 +130,8 @@ impl ObjectStorageServiceFactory {
                 ).await?;
                 Ok(Box::new(s3_service))
             }
-            "minio" => {
-                let minio_service = crate::infrastructure::external::minio_service::MinIOObjectStorageService::new(
-                    bucket_name,
-                    region,
-                    endpoint,
-                    access_key,
-                    secret_key,
-                ).await?;
-                Ok(Box::new(minio_service))
-            }
             _ => Err(ObjectStorageError::ConfigError(
-                format!("Unsupported object storage provider: {}", provider)
+                format!("Unsupported object storage provider: {}. Only 's3' is supported.", provider)
             ))
         }
     }

@@ -126,26 +126,25 @@ async fn main() -> std::io::Result<()> {
         mask_group_repo.clone(),
         Arc::new(user_repo.clone()),
     ));
-    // Initialize Object Storage service (temporarily disabled for testing)
+    // Initialize Object Storage service
     print!("☁️  Initializing Object Storage service... ");
-    // TODO: Re-enable after testing
-    // let object_storage = ObjectStorageServiceFactory::create(
-    //     &settings.object_storage.provider,
-    //     &settings.object_storage.bucket_name,
-    //     &settings.object_storage.region,
-    //     &settings.object_storage.endpoint,
-    //     &settings.object_storage.access_key,
-    //     &settings.object_storage.secret_key,
-    // ).await.map_err(|e| {
-    //     eprintln!("❌ Failed to initialize Object Storage: {}", e);
-    //     std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-    // })?;
-    // let signed_url_service = Arc::new(SignedUrlServiceImpl::new(
-    //     object_storage,
-    //     settings.signed_url.default_ttl,
-    //     settings.signed_url.max_ttl,
-    // ));
-    println!("✅ Skipped (Testing mode)");
+    let object_storage = ObjectStorageServiceFactory::create(
+        &settings.object_storage.provider,
+        &settings.object_storage.bucket_name,
+        &settings.object_storage.region,
+        &settings.object_storage.endpoint,
+        &settings.object_storage.access_key,
+        &settings.object_storage.secret_key,
+    ).await.map_err(|e| {
+        eprintln!("❌ Failed to initialize Object Storage: {}", e);
+        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+    })?;
+    let signed_url_service = Arc::new(SignedUrlServiceImpl::new(
+        object_storage,
+        settings.signed_url.default_ttl,
+        settings.signed_url.max_ttl,
+    ));
+    println!("✅ Done (Provider: {})", settings.object_storage.provider);
 
     // Initialize use cases
     print!("📋 Initializing use cases... ");
@@ -155,16 +154,15 @@ async fn main() -> std::io::Result<()> {
     let permission_use_case = Arc::new(PermissionUseCase::new(permission_service));
     let access_control_use_case = Arc::new(AccessControlUseCase::new(access_control_service));
     let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
-    // TODO: Re-enable after Object Storage is configured
-    // let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
-    //     mask_group_service,
-    //     signed_url_service.clone(),
-    // ));
-    // let mask_use_case = Arc::new(MaskUseCase::new(
-    //     mask_service,
-    //     mask_group_service.clone(),
-    //     signed_url_service.clone(),
-    // ));
+    let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
+        mask_group_service.clone(),
+        signed_url_service.clone(),
+    ));
+    let mask_use_case = Arc::new(MaskUseCase::new(
+        mask_service,
+        mask_group_service.clone(),
+        signed_url_service.clone(),
+    ));
     println!("✅ Done");
 
     // Cache configuration
@@ -216,9 +214,8 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| permission_controller::configure_routes(cfg, permission_use_case.clone()))
                     .configure(|cfg| access_control_controller::configure_routes(cfg, access_control_use_case.clone()))
                     .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
-                    // TODO: Re-enable after Object Storage is configured
-                    // .configure(|cfg| mask_group_controller::configure_routes(cfg, mask_group_use_case.clone()))
-                    // .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
+                    .configure(|cfg| mask_group_controller::configure_routes(cfg, mask_group_use_case.clone()))
+                    .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

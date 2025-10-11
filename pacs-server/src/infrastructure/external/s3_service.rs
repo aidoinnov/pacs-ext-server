@@ -4,6 +4,7 @@ use aws_sdk_s3::{
     presigning::PresigningConfig,
     types::{ObjectCannedAcl, StorageClass},
     Client as S3Client,
+    config::Credentials,
 };
 use std::time::Duration;
 use crate::application::services::object_storage_service::{
@@ -21,14 +22,31 @@ impl S3ObjectStorageService {
     pub async fn new(
         bucket_name: &str,
         region: &str,
-        _access_key: &str,
-        _secret_key: &str,
+        access_key: &str,
+        secret_key: &str,
     ) -> Result<Self, ObjectStorageError> {
-        // TODO: AWS SDK lifetime 문제 해결 필요
-        // 임시로 에러 반환하여 컴파일 문제 회피
-        Err(ObjectStorageError::ConfigError(
-            "S3 service temporarily disabled due to AWS SDK lifetime issues".to_string()
-        ))
+        // AWS 설정 구성
+        let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
+            .region(aws_config::Region::new(region.to_string()))
+            .credentials_provider(Credentials::new(
+                access_key,
+                secret_key,
+                None,
+                None,
+                "s3"
+            ))
+            .load()
+            .await;
+
+        let client = S3Client::new(&aws_config);
+        
+        // 버킷 존재 확인 (주석 처리 - 서버 시작 시 버킷이 없어도 실행 가능하도록)
+        // Self::verify_bucket_exists(&client, bucket_name).await?;
+
+        Ok(Self {
+            client,
+            bucket_name: bucket_name.to_string(),
+        })
     }
     
     /// 버킷 존재 여부 확인

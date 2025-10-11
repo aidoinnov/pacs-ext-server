@@ -45,8 +45,8 @@ provider = "s3"  # "s3" or "minio"
 bucket_name = "pacs-masks"
 region = "us-east-1"
 endpoint = ""  # MinIO endpoint (leave empty for AWS S3)
-access_key = ""
-secret_key = ""
+access_key_id = ""
+secret_access_key = ""
 
 [signed_url]
 default_ttl = 600  # 10 minutes

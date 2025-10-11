@@ -3,7 +3,8 @@ use crate::application::dto::mask_dto::{
     CreateMaskRequest, UpdateMaskRequest, MaskResponse, MaskListResponse, 
     DownloadUrlRequest, DownloadUrlResponse, MaskStatsResponse
 };
-use crate::domain::services::{MaskService, MaskGroupService, ServiceError};
+use crate::domain::services::{MaskService, MaskGroupService};
+use crate::domain::ServiceError;
 use crate::application::services::SignedUrlService;
 use crate::domain::entities::{NewMask, UpdateMask, Mask};
 

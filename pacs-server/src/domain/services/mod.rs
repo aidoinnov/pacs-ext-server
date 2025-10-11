@@ -7,7 +7,7 @@ pub mod annotation_service;
 pub mod mask_group_service;
 pub mod mask_service;
 
-pub use user_service::{UserService, UserServiceImpl, ServiceError};
+pub use user_service::{UserService, UserServiceImpl};
 pub use project_service::{ProjectService, ProjectServiceImpl};
 pub use permission_service::{PermissionService, PermissionServiceImpl};
 pub use access_control_service::{AccessControlService, AccessControlServiceImpl};

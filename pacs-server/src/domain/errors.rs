@@ -1,9 +1,4 @@
-pub mod entities;
-pub mod repositories;
-pub mod services;
-pub mod errors;
-
-// ServiceError를 직접 정의
+/// 공통 서비스 에러 타입
 #[derive(Debug)]
 pub enum ServiceError {
     NotFound(String),
@@ -11,6 +6,12 @@ pub enum ServiceError {
     ValidationError(String),
     DatabaseError(String),
     Unauthorized(String),
+}
+
+impl From<sqlx::Error> for ServiceError {
+    fn from(err: sqlx::Error) -> Self {
+        ServiceError::DatabaseError(err.to_string())
+    }
 }
 
 impl std::fmt::Display for ServiceError {
@@ -26,9 +27,3 @@ impl std::fmt::Display for ServiceError {
 }
 
 impl std::error::Error for ServiceError {}
-
-impl From<sqlx::Error> for ServiceError {
-    fn from(err: sqlx::Error) -> Self {
-        ServiceError::DatabaseError(err.to_string())
-    }
-}

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use sqlx::{PgPool, Postgres, Transaction};
 use crate::domain::entities::{Role, Permission, RoleScope};
 use crate::domain::repositories::{PermissionRepository, RoleRepository};
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 // 트랜잭션 헬퍼 함수들
 impl<PE, R> super::PermissionServiceImpl<PE, R>

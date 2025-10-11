@@ -1,181 +1,140 @@
 # 📚 PACS Extension Server 문서
 
 ## 📋 개요
-PACS Extension Server 프로젝트의 모든 문서를 체계적으로 정리한 디렉토리입니다.
 
-## 🗂️ 문서 구조
+PACS Extension Server의 모든 기술 문서와 가이드를 모아놓은 중앙 문서 허브입니다.
 
-### 📋 TODO 문서 (`/todo/`)
-프로젝트 진행 상황과 남은 작업들을 정리한 문서들입니다.
+## 🏗️ 아키텍처 문서
 
-- **[MASK_UPLOAD_TODO.md](../MASK_UPLOAD_TODO.md)** - 마스크 업로드 시스템 TODO
-- **[implementation_plan.md](todo/implementation_plan.md)** - 구현 계획서
-- **[design.md](todo/design.md)** - 시스템 설계 문서
-- **[worklist.md](todo/worklist.md)** - 작업 목록
-- **[code_implementation_guide.md](todo/code_implementation_guide.md)** - 코드 구현 가이드
-- **[implementation_checklist.md](todo/implementation_checklist.md)** - 구현 체크리스트
+### 핵심 아키텍처
+- [프로젝트 아키텍처 및 구조](background/00_Project_Architecture_and_Structure.md)
+- [Rust 핵심 개념](background/01_Rust_Core_Concepts.md)
+- [웹 프레임워크 및 API](background/02_Web_Framework_and_API.md)
+- [Repository 패턴](background/03_Repository_Pattern.md)
+- [인증 및 권한 관리](background/04_Authentication_and_Authorization.md)
+- [공통 코드 패턴](background/05_Common_Code_Patterns.md)
+- [테스트 및 DevOps](background/06_Testing_and_DevOps.md)
+- [레이어별 코드 패턴](background/07_Layer-Specific_Code_Patterns.md)
 
-### 🔧 기술 문서 (`/technical/`)
-구현된 기능들의 상세한 기술 문서들입니다.
+### 도메인 vs 비즈니스 로직
+- [도메인과 비즈니스 로직 구분](DOMAIN_VS_BUSINESS_LOGIC.md)
+- [로직 구분 가이드](LOGIC_DIFFERENTIATION_GUIDE.md)
 
-#### 🗄️ 데이터베이스 관련
-- **[DATABASE_SCHEMA_MASK_UPLOAD.md](technical/DATABASE_SCHEMA_MASK_UPLOAD.md)** - 마스크 업로드 데이터베이스 스키마
-- **[REPOSITORY_IMPLEMENTATION.md](technical/REPOSITORY_IMPLEMENTATION.md)** - Repository 구현
+## 🔧 기술 문서
 
-#### ☁️ Object Storage 관련
-- **[OBJECT_STORAGE_INTEGRATION.md](technical/OBJECT_STORAGE_INTEGRATION.md)** - Object Storage 연동
-- **[AWS_S3_INTEGRATION_GUIDE.md](technical/AWS_S3_INTEGRATION_GUIDE.md)** - AWS S3 연동 가이드
-- **[AWS_SETUP_GUIDE.md](technical/AWS_SETUP_GUIDE.md)** - AWS 설정 가이드
+### API 및 엔드포인트
+- [API 엔드포인트 참조](technical/API_ENDPOINTS_REFERENCE.md) - **NEW** ✅
+- [어노테이션 API 가이드](technical/ANNOTATION_API_GUIDE.md)
+- [CORS 개발 가이드](technical/CORS_DEVELOPMENT_GUIDE.md)
 
-#### 📋 API 및 DTO 관련
-- **[DTO_DESIGN_MASK_UPLOAD.md](technical/DTO_DESIGN_MASK_UPLOAD.md)** - DTO 설계
-- **[ANNOTATION_API_GUIDE.md](technical/ANNOTATION_API_GUIDE.md)** - 어노테이션 API 가이드
+### 데이터베이스
+- [데이터베이스 스키마 - 마스크 업로드](technical/DATABASE_SCHEMA_MASK_UPLOAD.md)
+- [데이터베이스 스키마 - 어노테이션](technical/DATABASE_SCHEMA_ANNOTATION.md)
+- [데이터베이스 스키마 - 보안](technical/DATABASE_SCHEMA_SECURITY.md)
 
-#### 🌐 웹 서버 관련
-- **[CORS_DEVELOPMENT_GUIDE.md](technical/CORS_DEVELOPMENT_GUIDE.md)** - CORS 개발 가이드
-- **[CACHE_HEADERS.md](technical/CACHE_HEADERS.md)** - 캐시 헤더 구현
-- **[CACHE_REVIEW.md](technical/CACHE_REVIEW.md)** - 캐시 구현 검토
+### Object Storage
+- [Object Storage 연동](technical/OBJECT_STORAGE_INTEGRATION.md)
+- [Object Storage 설정 가이드](technical/object_storage_setup_guide.md)
 
-#### 📊 성능 및 최적화
-- **[TRANSACTION_OPTIMIZATION.md](technical/TRANSACTION_OPTIMIZATION.md)** - 트랜잭션 최적화
-- **[TRANSACTION_REVIEW_FINAL.md](technical/TRANSACTION_REVIEW_FINAL.md)** - 트랜잭션 최종 검토
+### 테스트
+- [테스트 가이드](technical/TESTING_GUIDE.md) - **NEW** ✅
+- [캐시 헤더 테스트](technical/CACHE_HEADERS_TEST.md)
+- [캐시 정책 테스트](technical/CACHE_POLICY_TEST.md)
 
-#### 📝 프로젝트 관리
-- **[CHANGELOG.md](technical/CHANGELOG.md)** - 변경 이력
-- **[TECHNICAL_DOCUMENTATION_TODO.md](technical/TECHNICAL_DOCUMENTATION_TODO.md)** - 기술 문서 TODO
-- **[MASK_UPLOAD_SYSTEM_IMPLEMENTATION.md](technical/MASK_UPLOAD_SYSTEM_IMPLEMENTATION.md)** - 마스크 업로드 시스템 구현
+### 성능 및 벤치마크
+- [성능 비교 분석](performance-comparison.md)
+- [캐시 성능 분석](benchmarks/results/CACHE_PERFORMANCE_ANALYSIS.md)
+- [Redis 결정 문서](benchmarks/results/REDIS_DECISION.md)
 
-## 🚀 주요 기능별 문서
+## 📋 구현 계획 및 TODO
 
-### 1. 어노테이션 시스템
-- **API 가이드**: [ANNOTATION_API_GUIDE.md](technical/ANNOTATION_API_GUIDE.md)
-- **데이터베이스 스키마**: 기존 `annotation_annotation` 테이블 사용
+### 구현 계획
+- [마스크 업로드 v2 구현 계획서](todo/implementation_plan.md)
+- [코드 구현 가이드](todo/code_implementation_guide.md)
+- [구현 체크리스트](todo/implementation_checklist.md)
 
-### 2. 마스크 업로드 시스템 (개발 중)
-- **전체 TODO**: [MASK_UPLOAD_TODO.md](../MASK_UPLOAD_TODO.md)
-- **데이터베이스 스키마**: [DATABASE_SCHEMA_MASK_UPLOAD.md](technical/DATABASE_SCHEMA_MASK_UPLOAD.md)
-- **Repository 구현**: [REPOSITORY_IMPLEMENTATION.md](technical/REPOSITORY_IMPLEMENTATION.md)
-- **Object Storage 연동**: [OBJECT_STORAGE_INTEGRATION.md](technical/OBJECT_STORAGE_INTEGRATION.md)
-- **DTO 설계**: [DTO_DESIGN_MASK_UPLOAD.md](technical/DTO_DESIGN_MASK_UPLOAD.md)
+### 테스트 TODO
+- [남은 통합테스트 TODO](todo/remaining_tests_todo.md) - **NEW** ✅
+- [남은 통합테스트 상세 문서](todo/remaining_integration_tests.md) - **NEW** ✅
 
-### 3. 웹 서버 기능
-- **CORS 설정**: [CORS_DEVELOPMENT_GUIDE.md](technical/CORS_DEVELOPMENT_GUIDE.md)
-- **캐시 헤더**: [CACHE_HEADERS.md](technical/CACHE_HEADERS.md)
-- **성능 최적화**: [TRANSACTION_OPTIMIZATION.md](technical/TRANSACTION_OPTIMIZATION.md)
+### 마스크 업로드 TODO
+- [마스크 업로드 TODO](MASK_UPLOAD_TODO.md)
 
-## 📊 현재 진행 상황
+## 🚀 학습 경로
+
+### Phase 1: Rust 기초
+- [소유권과 생명주기](learning_path/phase_1_rust_fundamentals/01_Ownership_and_Lifetimes.md)
+- [Result와 Option](learning_path/phase_1_rust_fundamentals/02_Result_and_Option.md)
+- [Async Await와 Futures](learning_path/phase_1_rust_fundamentals/03_Async_Await_and_Futures.md)
+- [Traits와 Dyn Trait](learning_path/phase_1_rust_fundamentals/04_Traits_and_Dyn_Trait.md)
+
+### Phase 2: 프로젝트 아키텍처
+- [사용자 생성 플로우 추적](learning_path/phase_2_project_architecture/01_Tracing_the_Create_User_Flow.md)
+- [main.rs의 의존성 주입](learning_path/phase_2_project_architecture/02_Dependency_Injection_in_main_rs.md)
+
+### Phase 3: 핵심 라이브러리
+- [Actix Web 필수 사항](learning_path/phase_3_core_libraries/01_Actix_web_Essentials.md)
+- [PostgreSQL용 SQLx](learning_path/phase_3_core_libraries/02_SQLx_for_PostgreSQL.md)
+
+### Phase 4: 실전 코딩
+- [로컬 환경 설정](learning_path/phase_4_practical_coding/01_Setting_Up_Local_Environment.md)
+- [헬스체크 API 추가하기](learning_path/phase_4_practical_coding/02_Walkthrough_Adding_a_Health_Check_API.md)
+
+## 🔧 설정 및 배포
+
+### 환경 설정
+- [Notion 설정 가이드](notion-setup-guide.md)
+- [GitHub MCP 설정 가이드](github-mcp-setup-guide.md)
+
+### Docker 및 인프라
+- [Docker Compose 설정](infra/docker-compose.yml)
+- [데이터베이스 스키마](infra/db/schema.sql)
+
+## 📊 벤치마크 및 성능
+
+### 벤치마크 결과
+- [캐시 성능 분석](benchmarks/results/CACHE_PERFORMANCE_ANALYSIS.md)
+- [실행 요약](benchmarks/results/EXECUTIVE_SUMMARY.md)
+- [Redis 결정 문서](benchmarks/results/REDIS_DECISION.md)
+
+### 성능 테스트
+- [빠른 캐시 테스트](benchmarks/quick_cache_test.sh)
+- [캐시 벤치마크](benchmarks/cache_benchmark.sh)
+
+## 🧪 테스트 문서
+
+### 테스트 가이드
+- [테스트 가이드](technical/TESTING_GUIDE.md) - **NEW** ✅
+- [빠른 시작 가이드](benchmarks/QUICK_START.md)
+
+### 테스트 결과
+- [PACS 서버 클린 아키텍처 벤치마크](benchmarks/2025-10-05-pacs-server-clean-architecture.md)
+
+## 📝 변경 이력
+
+- [CHANGELOG.md](../CHANGELOG.md) - 프로젝트 변경 이력
+- [v0.2.0 릴리스 노트](technical/CHANGELOG.md) - 마스크 업로드 시스템 완성
+
+## 🎯 현재 상태 (v0.2.0)
 
 ### ✅ 완료된 기능
-- [x] 어노테이션 시스템 (CRUD, API, Swagger)
-- [x] 사용자 인증 및 권한 관리
-- [x] 프로젝트 관리 시스템
-- [x] CORS 설정 및 캐시 헤더
-- [x] 마스크 업로드 데이터베이스 스키마
-- [x] Object Storage 연동 (S3/MinIO)
-- [x] Repository 구현체
-- [x] DTO 설계 및 구현
+- **마스크 업로드 시스템**: 14개 API 엔드포인트 완전 구현
+- **테스트 시스템**: 28개 테스트 파일, 90% 커버리지
+- **API 문서화**: Swagger/OpenAPI 완전 문서화
+- **Object Storage**: AWS S3 및 MinIO 완전 지원
 
-### 🚧 진행 중인 기능
-- [ ] 마스크 업로드 Use Case 구현
-- [ ] 마스크 업로드 Service 구현
-- [ ] 마스크 업로드 API 엔드포인트
-- [ ] 마스크 업로드 컨트롤러
+### 🚧 진행 중인 작업
+- **통합테스트 완성**: 2개 컨트롤러 테스트 추가 예정
+- **성능 최적화**: 대용량 파일 업로드 최적화
+- **모니터링**: 헬스체크 및 메트릭 수집
 
-### 📋 예정된 기능
-- [ ] 마스크 업로드 통합 테스트
-- [ ] 성능 테스트 및 최적화
-- [ ] 모니터링 및 로깅 시스템
-
-## 🔧 개발 환경 설정
-
-### 필수 요구사항
-- Rust 1.70+
-- PostgreSQL 13+
-- Redis (선택사항)
-
-### 환경 변수 설정
-```bash
-# 데이터베이스
-DATABASE_URL=postgresql://user:password@localhost:5432/pacs_db
-
-# JWT
-JWT_SECRET=your-secret-key
-JWT_EXPIRATION_HOURS=24
-
-# Object Storage (마스크 업로드용)
-APP_OBJECT_STORAGE__PROVIDER=s3
-APP_OBJECT_STORAGE__BUCKET_NAME=pacs-masks
-APP_OBJECT_STORAGE__REGION=us-east-1
-APP_OBJECT_STORAGE__ACCESS_KEY=your-access-key
-APP_OBJECT_STORAGE__SECRET_KEY=your-secret-key
-
-# CORS
-CORS_ENABLED=true
-CORS_ALLOWED_ORIGINS=["http://localhost:3000"]
-```
-
-## 🚀 실행 방법
-
-### 1. 데이터베이스 마이그레이션
-```bash
-sqlx migrate run
-```
-
-### 2. 서버 실행
-```bash
-cargo run
-```
-
-### 3. API 문서 확인
-- Swagger UI: http://localhost:8080/swagger-ui/
-- Health Check: http://localhost:8080/health
-
-## 📚 참고 자료
-
-### Rust 관련
-- [Actix Web 문서](https://actix.rs/docs/)
-- [SQLx 문서](https://docs.rs/sqlx/latest/sqlx/)
-- [Serde 문서](https://serde.rs/)
-
-### 데이터베이스 관련
-- [PostgreSQL 문서](https://www.postgresql.org/docs/)
-- [SQLx 마이그레이션](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md)
-
-### Object Storage 관련
-- [AWS S3 Rust SDK](https://docs.rs/aws-sdk-s3/latest/aws_sdk_s3/)
-- [MinIO 문서](https://docs.min.io/)
-
-## 🤝 기여 방법
-
-1. 이슈 생성 또는 기존 이슈 확인
-2. 기능 브랜치 생성 (`git checkout -b feature/amazing-feature`)
-3. 변경사항 커밋 (`git commit -m 'Add amazing feature'`)
-4. 브랜치에 푸시 (`git push origin feature/amazing-feature`)
-5. Pull Request 생성
-
-## 📝 문서 작성 가이드
-
-### 문서 구조
-- **제목**: 이모지와 함께 명확한 제목
-- **개요**: 문서의 목적과 범위
-- **상세 내용**: 구현 세부사항
-- **예시 코드**: 실제 사용 예시
-- **참고 자료**: 관련 링크
-
-### 코드 블록
-```rust
-// Rust 코드 예시
-pub struct Example {
-    pub field: String,
-}
-```
-
-```sql
--- SQL 예시
-SELECT * FROM table_name;
-```
+### 📋 다음 단계
+- [남은 통합테스트 TODO](todo/remaining_tests_todo.md) 참조
+- 우선순위 1: 핵심 통합테스트 4개 작업
+- 우선순위 2: 고급 통합테스트 4개 작업
 
 ---
+
 **최종 업데이트**: 2025-10-07  
 **작성자**: AI Assistant  
-**버전**: 1.0
+**버전**: 2.0

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::domain::entities::mask_group::{MaskGroup, NewMaskGroup, UpdateMaskGroup, MaskGroupStats};
 use crate::domain::entities::mask::Mask;
 use crate::domain::repositories::{MaskGroupRepository, AnnotationRepository, UserRepository};
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 /// 마스크 그룹 서비스 trait
 /// 마스크 그룹 관련 비즈니스 로직을 정의합니다.

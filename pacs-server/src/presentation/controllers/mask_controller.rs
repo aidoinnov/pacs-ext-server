@@ -6,7 +6,7 @@ use crate::application::dto::mask_dto::{
     MaskListResponse, DownloadUrlRequest, DownloadUrlResponse, MaskStatsResponse
 };
 use crate::application::use_cases::MaskUseCase;
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 pub struct MaskController<MS, MGS, SUS> 
 where
@@ -449,5 +449,15 @@ where
     MGS: crate::domain::services::MaskGroupService + Send + Sync + 'static,
     SUS: crate::application::services::SignedUrlService + Send + Sync + 'static,
 {
-    cfg.app_data(web::Data::new(use_case));
+    cfg.app_data(web::Data::new(use_case))
+        .service(
+            web::scope("/api/annotations/{annotation_id}/mask-groups/{group_id}/masks")
+                .route("", web::post().to(create_mask::<MS, MGS, SUS>))
+                .route("", web::get().to(list_masks::<MS, MGS, SUS>))
+                .route("/{mask_id}", web::get().to(get_mask::<MS, MGS, SUS>))
+                .route("/{mask_id}", web::put().to(update_mask::<MS, MGS, SUS>))
+                .route("/{mask_id}", web::delete().to(delete_mask::<MS, MGS, SUS>))
+                .route("/{mask_id}/download-url", web::post().to(generate_download_url::<MS, MGS, SUS>))
+                .route("/stats", web::get().to(get_mask_stats::<MS, MGS, SUS>))
+        );
 }

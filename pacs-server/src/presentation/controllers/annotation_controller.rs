@@ -6,7 +6,8 @@ use crate::application::dto::annotation_dto::{
     AnnotationResponse, AnnotationListResponse
 };
 use crate::application::use_cases::AnnotationUseCase;
-use crate::domain::services::annotation_service::{AnnotationService, ServiceError};
+use crate::domain::services::annotation_service::AnnotationService;
+use crate::domain::ServiceError;
 use crate::infrastructure::repositories::{AnnotationRepositoryImpl, UserRepositoryImpl, ProjectRepositoryImpl};
 use crate::domain::services::AnnotationServiceImpl;
 

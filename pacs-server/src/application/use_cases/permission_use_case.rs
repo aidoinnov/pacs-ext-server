@@ -2,7 +2,8 @@ use crate::application::dto::{
     CreateRoleRequest, RoleResponse, PermissionResponse, AssignPermissionRequest,
     RolePermissionsResponse, ProjectPermissionsResponse, ResourcePermissionsResponse,
 };
-use crate::domain::services::{PermissionService, ServiceError};
+use crate::domain::services::PermissionService;
+use crate::domain::ServiceError;
 use crate::domain::entities::RoleScope;
 
 /// 권한 관리 유스케이스

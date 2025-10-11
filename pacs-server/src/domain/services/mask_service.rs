@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use crate::domain::entities::mask::{Mask, NewMask, UpdateMask, MaskStats};
 use crate::domain::repositories::{MaskRepository, MaskGroupRepository, UserRepository};
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 /// 마스크 서비스 trait
 /// 마스크 관련 비즈니스 로직을 정의합니다.

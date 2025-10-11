@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use chrono::{DateTime, Utc};
 use crate::domain::entities::mask::{Mask, NewMask, UpdateMask, MaskStats};
 use crate::domain::repositories::MaskRepository;
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 /// MaskRepository의 PostgreSQL 구현체
 #[derive(Debug, Clone)]

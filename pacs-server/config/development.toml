@@ -25,12 +25,12 @@ level = "debug"
 format = "pretty"
 
 [object_storage]
-provider = "minio"  # Use MinIO for local development
-bucket_name = "pacs-masks-dev"
-region = "us-east-1"
-endpoint = "http://localhost:9000"  # MinIO default endpoint
-access_key = "minioadmin"
-secret_key = "minioadmin"
+provider = "s3"  # Use S3 for development
+bucket_name = "pacs-masks"
+region = "ap-northeast-2"
+endpoint = ""  # AWS S3 endpoint (leave empty for default)
+access_key_id = ""  # Will be overridden by .env
+secret_access_key = ""  # Will be overridden by .env
 
 [signed_url]
 default_ttl = 600   # 10 minutes

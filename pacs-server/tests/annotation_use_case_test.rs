@@ -54,6 +54,7 @@ mod annotation_use_case_tests {
         // 관계 테이블 먼저 삭제 (FK 제약)
         sqlx::query("DELETE FROM annotation_annotation_history").execute(pool).await.unwrap();
         sqlx::query("DELETE FROM annotation_annotation").execute(pool).await.unwrap();
+        sqlx::query("DELETE FROM security_access_log").execute(pool).await.unwrap();
         sqlx::query("DELETE FROM security_user_project").execute(pool).await.unwrap();
         sqlx::query("DELETE FROM security_user").execute(pool).await.unwrap();
         sqlx::query("DELETE FROM security_project").execute(pool).await.unwrap();
@@ -70,8 +71,8 @@ mod annotation_use_case_tests {
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind("testuser")
-        .bind("test@example.com")
+        .bind(&format!("testuser_{}", keycloak_id))
+        .bind(&format!("test_{}@example.com", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test user");
@@ -79,8 +80,8 @@ mod annotation_use_case_tests {
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind("Test Project")
-        .bind("Test Description")
+        .bind(&format!("Test Project {}", keycloak_id))
+        .bind(&format!("Test Description {}", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test project");
@@ -103,6 +104,9 @@ mod annotation_use_case_tests {
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
             annotation_data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             description: Some("Test annotation".to_string()),
         };
@@ -140,8 +144,8 @@ mod annotation_use_case_tests {
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind("testuser")
-        .bind("test@example.com")
+        .bind(&format!("testuser_{}", keycloak_id))
+        .bind(&format!("test_{}@example.com", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test user");
@@ -149,8 +153,8 @@ mod annotation_use_case_tests {
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind("Test Project")
-        .bind("Test Description")
+        .bind(&format!("Test Project {}", keycloak_id))
+        .bind(&format!("Test Description {}", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test project");
@@ -208,8 +212,8 @@ mod annotation_use_case_tests {
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind("testuser")
-        .bind("test@example.com")
+        .bind(&format!("testuser_{}", keycloak_id))
+        .bind(&format!("test_{}@example.com", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test user");
@@ -217,8 +221,8 @@ mod annotation_use_case_tests {
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind("Test Project")
-        .bind("Test Description")
+        .bind(&format!("Test Project {}", keycloak_id))
+        .bind(&format!("Test Description {}", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test project");
@@ -256,6 +260,9 @@ mod annotation_use_case_tests {
         let annotation_id: i32 = annotation_result.get("id");
 
         let update_req = UpdateAnnotationRequest {
+            tool_name: Some("updated_tool".to_string()),
+            tool_version: Some("2.0.0".to_string()),
+            viewer_software: Some("updated_viewer".to_string()),
             annotation_data: Some(json!({"type": "updated", "x": 200, "y": 300})),
             description: Some("Updated annotation".to_string()),
         };
@@ -282,8 +289,8 @@ mod annotation_use_case_tests {
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind("testuser")
-        .bind("test@example.com")
+        .bind(&format!("testuser_{}", keycloak_id))
+        .bind(&format!("test_{}@example.com", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test user");
@@ -291,8 +298,8 @@ mod annotation_use_case_tests {
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind("Test Project")
-        .bind("Test Description")
+        .bind(&format!("Test Project {}", keycloak_id))
+        .bind(&format!("Test Description {}", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test project");
@@ -361,8 +368,8 @@ mod annotation_use_case_tests {
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
         .bind(keycloak_id)
-        .bind("testuser")
-        .bind("test@example.com")
+        .bind(&format!("testuser_{}", keycloak_id))
+        .bind(&format!("test_{}@example.com", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test user");
@@ -370,8 +377,8 @@ mod annotation_use_case_tests {
         let project_result = sqlx::query(
             "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
         )
-        .bind("Test Project")
-        .bind("Test Description")
+        .bind(&format!("Test Project {}", keycloak_id))
+        .bind(&format!("Test Description {}", keycloak_id))
         .fetch_one(&*pool)
         .await
         .expect("Failed to create test project");

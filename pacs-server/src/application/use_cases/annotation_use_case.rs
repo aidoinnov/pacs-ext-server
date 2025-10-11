@@ -2,7 +2,7 @@ use crate::application::dto::{
     CreateAnnotationRequest, UpdateAnnotationRequest, AnnotationResponse, AnnotationListResponse,
 };
 use crate::domain::services::{AnnotationService};
-use crate::domain::services::annotation_service::ServiceError;
+use crate::domain::ServiceError;
 use crate::domain::entities::{NewAnnotation};
 
 /// Annotation 관리 유스케이스

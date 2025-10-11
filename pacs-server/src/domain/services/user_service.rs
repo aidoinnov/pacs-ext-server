@@ -206,20 +206,8 @@ where
     }
 }
 
-#[derive(Debug)]
-pub enum ServiceError {
-    NotFound(String),
-    AlreadyExists(String),
-    ValidationError(String),
-    DatabaseError(String),
-    Unauthorized(String),
-}
-
-impl From<sqlx::Error> for ServiceError {
-    fn from(err: sqlx::Error) -> Self {
-        ServiceError::DatabaseError(err.to_string())
-    }
-}
+// ServiceError는 이제 공통 모듈에서 가져옴
+use crate::domain::ServiceError;
 
 impl From<crate::application::services::SignedUrlError> for ServiceError {
     fn from(err: crate::application::services::SignedUrlError) -> Self {
@@ -227,16 +215,3 @@ impl From<crate::application::services::SignedUrlError> for ServiceError {
     }
 }
 
-impl std::fmt::Display for ServiceError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ServiceError::NotFound(msg) => write!(f, "Not found: {}", msg),
-            ServiceError::AlreadyExists(msg) => write!(f, "Already exists: {}", msg),
-            ServiceError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
-            ServiceError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
-            ServiceError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for ServiceError {}

@@ -2,7 +2,8 @@ use crate::application::dto::{
     CreateUserRequest, UserResponse, UserListResponse, AddProjectMemberRequest,
     UserProjectsResponse, ProjectSummary,
 };
-use crate::domain::services::{UserService, ServiceError};
+use crate::domain::services::UserService;
+use crate::domain::ServiceError;
 
 /// 사용자 관리 유스케이스
 pub struct UserUseCase<U: UserService> {

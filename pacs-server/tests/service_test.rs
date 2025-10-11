@@ -1557,7 +1557,9 @@ async fn test_annotation_service_create_annotation() {
         instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
         tool_name: "test_tool".to_string(),
         tool_version: Some("1.0.0".to_string()),
+        viewer_software: Some("test_viewer".to_string()),
         data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+        description: Some("Test annotation".to_string()),
         is_shared: false,
     };
 
@@ -1610,7 +1612,9 @@ async fn test_annotation_service_get_annotation() {
         instance_uid: Some("1.2.3.4.7".to_string()),
         tool_name: "test_tool".to_string(),
         tool_version: Some("1.0.0".to_string()),
+        viewer_software: Some("test_viewer".to_string()),
         data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+        description: Some("Test annotation".to_string()),
         is_shared: false,
     };
 
@@ -1678,7 +1682,9 @@ async fn test_annotation_service_update_annotation() {
         instance_uid: Some("1.2.3.4.7".to_string()),
         tool_name: "test_tool".to_string(),
         tool_version: Some("1.0.0".to_string()),
+        viewer_software: Some("test_viewer".to_string()),
         data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+        description: Some("Test annotation".to_string()),
         is_shared: false,
     };
 
@@ -1732,7 +1738,9 @@ async fn test_annotation_service_delete_annotation() {
         instance_uid: Some("1.2.3.4.7".to_string()),
         tool_name: "test_tool".to_string(),
         tool_version: Some("1.0.0".to_string()),
+        viewer_software: Some("test_viewer".to_string()),
         data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
+        description: Some("Test annotation".to_string()),
         is_shared: false,
     };
 
@@ -1787,7 +1795,9 @@ async fn test_annotation_service_get_user_annotations() {
             instance_uid: Some(format!("1.2.3.6.{}", i)),
             tool_name: "test_tool".to_string(),
             tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
             data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
+            description: Some("Test annotation".to_string()),
             is_shared: false,
         };
         annotation_service.create_annotation(new_annotation).await.unwrap();
@@ -1841,7 +1851,9 @@ async fn test_annotation_service_get_project_annotations() {
             instance_uid: Some(format!("1.2.3.6.{}", i)),
             tool_name: "test_tool".to_string(),
             tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
             data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
+            description: Some("Test annotation".to_string()),
             is_shared: false,
         };
         annotation_service.create_annotation(new_annotation).await.unwrap();
@@ -1897,7 +1909,9 @@ async fn test_annotation_service_get_study_annotations() {
             instance_uid: Some(format!("1.2.3.6.{}", i)),
             tool_name: "test_tool".to_string(),
             tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
             data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
+            description: Some("Test annotation".to_string()),
             is_shared: false,
         };
         annotation_service.create_annotation(new_annotation).await.unwrap();

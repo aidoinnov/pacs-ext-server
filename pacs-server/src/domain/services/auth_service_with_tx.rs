@@ -5,7 +5,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 use crate::domain::entities::{User, NewUser};
 use crate::domain::repositories::UserRepository;
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 use crate::infrastructure::auth::jwt_service::JwtService;
 use crate::infrastructure::auth::claims::Claims;
 

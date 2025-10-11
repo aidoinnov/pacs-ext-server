@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use crate::domain::entities::{AccessLog, NewAccessLog, Permission};
 use crate::domain::repositories::{AccessLogRepository, UserRepository, ProjectRepository, RoleRepository, PermissionRepository};
-use super::user_service::ServiceError;
+use crate::domain::ServiceError;
 
 /// 접근 제어 및 로깅 도메인 서비스
 /// DICOM 리소스 접근에 대한 로그를 관리합니다

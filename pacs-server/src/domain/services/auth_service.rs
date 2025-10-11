@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::domain::entities::User;
 use crate::domain::repositories::UserRepository;
 use crate::infrastructure::auth::{JwtService, Claims};
-use super::user_service::ServiceError;
+use crate::domain::ServiceError;
 
 /// 인증 도메인 서비스
 #[async_trait]

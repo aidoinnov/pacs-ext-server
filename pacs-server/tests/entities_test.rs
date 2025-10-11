@@ -234,11 +234,13 @@ mod annotation_tests {
             instance_uid: Some("1.2.3.4.5.6.7".to_string()),
             tool_name: "Arrow".to_string(),
             tool_version: Some("1.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
             data: json!({
                 "start": {"x": 100, "y": 200},
                 "end": {"x": 300, "y": 400},
                 "color": "red"
             }),
+            description: Some("Test annotation".to_string()),
             is_shared: true,
             created_at: NaiveDateTime::from_timestamp_opt(1234567890, 0).unwrap(),
             updated_at: NaiveDateTime::from_timestamp_opt(1234567890, 0).unwrap(),
@@ -259,9 +261,11 @@ mod annotation_tests {
             instance_uid: None,
             tool_name: "ROI".to_string(),
             tool_version: Some("2.0".to_string()),
+            viewer_software: Some("test_viewer".to_string()),
             data: json!({
                 "points": [[10, 20], [30, 40], [50, 60]]
             }),
+            description: Some("Test annotation".to_string()),
             is_shared: false,
         };
 

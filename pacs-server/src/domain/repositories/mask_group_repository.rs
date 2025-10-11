@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use crate::domain::entities::mask_group::{MaskGroup, NewMaskGroup, UpdateMaskGroup, MaskGroupStats};
 use crate::domain::entities::mask::Mask;
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 #[async_trait]
 pub trait MaskGroupRepository: Send + Sync {

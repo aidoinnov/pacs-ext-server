@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use crate::domain::entities::mask::{Mask, NewMask, UpdateMask, MaskStats};
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 #[async_trait]
 pub trait MaskRepository: Send + Sync {

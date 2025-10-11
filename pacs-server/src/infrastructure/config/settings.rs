@@ -68,7 +68,9 @@ pub struct ObjectStorageConfig {
     pub bucket_name: String,
     pub region: String,
     pub endpoint: String,  // MinIO endpoint (empty for AWS S3)
+    #[serde(rename = "access_key_id")]
     pub access_key: String,
+    #[serde(rename = "secret_access_key")]
     pub secret_key: String,
 }
 

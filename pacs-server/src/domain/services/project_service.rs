@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use crate::domain::entities::{Project, NewProject, User, Role};
 use crate::domain::repositories::{ProjectRepository, UserRepository, RoleRepository};
-use super::user_service::ServiceError;
+use crate::domain::ServiceError;
 
 /// 프로젝트 관리 도메인 서비스
 #[async_trait]

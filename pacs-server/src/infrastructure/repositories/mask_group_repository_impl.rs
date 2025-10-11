@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use crate::domain::entities::mask_group::{MaskGroup, NewMaskGroup, UpdateMaskGroup, MaskGroupStats};
 use crate::domain::entities::mask::Mask;
 use crate::domain::repositories::MaskGroupRepository;
-use crate::domain::services::ServiceError;
+use crate::domain::ServiceError;
 
 /// MaskGroupRepository의 PostgreSQL 구현체
 #[derive(Debug, Clone)]

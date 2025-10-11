@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use crate::domain::entities::{Permission, Role, RoleScope};
 use crate::domain::repositories::{PermissionRepository, RoleRepository};
-use super::user_service::ServiceError;
+use crate::domain::ServiceError;
 
 /// 권한 관리 도메인 서비스
 #[async_trait]

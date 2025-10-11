@@ -1,7 +1,8 @@
 use crate::application::dto::{
     LoginRequest, LoginResponse, RefreshTokenResponse, VerifyTokenResponse,
 };
-use crate::domain::services::{AuthService, ServiceError};
+use crate::domain::services::AuthService;
+use crate::domain::ServiceError;
 
 /// 인증 유스케이스
 pub struct AuthUseCase<A: AuthService> {
