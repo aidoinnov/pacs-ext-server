@@ -87,6 +87,7 @@ use crate::application::dto::annotation_dto::*;
     servers(
         (url = "http://localhost:8080", description = "Local development server"),
         (url = "http://0.0.0.0:8080", description = "Local server (all interfaces)"),
+        (url = "https://api.pacs-server.com", description = "Production server"),
     )
 )]
 pub struct ApiDoc;

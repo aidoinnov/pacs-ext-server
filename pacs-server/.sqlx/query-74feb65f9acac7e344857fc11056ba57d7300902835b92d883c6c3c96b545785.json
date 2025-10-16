@@ -1,0 +1,103 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE annotation_mask\n            SET slice_index = COALESCE($2, slice_index),\n                sop_instance_uid = COALESCE($3, sop_instance_uid),\n                label_name = COALESCE($4, label_name),\n                file_path = COALESCE($5, file_path),\n                mime_type = COALESCE($6, mime_type),\n                file_size = COALESCE($7, file_size),\n                checksum = COALESCE($8, checksum),\n                width = COALESCE($9, width),\n                height = COALESCE($10, height),\n                updated_at = CURRENT_TIMESTAMP\n            WHERE id = $1\n            RETURNING id, mask_group_id, slice_index, sop_instance_uid, label_name,\n                     file_path, mime_type, file_size, checksum, width, height, created_at, updated_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "mask_group_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "slice_index",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "sop_instance_uid",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "label_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "file_path",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "mime_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "file_size",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "checksum",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "width",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "height",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Text",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "74feb65f9acac7e344857fc11056ba57d7300902835b92d883c6c3c96b545785"
+}

@@ -121,7 +121,12 @@ async fn main() -> std::io::Result<()> {
 
     // 애플리케이션 설정 로드
     print!("⚙️  Loading configuration... ");
-    let settings = Settings::new().expect("Failed to load configuration");
+    let settings = Settings::new()
+        .or_else(|_| {
+            println!("⚠️  Config files not found, using environment variable defaults");
+            Settings::with_env_defaults()
+        })
+        .expect("Failed to load configuration");
     println!("✅ Done");
 
     // CORS(Cross-Origin Resource Sharing) 설정
@@ -286,10 +291,10 @@ async fn main() -> std::io::Result<()> {
     println!("\n{}", "=".repeat(80));
     println!("✨ Server Ready!");
     println!("{}", "=".repeat(80));
-    println!("🌐 Server URL:    http://0.0.0.0:8080");
-    println!("📖 Swagger UI:    http://0.0.0.0:8080/swagger-ui/");
-    println!("❤️  Health Check:  http://0.0.0.0:8080/health");
-    println!("🔌 API Endpoints: http://0.0.0.0:8080/api/");
+    println!("🌐 Server URL:    http://{}:{}", settings.server.host, settings.server.port);
+    println!("📖 Swagger UI:    http://{}:{}/swagger-ui/", settings.server.host, settings.server.port);
+    println!("❤️  Health Check:  http://{}:{}/health", settings.server.host, settings.server.port);
+    println!("🔌 API Endpoints: http://{}:{}/api/", settings.server.host, settings.server.port);
     println!("{}\n", "=".repeat(80));
 
     // Graceful shutdown을 위한 signal handler 설정
