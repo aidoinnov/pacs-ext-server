@@ -100,6 +100,7 @@ where
             .map_err(|e| ServiceError::DatabaseError(format!("Failed to begin transaction: {}", e)))?;
 
         // 어노테이션이 존재하는지 확인 (트랜잭션 내에서)
+        println!("🔍 [MaskGroupService] 어노테이션 존재 확인: annotation_id = {}", new_mask_group.annotation_id);
         let annotation = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM annotation_annotation WHERE id = $1)"
         )
@@ -108,6 +109,7 @@ where
         .await
         .map_err(|e| ServiceError::DatabaseError(format!("Failed to check annotation existence: {}", e)))?;
 
+        println!("🔍 [MaskGroupService] 어노테이션 존재 여부: {}", annotation);
         if !annotation {
             tx.rollback().await.ok();
             return Err(ServiceError::NotFound(format!("Annotation with id {} not found", new_mask_group.annotation_id)));

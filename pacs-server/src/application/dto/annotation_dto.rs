@@ -5,6 +5,14 @@ use chrono::NaiveDateTime;
 /// Annotation 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateAnnotationRequest {
+    /// User ID
+    #[schema(example = 336)]
+    pub user_id: Option<i32>,
+
+    /// Project ID
+    #[schema(example = 299)]
+    pub project_id: Option<i32>,
+
     /// Study Instance UID
     #[schema(example = "1.2.840.113619.2.55.3.604688119.868.1234567890.1")]
     pub study_instance_uid: String,

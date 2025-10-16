@@ -84,7 +84,14 @@ where
 {
     async fn create_annotation(&self, new_annotation: NewAnnotation) -> Result<Annotation, ServiceError> {
         // 사용자 존재 확인
-        if self.user_repository.find_by_id(new_annotation.user_id).await.map_err(|e| ServiceError::DatabaseError(e.to_string()))?.is_none() {
+        println!("DEBUG: Checking user_id: {}", new_annotation.user_id);
+        let user_result = self.user_repository.find_by_id(new_annotation.user_id).await.map_err(|e| {
+            println!("DEBUG: User repository error: {}", e);
+            ServiceError::DatabaseError(e.to_string())
+        })?;
+        println!("DEBUG: User result: {:?}", user_result);
+        if user_result.is_none() {
+            println!("DEBUG: User not found for id: {}", new_annotation.user_id);
             return Err(ServiceError::NotFound("User not found".into()));
         }
 

@@ -1,37 +1,87 @@
+//! # PACS Extension Server
+//! 
+//! PACS(의료영상저장전송시스템) 확장 서버의 메인 엔트리 포인트입니다.
+//! 이 서버는 의료 영상 어노테이션, 마스크 관리, 사용자 인증 등의 기능을 제공합니다.
+//! 
+//! ## 아키텍처
+//! - **Clean Architecture** 패턴을 따르며, 도메인 중심의 설계를 채택합니다.
+//! - **Repository Pattern**을 통해 데이터 접근을 추상화합니다.
+//! - **Use Case Pattern**을 통해 비즈니스 로직을 캡슐화합니다.
+//! 
+//! ## 주요 기능
+//! - 사용자 인증 및 권한 관리
+//! - 프로젝트 및 어노테이션 관리
+//! - 마스크 그룹 및 개별 마스크 관리
+//! - 객체 저장소 연동 (AWS S3, MinIO)
+//! - RESTful API 제공
+//! - OpenAPI 문서화
+
+// 웹 프레임워크 및 HTTP 관련 모듈
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+// PostgreSQL 데이터베이스 연결 풀 옵션
 use sqlx::postgres::PgPoolOptions;
+// Redis 클라이언트 (현재 비활성화)
 // use redis::Client as RedisClient;
+// 스레드 안전한 참조 카운팅 포인터
 use std::sync::Arc;
+// OpenAPI 문서 생성
 use utoipa::OpenApi;
+// Swagger UI 서비스
 use utoipa_swagger_ui::SwaggerUi;
 
+// 애플리케이션 레이어 모듈 (Use Case, Service 등)
 mod application;
+// 도메인 레이어 모듈 (Entity, Repository, Service 인터페이스 등)
 mod domain;
+// 인프라스트럭처 레이어 모듈 (데이터베이스, 외부 서비스 등)
 mod infrastructure;
+// 프레젠테이션 레이어 모듈 (Controller, DTO 등)
 mod presentation;
 
+// 애플리케이션 레이어 - Use Case 인터페이스들
 use application::use_cases::{
     AuthUseCase, UserUseCase, ProjectUseCase, PermissionUseCase, AccessControlUseCase,
     AnnotationUseCase, MaskGroupUseCase, MaskUseCase,
 };
+
+// 도메인 레이어 - 서비스 구현체들
 use domain::services::{
     AuthServiceImpl, UserServiceImpl, ProjectServiceImpl, PermissionServiceImpl,
     AccessControlServiceImpl, AnnotationServiceImpl, MaskGroupServiceImpl, MaskServiceImpl,
 };
+
+// 인프라스트럭처 레이어 - 리포지토리 구현체들
 use infrastructure::repositories::{
     UserRepositoryImpl, ProjectRepositoryImpl, RoleRepositoryImpl, PermissionRepositoryImpl,
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
 };
+
+// JWT 인증 서비스
 use infrastructure::auth::JwtService;
+// 서명된 URL 및 객체 저장소 서비스
 use application::services::{SignedUrlServiceImpl, ObjectStorageServiceFactory};
+// 설정 관련 구조체들
 use infrastructure::config::{JwtConfig, Settings};
+// 미들웨어 (캐시 헤더, CORS)
 use infrastructure::middleware::{CacheHeaders, configure_cors};
+// 프레젠테이션 레이어 - 컨트롤러들
 use presentation::controllers::{
     auth_controller, user_controller, project_controller, permission_controller,
     access_control_controller, annotation_controller, mask_group_controller, mask_controller,
 };
+// OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
 
+/// 서버 상태 확인을 위한 헬스체크 엔드포인트
+/// 
+/// # 반환값
+/// - `200 OK`: 서버가 정상적으로 동작 중
+/// - JSON 형태로 서버 상태 정보 반환
+/// 
+/// # 사용 예시
+/// ```bash
+/// curl http://localhost:8080/health
+/// ```
 async fn health_check() -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({
         "status": "healthy",
@@ -39,20 +89,43 @@ async fn health_check() -> impl Responder {
     }))
 }
 
+/// PACS Extension Server의 메인 함수
+/// 
+/// 이 함수는 서버의 전체 생명주기를 관리합니다:
+/// 1. 환경 변수 로드
+/// 2. 설정 로드
+/// 3. 데이터베이스 연결 설정
+/// 4. 서비스 및 리포지토리 초기화
+/// 5. HTTP 서버 시작
+/// 6. Graceful shutdown 처리
+/// 
+/// # 반환값
+/// - `Ok(())`: 서버가 정상적으로 종료됨
+/// - `Err(io::Error)`: 서버 시작 또는 실행 중 오류 발생
+/// 
+/// # 환경 변수
+/// - `DATABASE_URL`: PostgreSQL 데이터베이스 연결 URL
+/// - `JWT_SECRET`: JWT 토큰 서명을 위한 비밀키
+/// - `S3_ACCESS_KEY`, `S3_SECRET_KEY`: AWS S3 접근 키
+/// - `CACHE_ENABLED`: 캐시 활성화 여부 (기본값: true)
+/// - `CACHE_TTL_SECONDS`: 캐시 TTL (기본값: 300초)
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // .env 파일에서 환경 변수 로드
     dotenvy::dotenv().ok();
 
+    // 서버 초기화 시작 메시지 출력
     println!("\n{}", "=".repeat(80));
     println!("🚀 PACS Extension Server - Initialization");
     println!("{}\n", "=".repeat(80));
 
-    // Load configuration
+    // 애플리케이션 설정 로드
     print!("⚙️  Loading configuration... ");
     let settings = Settings::new().expect("Failed to load configuration");
     println!("✅ Done");
 
-    // CORS configuration
+    // CORS(Cross-Origin Resource Sharing) 설정
+    // 웹 브라우저에서 다른 도메인의 리소스에 접근할 수 있도록 허용하는 설정
     print!("🌐 Configuring CORS... ");
     let cors_enabled = settings.cors.enabled;
     println!("✅ {} (Origins: {:?})", 
@@ -60,10 +133,14 @@ async fn main() -> std::io::Result<()> {
         settings.cors.allowed_origins
     );
 
-    // Database connection
+    // PostgreSQL 데이터베이스 연결 설정
+    // 연결 풀을 사용하여 동시 연결 수를 제한하고 성능을 최적화
     print!("📦 Connecting to PostgreSQL... ");
     let database_url = settings.database_url();
 
+    // 데이터베이스 연결 풀 생성
+    // max_connections: 최대 동시 연결 수
+    // min_connections: 최소 유지 연결 수
     let pool = PgPoolOptions::new()
         .max_connections(settings.database.max_connections)
         .min_connections(settings.database.min_connections)
@@ -73,7 +150,9 @@ async fn main() -> std::io::Result<()> {
 
     println!("✅ Connected");
 
-    // Redis connection (commented out for now)
+    // Redis 연결 (현재 비활성화 상태)
+    // 캐싱 및 세션 저장을 위한 Redis 연결 설정
+    // 향후 캐싱 기능 구현 시 활성화 예정
     // let redis_url = std::env::var("REDIS_URL")
     //     .unwrap_or_else(|_| "redis://:redis123@localhost:6379/0".to_string());
     // let redis_client = RedisClient::open(redis_url)
@@ -85,29 +164,47 @@ async fn main() -> std::io::Result<()> {
     //     .expect("Failed to ping Redis");
     // println!("Successfully connected to Redis");
 
-    // Initialize repositories
+    // 데이터 접근 계층(Repository) 초기화
+    // 각 엔티티별로 데이터베이스 작업을 담당하는 리포지토리 생성
     print!("🔧 Initializing repositories... ");
+    
+    // 사용자 관련 데이터 접근을 위한 리포지토리
     let user_repo = UserRepositoryImpl::new(pool.clone());
+    // 프로젝트 관련 데이터 접근을 위한 리포지토리
     let project_repo = ProjectRepositoryImpl::new(pool.clone());
+    // 역할(Role) 관련 데이터 접근을 위한 리포지토리
     let role_repo = RoleRepositoryImpl::new(pool.clone());
+    // 권한(Permission) 관련 데이터 접근을 위한 리포지토리
     let permission_repo = PermissionRepositoryImpl::new(pool.clone());
+    // 접근 로그 관련 데이터 접근을 위한 리포지토리
     let access_log_repo = AccessLogRepositoryImpl::new(pool.clone());
+    // 어노테이션 관련 데이터 접근을 위한 리포지토리
     let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+    // 마스크 그룹 관련 데이터 접근을 위한 리포지토리 (Arc로 래핑하여 공유 소유권)
     let mask_group_repo = Arc::new(MaskGroupRepositoryImpl::new(pool.clone()));
+    // 마스크 관련 데이터 접근을 위한 리포지토리 (Arc로 래핑하여 공유 소유권)
     let mask_repo = Arc::new(MaskRepositoryImpl::new(pool.clone()));
     println!("✅ Done");
 
-    // Initialize JWT service
+    // JWT(JSON Web Token) 서비스 초기화
+    // 사용자 인증을 위한 토큰 생성 및 검증 서비스
     print!("🔐 Initializing JWT service... ");
     let jwt_service = JwtService::new(&settings.jwt);
     println!("✅ Done (TTL: {}h)", settings.jwt.expiration_hours);
 
-    // Initialize services
+    // 도메인 서비스 계층 초기화
+    // 비즈니스 로직을 담당하는 서비스들을 생성
     print!("⚙️  Initializing domain services... ");
+    
+    // 인증 서비스: 로그인, 토큰 생성/검증 등
     let auth_service = AuthServiceImpl::new(user_repo.clone(), jwt_service);
+    // 사용자 서비스: 사용자 CRUD, 프로젝트 멤버십 관리 등
     let user_service = UserServiceImpl::new(user_repo.clone(), project_repo.clone());
+    // 프로젝트 서비스: 프로젝트 CRUD, 사용자 관리 등
     let project_service = ProjectServiceImpl::new(project_repo.clone(), user_repo.clone(), role_repo.clone());
+    // 권한 서비스: 권한 CRUD, 역할-권한 매핑 등
     let permission_service = PermissionServiceImpl::new(permission_repo.clone(), role_repo.clone());
+    // 접근 제어 서비스: 권한 검증, 접근 로그 기록 등
     let access_control_service = AccessControlServiceImpl::new(
         access_log_repo,
         user_repo.clone(),
@@ -115,12 +212,15 @@ async fn main() -> std::io::Result<()> {
         role_repo,
         permission_repo,
     );
+    // 어노테이션 서비스: 어노테이션 CRUD, 히스토리 관리 등
     let annotation_service = AnnotationServiceImpl::new(annotation_repo.clone(), user_repo.clone(), project_repo.clone());
+    // 마스크 그룹 서비스: 마스크 그룹 CRUD, 업로드 URL 생성 등
     let mask_group_service = Arc::new(MaskGroupServiceImpl::new(
         mask_group_repo.clone(),
         Arc::new(annotation_repo.clone()),
         Arc::new(user_repo.clone()),
     ));
+    // 마스크 서비스: 개별 마스크 CRUD, 다운로드 URL 생성 등
     let mask_service = Arc::new(MaskServiceImpl::new(
         mask_repo.clone(),
         mask_group_repo.clone(),

@@ -58,6 +58,8 @@ where
     let mut request = req.into_inner();
     request.annotation_id = annotation_id;
 
+    println!("🔍 [MaskGroupController] 마스크 그룹 생성 요청: annotation_id = {}", annotation_id);
+
     // X-User-ID 헤더에서 user_id 추출
     let user_id = _http_req
         .headers()
@@ -65,6 +67,8 @@ where
         .and_then(|h| h.to_str().ok())
         .and_then(|s| s.parse::<i32>().ok())
         .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
+
+    println!("🔍 [MaskGroupController] user_id = {}", user_id);
 
     match use_case.create_mask_group(request, user_id).await {
         Ok(mask_group) => HttpResponse::Created().json(mask_group),

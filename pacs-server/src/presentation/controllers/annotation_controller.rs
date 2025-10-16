@@ -39,8 +39,14 @@ pub async fn create_annotation(
     // TODO: 실제 인증에서 user_id와 project_id를 가져와야 함
     // 현재는 임시로 하드코딩된 값 사용
     // 테스트를 위해 실제 데이터베이스에 있는 값 사용
-    let user_id = 336; // 실제로는 JWT에서 추출 (getuser)
-    let project_id = 302; // 실제로는 요청에서 추출하거나 기본값 (Get Project)
+    // let user_id = 336; // 실제로는 JWT에서 추출 (getuser)
+    // let user_id = req.body().user_id;
+    // let project_id = 302; // 실제로는 요청에서 추출하거나 기본값 (Get Project)
+    // let project_id = req.body().project_id;
+    // project_id는 요청 body에서 가져오거나 기본값 사용
+    let user_id = req.user_id.unwrap_or(1);
+    let project_id = req.project_id.unwrap_or(299); // 또는 적절한 기본값
+
 
     match use_case.create_annotation(req.into_inner(), user_id, project_id).await {
         Ok(annotation) => HttpResponse::Created().json(annotation),
@@ -111,7 +117,7 @@ pub async fn list_annotations(
 ) -> impl Responder {
     // TODO: 실제로는 인증에서 user_id를 가져와야 함
     // 기본값으로 1을 사용하지만, 쿼리 파라미터가 있으면 그것을 사용
-    let mut user_id = 1;
+    let mut user_id = 336;
 
     // 쿼리 파라미터에서 user_id 추출
     if let Some(user_id_str) = query.get("user_id") {
