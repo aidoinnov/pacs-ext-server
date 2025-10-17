@@ -111,13 +111,13 @@ async fn health_check() -> impl Responder {
 /// - `CACHE_TTL_SECONDS`: 캐시 TTL (기본값: 300초)
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // .env 파일에서 환경 변수 로드
-    dotenvy::dotenv().ok();
-
     // 서버 초기화 시작 메시지 출력
     println!("\n{}", "=".repeat(80));
     println!("🚀 PACS Extension Server - Initialization");
     println!("{}\n", "=".repeat(80));
+
+    // .env 파일에서 환경 변수 로드
+    dotenvy::dotenv().ok();
 
     // 애플리케이션 설정 로드
     print!("⚙️  Loading configuration... ");

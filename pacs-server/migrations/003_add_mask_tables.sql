@@ -5,7 +5,7 @@
 -- annotation_mask_group 테이블 생성
 -- 어노테이션에 연결된 마스크 그룹을 관리하는 테이블
 CREATE TABLE annotation_mask_group (
-    id SERIAL PRIMARY KEY,
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     annotation_id INTEGER NOT NULL REFERENCES annotation_annotation(id) ON DELETE CASCADE,
     group_name TEXT,                       -- 마스크 그룹 이름 (예: Liver_Segmentation_v2)
     model_name TEXT,                       -- AI 모델명 (optional)
@@ -15,14 +15,14 @@ CREATE TABLE annotation_mask_group (
     mask_type TEXT DEFAULT 'segmentation', -- 마스크 타입 (segmentation, detection 등)
     description TEXT,                      -- 그룹 설명
     created_by INTEGER,                    -- 생성자 ID
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- annotation_mask 테이블 생성
 -- 각 슬라이스별 또는 라벨별 마스크 파일 정보를 저장하는 테이블
 CREATE TABLE annotation_mask (
-    id SERIAL PRIMARY KEY,
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     mask_group_id INTEGER NOT NULL REFERENCES annotation_mask_group(id) ON DELETE CASCADE,
     slice_index INTEGER,                   -- 볼륨 내 슬라이스 인덱스
     sop_instance_uid TEXT,                 -- SOP Instance UID (DICOM 표준)
@@ -33,8 +33,8 @@ CREATE TABLE annotation_mask (
     checksum TEXT,                         -- 파일 체크섬 (무결성 검증용)
     width INTEGER,                         -- 이미지 너비
     height INTEGER,                        -- 이미지 높이
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 인덱스 생성

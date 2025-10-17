@@ -73,7 +73,7 @@ pub struct Mask {
     /// 마스크가 생성된 시각
     pub created_at: DateTime<Utc>,
     /// 마스크가 마지막으로 수정된 시각
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// 새로운 마스크 생성을 위한 DTO(Data Transfer Object)

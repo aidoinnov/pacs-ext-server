@@ -77,7 +77,8 @@ where
             width: mask.width,
             height: mask.height,
             created_at: mask.created_at.to_string(),
-            updated_at: mask.updated_at.to_string(),
+            updated_at: mask.updated_at.map(|dt| dt.to_string())
+                                        .unwrap_or("".to_string()),
         })
     }
 
@@ -104,7 +105,8 @@ where
             width: mask.width,
             height: mask.height,
             created_at: mask.created_at.to_string(),
-            updated_at: mask.updated_at.to_string(),
+            updated_at: mask.updated_at.map(|dt| dt.to_string())
+            .unwrap_or("".to_string()),
         })
     }
 
@@ -153,7 +155,9 @@ where
                 width: mask.width,
                 height: mask.height,
                 created_at: mask.created_at.to_string(),
-                updated_at: mask.updated_at.to_string(),
+                updated_at: mask.updated_at
+                .map(|dt| dt.to_string())
+                .unwrap_or("".to_string()),
             })
             .collect();
 
@@ -221,7 +225,8 @@ where
             width: mask.width,
             height: mask.height,
             created_at: mask.created_at.to_string(),
-            updated_at: mask.updated_at.to_string(),
+            updated_at: mask.updated_at.map(|dt| dt.to_string())
+            .unwrap_or("".to_string()),
         })
     }
 

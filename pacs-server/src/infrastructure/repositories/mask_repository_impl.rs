@@ -59,8 +59,8 @@ impl MaskRepository for MaskRepositoryImpl {
             checksum: result.checksum,
             width: result.width,
             height: result.height,
-            created_at: result.created_at.unwrap_or_default(),
-            updated_at: result.updated_at.unwrap_or_default(),
+            created_at: result.created_at,
+            updated_at: Some(result.updated_at),
         })
     }
 
@@ -91,8 +91,8 @@ impl MaskRepository for MaskRepositoryImpl {
             width: row.width,
             height: row.height,
             file_size: row.file_size,
-            created_at: row.created_at.unwrap_or_default(),
-            updated_at: row.updated_at.unwrap_or_default(),
+            created_at: row.created_at,
+            updated_at: Some(row.updated_at),
         }))
     }
 
@@ -142,8 +142,8 @@ impl MaskRepository for MaskRepositoryImpl {
             checksum: result.checksum,
             width: result.width,
             height: result.height,
-            created_at: result.created_at.unwrap_or_default(),
-            updated_at: result.updated_at.unwrap_or_default(),
+            created_at: result.created_at,
+            updated_at: Some(result.updated_at),
         })
     }
 
@@ -206,8 +206,8 @@ impl MaskRepository for MaskRepositoryImpl {
             checksum: row.checksum,
             width: row.width,
             height: row.height,
-            created_at: row.created_at.unwrap_or_default(),
-            updated_at: row.updated_at.unwrap_or_default(),
+            created_at: row.created_at,
+            updated_at: Some(row.updated_at),
         }).collect())
     }
 

@@ -58,8 +58,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             mask_type: result.mask_type,
             description: result.description,
             created_by: result.created_by,
-            created_at: result.created_at.unwrap_or_default(),
-            updated_at: result.updated_at.unwrap_or_default(),
+            created_at: result.created_at,
+            updated_at: result.updated_at,
         })
     }
 
@@ -89,8 +89,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             mask_type: row.mask_type,
             description: row.description,
             created_by: row.created_by,
-            created_at: row.created_at.unwrap_or_default(),
-            updated_at: row.updated_at.unwrap_or_default(),
+            created_at: row.created_at,
+            updated_at: row.updated_at,
         }))
     }
 
@@ -135,8 +135,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             mask_type: result.mask_type,
             description: result.description,
             created_by: result.created_by,
-            created_at: result.created_at.unwrap_or_default(),
-            updated_at: result.updated_at.unwrap_or_default(),
+            created_at: result.created_at,
+            updated_at: result.updated_at,
         })
     }
 
@@ -198,8 +198,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             mask_type: row.mask_type,
             description: row.description,
             created_by: row.created_by,
-            created_at: row.created_at.unwrap_or_default(),
-            updated_at: row.updated_at.unwrap_or_default(),
+            created_at: row.created_at,
+            updated_at: row.updated_at,
         }).collect())
     }
 
@@ -231,8 +231,8 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             checksum: row.checksum,
             width: row.width,
             height: row.height,
-            created_at: row.created_at.unwrap_or_default(),
-            updated_at: row.updated_at.unwrap_or_default(),
+            created_at: row.created_at,
+            updated_at: Some(row.updated_at),
         }).collect())
     }
 
