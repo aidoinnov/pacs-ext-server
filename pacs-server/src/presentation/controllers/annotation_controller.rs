@@ -123,7 +123,7 @@ pub async fn list_annotations(
 
     // viewer_software 파라미터 추출
     let viewer_software = query.get("viewer_software").map(|s| s.as_str());
-
+    println!("viewer_software: {}", viewer_software.unwrap_or("None"));
     // 쿼리 파라미터에 따라 다른 메서드 호출
     let result = if let Some(study_uid) = query.get("study_instance_uid") {
         use_case.get_annotations_by_study_with_viewer(study_uid, viewer_software).await
@@ -217,7 +217,7 @@ pub async fn delete_annotation(
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<AnnotationUseCase<AnnotationServiceImpl<AnnotationRepositoryImpl, UserRepositoryImpl, ProjectRepositoryImpl>>>) {
     cfg.app_data(web::Data::new(use_case))
         .service(
-            web::scope("/api/annotations")
+            web::scope("/annotations")
                 .route("", web::post().to(create_annotation))
                 .route("", web::get().to(list_annotations))
                 .route("/{annotation_id}", web::get().to(get_annotation))

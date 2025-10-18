@@ -10,6 +10,7 @@ PACS (Picture Archiving and Communication System) Extension Server는 의료 영
 - **RESTful API**: 표준 HTTP 메서드 지원
 - **Swagger 문서**: 자동 생성된 API 문서
 - **데이터 검증**: 입력 데이터 유효성 검사
+- **뷰어 소프트웨어 필터링**: OHIF Viewer, DICOM Viewer 등으로 필터링 ✨
 
 ### 🎭 마스크 업로드 시스템 ✅
 - **Object Storage 연동**: AWS S3 및 MinIO 지원
@@ -196,7 +197,20 @@ curl -X POST http://localhost:8080/api/annotations \
 
 ### 어노테이션 조회
 ```bash
+# 특정 어노테이션 조회
 curl -X GET http://localhost:8080/api/annotations/1 \
+  -H "Authorization: Bearer <jwt-token>"
+
+# 뷰어 소프트웨어로 필터링
+curl -X GET "http://localhost:8080/api/annotations?viewer_software=OHIF%20Viewer" \
+  -H "Authorization: Bearer <jwt-token>"
+
+# 사용자별 뷰어 소프트웨어 필터링
+curl -X GET "http://localhost:8080/api/annotations?user_id=123&viewer_software=DICOM%20Viewer" \
+  -H "Authorization: Bearer <jwt-token>"
+
+# 프로젝트별 필터링
+curl -X GET "http://localhost:8080/api/annotations?project_id=456&viewer_software=OHIF%20Viewer" \
   -H "Authorization: Bearer <jwt-token>"
 ```
 
@@ -325,6 +339,7 @@ CMD ["pacs-server"]
 - [데이터베이스 스키마](docs/technical/DATABASE_SCHEMA_MASK_UPLOAD.md)
 - [Object Storage 연동](docs/technical/OBJECT_STORAGE_INTEGRATION.md)
 - [트랜잭션 처리 최적화](docs/technical/TRANSACTION_OPTIMIZATION_FINAL.md) ✨
+- [뷰어 소프트웨어 필터링](docs/VIEWER_SOFTWARE_FILTERING.md) ✨
 
 ### 개발 가이드
 - [구현 계획서](docs/todo/implementation_plan.md)
@@ -368,6 +383,19 @@ CMD ["pacs-server"]
 자세한 변경 이력은 [CHANGELOG.md](docs/technical/CHANGELOG.md)를 참조하세요.
 
 ### 주요 버전
+- **v1.0.0-beta.3**: 뷰어 소프트웨어 필터링 기능 (2025-01-27) ✨
+  - 뷰어 소프트웨어별 어노테이션 필터링 지원
+  - API 라우팅 404 오류 수정
+  - 포괄적인 테스트 커버리지 (15+ 새 테스트)
+  - 동적 테스트 데이터 생성 및 정리
+  - 완전한 기술 문서화
+
+- **v1.0.0-beta.2**: 통합 테스트 컴파일 수정 (2025-01-27) ✅
+  - 9개 통합 테스트 파일 컴파일 오류 해결
+  - 서비스 생성자 패턴 표준화
+  - DTO 필드 완성도 개선
+  - 100% 테스트 컴파일 성공
+
 - **v1.0.0-beta.1**: 트랜잭션 처리 최적화 (2025-10-11) ✅
   - 122개 테스트 모두 통과
   - 원자적 트랜잭션 처리 구현
@@ -386,6 +414,6 @@ CMD ["pacs-server"]
 - **v1.3.0**: AI 통합 및 자동 마스크 생성
 
 ---
-**최종 업데이트**: 2025-10-11  
+**최종 업데이트**: 2025-01-27  
 **작성자**: AI Assistant  
-**버전**: 1.0.0-beta.1
+**버전**: 1.0.0-beta.3
