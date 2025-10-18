@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 /// 역할 할당 요청 DTO
@@ -46,7 +46,7 @@ pub struct AccessLogResponse {
     pub instance_uid: Option<String>,
     pub action: String,
     pub result: String,
-    pub logged_at: NaiveDateTime,
+    pub logged_at: DateTime<Utc>,
 }
 
 /// 접근 로그 목록 응답 DTO

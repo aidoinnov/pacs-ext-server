@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use chrono::NaiveDateTime;
+// use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 
 /// Annotation 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -131,12 +132,14 @@ pub struct AnnotationResponse {
     /// 생성 시간
     /// 어노테이션이 생성된 시각
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
-    pub created_at: NaiveDateTime,
+    // pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 
     /// 수정 시간
     /// 어노테이션이 마지막으로 수정된 시각
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
-    pub updated_at: NaiveDateTime,
+    // pub updated_at: NaiveDateTime,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Annotation 목록 응답 DTO

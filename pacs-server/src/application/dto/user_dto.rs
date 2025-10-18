@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
-use chrono::NaiveDateTime;
+// use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 
 /// 사용자 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -25,7 +26,8 @@ pub struct UserResponse {
     pub username: String,
     pub email: String,
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
-    pub created_at: NaiveDateTime,
+    // pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 impl From<crate::domain::entities::user::User> for UserResponse {

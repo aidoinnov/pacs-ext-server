@@ -55,14 +55,33 @@ RUN apt-get update && apt-get install -y \
 # 작업 디렉토리 설정
 WORKDIR /app
 
-COPY --from=builder /app/target/release/pacs_server /app/pacs-server
+COPY --from=builder /app/target/release/pacs_server /app/pacs_server
 COPY --from=builder /app/config ./config
 COPY --from=builder /app/migrations ./migrations
 
-COPY --from=builder /app ./
+COPY --from=builder /app/target ./taraget
 
+
+# 시작 스크립트 생성
+RUN echo '#!/bin/bash\n\
+echo "🔄 Running database migrations..."\n\
+for file in migrations/*.sql; do\n\
+    if [ -f "$file" ]; then\n\
+        echo "📄 Executing: $file"\n\
+        psql "$DATABASE_URL" -f "$file" || {\n\
+            echo "❌ Migration failed: $file"\n\
+            exit 1\n\
+        }\n\
+    fi\n\
+done\n\
+echo "✅ All migrations completed successfully"\n\
+echo "🚀 Starting PACS Extension Server..."\n\
+exec ./pacs_server' > /app/start.sh
+
+RUN chmod +x /app/start.sh
 
 # -------------------------------------------------------------------
 # 컨테이너 시작 명령
 # -------------------------------------------------------------------
-CMD ["./pacs-server"]
+# 애플리케이션 실행
+CMD ["/app/start.sh"]

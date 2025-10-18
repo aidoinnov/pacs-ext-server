@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 
 use pacs_server::application::dto::user_dto::{
     CreateUserRequest, UserResponse, AddProjectMemberRequest, UserProjectsResponse, ProjectSummary
@@ -44,7 +44,7 @@ impl UserService for MockUserService {
             keycloak_id,
             username,
             email,
-            created_at: NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
+            created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
         };
         Ok(user)
     }
@@ -112,7 +112,7 @@ fn create_test_user() -> User {
         keycloak_id: Uuid::new_v4(),
         username: "testuser".to_string(),
         email: "test@example.com".to_string(),
-        created_at: NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
+        created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
     }
 }
 
@@ -122,7 +122,7 @@ fn create_test_project() -> Project {
         name: "Test Project".to_string(),
         description: Some("Test Description".to_string()),
         is_active: true,
-        created_at: NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
+        created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
     }
 }
 

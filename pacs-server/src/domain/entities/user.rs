@@ -4,7 +4,8 @@
 //! 사용자는 PACS 시스템에 접근할 수 있는 개인 또는 시스템 계정을 의미합니다.
 
 // 날짜/시간 처리를 위한 chrono 라이브러리
-use chrono::NaiveDateTime;
+// use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 // JSON 직렬화/역직렬화를 위한 serde 라이브러리
 use serde::{Deserialize, Serialize};
 // SQLx를 통한 데이터베이스 행 매핑을 위한 트레이트
@@ -45,7 +46,8 @@ pub struct User {
     /// 사용자의 이메일 주소 (로그인 및 알림에 사용)
     pub email: String,
     /// 사용자 계정이 생성된 시각
-    pub created_at: NaiveDateTime,
+    // pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 /// 새로운 사용자 생성을 위한 DTO(Data Transfer Object)

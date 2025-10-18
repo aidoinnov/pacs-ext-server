@@ -4,7 +4,11 @@
 //! 어노테이션은 의료진이 의료 영상에 추가한 표시, 측정, 분석 결과 등을 의미합니다.
 
 // 날짜/시간 처리를 위한 chrono 라이브러리
-use chrono::NaiveDateTime;
+//use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
+
+
+
 // JSON 직렬화/역직렬화를 위한 serde 라이브러리
 use serde::{Deserialize, Serialize};
 // SQLx를 통한 데이터베이스 행 매핑을 위한 트레이트
@@ -73,9 +77,11 @@ pub struct Annotation {
     /// 다른 사용자와 공유 여부
     pub is_shared: bool,
     /// 어노테이션이 생성된 시각
-    pub created_at: NaiveDateTime,
+    // pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
     /// 어노테이션이 마지막으로 수정된 시각
-    pub updated_at: NaiveDateTime,
+    // pub updated_at: NaiveDateTime,
+    pub updated_at: DateTime<Utc>,
     /// 어노테이션 생성에 사용된 뷰어 소프트웨어 (선택사항)
     pub viewer_software: Option<String>,
     /// 어노테이션에 대한 설명 (선택사항)
@@ -123,7 +129,8 @@ pub struct AnnotationHistory {
     /// 변경 후 데이터 (JSON 형태)
     pub data_after: Option<serde_json::Value>,
     /// 변경이 수행된 시각
-    pub action_at: NaiveDateTime,
+    // pub action_at: NaiveDateTime,
+    pub action_at: DateTime<Utc>,
 }
 
 /// 새로운 어노테이션 생성을 위한 DTO(Data Transfer Object)

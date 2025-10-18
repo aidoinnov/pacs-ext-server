@@ -5,7 +5,7 @@
 # 프로젝트 정보
 PROJECT_NAME=pacs-server
 IMAGE_NAME=aido/pacs-extension-server
-VERSION=0.1.7
+VERSION=0.1.21
 CONTAINER_NAME ?= pacs-server
 
 # 레지스트리 정보
@@ -92,8 +92,8 @@ clean-cargo:
 ## docker-build: Docker 이미지 빌드
 docker-build:
 	@echo ">>> Building Docker image: $(LOCAL_VERSION)"
-	docker build --no-cache -t $(LOCAL_LATEST) -t $(LOCAL_VERSION) .
-	# docker build -t $(LOCAL_LATEST) -t $(LOCAL_VERSION) .
+	# docker build --no-cache -t $(LOCAL_LATEST) -t $(LOCAL_VERSION) .
+	docker build -t $(LOCAL_LATEST) -t $(LOCAL_VERSION) .
 	@echo ">>> Tagging for push registry"
 	docker tag $(LOCAL_LATEST)  $(PUSH_LATEST)
 	docker tag $(LOCAL_VERSION) $(PUSH_VERSION)
@@ -117,6 +117,9 @@ docker-run:
 	@echo ">>> Using host network for Bastion tunnel access"
 	docker run --rm -it --name $(CONTAINER_NAME) \
 		--network=host \
+		-e APP_SERVER__HOST=0.0.0.0 \
+		-e APP_SERVER__PORT=8080 \
+		-e RUN_ENV=production \
 		-e RUST_LOG=info \
 		-e DATABASE_URL=postgres://pacs_extension_admin:PacsExtension2024@localhost:5456/pacs_extension \
 		$(LOCAL_VERSION)
@@ -131,6 +134,9 @@ docker-shell:
 	@echo ">>> Starting shell inside $(LOCAL_VERSION)"
 	docker run --rm -it \
 		--network=host \
+		-e APP_SERVER__HOST=0.0.0.0 \
+		-e APP_SERVER__PORT=8080 \
+		-e RUN_ENV=production \
 	  	-e RUST_LOG=debug \
 	  	-e DATABASE_URL=postgres://pacs_extension_admin:PacsExtension2024@localhost:5456/pacs_extension \
 	  	$(LOCAL_VERSION) /bin/sh

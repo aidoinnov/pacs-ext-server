@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 
 use pacs_server::application::use_cases::PermissionUseCase;
 use pacs_server::application::dto::{

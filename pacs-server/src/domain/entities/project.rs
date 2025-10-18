@@ -5,7 +5,7 @@
 //! 어노테이션과 마스크는 특정 프로젝트에 속하게 됩니다.
 
 // 날짜/시간 처리를 위한 chrono 라이브러리
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 // JSON 직렬화/역직렬화를 위한 serde 라이브러리
 use serde::{Deserialize, Serialize};
 // SQLx를 통한 데이터베이스 행 매핑을 위한 트레이트
@@ -45,7 +45,7 @@ pub struct Project {
     /// 프로젝트 활성화 상태 (true: 활성, false: 비활성)
     pub is_active: bool,
     /// 프로젝트가 생성된 시각
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 /// 새로운 프로젝트 생성을 위한 DTO(Data Transfer Object)

@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -18,7 +18,7 @@ pub struct GrantLog {
     pub project_id: Option<i32>,
     pub action: GrantAction,
     pub via_group_id: Option<i32>,
-    pub logged_at: NaiveDateTime,
+    pub logged_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -37,7 +37,7 @@ pub struct AccessLog {
     pub ip_address: Option<String>,
     pub session_id: Option<String>,
     pub via_group_id: Option<i32>,
-    pub logged_at: NaiveDateTime,
+    pub logged_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use chrono::NaiveDateTime;
+// use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 
 /// 프로젝트 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -25,7 +26,8 @@ pub struct ProjectResponse {
     pub description: Option<String>,
     pub is_active: bool,
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
-    pub created_at: NaiveDateTime,
+    // pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 impl From<crate::domain::entities::project::Project> for ProjectResponse {
@@ -66,7 +68,8 @@ pub struct MemberInfo {
     pub id: i32,
     pub username: String,
     pub email: String,
-    pub joined_at: NaiveDateTime,
+    // pub joined_at: NaiveDateTime,
+    pub joined_at: DateTime<Utc>,
 }
 
 /// 프로젝트 역할 목록 응답 DTO

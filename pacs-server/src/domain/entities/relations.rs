@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -8,7 +8,7 @@ pub struct UserProject {
     pub id: i32,
     pub user_id: i32,
     pub project_id: i32,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 // Project-Role relation
@@ -17,7 +17,7 @@ pub struct ProjectRole {
     pub id: i32,
     pub project_id: i32,
     pub role_id: i32,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 // Role-Permission relation
@@ -27,7 +27,7 @@ pub struct RolePermission {
     pub role_id: i32,
     pub permission_id: i32,
     pub scope: Option<String>,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 // Project-Permission relation
@@ -38,7 +38,7 @@ pub struct ProjectPermission {
     pub permission_id: i32,
     pub scope: Option<String>,
     pub inherits_from_role_permission: bool,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 // Role-AccessCondition relation
@@ -47,7 +47,7 @@ pub struct RoleAccessCondition {
     pub id: i32,
     pub role_id: i32,
     pub access_condition_id: i32,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 // Project-AccessCondition relation
@@ -56,7 +56,7 @@ pub struct ProjectAccessCondition {
     pub id: i32,
     pub project_id: i32,
     pub access_condition_id: i32,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 // User-Group relation
@@ -65,7 +65,7 @@ pub struct UserGroup {
     pub id: i32,
     pub user_id: i32,
     pub group_id: i32,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
 
 // Group-Role relation
@@ -74,5 +74,5 @@ pub struct GroupRole {
     pub id: i32,
     pub group_id: i32,
     pub role_id: i32,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
