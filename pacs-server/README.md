@@ -11,6 +11,7 @@ PACS (Picture Archiving and Communication System) Extension Server는 의료 영
 - **Swagger 문서**: 자동 생성된 API 문서
 - **데이터 검증**: 입력 데이터 유효성 검사
 - **뷰어 소프트웨어 필터링**: OHIF Viewer, DICOM Viewer 등으로 필터링 ✨
+- **측정값 지원**: 구조화된 측정 데이터 저장 및 관리 ✨
 
 ### 🎭 마스크 업로드 시스템 ✅
 - **Object Storage 연동**: AWS S3 및 MinIO 지원
@@ -195,6 +196,41 @@ curl -X POST http://localhost:8080/api/annotations \
   }'
 ```
 
+### 측정값이 포함된 어노테이션 생성
+```bash
+curl -X POST http://localhost:8080/api/annotations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt-token>" \
+  -d '{
+    "study_uid": "1.2.3.4.5.6.7.8.9.10",
+    "series_uid": "1.2.3.4.5.6.7.8.9.11",
+    "instance_uid": "1.2.3.4.5.6.7.8.9.12",
+    "project_id": 1,
+    "annotation_data": {
+      "type": "measurement",
+      "points": [[0, 0], [100, 100]]
+    },
+    "description": "폐 결절 크기 측정",
+    "tool_name": "Measurement Tool",
+    "tool_version": "2.1.0",
+    "viewer_software": "OHIF Viewer",
+    "measurement_values": [
+      {
+        "id": "m1",
+        "type": "raw",
+        "values": [42.3, 18.7],
+        "unit": "mm"
+      },
+      {
+        "id": "m2",
+        "type": "mean",
+        "values": [30.5],
+        "unit": "mm"
+      }
+    ]
+  }'
+```
+
 ### 어노테이션 조회
 ```bash
 # 특정 어노테이션 조회
@@ -340,6 +376,7 @@ CMD ["pacs-server"]
 - [Object Storage 연동](docs/technical/OBJECT_STORAGE_INTEGRATION.md)
 - [트랜잭션 처리 최적화](docs/technical/TRANSACTION_OPTIMIZATION_FINAL.md) ✨
 - [뷰어 소프트웨어 필터링](docs/VIEWER_SOFTWARE_FILTERING.md) ✨
+- [어노테이션 측정값 기능](docs/ANNOTATION_MEASUREMENT_VALUES.md) ✨
 
 ### 개발 가이드
 - [구현 계획서](docs/todo/implementation_plan.md)
@@ -383,6 +420,13 @@ CMD ["pacs-server"]
 자세한 변경 이력은 [CHANGELOG.md](docs/technical/CHANGELOG.md)를 참조하세요.
 
 ### 주요 버전
+- **v1.0.0-beta.4**: 어노테이션 측정값 기능 (2025-01-27) ✨
+  - 구조화된 측정 데이터 저장 및 관리
+  - JSONB 기반 유연한 측정값 스키마
+  - 다양한 측정 타입 및 단위 지원
+  - 포괄적인 API 문서화 및 테스트
+  - 성능 최적화된 JSONB 인덱싱
+
 - **v1.0.0-beta.3**: 뷰어 소프트웨어 필터링 기능 (2025-01-27) ✨
   - 뷰어 소프트웨어별 어노테이션 필터링 지원
   - API 라우팅 404 오류 수정

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod annotation_controller_tests {
     use actix_web::{test, web, App};
-    use pacs_server::application::dto::annotation_dto::CreateAnnotationRequest;
+    use pacs_server::application::dto::annotation_dto::{CreateAnnotationRequest, UpdateAnnotationRequest};
     use pacs_server::application::use_cases::AnnotationUseCase;
     use pacs_server::domain::services::AnnotationServiceImpl;
     use pacs_server::infrastructure::repositories::{
@@ -146,6 +146,7 @@ mod annotation_controller_tests {
             tool_name: Some("Circle Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             description: Some("Test annotation".to_string()),
+            measurement_values: None,
         };
 
         let result = annotation_use_case.create_annotation(create_req, user_id, project_id).await;
@@ -186,6 +187,7 @@ mod annotation_controller_tests {
             tool_name: Some("Rectangle Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             description: Some("새로운 필드들이 포함된 테스트 어노테이션".to_string()),
+            measurement_values: None,
         };
 
         let result = annotation_use_case.create_annotation(create_req, user_id, project_id).await;
@@ -223,6 +225,7 @@ mod annotation_controller_tests {
             tool_name: Some("Point Tool".to_string()),
             tool_version: None, // Not provided
             description: Some("부분적으로만 새로운 필드가 포함된 테스트".to_string()),
+            measurement_values: None,
         };
 
         let result = annotation_use_case.create_annotation(create_req, user_id, project_id).await;
@@ -256,6 +259,7 @@ mod annotation_controller_tests {
             tool_name: Some("Original Tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             description: Some("Original description".to_string()),
+            measurement_values: None,
         };
 
         let create_result = annotation_use_case.create_annotation(create_req, user_id, project_id).await;
@@ -280,6 +284,7 @@ mod annotation_controller_tests {
             tool_name: Some("Updated Tool".to_string()),
             tool_version: Some("2.0.0".to_string()),
             description: Some("Updated description with new fields".to_string()),
+            measurement_values: None,
         };
 
         let update_result = annotation_use_case.update_annotation(annotation_id, update_req).await;
@@ -307,6 +312,7 @@ mod annotation_controller_tests {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = CreateAnnotationRequest {
@@ -320,6 +326,7 @@ mod annotation_controller_tests {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("DICOM Viewer".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -392,6 +399,7 @@ mod annotation_controller_tests {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = CreateAnnotationRequest {
@@ -405,6 +413,7 @@ mod annotation_controller_tests {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("DICOM Viewer".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -468,6 +477,7 @@ mod annotation_controller_tests {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = CreateAnnotationRequest {
@@ -481,6 +491,7 @@ mod annotation_controller_tests {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("DICOM Viewer".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -543,6 +554,7 @@ mod annotation_controller_tests {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션 생성
@@ -563,6 +575,113 @@ mod annotation_controller_tests {
         let body: serde_json::Value = test::read_body_json(resp).await;
         assert_eq!(body["total"], 0);
         assert!(body["annotations"].as_array().unwrap().is_empty());
+
+        // Cleanup
+        cleanup_test_data(&pool, user_id, project_id).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_annotation_with_measurement_values() {
+        let (app, pool) = setup_test_app().await;
+        let (user_id, project_id) = create_test_data(&pool).await;
+
+        let annotation = CreateAnnotationRequest {
+            user_id: Some(user_id),
+            project_id: Some(project_id),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: serde_json::json!({"type": "measurement", "points": [[0, 0], [100, 100]]}),
+            description: Some("폐 결절 크기 측정".to_string()),
+            tool_name: Some("Measurement Tool".to_string()),
+            tool_version: Some("2.1.0".to_string()),
+            viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: Some(serde_json::json!([
+                {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"},
+                {"id": "m2", "type": "mean", "values": [30.5], "unit": "mm"}
+            ])),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/annotations")
+            .set_json(&annotation)
+            .to_request();
+        
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert!(body["measurement_values"].is_array());
+        assert_eq!(body["measurement_values"][0]["id"], "m1");
+        assert_eq!(body["measurement_values"][0]["type"], "raw");
+        assert_eq!(body["measurement_values"][0]["unit"], "mm");
+        assert_eq!(body["measurement_values"][1]["id"], "m2");
+        assert_eq!(body["measurement_values"][1]["type"], "mean");
+
+        // Cleanup
+        cleanup_test_data(&pool, user_id, project_id).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_annotation_with_measurement_values() {
+        let (app, pool) = setup_test_app().await;
+        let (user_id, project_id) = create_test_data(&pool).await;
+
+        // 먼저 어노테이션 생성
+        let annotation = CreateAnnotationRequest {
+            user_id: Some(user_id),
+            project_id: Some(project_id),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: serde_json::json!({"type": "measurement", "points": [[0, 0], [100, 100]]}),
+            description: Some("초기 측정".to_string()),
+            tool_name: Some("Measurement Tool".to_string()),
+            tool_version: Some("2.1.0".to_string()),
+            viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: Some(serde_json::json!([
+                {"id": "m1", "type": "raw", "values": [42.3], "unit": "mm"}
+            ])),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/annotations")
+            .set_json(&annotation)
+            .to_request();
+        
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let annotation_id = body["id"].as_i64().unwrap();
+
+        // 어노테이션 업데이트 (measurement_values 포함)
+        let update_request = UpdateAnnotationRequest {
+            annotation_data: Some(serde_json::json!({"type": "measurement", "points": [[0, 0], [120, 120]]})),
+            tool_name: Some("Updated Measurement Tool".to_string()),
+            tool_version: Some("2.2.0".to_string()),
+            viewer_software: Some("DICOM Viewer".to_string()),
+            description: Some("업데이트된 측정".to_string()),
+            measurement_values: Some(serde_json::json!([
+                {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"},
+                {"id": "m2", "type": "mean", "values": [30.5], "unit": "mm"},
+                {"id": "m3", "type": "stddev", "values": [5.2], "unit": "mm"}
+            ])),
+        };
+
+        let req = test::TestRequest::put()
+            .uri(&format!("/api/annotations/{}", annotation_id))
+            .set_json(&update_request)
+            .to_request();
+        
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert!(body["measurement_values"].is_array());
+        assert_eq!(body["measurement_values"].as_array().unwrap().len(), 3);
+        assert_eq!(body["measurement_values"][2]["id"], "m3");
+        assert_eq!(body["measurement_values"][2]["type"], "stddev");
 
         // Cleanup
         cleanup_test_data(&pool, user_id, project_id).await;

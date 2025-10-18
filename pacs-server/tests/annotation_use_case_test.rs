@@ -792,4 +792,78 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
         cleanup_test_data(&pool).await;
     }
+
+    #[tokio::test]
+    async fn test_create_annotation_with_measurement_values() {
+        let (app, pool) = setup_test_app().await;
+        let (user_id, project_id) = create_test_data(&pool).await;
+
+        let annotation_request = CreateAnnotationRequest {
+            user_id: Some(user_id),
+            project_id: Some(project_id),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: json!({"type": "measurement", "points": [[0, 0], [100, 100]]}),
+            description: Some("폐 결절 크기 측정".to_string()),
+            tool_name: Some("Measurement Tool".to_string()),
+            tool_version: Some("2.1.0".to_string()),
+            viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: Some(json!([
+                {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"},
+                {"id": "m2", "type": "mean", "values": [30.5], "unit": "mm"}
+            ])),
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/annotations")
+            .set_json(&annotation_request)
+            .to_request();
+        
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert!(body["measurement_values"].is_array());
+        assert_eq!(body["measurement_values"][0]["id"], "m1");
+        assert_eq!(body["measurement_values"][0]["type"], "raw");
+        assert_eq!(body["measurement_values"][0]["unit"], "mm");
+        assert_eq!(body["measurement_values"][1]["id"], "m2");
+        assert_eq!(body["measurement_values"][1]["type"], "mean");
+
+        cleanup_test_data(&pool, user_id, project_id).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_annotation_without_measurement_values() {
+        let (app, pool) = setup_test_app().await;
+        let (user_id, project_id) = create_test_data(&pool).await;
+
+        let annotation_request = CreateAnnotationRequest {
+            user_id: Some(user_id),
+            project_id: Some(project_id),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: json!({"type": "point", "coordinates": [50, 50]}),
+            description: Some("단순 포인트 어노테이션".to_string()),
+            tool_name: Some("Point Tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("DICOM Viewer".to_string()),
+            measurement_values: None,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/api/annotations")
+            .set_json(&annotation_request)
+            .to_request();
+        
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 201);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert!(body["measurement_values"].is_null());
+
+        cleanup_test_data(&pool, user_id, project_id).await;
+    }
 }

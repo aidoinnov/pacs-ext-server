@@ -5,6 +5,125 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-beta.4] - 2025-01-27
+
+### ✨ Added
+
+#### **Annotation Measurement Values Support**
+- **Database Schema Enhancement**
+  - Added `measurement_values` JSONB column to `annotation_annotation` table
+  - Implemented GIN index for efficient JSONB querying
+  - Added comprehensive column documentation
+
+- **Entity and DTO Updates**
+  - Extended `Annotation` and `NewAnnotation` entities with `measurement_values` field
+  - Updated all annotation DTOs (`CreateAnnotationRequest`, `UpdateAnnotationRequest`, `AnnotationResponse`)
+  - Added OpenAPI schema examples for measurement data
+
+- **Repository Layer Enhancements**
+  - Updated all SQL queries to include `measurement_values` field
+  - Enhanced create, update, and find operations
+  - Maintained backward compatibility with existing data
+
+- **Use Case Layer Integration**
+  - Integrated measurement values in annotation creation flow
+  - Updated response mapping to include measurement data
+  - Preserved existing functionality while adding new features
+
+- **Comprehensive Testing**
+  - Added unit tests for measurement values functionality
+  - Implemented integration tests for API endpoints
+  - Created test cases for both with and without measurement values scenarios
+  - Added update operation tests with measurement data
+
+- **Technical Documentation**
+  - Created comprehensive `ANNOTATION_MEASUREMENT_VALUES.md` documentation
+  - Documented JSON structure and supported measurement types
+  - Included API usage examples and best practices
+  - Added performance considerations and migration guidelines
+
+#### **Measurement Data Structure**
+- **Supported Measurement Types**
+  - `raw`: Raw measurement values
+  - `mean`: Average values
+  - `stddev`: Standard deviation
+  - `min`: Minimum values
+  - `max`: Maximum values
+  - `custom`: User-defined types
+
+- **Supported Units**
+  - `mm`: Millimeters
+  - `cm`: Centimeters
+  - `px`: Pixels
+  - `HU`: Hounsfield Units
+  - `%`: Percentage
+  - `ratio`: Ratios
+  - `custom`: User-defined units
+
+- **JSON Schema**
+  ```json
+  [
+    {
+      "id": "m1",
+      "type": "raw",
+      "values": [42.3, 18.7],
+      "unit": "mm"
+    }
+  ]
+  ```
+
+### 🔧 Technical Improvements
+
+- **Database Migration**
+  - Created migration `005_add_measurement_values.sql`
+  - Added proper indexing for JSONB queries
+  - Maintained data integrity during migration
+
+- **API Enhancements**
+  - Extended existing annotation endpoints to support measurement values
+  - Maintained backward compatibility
+  - Added comprehensive OpenAPI documentation
+
+- **Code Quality**
+  - Updated all repository queries consistently
+  - Maintained clean architecture principles
+  - Added comprehensive error handling
+
+### 📚 Documentation Updates
+
+- **API Documentation**
+  - Updated OpenAPI schemas with measurement values examples
+  - Added comprehensive field descriptions
+  - Included usage examples for different measurement types
+
+- **Technical Guides**
+  - Created detailed measurement values documentation
+  - Added best practices and guidelines
+  - Included performance optimization tips
+
+### 🧪 Testing Coverage
+
+- **Unit Tests**
+  - `test_create_annotation_with_measurement_values`
+  - `test_create_annotation_without_measurement_values`
+
+- **Integration Tests**
+  - `test_create_annotation_with_measurement_values`
+  - `test_update_annotation_with_measurement_values`
+
+- **Test Scenarios**
+  - Measurement values creation and retrieval
+  - Update operations with measurement data
+  - Null measurement values handling
+  - JSON structure validation
+
+### 🔄 Migration Notes
+
+- **Backward Compatibility**: Existing annotations will have `measurement_values` set to `NULL`
+- **Data Migration**: No automatic migration of existing data required
+- **API Compatibility**: All existing API endpoints remain unchanged
+- **Database Schema**: New column is nullable and has no impact on existing queries
+
 ## [1.0.0-beta.2] - 2025-01-27
 
 ### 🔧 Integration Test Compilation Fixes

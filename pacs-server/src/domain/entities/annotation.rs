@@ -86,6 +86,8 @@ pub struct Annotation {
     pub viewer_software: Option<String>,
     /// 어노테이션에 대한 설명 (선택사항)
     pub description: Option<String>,
+    /// 측정값 (JSON 배열 형태의 측정 객체들)
+    pub measurement_values: Option<serde_json::Value>,
 }
 
 /// 어노테이션 변경 이력을 나타내는 엔티티
@@ -187,6 +189,8 @@ pub struct NewAnnotation {
     pub viewer_software: Option<String>,
     /// 어노테이션에 대한 설명 (선택사항)
     pub description: Option<String>,
+    /// 측정값 (JSON 배열 형태의 측정 객체들)
+    pub measurement_values: Option<serde_json::Value>,
     /// 어노테이션의 실제 데이터 (JSON 형태)
     pub data: serde_json::Value,
     /// 다른 사용자와 공유 여부

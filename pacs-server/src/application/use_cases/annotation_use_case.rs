@@ -114,6 +114,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             tool_version: request.tool_version,
             viewer_software: request.viewer_software,
             description: request.description,
+            measurement_values: request.measurement_values,
             data: request.annotation_data,
             is_shared: false, // 기본값은 비공유
         };
@@ -131,6 +132,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             tool_version: annotation.tool_version,
             viewer_software: annotation.viewer_software,
             description: annotation.description,
+            measurement_values: annotation.measurement_values,
             created_at: annotation.created_at,
             updated_at: annotation.updated_at,
         })
@@ -167,6 +169,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             tool_version: annotation.tool_version,
             viewer_software: annotation.viewer_software,
             description: annotation.description,
+            measurement_values: annotation.measurement_values,
             created_at: annotation.created_at,
             updated_at: annotation.updated_at,
         })
@@ -209,6 +212,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -254,6 +258,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -300,6 +305,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -346,6 +352,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -392,6 +399,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -439,6 +447,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -484,6 +493,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -537,6 +547,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             tool_version: updated_annotation.tool_version,
             viewer_software: updated_annotation.viewer_software,
             description: updated_annotation.description,
+            measurement_values: updated_annotation.measurement_values,
             created_at: updated_annotation.created_at,
             updated_at: updated_annotation.updated_at,
         })
@@ -616,6 +627,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -652,6 +664,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
@@ -688,6 +701,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
                 tool_version: annotation.tool_version,
                 viewer_software: annotation.viewer_software,
                 description: annotation.description,
+                measurement_values: annotation.measurement_values,
                 created_at: annotation.created_at,
                 updated_at: annotation.updated_at,
             })
