@@ -589,4 +589,113 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     pub async fn can_access_annotation(&self, user_id: i32, annotation_id: i32) -> Result<bool, ServiceError> {
         self.annotation_service.can_access_annotation(user_id, annotation_id).await
     }
+
+    // viewer_software 필터링 메서드들
+    /// 사용자의 어노테이션 목록 조회 (viewer_software 필터링)
+    /// 
+    /// # Arguments
+    /// * `user_id` - 사용자 ID
+    /// * `viewer_software` - 뷰어 소프트웨어 (옵션)
+    /// 
+    /// # Returns
+    /// * `Result<AnnotationListResponse, ServiceError>` - 어노테이션 목록 응답
+    pub async fn get_annotations_by_user_with_viewer(&self, user_id: i32, viewer_software: Option<&str>) -> Result<AnnotationListResponse, ServiceError> {
+        let annotations = self.annotation_service.get_annotations_by_user_with_viewer(user_id, viewer_software).await?;
+
+        let total = annotations.len();
+        let annotation_responses = annotations
+            .into_iter()
+            .map(|annotation| AnnotationResponse {
+                id: annotation.id,
+                user_id: annotation.user_id,
+                study_instance_uid: annotation.study_uid,
+                series_instance_uid: annotation.series_uid.unwrap_or_default(),
+                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
+                annotation_data: annotation.data,
+                tool_name: Some(annotation.tool_name),
+                tool_version: annotation.tool_version,
+                viewer_software: annotation.viewer_software,
+                description: annotation.description,
+                created_at: annotation.created_at,
+                updated_at: annotation.updated_at,
+            })
+            .collect();
+
+        Ok(AnnotationListResponse {
+            annotations: annotation_responses,
+            total,
+        })
+    }
+
+    /// 프로젝트의 어노테이션 목록 조회 (viewer_software 필터링)
+    /// 
+    /// # Arguments
+    /// * `project_id` - 프로젝트 ID
+    /// * `viewer_software` - 뷰어 소프트웨어 (옵션)
+    /// 
+    /// # Returns
+    /// * `Result<AnnotationListResponse, ServiceError>` - 어노테이션 목록 응답
+    pub async fn get_annotations_by_project_with_viewer(&self, project_id: i32, viewer_software: Option<&str>) -> Result<AnnotationListResponse, ServiceError> {
+        let annotations = self.annotation_service.get_annotations_by_project_with_viewer(project_id, viewer_software).await?;
+
+        let total = annotations.len();
+        let annotation_responses = annotations
+            .into_iter()
+            .map(|annotation| AnnotationResponse {
+                id: annotation.id,
+                user_id: annotation.user_id,
+                study_instance_uid: annotation.study_uid,
+                series_instance_uid: annotation.series_uid.unwrap_or_default(),
+                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
+                annotation_data: annotation.data,
+                tool_name: Some(annotation.tool_name),
+                tool_version: annotation.tool_version,
+                viewer_software: annotation.viewer_software,
+                description: annotation.description,
+                created_at: annotation.created_at,
+                updated_at: annotation.updated_at,
+            })
+            .collect();
+
+        Ok(AnnotationListResponse {
+            annotations: annotation_responses,
+            total,
+        })
+    }
+
+    /// Study UID로 어노테이션 목록 조회 (viewer_software 필터링)
+    /// 
+    /// # Arguments
+    /// * `study_uid` - Study Instance UID
+    /// * `viewer_software` - 뷰어 소프트웨어 (옵션)
+    /// 
+    /// # Returns
+    /// * `Result<AnnotationListResponse, ServiceError>` - 어노테이션 목록 응답
+    pub async fn get_annotations_by_study_with_viewer(&self, study_uid: &str, viewer_software: Option<&str>) -> Result<AnnotationListResponse, ServiceError> {
+        let annotations = self.annotation_service.get_annotations_by_study_with_viewer(study_uid, viewer_software).await?;
+
+        let total = annotations.len();
+        let annotation_responses = annotations
+            .into_iter()
+            .map(|annotation| AnnotationResponse {
+                id: annotation.id,
+                user_id: annotation.user_id,
+                study_instance_uid: annotation.study_uid,
+                series_instance_uid: annotation.series_uid.unwrap_or_default(),
+                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
+                annotation_data: annotation.data,
+                tool_name: Some(annotation.tool_name),
+                tool_version: annotation.tool_version,
+                viewer_software: annotation.viewer_software,
+                description: annotation.description,
+                created_at: annotation.created_at,
+                updated_at: annotation.updated_at,
+            })
+            .collect();
+
+        Ok(AnnotationListResponse {
+            annotations: annotation_responses,
+            total,
+        })
+    }
 }

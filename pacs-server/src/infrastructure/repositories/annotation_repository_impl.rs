@@ -294,6 +294,103 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         .await
     }
 
+    // viewer_software 필터링 메서드들
+    async fn find_by_user_id_with_viewer(&self, user_id: i32, viewer_software: Option<&str>) -> Result<Vec<Annotation>, sqlx::Error> {
+        match viewer_software {
+            Some(viewer) => {
+                sqlx::query_as::<_, Annotation>(
+                    "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                            tool_name, tool_version, data, is_shared, created_at, updated_at,
+                            viewer_software, description
+                     FROM annotation_annotation
+                     WHERE user_id = $1 AND viewer_software = $2
+                     ORDER BY created_at DESC"
+                )
+                .bind(user_id)
+                .bind(viewer)
+                .fetch_all(&self.pool)
+                .await
+            },
+            None => {
+                sqlx::query_as::<_, Annotation>(
+                    "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                            tool_name, tool_version, data, is_shared, created_at, updated_at,
+                            viewer_software, description
+                     FROM annotation_annotation
+                     WHERE user_id = $1
+                     ORDER BY created_at DESC"
+                )
+                .bind(user_id)
+                .fetch_all(&self.pool)
+                .await
+            }
+        }
+    }
+
+    async fn find_by_project_id_with_viewer(&self, project_id: i32, viewer_software: Option<&str>) -> Result<Vec<Annotation>, sqlx::Error> {
+        match viewer_software {
+            Some(viewer) => {
+                sqlx::query_as::<_, Annotation>(
+                    "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                            tool_name, tool_version, data, is_shared, created_at, updated_at,
+                            viewer_software, description
+                     FROM annotation_annotation
+                     WHERE project_id = $1 AND viewer_software = $2
+                     ORDER BY created_at DESC"
+                )
+                .bind(project_id)
+                .bind(viewer)
+                .fetch_all(&self.pool)
+                .await
+            },
+            None => {
+                sqlx::query_as::<_, Annotation>(
+                    "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                            tool_name, tool_version, data, is_shared, created_at, updated_at,
+                            viewer_software, description
+                     FROM annotation_annotation
+                     WHERE project_id = $1
+                     ORDER BY created_at DESC"
+                )
+                .bind(project_id)
+                .fetch_all(&self.pool)
+                .await
+            }
+        }
+    }
+
+    async fn find_by_study_uid_with_viewer(&self, study_uid: &str, viewer_software: Option<&str>) -> Result<Vec<Annotation>, sqlx::Error> {
+        match viewer_software {
+            Some(viewer) => {
+                sqlx::query_as::<_, Annotation>(
+                    "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                            tool_name, tool_version, data, is_shared, created_at, updated_at,
+                            viewer_software, description
+                     FROM annotation_annotation
+                     WHERE study_uid = $1 AND viewer_software = $2
+                     ORDER BY created_at DESC"
+                )
+                .bind(study_uid)
+                .bind(viewer)
+                .fetch_all(&self.pool)
+                .await
+            },
+            None => {
+                sqlx::query_as::<_, Annotation>(
+                    "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                            tool_name, tool_version, data, is_shared, created_at, updated_at,
+                            viewer_software, description
+                     FROM annotation_annotation
+                     WHERE study_uid = $1
+                     ORDER BY created_at DESC"
+                )
+                .bind(study_uid)
+                .fetch_all(&self.pool)
+                .await
+            }
+        }
+    }
+
     fn pool(&self) -> &PgPool {
         &self.pool
     }

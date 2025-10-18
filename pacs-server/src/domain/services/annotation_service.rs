@@ -21,6 +21,16 @@ pub trait AnnotationService: Send + Sync {
     /// Study UID로 Annotation 목록 조회
     async fn get_annotations_by_study(&self, study_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
 
+    // viewer_software 필터링 메서드들
+    /// 사용자의 Annotation 목록 조회 (viewer_software 필터링)
+    async fn get_annotations_by_user_with_viewer(&self, user_id: i32, viewer_software: Option<&str>) -> Result<Vec<Annotation>, ServiceError>;
+
+    /// 프로젝트의 Annotation 목록 조회 (viewer_software 필터링)
+    async fn get_annotations_by_project_with_viewer(&self, project_id: i32, viewer_software: Option<&str>) -> Result<Vec<Annotation>, ServiceError>;
+
+    /// Study UID로 Annotation 목록 조회 (viewer_software 필터링)
+    async fn get_annotations_by_study_with_viewer(&self, study_uid: &str, viewer_software: Option<&str>) -> Result<Vec<Annotation>, ServiceError>;
+
     /// Series UID로 Annotation 목록 조회
     async fn get_annotations_by_series(&self, series_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
 
@@ -231,6 +241,29 @@ where
         .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
         Ok(is_member > 0)
+    }
+
+    // viewer_software 필터링 메서드들
+    async fn get_annotations_by_user_with_viewer(&self, user_id: i32, viewer_software: Option<&str>) -> Result<Vec<Annotation>, ServiceError> {
+        // 사용자 존재 확인
+        if self.user_repository.find_by_id(user_id).await?.is_none() {
+            return Err(ServiceError::NotFound("User not found".into()));
+        }
+
+        Ok(self.annotation_repository.find_by_user_id_with_viewer(user_id, viewer_software).await?)
+    }
+
+    async fn get_annotations_by_project_with_viewer(&self, project_id: i32, viewer_software: Option<&str>) -> Result<Vec<Annotation>, ServiceError> {
+        // 프로젝트 존재 확인
+        if self.project_repository.find_by_id(project_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Project not found".into()));
+        }
+
+        Ok(self.annotation_repository.find_by_project_id_with_viewer(project_id, viewer_software).await?)
+    }
+
+    async fn get_annotations_by_study_with_viewer(&self, study_uid: &str, viewer_software: Option<&str>) -> Result<Vec<Annotation>, ServiceError> {
+        Ok(self.annotation_repository.find_by_study_uid_with_viewer(study_uid, viewer_software).await?)
     }
 }
 
