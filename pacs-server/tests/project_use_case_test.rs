@@ -50,7 +50,7 @@ impl ProjectService for MockProjectService {
             name,
             description,
             is_active: true,
-            created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
+            created_at: Utc::timestamp_opt(1640995200, 0).unwrap(),
         };
         Ok(project)
     }
@@ -129,7 +129,7 @@ fn create_test_project() -> Project {
         name: "Test Project".to_string(),
         description: Some("Test Description".to_string()),
         is_active: true,
-        created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
+        created_at: Utc::timestamp_opt(1640995200, 0).unwrap(),
     }
 }
 
@@ -139,7 +139,7 @@ fn create_test_user() -> User {
         keycloak_id: uuid::Uuid::new_v4(),
         username: "testuser".to_string(),
         email: "test@example.com".to_string(),
-        created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
+        created_at: Utc::timestamp_opt(1640995200, 0).unwrap(),
     }
 }
 
@@ -149,7 +149,7 @@ fn create_test_role() -> Role {
         name: "Admin".to_string(),
         description: Some("Administrator".to_string()),
         scope: "PROJECT".to_string(),
-        created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
+        created_at: Utc::timestamp_opt(1640995200, 0).unwrap(),
     }
 }
 
@@ -228,7 +228,7 @@ async fn test_project_use_case_get_all_projects_success() {
         name: "Second Project".to_string(),
         description: None,
         is_active: true,
-        created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
+        created_at: Utc::timestamp_opt(1640995200, 0).unwrap(),
     };
     mock_project_service.add_project(project1);
     mock_project_service.add_project(project2);
@@ -295,7 +295,7 @@ async fn test_project_use_case_get_project_members_success() {
         keycloak_id: uuid::Uuid::new_v4(),
         username: "user2".to_string(),
         email: "user2@example.com".to_string(),
-        created_at: Utc::from_timestamp_opt(1640995200, 0).unwrap(),
+        created_at: Utc::timestamp_opt(1640995200, 0).unwrap(),
     };
     
     mock_project_service.add_project(project.clone());

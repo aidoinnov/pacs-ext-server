@@ -67,7 +67,7 @@ fn create_test_user() -> User {
         keycloak_id: Uuid::new_v4(),
         username: "testuser".to_string(),
         email: "test@example.com".to_string(),
-        created_at: NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
+        created_at: Utc::timestamp_opt(1640995200, 0).unwrap(),
     }
 }
 

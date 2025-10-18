@@ -113,6 +113,8 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
         .expect("Failed to add user to project");
 
         let create_req = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -320,6 +322,8 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
         // Create annotation using use case
         let create_req = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
             study_instance_uid: "1.2.3.4.5".to_string(),
             series_instance_uid: "1.2.3.4.6".to_string(),
             sop_instance_uid: "1.2.3.4.7".to_string(),
@@ -402,6 +406,8 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
         // Create annotation using use case
         let create_req = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
             study_instance_uid: "1.2.3.4.5".to_string(),
             series_instance_uid: "1.2.3.4.6".to_string(),
             sop_instance_uid: "1.2.3.4.7".to_string(),
@@ -488,6 +494,10 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
         for i in 0..3 {
             let create_req = CreateAnnotationRequest {
+                user_id: Some(336),
+                project_id: Some(299),
+            user_id: Some(336),
+            project_id: Some(299),
                 study_instance_uid: format!("1.2.3.4.{}", i),
                 series_instance_uid: format!("1.2.3.5.{}", i),
                 sop_instance_uid: format!("1.2.3.6.{}", i),
@@ -578,6 +588,8 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
         // Test with empty study_uid (should fail validation)
         let invalid_req = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
             study_instance_uid: "".to_string(),
             series_instance_uid: "1.2.3.4.5".to_string(),
             sop_instance_uid: "1.2.3.4.6".to_string(),
@@ -590,6 +602,193 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
         let result = annotation_use_case.create_annotation(invalid_req, user_id, project_id).await;
         assert!(result.is_err());
+
+        cleanup_test_data(&pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_annotations_by_user_with_viewer_filter() {
+        let (app, pool) = setup_test_app().await;
+        let annotation_use_case = test_get_annotation_use_case(&pool).await;
+        
+        let user_id = 336;
+        let project_id = 299;
+        
+        // 테스트 데이터 생성
+        let annotation1 = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: serde_json::json!({"type": "test1"}),
+            description: Some("Test annotation 1".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("OHIF Viewer".to_string()),
+        };
+
+        let annotation2 = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
+            study_instance_uid: "1.2.3.4.8".to_string(),
+            series_instance_uid: "1.2.3.4.9".to_string(),
+            sop_instance_uid: "1.2.3.4.10".to_string(),
+            annotation_data: serde_json::json!({"type": "test2"}),
+            description: Some("Test annotation 2".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("DICOM Viewer".to_string()),
+        };
+
+        let annotation3 = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
+            study_instance_uid: "1.2.3.4.11".to_string(),
+            series_instance_uid: "1.2.3.4.12".to_string(),
+            sop_instance_uid: "1.2.3.4.13".to_string(),
+            annotation_data: serde_json::json!({"type": "test3"}),
+            description: Some("Test annotation 3".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("OHIF Viewer".to_string()),
+        };
+
+        // 어노테이션들 생성
+        annotation_use_case.create_annotation(annotation1, user_id, project_id).await.unwrap();
+        annotation_use_case.create_annotation(annotation2, user_id, project_id).await.unwrap();
+        annotation_use_case.create_annotation(annotation3, user_id, project_id).await.unwrap();
+
+        // OHIF Viewer로 필터링
+        let ohif_annotations = annotation_use_case.get_annotations_by_user_with_viewer(user_id, Some("OHIF Viewer")).await.unwrap();
+        assert_eq!(ohif_annotations.total, 2);
+        assert!(ohif_annotations.annotations.iter().all(|a| a.viewer_software == Some("OHIF Viewer".to_string())));
+
+        // DICOM Viewer로 필터링
+        let dicom_annotations = annotation_use_case.get_annotations_by_user_with_viewer(user_id, Some("DICOM Viewer")).await.unwrap();
+        assert_eq!(dicom_annotations.total, 1);
+        assert!(dicom_annotations.annotations.iter().all(|a| a.viewer_software == Some("DICOM Viewer".to_string())));
+
+        // 필터 없이 모든 어노테이션 조회
+        let all_annotations = annotation_use_case.get_annotations_by_user_with_viewer(user_id, None).await.unwrap();
+        assert_eq!(all_annotations.total, 3);
+
+        // 존재하지 않는 viewer_software로 필터링
+        let no_annotations = annotation_use_case.get_annotations_by_user_with_viewer(user_id, Some("NonExistent Viewer")).await.unwrap();
+        assert_eq!(no_annotations.total, 0);
+
+        cleanup_test_data(&pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_annotations_by_project_with_viewer_filter() {
+        let (app, pool) = setup_test_app().await;
+        let annotation_use_case = test_get_annotation_use_case(&pool).await;
+        
+        let user_id = 336;
+        let project_id = 299;
+        
+        // 테스트 데이터 생성
+        let annotation1 = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: serde_json::json!({"type": "test1"}),
+            description: Some("Test annotation 1".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("OHIF Viewer".to_string()),
+        };
+
+        let annotation2 = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
+            study_instance_uid: "1.2.3.4.8".to_string(),
+            series_instance_uid: "1.2.3.4.9".to_string(),
+            sop_instance_uid: "1.2.3.4.10".to_string(),
+            annotation_data: serde_json::json!({"type": "test2"}),
+            description: Some("Test annotation 2".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("DICOM Viewer".to_string()),
+        };
+
+        // 어노테이션들 생성
+        annotation_use_case.create_annotation(annotation1, user_id, project_id).await.unwrap();
+        annotation_use_case.create_annotation(annotation2, user_id, project_id).await.unwrap();
+
+        // OHIF Viewer로 필터링
+        let ohif_annotations = annotation_use_case.get_annotations_by_project_with_viewer(project_id, Some("OHIF Viewer")).await.unwrap();
+        assert_eq!(ohif_annotations.total, 1);
+        assert!(ohif_annotations.annotations.iter().all(|a| a.viewer_software == Some("OHIF Viewer".to_string())));
+
+        // DICOM Viewer로 필터링
+        let dicom_annotations = annotation_use_case.get_annotations_by_project_with_viewer(project_id, Some("DICOM Viewer")).await.unwrap();
+        assert_eq!(dicom_annotations.total, 1);
+        assert!(dicom_annotations.annotations.iter().all(|a| a.viewer_software == Some("DICOM Viewer".to_string())));
+
+        // 필터 없이 모든 어노테이션 조회
+        let all_annotations = annotation_use_case.get_annotations_by_project_with_viewer(project_id, None).await.unwrap();
+        assert_eq!(all_annotations.total, 2);
+
+        cleanup_test_data(&pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_annotations_by_study_with_viewer_filter() {
+        let (app, pool) = setup_test_app().await;
+        let annotation_use_case = test_get_annotation_use_case(&pool).await;
+        
+        let user_id = 336;
+        let project_id = 299;
+        let study_uid = "1.2.3.4.5";
+        
+        // 테스트 데이터 생성
+        let annotation1 = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
+            study_instance_uid: study_uid.to_string(),
+            series_instance_uid: "1.2.3.4.6".to_string(),
+            sop_instance_uid: "1.2.3.4.7".to_string(),
+            annotation_data: serde_json::json!({"type": "test1"}),
+            description: Some("Test annotation 1".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("OHIF Viewer".to_string()),
+        };
+
+        let annotation2 = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
+            study_instance_uid: study_uid.to_string(),
+            series_instance_uid: "1.2.3.4.8".to_string(),
+            sop_instance_uid: "1.2.3.4.9".to_string(),
+            annotation_data: serde_json::json!({"type": "test2"}),
+            description: Some("Test annotation 2".to_string()),
+            tool_name: Some("test_tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            viewer_software: Some("DICOM Viewer".to_string()),
+        };
+
+        // 어노테이션들 생성
+        annotation_use_case.create_annotation(annotation1, user_id, project_id).await.unwrap();
+        annotation_use_case.create_annotation(annotation2, user_id, project_id).await.unwrap();
+
+        // OHIF Viewer로 필터링
+        let ohif_annotations = annotation_use_case.get_annotations_by_study_with_viewer(study_uid, Some("OHIF Viewer")).await.unwrap();
+        assert_eq!(ohif_annotations.total, 1);
+        assert!(ohif_annotations.annotations.iter().all(|a| a.viewer_software == Some("OHIF Viewer".to_string())));
+
+        // DICOM Viewer로 필터링
+        let dicom_annotations = annotation_use_case.get_annotations_by_study_with_viewer(study_uid, Some("DICOM Viewer")).await.unwrap();
+        assert_eq!(dicom_annotations.total, 1);
+        assert!(dicom_annotations.annotations.iter().all(|a| a.viewer_software == Some("DICOM Viewer".to_string())));
+
+        // 필터 없이 모든 어노테이션 조회
+        let all_annotations = annotation_use_case.get_annotations_by_study_with_viewer(study_uid, None).await.unwrap();
+        assert_eq!(all_annotations.total, 2);
 
         cleanup_test_data(&pool).await;
     }

@@ -1091,7 +1091,7 @@ mod tests {
             width: Some(512),
             height: Some(512),
             created_at: Utc::now(),
-            updated_at: Utc::now(),
+            updated_at: Some(Utc::now()),
         };
 
         let new_mask: NewMask = mask.into();

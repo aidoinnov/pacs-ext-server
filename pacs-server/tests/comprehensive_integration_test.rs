@@ -719,6 +719,8 @@ mod comprehensive_integration_tests {
 
         // Test 1: Invalid annotation data
         let invalid_annotation_req = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
             study_instance_uid: "".to_string(), // Empty study UID
             series_instance_uid: "".to_string(), // Empty series UID
             sop_instance_uid: "".to_string(), // Empty instance UID

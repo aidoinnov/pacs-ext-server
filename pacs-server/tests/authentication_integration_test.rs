@@ -417,6 +417,8 @@ mod authentication_integration_tests {
 
         // Create annotation for the user
         let annotation_req = CreateAnnotationRequest {
+            user_id: Some(336),
+            project_id: Some(299),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),

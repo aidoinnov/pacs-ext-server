@@ -95,7 +95,7 @@ impl AccessControlService for MockAccessControlService {
             ip_address,
             session_id: None,
             via_group_id: None,
-            logged_at: chrono::Utc::now().naive_utc(),
+            logged_at: chrono::Utc::now(),
         };
         Ok(log)
     }
@@ -171,7 +171,7 @@ fn create_test_user() -> User {
         keycloak_id: Uuid::new_v4(),
         username: "testuser".to_string(),
         email: "test@example.com".to_string(),
-        created_at: chrono::Utc::now().naive_utc(),
+        created_at: chrono::Utc::now(),
     }
 }
 
@@ -181,7 +181,7 @@ fn create_test_project() -> Project {
         name: "Test Project".to_string(),
         description: Some("A test project".to_string()),
         is_active: true,
-        created_at: chrono::Utc::now().naive_utc(),
+        created_at: chrono::Utc::now(),
     }
 }
 
@@ -191,7 +191,7 @@ fn create_test_role() -> Role {
         name: "Test Role".to_string(),
         description: Some("A test role".to_string()),
         scope: "GLOBAL".to_string(),
-        created_at: chrono::Utc::now().naive_utc(),
+        created_at: chrono::Utc::now(),
     }
 }
 
@@ -219,7 +219,7 @@ fn create_test_access_log() -> AccessLog {
         ip_address: Some("127.0.0.1".to_string()),
         session_id: None,
         via_group_id: None,
-        logged_at: chrono::Utc::now().naive_utc(),
+        logged_at: chrono::Utc::now(),
     }
 }
 

@@ -37,13 +37,7 @@ pub async fn create_annotation(
     _http_req: HttpRequest,
 ) -> impl Responder {
     // TODO: 실제 인증에서 user_id와 project_id를 가져와야 함
-    // 현재는 임시로 하드코딩된 값 사용
-    // 테스트를 위해 실제 데이터베이스에 있는 값 사용
-    // let user_id = 336; // 실제로는 JWT에서 추출 (getuser)
-    // let user_id = req.body().user_id;
-    // let project_id = 302; // 실제로는 요청에서 추출하거나 기본값 (Get Project)
-    // let project_id = req.body().project_id;
-    // project_id는 요청 body에서 가져오거나 기본값 사용
+    // 현재는 요청 body에서 가져오거나 기본값 사용
     let user_id = req.user_id.unwrap_or(1);
     let project_id = req.project_id.unwrap_or(299); // 또는 적절한 기본값
 
@@ -223,7 +217,7 @@ pub async fn delete_annotation(
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<AnnotationUseCase<AnnotationServiceImpl<AnnotationRepositoryImpl, UserRepositoryImpl, ProjectRepositoryImpl>>>) {
     cfg.app_data(web::Data::new(use_case))
         .service(
-            web::scope("/annotations")
+            web::scope("/api/annotations")
                 .route("", web::post().to(create_annotation))
                 .route("", web::get().to(list_annotations))
                 .route("/{annotation_id}", web::get().to(get_annotation))
