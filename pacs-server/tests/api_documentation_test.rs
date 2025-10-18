@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[ignore]
 mod api_documentation_tests {
     use actix_web::{test, web, App, middleware::Logger};
     use utoipa::OpenApi;

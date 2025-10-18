@@ -5,6 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-beta.5] - 2025-01-18
+
+### ✨ Added
+
+#### **Enhanced Annotation System**
+- **Viewer Software Filtering**
+  - Added `viewer_software` field to annotation entities and DTOs
+  - Implemented filtering by viewer software in all annotation queries
+  - Added support for multiple viewer types (OHIF, DICOM, Cornerstone, etc.)
+  - Enhanced API endpoints with viewer_software query parameter
+
+- **Comprehensive Test Coverage**
+  - Added unit tests for measurement_values functionality
+  - Added integration tests for viewer_software filtering
+  - Added tests for combined filtering scenarios (user + viewer, project + viewer, study + viewer)
+  - Improved test stability and error handling
+
+### 🔧 Fixed
+
+#### **DateTime Type Compatibility**
+- **PostgreSQL TIMESTAMPTZ Compatibility**
+  - Migrated all DateTime fields from `NaiveDateTime` to `DateTime<Utc>`
+  - Fixed PostgreSQL TIMESTAMPTZ type compatibility issues
+  - Updated all test cases to use proper DateTime initialization
+  - Resolved timezone-related database errors
+
+- **Test Infrastructure Improvements**
+  - Fixed ServiceResponse and TestRequest move errors in tests
+  - Improved test data setup and cleanup
+  - Enhanced error debugging capabilities
+  - Resolved compilation warnings and type mismatches
+
+### 🏗️ Technical Improvements
+
+#### **Repository Layer Enhancements**
+- Added `update_with_measurements` method for measurement_values updates
+- Implemented `find_by_*_with_viewer` methods for viewer software filtering
+- Enhanced SQL queries to include all new fields
+- Improved transaction handling for complex operations
+
+#### **Service Layer Updates**
+- Added `update_annotation_with_measurements` service method
+- Implemented viewer software filtering in all annotation services
+- Enhanced error handling and validation
+- Improved data consistency across operations
+
+#### **API Layer Improvements**
+- Enhanced `list_annotations` endpoint with advanced filtering
+- Improved query parameter handling for combined filters
+- Updated OpenAPI documentation with new fields and examples
+- Enhanced error responses and validation messages
+
+### 📚 Documentation
+
+#### **Implementation Documentation**
+- Created comprehensive implementation documentation for measurement_values feature
+- Added detailed viewer_software filtering documentation
+- Documented DateTime type migration process
+- Created step-by-step implementation guides
+
+#### **API Documentation Updates**
+- Updated OpenAPI schemas with new fields
+- Added comprehensive examples for measurement_values usage
+- Enhanced API parameter documentation
+- Improved error response documentation
+
+### 🧪 Testing
+
+#### **Test Coverage Expansion**
+- **Measurement Values Tests**
+  - `test_create_annotation_with_measurement_values`
+  - `test_update_annotation_with_measurement_values`
+  - Various measurement data structure validations
+
+- **Viewer Software Filtering Tests**
+  - `test_list_annotations_with_viewer_software_filter`
+  - `test_list_annotations_with_nonexistent_viewer_filter`
+  - `test_list_annotations_with_project_and_viewer_filter`
+  - `test_list_annotations_with_study_and_viewer_filter`
+
+- **Integration Tests**
+  - Combined filtering scenarios
+  - Error handling and edge cases
+  - Data consistency validations
+
+### 🔄 Migration Notes
+
+#### **Database Migrations**
+- `004_add_viewer_software.sql` - Added viewer_software column and index
+- `005_add_measurement_values.sql` - Added measurement_values JSONB column and GIN index
+
+#### **Breaking Changes**
+- DateTime field types changed from `NaiveDateTime` to `DateTime<Utc>`
+- New required fields in annotation DTOs (project_id, user_id)
+- Enhanced API parameter requirements for filtering
+
+#### **Backward Compatibility**
+- All new fields are optional and backward compatible
+- Existing annotations will have NULL values for new fields
+- API endpoints maintain backward compatibility with optional parameters
+
 ## [1.0.0-beta.4] - 2025-01-27
 
 ### ✨ Added

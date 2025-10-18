@@ -533,8 +533,9 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
         // 업데이트할 데이터 결정
         let new_data = request.annotation_data.unwrap_or(current_annotation.data);
         let is_shared = false; // 현재는 is_shared 업데이트 기능 없음
+        let measurement_values = request.measurement_values.or(current_annotation.measurement_values);
 
-        let updated_annotation = self.annotation_service.update_annotation(annotation_id, new_data, is_shared).await?;
+        let updated_annotation = self.annotation_service.update_annotation_with_measurements(annotation_id, new_data, is_shared, measurement_values).await?;
 
         Ok(AnnotationResponse {
             id: updated_annotation.id,

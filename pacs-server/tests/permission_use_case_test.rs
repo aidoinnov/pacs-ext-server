@@ -96,7 +96,7 @@ impl PermissionService for MockPermissionService {
             name,
             description,
             scope: scope_str.to_string(),
-            created_at: chrono::Utc::now().naive_utc(),
+            created_at: chrono::Utc::now(),
         };
         Ok(role)
     }

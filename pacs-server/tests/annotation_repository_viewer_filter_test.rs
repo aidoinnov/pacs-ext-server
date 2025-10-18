@@ -5,7 +5,7 @@ use pacs_server::domain::repositories::AnnotationRepository;
 use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
     use sqlx::postgres::PgPoolOptions;
     use std::sync::Arc;
-    use chrono::{DateTime, Utc};
+    use chrono::{DateTime, Utc, TimeZone};
 
     async fn setup_test_repository() -> (AnnotationRepositoryImpl, Arc<sqlx::Pool<sqlx::Postgres>>) {
         dotenvy::dotenv().ok();
@@ -20,7 +20,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             .expect("Failed to connect to test database");
 
         let pool = Arc::new(pool);
-        let repository = AnnotationRepositoryImpl::new(pool.clone());
+        let repository = AnnotationRepositoryImpl::new((*pool).clone());
 
         (repository, pool)
     }
@@ -55,6 +55,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("OHIF Viewer".to_string()),
             description: Some("Test annotation 1".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = NewAnnotation {
@@ -69,6 +70,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("DICOM Viewer".to_string()),
             description: Some("Test annotation 2".to_string()),
+            measurement_values: None,
         };
 
         let annotation3 = NewAnnotation {
@@ -83,6 +85,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("OHIF Viewer".to_string()),
             description: Some("Test annotation 3".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -131,6 +134,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("OHIF Viewer".to_string()),
             description: Some("Test annotation 1".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = NewAnnotation {
@@ -145,6 +149,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("DICOM Viewer".to_string()),
             description: Some("Test annotation 2".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -189,6 +194,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("OHIF Viewer".to_string()),
             description: Some("Test annotation 1".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = NewAnnotation {
@@ -203,6 +209,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("DICOM Viewer".to_string()),
             description: Some("Test annotation 2".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -246,6 +253,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("OHIF Viewer".to_string()),
             description: Some("Test annotation 1".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = NewAnnotation {
@@ -260,6 +268,7 @@ use pacs_server::infrastructure::repositories::AnnotationRepositoryImpl;
             is_shared: false,
             viewer_software: Some("ohif viewer".to_string()), // 소문자
             description: Some("Test annotation 2".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성

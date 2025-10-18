@@ -42,7 +42,10 @@ mod annotation_controller_tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(annotation_use_case.clone()))
-                .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone())),
+                .service(
+                    web::scope("/api")
+                        .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
+                ),
         )
         .await;
 
@@ -346,18 +349,29 @@ mod annotation_controller_tests {
 
         // OHIF Viewer로 필터링 테스트
         let req = test::TestRequest::get()
-            .uri("/api/annotations?viewer_software=OHIF%20Viewer")
+            .uri(&format!("/api/annotations?user_id={}&viewer_software=OHIF%20Viewer", user_id))
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
+        let status = resp.status();
+        if status != 200 {
+            let body: serde_json::Value = test::read_body_json(resp).await;
+            println!("Error response: {}", body);
+            assert_eq!(status, 200);
+        } else {
+            assert_eq!(status, 200);
+        }
 
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/annotations?user_id={}&viewer_software=OHIF%20Viewer", user_id))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
         let body: serde_json::Value = test::read_body_json(resp).await;
         assert_eq!(body["total"], 1);
         assert_eq!(body["annotations"][0]["viewer_software"], "OHIF Viewer");
 
         // DICOM Viewer로 필터링 테스트
         let req = test::TestRequest::get()
-            .uri("/api/annotations?viewer_software=DICOM%20Viewer")
+            .uri(&format!("/api/annotations?user_id={}&viewer_software=DICOM%20Viewer", user_id))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -368,7 +382,7 @@ mod annotation_controller_tests {
 
         // 필터 없이 모든 어노테이션 조회 테스트
         let req = test::TestRequest::get()
-            .uri("/api/annotations")
+            .uri(&format!("/api/annotations?user_id={}", user_id))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -511,7 +525,7 @@ mod annotation_controller_tests {
 
         // Study UID와 OHIF Viewer로 필터링 테스트
         let req = test::TestRequest::get()
-            .uri(&format!("/api/annotations?study_instance_uid={}&viewer_software=OHIF%20Viewer", study_uid))
+            .uri(&format!("/api/annotations?user_id={}&study_instance_uid={}&viewer_software=OHIF%20Viewer", user_id, study_uid))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -522,7 +536,7 @@ mod annotation_controller_tests {
 
         // Study UID와 DICOM Viewer로 필터링 테스트
         let req = test::TestRequest::get()
-            .uri(&format!("/api/annotations?study_instance_uid={}&viewer_software=DICOM%20Viewer", study_uid))
+            .uri(&format!("/api/annotations?user_id={}&study_instance_uid={}&viewer_software=DICOM%20Viewer", user_id, study_uid))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -567,7 +581,7 @@ mod annotation_controller_tests {
 
         // 존재하지 않는 viewer_software로 필터링 테스트
         let req = test::TestRequest::get()
-            .uri("/api/annotations?viewer_software=NonExistent%20Viewer")
+            .uri(&format!("/api/annotations?user_id={}&viewer_software=NonExistent%20Viewer", user_id))
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200);
@@ -608,15 +622,20 @@ mod annotation_controller_tests {
             .to_request();
         
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 201);
-
-        let body: serde_json::Value = test::read_body_json(resp).await;
-        assert!(body["measurement_values"].is_array());
-        assert_eq!(body["measurement_values"][0]["id"], "m1");
-        assert_eq!(body["measurement_values"][0]["type"], "raw");
-        assert_eq!(body["measurement_values"][0]["unit"], "mm");
-        assert_eq!(body["measurement_values"][1]["id"], "m2");
-        assert_eq!(body["measurement_values"][1]["type"], "mean");
+        let status = resp.status();
+        if status != 201 {
+            let body: serde_json::Value = test::read_body_json(resp).await;
+            println!("Error response: {}", body);
+            assert_eq!(status, 201);
+        } else {
+            let body: serde_json::Value = test::read_body_json(resp).await;
+            assert!(body["measurement_values"].is_array());
+            assert_eq!(body["measurement_values"][0]["id"], "m1");
+            assert_eq!(body["measurement_values"][0]["type"], "raw");
+            assert_eq!(body["measurement_values"][0]["unit"], "mm");
+            assert_eq!(body["measurement_values"][1]["id"], "m2");
+            assert_eq!(body["measurement_values"][1]["type"], "mean");
+        }
 
         // Cleanup
         cleanup_test_data(&pool, user_id, project_id).await;

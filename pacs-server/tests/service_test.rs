@@ -1814,6 +1814,7 @@ async fn test_annotation_service_get_user_annotations() {
             data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
             description: Some("Test annotation".to_string()),
             is_shared: false,
+            measurement_values: None,
         };
         annotation_service.create_annotation(new_annotation).await.unwrap();
     }
@@ -1870,6 +1871,7 @@ async fn test_annotation_service_get_project_annotations() {
             data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
             description: Some("Test annotation".to_string()),
             is_shared: false,
+            measurement_values: None,
         };
         annotation_service.create_annotation(new_annotation).await.unwrap();
     }
@@ -1928,6 +1930,7 @@ async fn test_annotation_service_get_study_annotations() {
             data: json!({"type": "circle", "x": 100 + i * 10, "y": 200 + i * 10, "radius": 50}),
             description: Some("Test annotation".to_string()),
             is_shared: false,
+            measurement_values: None,
         };
         annotation_service.create_annotation(new_annotation).await.unwrap();
     }

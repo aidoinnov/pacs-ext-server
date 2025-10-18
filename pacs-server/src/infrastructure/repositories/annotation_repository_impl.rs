@@ -225,6 +225,59 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         Ok(updated_annotation)
     }
 
+    async fn update_with_measurements(&self, id: i32, data: serde_json::Value, is_shared: bool, measurement_values: Option<serde_json::Value>) -> Result<Option<Annotation>, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        // 기존 annotation 데이터를 가져와서 history에 저장
+        let old_annotation = sqlx::query_as::<_, Annotation>(
+            "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description, measurement_values
+             FROM annotation_annotation WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let old_data = old_annotation.as_ref().map(|a| a.data.clone());
+        let user_id = old_annotation.as_ref().map(|a| a.user_id).unwrap_or(0);
+
+        // annotation 업데이트 (measurement_values 포함)
+        let updated_annotation = sqlx::query_as::<_, Annotation>(
+            "UPDATE annotation_annotation 
+             SET data = $2, is_shared = $3, measurement_values = $4, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1
+             RETURNING id, project_id, user_id, study_uid, series_uid, instance_uid, 
+                       tool_name, tool_version, data, is_shared, created_at, updated_at,
+                       viewer_software, description, measurement_values"
+        )
+        .bind(id)
+        .bind(data)
+        .bind(is_shared)
+        .bind(measurement_values)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        // history 생성 (같은 트랜잭션 내에서)
+        if let Some(annotation) = &updated_annotation {
+            let _ = sqlx::query_as::<_, AnnotationHistory>(
+                "INSERT INTO annotation_annotation_history (annotation_id, user_id, action, data_before, data_after)
+                 VALUES ($1, $2, $3, $4, $5)
+                 RETURNING id, annotation_id, user_id, action, data_before, data_after, action_at"
+            )
+            .bind(annotation.id)
+            .bind(user_id)
+            .bind("UPDATE")
+            .bind(old_data)
+            .bind(Some(annotation.data.clone()))
+            .fetch_one(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(updated_annotation)
+    }
+
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 

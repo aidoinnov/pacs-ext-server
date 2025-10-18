@@ -25,10 +25,10 @@ fn create_test_mask_group() -> MaskGroup {
             NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
             Utc,
         ),
-        updated_at: DateTime::from_naive_utc_and_offset(
+        updated_at: Some(DateTime::from_naive_utc_and_offset(
             NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
             Utc,
-        ),
+        )),
     }
 }
 
@@ -49,10 +49,10 @@ fn create_test_mask() -> Mask {
             NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
             Utc,
         ),
-        updated_at: DateTime::from_naive_utc_and_offset(
+        updated_at: Some(DateTime::from_naive_utc_and_offset(
             NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
             Utc,
-        ),
+        )),
     }
 }
 

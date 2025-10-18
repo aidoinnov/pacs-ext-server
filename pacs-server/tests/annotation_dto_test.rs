@@ -4,11 +4,13 @@ mod annotation_dto_tests {
         CreateAnnotationRequest, UpdateAnnotationRequest, AnnotationResponse
     };
     use serde_json::json;
-    use chrono::NaiveDateTime;
+    use chrono::{DateTime, Utc, TimeZone};
 
     #[test]
     fn test_create_annotation_request_serialization() {
         let request = CreateAnnotationRequest {
+            project_id: 1,
+            user_id: 1,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -24,6 +26,7 @@ mod annotation_dto_tests {
             tool_name: Some("Circle Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             description: Some("Test annotation with new fields".to_string()),
+            measurement_values: None,
         };
 
         // Test serialization
@@ -45,6 +48,8 @@ mod annotation_dto_tests {
     #[test]
     fn test_create_annotation_request_with_none_fields() {
         let request = CreateAnnotationRequest {
+            project_id: 1,
+            user_id: 1,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -53,6 +58,7 @@ mod annotation_dto_tests {
             tool_name: None,
             tool_version: None,
             description: None,
+            measurement_values: None,
         };
 
         // Test serialization with None values
@@ -86,6 +92,7 @@ mod annotation_dto_tests {
             tool_name: Some("Updated Rectangle Tool".to_string()),
             tool_version: Some("3.0.0".to_string()),
             description: Some("Updated description".to_string()),
+            measurement_values: None,
         };
 
         // Test serialization
@@ -108,6 +115,7 @@ mod annotation_dto_tests {
     fn test_annotation_response_serialization() {
         let response = AnnotationResponse {
             id: 123,
+            project_id: 1,
             user_id: 456,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
@@ -121,8 +129,9 @@ mod annotation_dto_tests {
             tool_name: Some("Polygon Tool".to_string()),
             tool_version: Some("2.5.0".to_string()),
             description: Some("Polygon annotation".to_string()),
-            created_at: NaiveDateTime::parse_from_str("2024-01-01T12:00:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
-            updated_at: NaiveDateTime::parse_from_str("2024-01-01T12:30:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
         };
 
         // Test serialization
@@ -149,6 +158,7 @@ mod annotation_dto_tests {
     fn test_annotation_response_with_none_fields() {
         let response = AnnotationResponse {
             id: 789,
+            project_id: 1,
             user_id: 101,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
@@ -158,8 +168,9 @@ mod annotation_dto_tests {
             tool_name: None,
             tool_version: None,
             description: None,
-            created_at: NaiveDateTime::parse_from_str("2024-01-02T10:00:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
-            updated_at: NaiveDateTime::parse_from_str("2024-01-02T10:15:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704196800, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704197700, 0).unwrap(),
         };
 
         // Test serialization with None values
@@ -193,6 +204,8 @@ mod annotation_dto_tests {
         });
 
         let circle_request = CreateAnnotationRequest {
+            project_id: 1,
+            user_id: 1,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -201,6 +214,7 @@ mod annotation_dto_tests {
             tool_name: Some("Circle Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             description: Some("Circle annotation test".to_string()),
+            measurement_values: None,
         };
 
         let circle_json = serde_json::to_string(&circle_request).expect("Failed to serialize circle");
@@ -219,6 +233,8 @@ mod annotation_dto_tests {
         });
 
         let rectangle_request = CreateAnnotationRequest {
+            project_id: 1,
+            user_id: 1,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -227,6 +243,7 @@ mod annotation_dto_tests {
             tool_name: Some("Rectangle Tool".to_string()),
             tool_version: Some("1.8.0".to_string()),
             description: Some("Rectangle annotation test".to_string()),
+            measurement_values: None,
         };
 
         let rectangle_json = serde_json::to_string(&rectangle_request).expect("Failed to serialize rectangle");
@@ -244,6 +261,8 @@ mod annotation_dto_tests {
         });
 
         let point_request = CreateAnnotationRequest {
+            project_id: 1,
+            user_id: 1,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -252,6 +271,7 @@ mod annotation_dto_tests {
             tool_name: Some("Point Tool".to_string()),
             tool_version: Some("3.2.1".to_string()),
             description: Some("Point annotation test".to_string()),
+            measurement_values: None,
         };
 
         let point_json = serde_json::to_string(&point_request).expect("Failed to serialize point");

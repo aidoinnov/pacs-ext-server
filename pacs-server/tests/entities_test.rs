@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, TimeZone};
 use pacs_server::domain::entities::*;
 use serde_json::json;
 use uuid::Uuid;
@@ -14,7 +14,8 @@ mod user_tests {
             keycloak_id: Uuid::new_v4(),
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(user.id, 1);
@@ -28,6 +29,7 @@ mod user_tests {
             keycloak_id: Uuid::new_v4(),
             username: "newuser".to_string(),
             email: "new@example.com".to_string(),
+            measurement_values: None,
         };
 
         assert_eq!(new_user.username, "newuser");
@@ -41,7 +43,8 @@ mod user_tests {
             keycloak_id: Uuid::new_v4(),
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         let json = serde_json::to_string(&user).unwrap();
@@ -61,7 +64,8 @@ mod project_tests {
             name: "Test Project".to_string(),
             description: Some("Test Description".to_string()),
             is_active: true,
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(project.id, 1);
@@ -75,6 +79,7 @@ mod project_tests {
         let new_project = NewProject {
             name: "New Project".to_string(),
             description: None,
+            measurement_values: None,
         };
 
         assert_eq!(new_project.name, "New Project");
@@ -105,7 +110,8 @@ mod role_tests {
             name: "Admin".to_string(),
             description: Some("Administrator role".to_string()),
             scope: "GLOBAL".to_string(),
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(role.name, "Admin");
@@ -149,7 +155,8 @@ mod access_condition_tests {
             operator: "EQUALS".to_string(),
             value: Some("12345".to_string()),
             condition_type: ConditionType::Allow,
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(condition.resource_type, "DICOM");
@@ -188,7 +195,8 @@ mod logs_tests {
             ip_address: Some("192.168.1.1".to_string()),
             session_id: Some("session123".to_string()),
             via_group_id: None,
-            logged_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            logged_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(log.user_id, 1);
@@ -212,6 +220,7 @@ mod logs_tests {
             ip_address: Some("10.0.0.1".to_string()),
             session_id: None,
             via_group_id: None,
+            measurement_values: None,
         };
 
         assert_eq!(new_log.resource_type, "SERIES");
@@ -242,8 +251,9 @@ mod annotation_tests {
             }),
             description: Some("Test annotation".to_string()),
             is_shared: true,
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
             updated_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(annotation.tool_name, "Arrow");
@@ -267,6 +277,8 @@ mod annotation_tests {
             }),
             description: Some("Test annotation".to_string()),
             is_shared: false,
+            measurement_values: None,
+            measurement_values: None,
         };
 
         assert_eq!(new_annotation.tool_name, "ROI");
@@ -284,7 +296,8 @@ mod relations_tests {
             id: 1,
             user_id: 10,
             project_id: 20,
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(user_project.user_id, 10);
@@ -297,7 +310,8 @@ mod relations_tests {
             id: 1,
             project_id: 5,
             role_id: 3,
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(project_role.project_id, 5);
@@ -311,7 +325,8 @@ mod relations_tests {
             role_id: 1,
             permission_id: 2,
             scope: Some("PROJECT".to_string()),
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(role_permission.scope, Some("PROJECT".to_string()));
@@ -325,7 +340,8 @@ mod relations_tests {
             permission_id: 1,
             scope: None,
             inherits_from_role_permission: true,
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert!(project_permission.inherits_from_role_permission);
@@ -344,7 +360,8 @@ mod viewer_tests {
             owner_user_id: 1,
             name: "Chest CT Protocol".to_string(),
             is_default: true,
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(protocol.name, "Chest CT Protocol");
@@ -358,7 +375,8 @@ mod viewer_tests {
             protocol_id: 1,
             rows: 2,
             cols: 3,
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(layout.rows, 2);
@@ -374,7 +392,8 @@ mod viewer_tests {
             position_col: 1,
             selection_rule: Some("FIRST_SERIES".to_string()),
             sort_order: Some("ASC".to_string()),
-            created_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
+            measurement_values: None,
         };
 
         assert_eq!(viewport.position_row, 0);

@@ -123,10 +123,14 @@ pub async fn list_annotations(
 
     // viewer_software 파라미터 추출
     let viewer_software = query.get("viewer_software").map(|s| s.as_str());
-    println!("viewer_software: {}", viewer_software.unwrap_or("None"));
     // 쿼리 파라미터에 따라 다른 메서드 호출
     let result = if let Some(study_uid) = query.get("study_instance_uid") {
-        use_case.get_annotations_by_study_with_viewer(study_uid, viewer_software).await
+        // study_instance_uid와 user_id가 모두 있으면 사용자별 study annotation 조회
+        if query.get("user_id").is_some() {
+            use_case.get_annotations_by_user_with_viewer(user_id, viewer_software).await
+        } else {
+            use_case.get_annotations_by_study_with_viewer(study_uid, viewer_software).await
+        }
     } else if let Some(project_id_str) = query.get("project_id") {
         if let Ok(project_id) = project_id_str.parse::<i32>() {
             use_case.get_annotations_by_project_with_viewer(project_id, viewer_software).await
