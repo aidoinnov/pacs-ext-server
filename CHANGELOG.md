@@ -8,6 +8,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added - 2025-10-05
 
+#### Terraform Infrastructure Documentation
+- **Terraform 학습 가이드 시리즈** - 16개 문서 작성
+  - `terraform-learning-guide.md` - Terraform 기초 학습 가이드
+  - `terraform-core-concepts.md` - Terraform 핵심 개념 (HCL, Provider, Resource, State, Variables, Outputs, Data Sources, Modules)
+  - `terraform-docker-provider-guide.md` - Docker Provider 기초 가이드
+  - `terraform-docker-compose-analysis.md` - 현재 docker-compose.yml 분석 및 Terraform 변환
+  - `terraform-postgresql-setup.md` - Terraform으로 PostgreSQL 구성하기
+  - `terraform-docker-network-guide.md` - Docker 네트워크 구성 가이드
+  - `terraform-environment-management-guide.md` - 환경별 설정 관리 (development/production)
+  - `terraform-aws-provider-guide.md` - AWS Provider 설정 가이드
+  - `terraform-s3-bucket-guide.md` - S3 버킷 생성 및 관리
+  - `terraform-iam-policy-guide.md` - IAM 정책 및 사용자 생성
+  - `terraform-rds-postgresql-guide.md` - RDS PostgreSQL 구성
+  - `terraform-vpc-networking-guide.md` - VPC 및 네트워킹 구성
+  - `terraform-eks-cluster-guide.md` - EKS 클러스터 구성
+  - `terraform-alb-guide.md` - Application Load Balancer 가이드
+  - `terraform-autoscaling-guide.md` - Auto Scaling 그룹 가이드
+  - `terraform-cicd-guide.md` - CI/CD 파이프라인 가이드
+  - `terraform-monitoring-guide.md` - 모니터링 및 로깅 가이드
+  - `terraform-security-guide.md` - 보안 및 컴플라이언스 가이드
+
+- **프로젝트 기반 학습 계획**
+  - `terraform-project-based-learning.md` - PACS 프로젝트 기반 6단계 학습 계획
+  - `terraform-documentation-plan.md` - 15개 핵심 문서 + 5개 추가 문서 작성 계획
+  - 16주 학습 로드맵 및 체크리스트 제공
+
+- **실용적인 예제 및 테스트**
+  - 각 가이드마다 실제 PACS 프로젝트 환경에 맞는 Terraform 코드 예제
+  - Docker Compose → Terraform 마이그레이션 가이드
+  - AWS 클라우드 인프라 구성 (VPC, RDS, EKS, ALB, Auto Scaling)
+  - CI/CD 파이프라인 (GitHub Actions) 설정
+  - 모니터링 및 보안 설정 (CloudWatch, GuardDuty, Security Hub)
+  - HIPAA 컴플라이언스 가이드
+
+### Added - 2025-10-05
+
 #### Presentation Layer - HTTP Controllers (25 통합 테스트)
 - **AuthController** (`/auth`) - 인증 API (3개 테스트)
   - `POST /auth/login` - Keycloak ID 기반 로그인

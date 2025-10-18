@@ -801,3 +801,5 @@ Error: AccessDenied: User is not authorized to perform: sts:AssumeRole
 - [최소 권한 원칙](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
 
 이제 PACS 프로젝트의 보안을 위한 IAM 설정이 완료되었습니다! 🚀
+
+

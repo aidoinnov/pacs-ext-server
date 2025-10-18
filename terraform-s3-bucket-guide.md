@@ -783,3 +783,5 @@ Error: AccessDenied: Access Denied
 - [CORS 설정 가이드](https://docs.aws.amazon.com/AmazonS3/latest/userguide/cors.html)
 
 이제 PACS 프로젝트의 마스크 이미지를 안전하게 저장할 S3 버킷이 준비되었습니다! 🚀
+
+

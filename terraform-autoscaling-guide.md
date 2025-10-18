@@ -1207,3 +1207,5 @@ resource "aws_autoscaling_group" "pacs_backend" {
 - [CloudWatch 메트릭](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/working_with_metrics.html)
 
 이제 PACS 프로젝트의 자동 스케일링을 위한 Auto Scaling Group이 준비되었습니다! 🚀
+
+

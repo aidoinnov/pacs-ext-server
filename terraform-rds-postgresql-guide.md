@@ -962,3 +962,5 @@ resource "aws_db_instance" "main" {
 - [RDS 백업 및 복구](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/BackupRestore.html)
 
 이제 PACS 프로젝트의 DICOM 메타데이터를 안전하게 저장할 PostgreSQL 데이터베이스가 준비되었습니다! 🚀
+
+

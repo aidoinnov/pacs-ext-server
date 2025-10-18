@@ -1044,3 +1044,5 @@ kubectl get nodes
 - [AWS EKS 배포 가이드](https://docs.aws.amazon.com/eks/latest/userguide/deploy-applications.html)
 
 이제 PACS 프로젝트의 자동화된 배포를 위한 CI/CD 파이프라인이 준비되었습니다! 🚀
+
+

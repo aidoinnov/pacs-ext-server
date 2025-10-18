@@ -363,3 +363,5 @@ resource "aws_instance" "web" {
 5. **상태 관리** - 원격 백엔드 설정
 
 이 핵심 개념들을 이해하면 Terraform을 효과적으로 사용할 수 있습니다!
+
+

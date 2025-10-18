@@ -1464,3 +1464,5 @@ echo "All state synchronizations completed! 🎉"
 - [Terraform 백엔드 설정](https://developer.hashicorp.com/terraform/language/settings/backends)
 
 이제 PACS 프로젝트를 여러 환경에서 안전하고 효율적으로 관리할 수 있게 되었습니다! 🚀
+
+

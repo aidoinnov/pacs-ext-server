@@ -790,3 +790,5 @@ variable "availability_zones" {
 - [Terraform AWS 예제](https://github.com/hashicorp/terraform-provider-aws/tree/main/examples)
 
 이제 PACS 프로젝트를 AWS 클라우드에서 관리할 준비가 완료되었습니다! 🚀
+
+

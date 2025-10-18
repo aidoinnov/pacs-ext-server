@@ -1311,3 +1311,5 @@ resource "kubernetes_network_policy" "pacs" {
 - [EKS Best Practices](https://aws.github.io/aws-eks-best-practices/)
 
 이제 PACS 프로젝트의 컨테이너 오케스트레이션을 위한 EKS 클러스터가 준비되었습니다! 🚀
+
+

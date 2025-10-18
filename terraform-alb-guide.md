@@ -1228,3 +1228,5 @@ resource "aws_lb_listener_rule" "keycloak" {
 - [SSL/TLS 설정 가이드](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html)
 
 이제 PACS 프로젝트의 고가용성 로드 밸런싱을 위한 ALB가 준비되었습니다! 🚀
+
+

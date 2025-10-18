@@ -1216,3 +1216,5 @@ resource "aws_security_group" "pacs_web" {
 - [보안 그룹 규칙](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html)
 
 이제 PACS 프로젝트의 안전하고 확장 가능한 네트워크 인프라가 준비되었습니다! 🚀
+
+

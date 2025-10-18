@@ -513,3 +513,5 @@ resource "docker_container" "postgres" {
 - [PostgreSQL Docker 이미지](https://hub.docker.com/_/postgres)
 
 이 분석을 통해 Docker Compose에서 Terraform으로의 마이그레이션 준비가 완료되었습니다! 🚀
+
+
