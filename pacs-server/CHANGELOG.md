@@ -22,7 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 #### **User Profile Management**
-- **Added user profile update API**: New `PUT /api/users/{user_id}` endpoint for updating user information
+- **Added user profile fields**: Extended user table with `full_name`, `organization`, `department`, `phone`, and `updated_at` fields
+- **Added user update API**: Implemented `PUT /api/users/{user_id}` endpoint for updating user profile information
+- **Enhanced user DTOs**: Updated `CreateUserRequest`, `UpdateUserRequest`, and `UserResponse` with new profile fields
+- **Added UpdateUser entity**: Created builder pattern-based `UpdateUser` entity for flexible user updates
+- **Database migration**: Added migration `006_add_user_profile_fields.sql` with automatic `updated_at` trigger
+- **Partial update support**: Users can update individual fields without affecting others
+- **Email uniqueness validation**: Added email duplicate check during user updates
 - **Extended user profile fields**: Added support for additional user profile fields:
   - `full_name` - 사용자 실명 (한글명/영문명)
   - `organization` - 소속 기관
