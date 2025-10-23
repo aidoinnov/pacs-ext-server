@@ -1,13 +1,22 @@
 use async_trait::async_trait;
 use uuid::Uuid;
-use crate::domain::entities::{User, NewUser, Project};
+use crate::domain::entities::{User, NewUser, UpdateUser, Project};
 use crate::domain::repositories::{UserRepository, ProjectRepository};
 
 /// 사용자 관리 도메인 서비스
 #[async_trait]
 pub trait UserService: Send + Sync {
     /// 사용자 생성
-    async fn create_user(&self, username: String, email: String, keycloak_id: Uuid) -> Result<User, ServiceError>;
+    async fn create_user(
+        &self, 
+        username: String, 
+        email: String, 
+        keycloak_id: Uuid,
+        full_name: Option<String>,
+        organization: Option<String>,
+        department: Option<String>,
+        phone: Option<String>,
+    ) -> Result<User, ServiceError>;
 
     /// 사용자 조회 (ID)
     async fn get_user_by_id(&self, id: i32) -> Result<User, ServiceError>;
@@ -17,6 +26,9 @@ pub trait UserService: Send + Sync {
 
     /// 사용자 조회 (Username)
     async fn get_user_by_username(&self, username: &str) -> Result<User, ServiceError>;
+
+    /// 사용자 정보 업데이트
+    async fn update_user(&self, update_user: UpdateUser) -> Result<User, ServiceError>;
 
     /// 사용자 삭제
     async fn delete_user(&self, id: i32) -> Result<(), ServiceError>;
@@ -67,7 +79,16 @@ where
     U: UserRepository,
     P: ProjectRepository,
 {
-    async fn create_user(&self, username: String, email: String, keycloak_id: Uuid) -> Result<User, ServiceError> {
+    async fn create_user(
+        &self, 
+        username: String, 
+        email: String, 
+        keycloak_id: Uuid,
+        full_name: Option<String>,
+        organization: Option<String>,
+        department: Option<String>,
+        phone: Option<String>,
+    ) -> Result<User, ServiceError> {
         // 중복 체크
         if let Some(_) = self.user_repository.find_by_keycloak_id(keycloak_id).await? {
             return Err(ServiceError::AlreadyExists("User with this keycloak_id already exists".into()));
@@ -86,6 +107,10 @@ where
             keycloak_id,
             username,
             email,
+            full_name,
+            organization,
+            department,
+            phone,
         };
 
         Ok(self.user_repository.create(new_user).await?)
@@ -110,6 +135,26 @@ where
             .find_by_username(username)
             .await?
             .ok_or(ServiceError::NotFound("User not found".into()))
+    }
+
+    async fn update_user(&self, update_user: UpdateUser) -> Result<User, ServiceError> {
+        // 사용자 존재 여부 확인
+        self.user_repository
+            .find_by_id(update_user.id)
+            .await?
+            .ok_or(ServiceError::NotFound("User not found".into()))?;
+
+        // 이메일 중복 검사 (이메일이 변경되는 경우)
+        if let Some(ref email) = update_user.email {
+            if let Some(existing_user) = self.user_repository.find_by_email(email).await? {
+                if existing_user.id != update_user.id {
+                    return Err(ServiceError::AlreadyExists("Email already taken".into()));
+                }
+            }
+        }
+
+        // 사용자 정보 업데이트
+        Ok(self.user_repository.update(&update_user).await?)
     }
 
     async fn delete_user(&self, id: i32) -> Result<(), ServiceError> {

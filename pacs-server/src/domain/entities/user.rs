@@ -23,7 +23,12 @@ use uuid::Uuid;
 /// - `keycloak_id`: Keycloak 인증 시스템에서 사용하는 사용자 식별자
 /// - `username`: 사용자 로그인에 사용되는 고유한 사용자명
 /// - `email`: 사용자의 이메일 주소 (로그인 및 알림에 사용)
+/// - `full_name`: 사용자의 실명 (한글명/영문명)
+/// - `organization`: 소속 기관
+/// - `department`: 소속 부서/그룹
+/// - `phone`: 연락처
 /// - `created_at`: 사용자 계정이 생성된 시각
+/// - `updated_at`: 마지막 업데이트 시각
 /// 
 /// # 예시
 /// ```rust
@@ -32,7 +37,12 @@ use uuid::Uuid;
 ///     keycloak_id: Uuid::new_v4(),
 ///     username: "john_doe".to_string(),
 ///     email: "john@example.com".to_string(),
-///     created_at: NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
+///     full_name: Some("홍길동".to_string()),
+///     organization: Some("서울대학교병원".to_string()),
+///     department: Some("영상의학과".to_string()),
+///     phone: Some("010-1234-5678".to_string()),
+///     created_at: DateTime::from_timestamp(1640995200, 0).unwrap(),
+///     updated_at: Some(DateTime::from_timestamp(1640995200, 0).unwrap()),
 /// };
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -45,9 +55,18 @@ pub struct User {
     pub username: String,
     /// 사용자의 이메일 주소 (로그인 및 알림에 사용)
     pub email: String,
+    /// 사용자의 실명 (한글명/영문명)
+    pub full_name: Option<String>,
+    /// 소속 기관
+    pub organization: Option<String>,
+    /// 소속 부서/그룹
+    pub department: Option<String>,
+    /// 연락처
+    pub phone: Option<String>,
     /// 사용자 계정이 생성된 시각
-    // pub created_at: NaiveDateTime,
     pub created_at: DateTime<Utc>,
+    /// 마지막 업데이트 시각
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// 새로운 사용자 생성을 위한 DTO(Data Transfer Object)
@@ -59,6 +78,10 @@ pub struct User {
 /// - `keycloak_id`: Keycloak에서 발급받은 사용자 식별자
 /// - `username`: 생성할 사용자명 (중복되지 않아야 함)
 /// - `email`: 사용자의 이메일 주소 (유효한 이메일 형식이어야 함)
+/// - `full_name`: 사용자의 실명 (선택사항)
+/// - `organization`: 소속 기관 (선택사항)
+/// - `department`: 소속 부서/그룹 (선택사항)
+/// - `phone`: 연락처 (선택사항)
 /// 
 /// # 예시
 /// ```rust
@@ -66,6 +89,10 @@ pub struct User {
 ///     keycloak_id: Uuid::new_v4(),
 ///     username: "jane_doe".to_string(),
 ///     email: "jane@example.com".to_string(),
+///     full_name: Some("김영희".to_string()),
+///     organization: Some("서울대학교병원".to_string()),
+///     department: Some("영상의학과".to_string()),
+///     phone: Some("010-9876-5432".to_string()),
 /// };
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,4 +103,98 @@ pub struct NewUser {
     pub username: String,
     /// 사용자의 이메일 주소 (유효한 이메일 형식이어야 함)
     pub email: String,
+    /// 사용자의 실명 (선택사항)
+    pub full_name: Option<String>,
+    /// 소속 기관 (선택사항)
+    pub organization: Option<String>,
+    /// 소속 부서/그룹 (선택사항)
+    pub department: Option<String>,
+    /// 연락처 (선택사항)
+    pub phone: Option<String>,
+}
+
+/// 사용자 정보 업데이트를 위한 엔티티 (Builder 패턴)
+/// 
+/// 이 구조체는 사용자 정보 업데이트 시 사용되며, 제공된 필드만 업데이트합니다.
+/// Builder 패턴을 사용하여 유연한 업데이트를 지원합니다.
+/// 
+/// # 필드
+/// - `id`: 업데이트할 사용자 ID
+/// - `email`: 이메일 주소 (선택사항)
+/// - `full_name`: 실명 (선택사항)
+/// - `organization`: 소속 기관 (선택사항)
+/// - `department`: 소속 부서/그룹 (선택사항)
+/// - `phone`: 연락처 (선택사항)
+/// 
+/// # 예시
+/// ```rust
+/// let update_user = UpdateUser::new(1)
+///     .with_email("new_email@example.com".to_string())
+///     .with_full_name("새로운 이름".to_string())
+///     .with_organization("새로운 기관".to_string());
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateUser {
+    /// 업데이트할 사용자 ID
+    pub id: i32,
+    /// 이메일 주소 (선택사항)
+    pub email: Option<String>,
+    /// 실명 (선택사항)
+    pub full_name: Option<String>,
+    /// 소속 기관 (선택사항)
+    pub organization: Option<String>,
+    /// 소속 부서/그룹 (선택사항)
+    pub department: Option<String>,
+    /// 연락처 (선택사항)
+    pub phone: Option<String>,
+}
+
+impl UpdateUser {
+    /// 새로운 UpdateUser 인스턴스를 생성합니다.
+    /// 
+    /// # Arguments
+    /// * `id` - 업데이트할 사용자 ID
+    /// 
+    /// # Returns
+    /// * `UpdateUser` - 빈 업데이트 객체
+    pub fn new(id: i32) -> Self {
+        Self {
+            id,
+            email: None,
+            full_name: None,
+            organization: None,
+            department: None,
+            phone: None,
+        }
+    }
+
+    /// 이메일 주소를 설정합니다.
+    pub fn with_email(mut self, email: String) -> Self {
+        self.email = Some(email);
+        self
+    }
+
+    /// 실명을 설정합니다.
+    pub fn with_full_name(mut self, full_name: String) -> Self {
+        self.full_name = Some(full_name);
+        self
+    }
+
+    /// 소속 기관을 설정합니다.
+    pub fn with_organization(mut self, organization: String) -> Self {
+        self.organization = Some(organization);
+        self
+    }
+
+    /// 소속 부서/그룹을 설정합니다.
+    pub fn with_department(mut self, department: String) -> Self {
+        self.department = Some(department);
+        self
+    }
+
+    /// 연락처를 설정합니다.
+    pub fn with_phone(mut self, phone: String) -> Self {
+        self.phone = Some(phone);
+        self
+    }
 }

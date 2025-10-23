@@ -1,5 +1,5 @@
 use crate::application::dto::{
-    CreateUserRequest, UserResponse, UserListResponse, AddProjectMemberRequest,
+    CreateUserRequest, UpdateUserRequest, UserResponse, UserListResponse, AddProjectMemberRequest,
     UserProjectsResponse, ProjectSummary,
 };
 use crate::domain::services::UserService;
@@ -19,42 +19,54 @@ impl<U: UserService> UserUseCase<U> {
     pub async fn create_user(&self, request: CreateUserRequest) -> Result<UserResponse, ServiceError> {
         let user = self
             .user_service
-            .create_user(request.username, request.email, request.keycloak_id)
+            .create_user(
+                request.username, 
+                request.email, 
+                request.keycloak_id,
+                request.full_name,
+                request.organization,
+                request.department,
+                request.phone,
+            )
             .await?;
 
-        Ok(UserResponse {
-            id: user.id,
-            keycloak_id: user.keycloak_id,
-            username: user.username,
-            email: user.email,
-            created_at: user.created_at,
-        })
+        Ok(UserResponse::from(user))
     }
 
     /// 사용자 조회 (ID)
     pub async fn get_user_by_id(&self, user_id: i32) -> Result<UserResponse, ServiceError> {
         let user = self.user_service.get_user_by_id(user_id).await?;
-
-        Ok(UserResponse {
-            id: user.id,
-            keycloak_id: user.keycloak_id,
-            username: user.username,
-            email: user.email,
-            created_at: user.created_at,
-        })
+        Ok(UserResponse::from(user))
     }
 
     /// 사용자 조회 (Username)
     pub async fn get_user_by_username(&self, username: &str) -> Result<UserResponse, ServiceError> {
         let user = self.user_service.get_user_by_username(username).await?;
+        Ok(UserResponse::from(user))
+    }
 
-        Ok(UserResponse {
-            id: user.id,
-            keycloak_id: user.keycloak_id,
-            username: user.username,
-            email: user.email,
-            created_at: user.created_at,
-        })
+    /// 사용자 정보 업데이트
+    pub async fn update_user(&self, user_id: i32, request: UpdateUserRequest) -> Result<UserResponse, ServiceError> {
+        let mut update_user = crate::domain::entities::UpdateUser::new(user_id);
+        
+        if let Some(email) = request.email {
+            update_user = update_user.with_email(email);
+        }
+        if let Some(full_name) = request.full_name {
+            update_user = update_user.with_full_name(full_name);
+        }
+        if let Some(organization) = request.organization {
+            update_user = update_user.with_organization(organization);
+        }
+        if let Some(department) = request.department {
+            update_user = update_user.with_department(department);
+        }
+        if let Some(phone) = request.phone {
+            update_user = update_user.with_phone(phone);
+        }
+
+        let user = self.user_service.update_user(update_user).await?;
+        Ok(UserResponse::from(user))
     }
 
     /// 사용자 삭제

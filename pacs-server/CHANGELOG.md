@@ -19,6 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fixed annotation DELETE API error**: Resolved "Database error: no column found for name: measurement_values" by adding missing `measurement_values` column to SQL queries
 - **Fixed find_shared_annotations query**: Added missing `measurement_values` column to shared annotations query
 
+### ✨ Added
+
+#### **User Profile Management**
+- **Added user profile update API**: New `PUT /api/users/{user_id}` endpoint for updating user information
+- **Extended user profile fields**: Added support for additional user profile fields:
+  - `full_name` - 사용자 실명 (한글명/영문명)
+  - `organization` - 소속 기관
+  - `department` - 소속 부서/그룹
+  - `phone` - 연락처
+  - `updated_at` - 마지막 업데이트 시각
+- **Database schema update**: Added new columns to `security_user` table with proper indexing
+- **Builder pattern for updates**: Implemented `UpdateUser` entity with builder pattern for flexible field updates
+- **Email uniqueness validation**: Added email duplicate checking during user updates
+- **OpenAPI documentation**: Complete API documentation for user update endpoint
+
 #### **Configuration Management**
 - **Cleaned up `.env` file**: Removed duplicate and commented-out environment variable definitions
 - **Updated config files**: Removed hardcoded object storage credentials from:
