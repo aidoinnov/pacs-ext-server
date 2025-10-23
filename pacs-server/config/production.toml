@@ -15,6 +15,15 @@ database = "pacs_production"
 max_connections = 20
 min_connections = 5
 
+[object_storage]
+# All object storage settings should be configured via environment variables:
+# APP_OBJECT_STORAGE__PROVIDER
+# APP_OBJECT_STORAGE__BUCKET_NAME
+# APP_OBJECT_STORAGE__REGION
+# APP_OBJECT_STORAGE__ENDPOINT (optional)
+# APP_OBJECT_STORAGE__ACCESS_KEY_ID
+# APP_OBJECT_STORAGE__SECRET_ACCESS_KEY
+
 [keycloak]
 url = "https://keycloak.production.local"
 realm = "pacs"

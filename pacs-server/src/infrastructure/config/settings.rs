@@ -233,25 +233,49 @@ impl Settings {
                     .parse()
                     .unwrap_or(3600),
             },
-            object_storage: ObjectStorageConfig {
-                provider: env::var("APP_OBJECT_STORAGE__PROVIDER")
+            object_storage: {
+                let provider = env::var("APP_OBJECT_STORAGE__PROVIDER")
                     .or_else(|_| env::var("OBJECT_STORAGE_PROVIDER"))
-                    .unwrap_or_else(|_| "s3".to_string()),
-                bucket_name: env::var("APP_OBJECT_STORAGE__BUCKET_NAME")
+                    .unwrap_or_else(|_| "s3".to_string());
+                let bucket_name = env::var("APP_OBJECT_STORAGE__BUCKET_NAME")
                     .or_else(|_| env::var("OBJECT_STORAGE_BUCKET_NAME"))
-                    .unwrap_or_else(|_| "pacs-masks".to_string()),
-                region: env::var("APP_OBJECT_STORAGE__REGION")
+                    .unwrap_or_else(|_| "pacs-masks".to_string());
+                let region = env::var("APP_OBJECT_STORAGE__REGION")
                     .or_else(|_| env::var("OBJECT_STORAGE_REGION"))
-                    .unwrap_or_else(|_| "us-east-1".to_string()),
-                endpoint: env::var("APP_OBJECT_STORAGE__ENDPOINT")
+                    .unwrap_or_else(|_| "us-east-1".to_string());
+                let endpoint = env::var("APP_OBJECT_STORAGE__ENDPOINT")
                     .or_else(|_| env::var("OBJECT_STORAGE_ENDPOINT"))
-                    .unwrap_or_else(|_| "".to_string()),
-                access_key: env::var("APP_OBJECT_STORAGE__ACCESS_KEY_ID")
+                    .unwrap_or_else(|_| "".to_string());
+                let access_key = env::var("APP_OBJECT_STORAGE__ACCESS_KEY_ID")
                     .or_else(|_| env::var("OBJECT_STORAGE_ACCESS_KEY_ID"))
-                    .unwrap_or_else(|_| "".to_string()),
-                secret_key: env::var("APP_OBJECT_STORAGE__SECRET_ACCESS_KEY")
+                    .unwrap_or_else(|_| "".to_string());
+                let secret_key = env::var("APP_OBJECT_STORAGE__SECRET_ACCESS_KEY")
                     .or_else(|_| env::var("OBJECT_STORAGE_SECRET_ACCESS_KEY"))
-                    .unwrap_or_else(|_| "".to_string()),
+                    .unwrap_or_else(|_| "".to_string());
+
+                // 디버깅: 환경 변수 로드 정보 출력
+                println!("🔧 Object Storage 설정 로드:");
+                println!("   Provider: {}", provider);
+                println!("   Bucket: {}", bucket_name);
+                println!("   Region: {}", region);
+                println!("   Endpoint: {}", if endpoint.is_empty() { "None".to_string() } else { endpoint.clone() });
+                println!("   Access Key: {} (길이: {})", 
+                    if access_key.is_empty() { "EMPTY".to_string() } else { format!("{}...{}", &access_key[..access_key.len().min(8)], &access_key[access_key.len().saturating_sub(4)..]) },
+                    access_key.len()
+                );
+                println!("   Secret Key: {} (길이: {})", 
+                    if secret_key.is_empty() { "EMPTY".to_string() } else { format!("{}...{}", &secret_key[..secret_key.len().min(8)], &secret_key[secret_key.len().saturating_sub(4)..]) },
+                    secret_key.len()
+                );
+
+                ObjectStorageConfig {
+                    provider,
+                    bucket_name,
+                    region,
+                    endpoint,
+                    access_key,
+                    secret_key,
+                }
             },
             signed_url: SignedUrlConfig {
                 default_ttl: env::var("APP_SIGNED_URL__DEFAULT_TTL")

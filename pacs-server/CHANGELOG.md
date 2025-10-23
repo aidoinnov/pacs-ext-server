@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-beta.7] - 2025-01-23
+
+### 🐛 Fixed
+
+#### **S3 Signed URL Generation**
+- **Fixed S3 signed URL generation error**: Resolved "액세스키가 없다" (Access key is missing) error
+- **Environment variable loading issue**: Fixed duplicate keys in `.env` file causing environment variables to not load properly
+- **Config file hardcoded values**: Removed hardcoded S3 credentials from TOML config files that were overriding environment variables
+- **Configuration priority**: Ensured proper environment variable priority over TOML file values
+
+#### **Configuration Management**
+- **Cleaned up `.env` file**: Removed duplicate and commented-out environment variable definitions
+- **Updated config files**: Removed hardcoded object storage credentials from:
+  - `config/default.toml`
+  - `config/development.toml` 
+  - `config/production.toml`
+- **Added debugging output**: Enhanced logging for environment variable loading verification
+
+### 🔧 Technical Details
+- **Root cause**: TOML config files contained hardcoded S3 credentials that were overriding environment variables
+- **Solution**: Removed all hardcoded sensitive values from config files, ensuring environment variables take precedence
+- **Verification**: Added debug logging to confirm proper environment variable loading
+- **Result**: S3 signed URL generation now works correctly with proper credential loading
+
 ## [1.0.0-beta.6] - 2025-01-23
 
 ### ✨ Added

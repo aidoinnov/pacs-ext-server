@@ -16,6 +16,9 @@
 //! - RESTful API 제공
 //! - OpenAPI 문서화
 
+// 환경 변수 로딩
+use dotenvy::dotenv;
+
 // 웹 프레임워크 및 HTTP 관련 모듈
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 // PostgreSQL 데이터베이스 연결 풀 옵션
@@ -118,6 +121,13 @@ async fn main() -> std::io::Result<()> {
 
     // .env 파일에서 환경 변수 로드
     dotenvy::dotenv().ok();
+    
+    // 디버깅: 환경 변수 로딩 확인
+    println!("🔍 환경 변수 로딩 확인:");
+    println!("   APP_OBJECT_STORAGE__ACCESS_KEY_ID: {}", 
+        std::env::var("APP_OBJECT_STORAGE__ACCESS_KEY_ID").unwrap_or_else(|_| "NOT_FOUND".to_string()));
+    println!("   APP_OBJECT_STORAGE__SECRET_ACCESS_KEY: {}", 
+        std::env::var("APP_OBJECT_STORAGE__SECRET_ACCESS_KEY").unwrap_or_else(|_| "NOT_FOUND".to_string()));
 
     // 애플리케이션 설정 로드
     print!("⚙️  Loading configuration... ");

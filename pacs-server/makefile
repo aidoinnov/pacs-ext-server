@@ -45,6 +45,16 @@ dev-watch:
 	@echo ">>> Starting PACS server with auto-reload"
 	@cargo watch -x run
 
+## restart: 서버 강제 리스타트
+restart:
+	@echo ">>> Restarting PACS server"
+	@./restart_server.sh
+
+## quick-restart: 서버 빠른 리스타트
+quick-restart:
+	@echo ">>> Quick restarting PACS server"
+	@./quick_restart.sh
+
 ## test: 모든 테스트 실행
 test:
 	@echo ">>> Running tests"

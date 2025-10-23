@@ -225,9 +225,15 @@ where
         // 권한 확인
         self.mask_group_service.can_access_mask_group(user_id, request.mask_group_id).await?;
 
+        // 마스크 그룹에서 annotation_id 조회
+        let mask_group = self.mask_group_service
+            .get_mask_group_by_id(request.mask_group_id)
+            .await?
+            .ok_or_else(|| ServiceError::NotFound(format!("Mask group with ID {} not found", request.mask_group_id)))?;
+
         let signed_url = self.signed_url_service
             .generate_mask_upload_url(
-                0, // annotation_id (임시)
+                mask_group.annotation_id, // 실제 annotation_id 사용
                 request.mask_group_id,
                 request.filename,
                 request.mime_type,
