@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Config file hardcoded values**: Removed hardcoded S3 credentials from TOML config files that were overriding environment variables
 - **Configuration priority**: Ensured proper environment variable priority over TOML file values
 
+#### **Database Query Fixes**
+- **Fixed annotation DELETE API error**: Resolved "Database error: no column found for name: measurement_values" by adding missing `measurement_values` column to SQL queries
+- **Fixed find_shared_annotations query**: Added missing `measurement_values` column to shared annotations query
+
 #### **Configuration Management**
 - **Cleaned up `.env` file**: Removed duplicate and commented-out environment variable definitions
 - **Updated config files**: Removed hardcoded object storage credentials from:

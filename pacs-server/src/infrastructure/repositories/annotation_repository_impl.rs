@@ -118,7 +118,7 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
                     tool_name, tool_version, data, is_shared, created_at, updated_at,
-                    viewer_software, description
+                    viewer_software, description, measurement_values
              FROM annotation_annotation
              WHERE project_id = $1 AND is_shared = true
              ORDER BY created_at DESC"
@@ -285,7 +285,7 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         let old_annotation = sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
                     tool_name, tool_version, data, is_shared, created_at, updated_at,
-                    viewer_software, description
+                    viewer_software, description, measurement_values
              FROM annotation_annotation WHERE id = $1"
         )
         .bind(id)
