@@ -278,7 +278,6 @@ mod annotation_tests {
             description: Some("Test annotation".to_string()),
             is_shared: false,
             measurement_values: None,
-            measurement_values: None,
         };
 
         assert_eq!(new_annotation.tool_name, "ROI");
