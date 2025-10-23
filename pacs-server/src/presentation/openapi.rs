@@ -2,10 +2,12 @@ use utoipa::OpenApi;
 use crate::presentation::controllers::auth_controller_docs::*;
 use crate::presentation::controllers::annotation_controller::*;
 use crate::presentation::controllers::project_controller::*;
+use crate::presentation::controllers::mask_group_controller::*;
 use crate::application::dto::auth_dto::*;
 use crate::application::dto::user_dto::*;
 use crate::application::dto::project_dto::*;
 use crate::application::dto::annotation_dto::*;
+use crate::application::dto::mask_group_dto::*;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -24,6 +26,14 @@ use crate::application::dto::annotation_dto::*;
         get_project,
         list_projects,
         get_active_projects,
+        // Mask Group endpoints
+        create_mask_group,
+        get_mask_group,
+        list_mask_groups,
+        update_mask_group,
+        delete_mask_group,
+        generate_upload_url,
+        complete_upload,
     ),
     components(
         schemas(
@@ -46,6 +56,16 @@ use crate::application::dto::annotation_dto::*;
             UpdateAnnotationRequest,
             AnnotationResponse,
             AnnotationListResponse,
+            // Mask Group DTOs
+            CreateMaskGroupRequest,
+            UpdateMaskGroupRequest,
+            MaskGroupResponse,
+            MaskGroupListResponse,
+            MaskGroupDetailResponse,
+            SignedUrlRequest,
+            SignedUrlResponse,
+            CompleteUploadRequest,
+            CompleteUploadResponse,
         )
     ),
     tags(
@@ -55,6 +75,7 @@ use crate::application::dto::annotation_dto::*;
         (name = "permissions", description = "Permission management endpoints - 권한 관리 API"),
         (name = "access-control", description = "Access control endpoints - 접근 제어 API"),
         (name = "annotations", description = "Annotation management endpoints - 어노테이션 관리 API"),
+        (name = "mask-groups", description = "Mask Group management endpoints - 마스크 그룹 관리 API"),
     ),
     info(
         title = "PACS Extension Server API",

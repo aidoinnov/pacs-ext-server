@@ -34,16 +34,17 @@ where
     /// Mask Group 생성
     pub async fn create_mask_group(
         &self, 
+        annotation_id: i32,
         request: CreateMaskGroupRequest, 
         user_id: i32
     ) -> Result<MaskGroupResponse, ServiceError> {
         // 권한 확인
         self.mask_group_service
-            .can_create_mask_group(user_id, request.annotation_id)
+            .can_create_mask_group(user_id, annotation_id)
             .await?;
 
         let new_mask_group = NewMaskGroup::new(
-            request.annotation_id,
+            annotation_id,
             request.group_name,
             request.model_name,
             request.version,

@@ -218,7 +218,7 @@ async fn main() -> std::io::Result<()> {
         permission_repo,
     );
     // 어노테이션 서비스: 어노테이션 CRUD, 히스토리 관리 등
-    let annotation_service = AnnotationServiceImpl::new(annotation_repo.clone(), user_repo.clone(), project_repo.clone());
+    let annotation_service: AnnotationServiceImpl<_, _, _> = AnnotationServiceImpl::new(annotation_repo.clone(), user_repo.clone(), project_repo.clone());
     // 마스크 그룹 서비스: 마스크 그룹 CRUD, 업로드 URL 생성 등
     let mask_group_service = Arc::new(MaskGroupServiceImpl::new(
         mask_group_repo.clone(),
@@ -334,8 +334,8 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| project_controller::configure_routes(cfg, project_use_case.clone()))
                     .configure(|cfg| permission_controller::configure_routes(cfg, permission_use_case.clone()))
                     .configure(|cfg| access_control_controller::configure_routes(cfg, access_control_use_case.clone()))
-                    .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
                     .configure(|cfg| mask_group_controller::configure_routes(cfg, mask_group_use_case.clone()))
+                    .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
                     .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
             )
     })

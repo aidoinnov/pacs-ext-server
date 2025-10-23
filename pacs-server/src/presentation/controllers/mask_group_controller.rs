@@ -55,8 +55,7 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let annotation_id = path.into_inner();
-    let mut request = req.into_inner();
-    request.annotation_id = annotation_id;
+    let request = req.into_inner();
 
     println!("🔍 [MaskGroupController] 마스크 그룹 생성 요청: annotation_id = {}", annotation_id);
 
@@ -70,7 +69,7 @@ where
 
     println!("🔍 [MaskGroupController] user_id = {}", user_id);
 
-    match use_case.create_mask_group(request, user_id).await {
+    match use_case.create_mask_group(annotation_id, request, user_id).await {
         Ok(mask_group) => HttpResponse::Created().json(mask_group),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
@@ -484,7 +483,7 @@ where
 {
     cfg.app_data(web::Data::new(use_case))
         .service(
-            web::scope("/api/annotations/{annotation_id}/mask-groups")
+            web::scope("/annotations/{annotation_id}/mask-groups")
                 .route("", web::post().to(create_mask_group::<MGS, SUS>))
                 .route("", web::get().to(list_mask_groups::<MGS, SUS>))
                 .route("/{group_id}", web::get().to(get_mask_group::<MGS, SUS>))

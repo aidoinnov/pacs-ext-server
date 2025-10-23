@@ -5,7 +5,7 @@
 # 프로젝트 정보
 PROJECT_NAME=pacs-server
 IMAGE_NAME=aido/pacs-extension-server
-VERSION=0.1.21
+VERSION=0.1.23
 CONTAINER_NAME ?= pacs-server
 
 # 레지스트리 정보

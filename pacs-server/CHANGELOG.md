@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-beta.6] - 2025-01-23
+
+### ✨ Added
+
+#### **Mask Group Management System**
+- **Complete Mask Group API Implementation**
+  - Added `MaskGroupRepositoryImpl` with PostgreSQL integration
+  - Implemented full CRUD operations for mask groups
+  - Added mask group service layer with business logic validation
+  - Created comprehensive use case layer for mask group operations
+  - Integrated mask group controller with RESTful API endpoints
+
+- **API Endpoints**
+  - `POST /api/annotations/{annotation_id}/mask-groups` - Create mask group
+  - `GET /api/annotations/{annotation_id}/mask-groups` - List mask groups
+  - `GET /api/annotations/{annotation_id}/mask-groups/{group_id}` - Get mask group details
+  - `PUT /api/annotations/{annotation_id}/mask-groups/{group_id}` - Update mask group
+  - `DELETE /api/annotations/{annotation_id}/mask-groups/{group_id}` - Delete mask group
+  - `POST /api/annotations/{annotation_id}/mask-groups/{group_id}/upload-url` - Generate signed URL
+  - `POST /api/annotations/{annotation_id}/mask-groups/{group_id}/complete-upload` - Complete upload
+
+- **Data Models**
+  - Enhanced `CreateMaskGroupRequest` DTO with comprehensive fields
+  - Added `UpdateMaskGroupRequest` for partial updates
+  - Implemented `MaskGroupResponse` with full entity mapping
+  - Added `MaskGroupListResponse` with pagination support
+  - Created `SignedUrlRequest` and `SignedUrlResponse` for file uploads
+
+- **Database Integration**
+  - Full PostgreSQL integration with SQLx
+  - Proper error handling and transaction support
+  - Optimized queries with proper indexing
+  - Support for complex filtering and pagination
+
+- **OpenAPI Documentation**
+  - Complete OpenAPI/Swagger documentation for all endpoints
+  - Detailed request/response schemas
+  - Comprehensive error response documentation
+  - Interactive API testing support
+
+### 🔧 Fixed
+
+- **Routing Configuration**
+  - Fixed route ordering to prevent path conflicts
+  - Resolved 404 errors in mask group endpoints
+  - Properly configured controller scopes and path parameters
+
+- **DTO Structure**
+  - Removed redundant `annotation_id` field from request DTOs
+  - Fixed parameter passing between controller and use case layers
+  - Ensured proper URL parameter extraction and validation
+
+### 🧪 Testing
+
+- **Integration Testing**
+  - Added comprehensive API integration tests
+  - Tested complete mask group creation workflow
+  - Verified authentication and authorization flows
+  - Validated error handling and edge cases
+
 ## [1.0.0-beta.5] - 2025-01-18
 
 ### ✨ Added

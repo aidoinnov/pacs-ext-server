@@ -1,4 +1,4 @@
-   Compiling pacs_server v0.1.0 (/Users/aido/Code/pacs-ext-server/pacs-server)
+nohup: ignoring input
 warning: unused import: `UserListResponse`
  --> src/application/use_cases/user_use_case.rs:2:38
   |
@@ -8,15 +8,15 @@ warning: unused import: `UserListResponse`
   = note: `#[warn(unused_imports)]` on by default
 
 warning: unused import: `MaskGroup`
- --> src/application/use_cases/mask_group_use_case.rs:9:62
-  |
-9 | use crate::domain::entities::{NewMaskGroup, UpdateMaskGroup, MaskGroup};
-  |                                                              ^^^^^^^^^
+  --> src/application/use_cases/mask_group_use_case.rs:10:62
+   |
+10 | use crate::domain::entities::{NewMaskGroup, UpdateMaskGroup, MaskGroup};
+   |                                                              ^^^^^^^^^
 
 warning: unused import: `Mask`
- --> src/application/use_cases/mask_use_case.rs:8:52
+ --> src/application/use_cases/mask_use_case.rs:9:52
   |
-8 | use crate::domain::entities::{NewMask, UpdateMask, Mask};
+9 | use crate::domain::entities::{NewMask, UpdateMask, Mask};
   |                                                    ^^^^
 
 warning: unused import: `serde_json::json`
@@ -24,6 +24,12 @@ warning: unused import: `serde_json::json`
   |
 3 | use serde_json::json;
   |     ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `DateTime` and `Utc`
+ --> src/infrastructure/repositories/mask_repository_impl.rs:3:14
+  |
+3 | use chrono::{DateTime, Utc};
+  |              ^^^^^^^^  ^^^
 
 warning: unused import: `aws_config::meta::region::RegionProviderChain`
  --> src/infrastructure/external/s3_service.rs:2:5
@@ -94,126 +100,126 @@ warning: unused variable: `endpoint`
    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_endpoint`
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_group_controller.rs:114:10
+   --> src/presentation/controllers/mask_group_controller.rs:122:10
     |
-114 |     let (annotation_id, group_id) = path.into_inner();
+122 |     let (annotation_id, group_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unreachable pattern
-   --> src/presentation/controllers/mask_group_controller.rs:251:9
+   --> src/presentation/controllers/mask_group_controller.rs:274:9
     |
-251 |         _ => HttpResponse::InternalServerError().json(json!({
+274 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ no value can reach this
     |
 note: multiple earlier patterns match some of the same values
-   --> src/presentation/controllers/mask_group_controller.rs:251:9
+   --> src/presentation/controllers/mask_group_controller.rs:274:9
     |
-230 |         Ok(mask_group) => HttpResponse::Ok().json(mask_group),
+253 |         Ok(mask_group) => HttpResponse::Ok().json(mask_group),
     |         -------------- matches some of the same values
-231 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+254 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
     |         -------------------------------- matches some of the same values
 ...
-235 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+258 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
     |         ------------------------------------ matches some of the same values
 ...
-239 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+262 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
     |         --------------------------------------- matches some of the same values
 ...
-251 |         _ => HttpResponse::InternalServerError().json(json!({
+274 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ ...and 2 other patterns collectively make this unreachable
     = note: `#[warn(unreachable_patterns)]` on by default
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_group_controller.rs:224:10
+   --> src/presentation/controllers/mask_group_controller.rs:242:10
     |
-224 |     let (annotation_id, group_id) = path.into_inner();
+242 |     let (annotation_id, group_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_group_controller.rs:283:10
+   --> src/presentation/controllers/mask_group_controller.rs:306:10
     |
-283 |     let (annotation_id, group_id) = path.into_inner();
+306 |     let (annotation_id, group_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unreachable pattern
-   --> src/presentation/controllers/mask_group_controller.rs:366:9
+   --> src/presentation/controllers/mask_group_controller.rs:399:9
     |
-366 |         _ => HttpResponse::InternalServerError().json(json!({
+399 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ no value can reach this
     |
 note: multiple earlier patterns match some of the same values
-   --> src/presentation/controllers/mask_group_controller.rs:366:9
+   --> src/presentation/controllers/mask_group_controller.rs:399:9
     |
-345 |         Ok(signed_url) => HttpResponse::Ok().json(signed_url),
+378 |         Ok(signed_url) => HttpResponse::Ok().json(signed_url),
     |         -------------- matches some of the same values
-346 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+379 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
     |         -------------------------------- matches some of the same values
 ...
-350 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+383 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
     |         ------------------------------------ matches some of the same values
 ...
-354 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+387 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
     |         --------------------------------------- matches some of the same values
 ...
-366 |         _ => HttpResponse::InternalServerError().json(json!({
+399 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ ...and 2 other patterns collectively make this unreachable
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_group_controller.rs:337:10
+   --> src/presentation/controllers/mask_group_controller.rs:365:10
     |
-337 |     let (annotation_id, group_id) = path.into_inner();
+365 |     let (annotation_id, group_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unreachable pattern
-   --> src/presentation/controllers/mask_group_controller.rs:430:9
+   --> src/presentation/controllers/mask_group_controller.rs:468:9
     |
-430 |         _ => HttpResponse::InternalServerError().json(json!({
+468 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ no value can reach this
     |
 note: multiple earlier patterns match some of the same values
-   --> src/presentation/controllers/mask_group_controller.rs:430:9
+   --> src/presentation/controllers/mask_group_controller.rs:468:9
     |
-409 |         Ok(response) => HttpResponse::Ok().json(response),
+447 |         Ok(response) => HttpResponse::Ok().json(response),
     |         ------------ matches some of the same values
-410 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+448 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
     |         -------------------------------- matches some of the same values
 ...
-414 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+452 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
     |         ------------------------------------ matches some of the same values
 ...
-418 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+456 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
     |         --------------------------------------- matches some of the same values
 ...
-430 |         _ => HttpResponse::InternalServerError().json(json!({
+468 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ ...and 2 other patterns collectively make this unreachable
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_group_controller.rs:401:10
+   --> src/presentation/controllers/mask_group_controller.rs:434:10
     |
-401 |     let (annotation_id, group_id) = path.into_inner();
+434 |     let (annotation_id, group_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unreachable pattern
-  --> src/presentation/controllers/mask_controller.rs:89:9
+  --> src/presentation/controllers/mask_controller.rs:94:9
    |
-89 |         _ => HttpResponse::InternalServerError().json(json!({
+94 |         _ => HttpResponse::InternalServerError().json(json!({
    |         ^ no value can reach this
    |
 note: multiple earlier patterns match some of the same values
-  --> src/presentation/controllers/mask_controller.rs:89:9
+  --> src/presentation/controllers/mask_controller.rs:94:9
    |
-68 |         Ok(mask) => HttpResponse::Created().json(mask),
+73 |         Ok(mask) => HttpResponse::Created().json(mask),
    |         -------- matches some of the same values
-69 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+74 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
    |         -------------------------------- matches some of the same values
 ...
-73 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+78 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
    |         ------------------------------------ matches some of the same values
 ...
-77 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+82 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
    |         --------------------------------------- matches some of the same values
 ...
-89 |         _ => HttpResponse::InternalServerError().json(json!({
+94 |         _ => HttpResponse::InternalServerError().json(json!({
    |         ^ ...and 2 other patterns collectively make this unreachable
 
 warning: unused variable: `annotation_id`
@@ -223,175 +229,151 @@ warning: unused variable: `annotation_id`
    |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_controller.rs:123:10
+   --> src/presentation/controllers/mask_controller.rs:128:10
     |
-123 |     let (annotation_id, group_id, mask_id) = path.into_inner();
+128 |     let (annotation_id, group_id, mask_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unused variable: `group_id`
-   --> src/presentation/controllers/mask_controller.rs:123:25
+   --> src/presentation/controllers/mask_controller.rs:128:25
     |
-123 |     let (annotation_id, group_id, mask_id) = path.into_inner();
+128 |     let (annotation_id, group_id, mask_id) = path.into_inner();
     |                         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_group_id`
 
-warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_controller.rs:177:10
-    |
-177 |     let (annotation_id, group_id) = path.into_inner();
-    |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
-
 warning: unreachable pattern
-   --> src/presentation/controllers/mask_controller.rs:264:9
+   --> src/presentation/controllers/mask_controller.rs:285:9
     |
-264 |         _ => HttpResponse::InternalServerError().json(json!({
+285 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ no value can reach this
     |
 note: multiple earlier patterns match some of the same values
-   --> src/presentation/controllers/mask_controller.rs:264:9
+   --> src/presentation/controllers/mask_controller.rs:285:9
     |
-243 |         Ok(mask) => HttpResponse::Ok().json(mask),
+264 |         Ok(mask) => HttpResponse::Ok().json(mask),
     |         -------- matches some of the same values
-244 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+265 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
     |         -------------------------------- matches some of the same values
 ...
-248 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+269 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
     |         ------------------------------------ matches some of the same values
 ...
-252 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+273 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
     |         --------------------------------------- matches some of the same values
 ...
-264 |         _ => HttpResponse::InternalServerError().json(json!({
+285 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ ...and 2 other patterns collectively make this unreachable
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_controller.rs:237:10
+   --> src/presentation/controllers/mask_controller.rs:253:10
     |
-237 |     let (annotation_id, group_id, mask_id) = path.into_inner();
+253 |     let (annotation_id, group_id, mask_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unused variable: `group_id`
-   --> src/presentation/controllers/mask_controller.rs:237:25
+   --> src/presentation/controllers/mask_controller.rs:253:25
     |
-237 |     let (annotation_id, group_id, mask_id) = path.into_inner();
+253 |     let (annotation_id, group_id, mask_id) = path.into_inner();
     |                         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_group_id`
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_controller.rs:298:10
+   --> src/presentation/controllers/mask_controller.rs:319:10
     |
-298 |     let (annotation_id, group_id, mask_id) = path.into_inner();
+319 |     let (annotation_id, group_id, mask_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unused variable: `group_id`
-   --> src/presentation/controllers/mask_controller.rs:298:25
+   --> src/presentation/controllers/mask_controller.rs:319:25
     |
-298 |     let (annotation_id, group_id, mask_id) = path.into_inner();
+319 |     let (annotation_id, group_id, mask_id) = path.into_inner();
     |                         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_group_id`
 
 warning: unreachable pattern
-   --> src/presentation/controllers/mask_controller.rs:383:9
+   --> src/presentation/controllers/mask_controller.rs:414:9
     |
-383 |         _ => HttpResponse::InternalServerError().json(json!({
+414 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ no value can reach this
     |
 note: multiple earlier patterns match some of the same values
-   --> src/presentation/controllers/mask_controller.rs:383:9
+   --> src/presentation/controllers/mask_controller.rs:414:9
     |
-362 |         Ok(download_url) => HttpResponse::Ok().json(download_url),
+393 |         Ok(download_url) => HttpResponse::Ok().json(download_url),
     |         ---------------- matches some of the same values
-363 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+394 |         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
     |         -------------------------------- matches some of the same values
 ...
-367 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+398 |         Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
     |         ------------------------------------ matches some of the same values
 ...
-371 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
+402 |         Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
     |         --------------------------------------- matches some of the same values
 ...
-383 |         _ => HttpResponse::InternalServerError().json(json!({
+414 |         _ => HttpResponse::InternalServerError().json(json!({
     |         ^ ...and 2 other patterns collectively make this unreachable
 
 warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_controller.rs:354:10
+   --> src/presentation/controllers/mask_controller.rs:380:10
     |
-354 |     let (annotation_id, group_id, mask_id) = path.into_inner();
+380 |     let (annotation_id, group_id, mask_id) = path.into_inner();
     |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
 
 warning: unused variable: `group_id`
-   --> src/presentation/controllers/mask_controller.rs:354:25
+   --> src/presentation/controllers/mask_controller.rs:380:25
     |
-354 |     let (annotation_id, group_id, mask_id) = path.into_inner();
+380 |     let (annotation_id, group_id, mask_id) = path.into_inner();
     |                         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_group_id`
 
-warning: unused variable: `annotation_id`
-   --> src/presentation/controllers/mask_controller.rs:416:10
-    |
-416 |     let (annotation_id, group_id) = path.into_inner();
-    |          ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation_id`
-
-warning: unused import: `AnnotationService`
- --> src/presentation/controllers/annotation_controller.rs:9:51
+warning: unused import: `crate::domain::services::annotation_service::AnnotationService`
+ --> src/presentation/controllers/annotation_controller.rs:9:5
   |
-9 | use crate::domain::services::annotation_service::{AnnotationService, ServiceError};
-  |                                                   ^^^^^^^^^^^^^^^^^
-
-warning: unused variable: `annotation`
-  --> src/domain/services/mask_group_service.rs:99:13
-   |
-99 |         let annotation = self.annotation_repository
-   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation`
-
-warning: unused variable: `user`
-   --> src/domain/services/mask_group_service.rs:107:17
-    |
-107 |             let user = self.user_repository
-    |                 ^^^^ help: if this is intentional, prefix it with an underscore: `_user`
+9 | use crate::domain::services::annotation_service::AnnotationService;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: unused variable: `existing_mask_group`
-   --> src/domain/services/mask_group_service.rs:128:13
+   --> src/domain/services/mask_group_service.rs:167:13
     |
-128 |         let existing_mask_group = self.mask_group_repository
+167 |         let existing_mask_group = self.mask_group_repository
     |             ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_existing_mask_group`
 
 warning: unused variable: `existing_mask_group`
-   --> src/domain/services/mask_group_service.rs:141:13
+   --> src/domain/services/mask_group_service.rs:180:13
     |
-141 |         let existing_mask_group = self.mask_group_repository
+180 |         let existing_mask_group = self.mask_group_repository
     |             ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_existing_mask_group`
 
 warning: unused variable: `annotation`
-   --> src/domain/services/mask_group_service.rs:163:17
+   --> src/domain/services/mask_group_service.rs:202:17
     |
-163 |             let annotation = self.annotation_repository
+202 |             let annotation = self.annotation_repository
     |                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation`
 
 warning: unused variable: `user`
-   --> src/domain/services/mask_group_service.rs:172:17
+   --> src/domain/services/mask_group_service.rs:211:17
     |
-172 |             let user = self.user_repository
+211 |             let user = self.user_repository
     |                 ^^^^ help: if this is intentional, prefix it with an underscore: `_user`
 
 warning: unused variable: `mask_group`
-   --> src/domain/services/mask_group_service.rs:186:13
+   --> src/domain/services/mask_group_service.rs:225:13
     |
-186 |         let mask_group = self.mask_group_repository
+225 |         let mask_group = self.mask_group_repository
     |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_mask_group`
 
 warning: unused variable: `annotation`
-   --> src/domain/services/mask_group_service.rs:199:17
+   --> src/domain/services/mask_group_service.rs:238:17
     |
-199 |             let annotation = self.annotation_repository
+238 |             let annotation = self.annotation_repository
     |                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation`
 
 warning: unused variable: `annotation`
-   --> src/domain/services/mask_group_service.rs:220:17
+   --> src/domain/services/mask_group_service.rs:259:17
     |
-220 |             let annotation = self.annotation_repository
+259 |             let annotation = self.annotation_repository
     |                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_annotation`
 
 warning: unused variable: `user`
-   --> src/domain/services/mask_group_service.rs:229:17
+   --> src/domain/services/mask_group_service.rs:268:17
     |
-229 |             let user = self.user_repository
+268 |             let user = self.user_repository
     |                 ^^^^ help: if this is intentional, prefix it with an underscore: `_user`
 
 warning: unused variable: `mask_group`
@@ -429,12 +411,6 @@ warning: unused variable: `mask_group`
     |
 183 |             let mask_group = self.mask_group_repository
     |                 ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_mask_group`
-
-warning: unused variable: `id`
-  --> src/infrastructure/repositories/mask_group_repository_impl.rs:98:28
-   |
-98 |     async fn update(&self, id: i32, update_mask_group: &UpdateMaskGroup) -> Result<MaskGroup, ServiceError> {
-   |                            ^^ help: if this is intentional, prefix it with an underscore: `_id`
 
 warning: unused variable: `id`
    --> src/infrastructure/repositories/mask_repository_impl.rs:100:28
@@ -551,7 +527,7 @@ warning: field `use_case` is never read
 17 |     use_case: Arc<MaskUseCase<MS, MGS, SUS>>,
    |     ^^^^^^^^
 
-warning: `pacs_server` (lib) generated 68 warnings (run `cargo fix --lib -p pacs_server` to apply 11 suggestions)
+warning: `pacs_server` (lib) generated 64 warnings (run `cargo fix --lib -p pacs_server` to apply 12 suggestions)
 warning: unused import: `mask_group_dto::*`
   --> src/application/dto/mod.rs:16:9
    |
@@ -639,173 +615,188 @@ warning: unused imports: `CacheMiddleware` and `CachePolicy`
   |                 ^^^^^^^^^^^^^^^  ^^^^^^^^^^^
 
 warning: unused import: `JwtConfig`
-  --> src/main.rs:27:30
+  --> src/main.rs:64:30
    |
-27 | use infrastructure::config::{JwtConfig, Settings};
+64 | use infrastructure::config::{JwtConfig, Settings};
    |                              ^^^^^^^^^
 
+warning: unused variable: `shutdown_signal`
+   --> src/main.rs:304:9
+    |
+304 |     let shutdown_signal = async {
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_shutdown_signal`
+
 warning: methods `refresh_token` and `logout` are never used
-  --> src/application/use_cases/auth_use_case.rs:48:18
+  --> src/application/use_cases/auth_use_case.rs:49:18
    |
-11 | impl<A: AuthService> AuthUseCase<A> {
+12 | impl<A: AuthService> AuthUseCase<A> {
    | ----------------------------------- methods in this implementation
 ...
-48 |     pub async fn refresh_token(&self, token: &str) -> Result<RefreshTokenResponse, ServiceError> {
+49 |     pub async fn refresh_token(&self, token: &str) -> Result<RefreshTokenResponse, ServiceError> {
    |                  ^^^^^^^^^^^^^
 ...
-63 |     pub async fn logout(&self, token: &str) -> Result<(), ServiceError> {
+64 |     pub async fn logout(&self, token: &str) -> Result<(), ServiceError> {
    |                  ^^^^^^
    |
    = note: `#[warn(dead_code)]` on by default
 
 warning: methods `delete_user`, `add_project_member`, `remove_project_member`, `get_user_projects`, and `is_project_member` are never used
-  --> src/application/use_cases/user_use_case.rs:60:18
-   |
-12 | impl<U: UserService> UserUseCase<U> {
-   | ----------------------------------- methods in this implementation
-...
-60 |     pub async fn delete_user(&self, user_id: i32) -> Result<(), ServiceError> {
-   |                  ^^^^^^^^^^^
-...
-65 |     pub async fn add_project_member(&self, request: AddProjectMemberRequest) -> Result<(), ServiceError> {
-   |                  ^^^^^^^^^^^^^^^^^^
-...
-72 |     pub async fn remove_project_member(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError> {
-   |                  ^^^^^^^^^^^^^^^^^^^^^
-...
-79 |     pub async fn get_user_projects(&self, user_id: i32) -> Result<UserProjectsResponse, ServiceError> {
-   |                  ^^^^^^^^^^^^^^^^^
-...
-99 |     pub async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError> {
-   |                  ^^^^^^^^^^^^^^^^^
-
-warning: multiple methods are never used
-   --> src/application/use_cases/project_use_case.rs:91:18
+   --> src/application/use_cases/user_use_case.rs:61:18
     |
- 12 | impl<P: ProjectService> ProjectUseCase<P> {
-    | ----------------------------------------- methods in this implementation
+ 13 | impl<U: UserService> UserUseCase<U> {
+    | ----------------------------------- methods in this implementation
 ...
- 91 |     pub async fn activate_project(&self, project_id: i32) -> Result<ProjectResponse, ServiceError> {
-    |                  ^^^^^^^^^^^^^^^^
+ 61 |     pub async fn delete_user(&self, user_id: i32) -> Result<(), ServiceError> {
+    |                  ^^^^^^^^^^^
 ...
-104 |     pub async fn deactivate_project(&self, project_id: i32) -> Result<ProjectResponse, ServiceError> {
+ 66 |     pub async fn add_project_member(&self, request: AddProjectMemberRequest) -> Result<(), ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^^
 ...
-117 |     pub async fn delete_project(&self, project_id: i32) -> Result<(), ServiceError> {
-    |                  ^^^^^^^^^^^^^^
+ 73 |     pub async fn remove_project_member(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^^^^^^
 ...
-122 |     pub async fn get_project_members(&self, project_id: i32) -> Result<ProjectMembersResponse, ServiceError> {
-    |                  ^^^^^^^^^^^^^^^^^^^
+ 80 |     pub async fn get_user_projects(&self, user_id: i32) -> Result<UserProjectsResponse, ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^^
 ...
-144 |     pub async fn assign_role(&self, project_id: i32, request: ProjectAssignRoleRequest) -> Result<(), ServiceError> {
-    |                  ^^^^^^^^^^^
-...
-151 |     pub async fn remove_role(&self, project_id: i32, role_id: i32) -> Result<(), ServiceError> {
-    |                  ^^^^^^^^^^^
-...
-158 |     pub async fn get_project_roles(&self, project_id: i32) -> Result<ProjectRolesResponse, ServiceError> {
+100 |     pub async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^
 
 warning: multiple methods are never used
-   --> src/application/use_cases/permission_use_case.rs:82:18
+   --> src/application/use_cases/project_use_case.rs:92:18
     |
- 13 | impl<P: PermissionService> PermissionUseCase<P> {
+ 13 | impl<P: ProjectService> ProjectUseCase<P> {
+    | ----------------------------------------- methods in this implementation
+...
+ 92 |     pub async fn activate_project(&self, project_id: i32) -> Result<ProjectResponse, ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^
+...
+105 |     pub async fn deactivate_project(&self, project_id: i32) -> Result<ProjectResponse, ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^^^
+...
+118 |     pub async fn delete_project(&self, project_id: i32) -> Result<(), ServiceError> {
+    |                  ^^^^^^^^^^^^^^
+...
+123 |     pub async fn get_project_members(&self, project_id: i32) -> Result<ProjectMembersResponse, ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^^^^
+...
+145 |     pub async fn assign_role(&self, project_id: i32, request: ProjectAssignRoleRequest) -> Result<(), ServiceError> {
+    |                  ^^^^^^^^^^^
+...
+152 |     pub async fn remove_role(&self, project_id: i32, role_id: i32) -> Result<(), ServiceError> {
+    |                  ^^^^^^^^^^^
+...
+159 |     pub async fn get_project_roles(&self, project_id: i32) -> Result<ProjectRolesResponse, ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^^
+
+warning: multiple methods are never used
+   --> src/application/use_cases/permission_use_case.rs:83:18
+    |
+ 14 | impl<P: PermissionService> PermissionUseCase<P> {
     | ----------------------------------------------- methods in this implementation
 ...
- 82 |     pub async fn assign_permission_to_role(
+ 83 |     pub async fn assign_permission_to_role(
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
- 93 |     pub async fn remove_permission_from_role(
+ 94 |     pub async fn remove_permission_from_role(
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-104 |     pub async fn get_role_permissions(&self, role_id: i32) -> Result<RolePermissionsResponse, ServiceError> {
+105 |     pub async fn get_role_permissions(&self, role_id: i32) -> Result<RolePermissionsResponse, ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^^^^
 ...
-125 |     pub async fn assign_permission_to_project(
+126 |     pub async fn assign_permission_to_project(
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-136 |     pub async fn remove_permission_from_project(
+137 |     pub async fn remove_permission_from_project(
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-147 |     pub async fn get_project_permissions(&self, project_id: i32) -> Result<ProjectPermissionsResponse, ServiceError> {
+148 |     pub async fn get_project_permissions(&self, project_id: i32) -> Result<ProjectPermissionsResponse, ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^^^^^^^
 ...
-169 |     pub async fn get_permissions_for_resource(&self, resource_type: &str) -> Result<ResourcePermissionsResponse, ServiceError> {
+170 |     pub async fn get_permissions_for_resource(&self, resource_type: &str) -> Result<ResourcePermissionsResponse, ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: methods `get_annotations_by_series`, `get_annotations_by_instance`, `get_annotations_by_project_and_study`, `get_shared_annotations`, and `can_access_annotation` are never used
-   --> src/application/use_cases/annotation_use_case.rs:160:18
+warning: multiple methods are never used
+   --> src/application/use_cases/annotation_use_case.rs:198:18
     |
- 13 | impl<A: AnnotationService> AnnotationUseCase<A> {
+ 49 | impl<A: AnnotationService> AnnotationUseCase<A> {
     | ----------------------------------------------- methods in this implementation
 ...
-160 |     pub async fn get_annotations_by_series(&self, series_uid: &str) -> Result<AnnotationListResponse, ServiceError> {
+198 |     pub async fn get_annotations_by_project(&self, project_id: i32) -> Result<AnnotationListResponse, ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+244 |     pub async fn get_annotations_by_user(&self, user_id: i32) -> Result<AnnotationListResponse, ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^
+...
+291 |     pub async fn get_annotations_by_study(&self, study_uid: &str) -> Result<AnnotationListResponse, ServiceError> {
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+338 |     pub async fn get_annotations_by_series(&self, series_uid: &str) -> Result<AnnotationListResponse, ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-189 |     pub async fn get_annotations_by_instance(&self, instance_uid: &str) -> Result<AnnotationListResponse, ServiceError> {
+385 |     pub async fn get_annotations_by_instance(&self, instance_uid: &str) -> Result<AnnotationListResponse, ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-218 |     pub async fn get_annotations_by_project_and_study(&self, project_id: i32, study_uid: &str) -> Result<AnnotationListResponse, ServiceE...
+433 |     pub async fn get_annotations_by_project_and_study(&self, project_id: i32, study_uid: &str) -> Result<AnnotationListResponse, ServiceE...
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-247 |     pub async fn get_shared_annotations(&self, project_id: i32) -> Result<AnnotationListResponse, ServiceError> {
+479 |     pub async fn get_shared_annotations(&self, project_id: i32) -> Result<AnnotationListResponse, ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^^^^^^
 ...
-308 |     pub async fn can_access_annotation(&self, user_id: i32, annotation_id: i32) -> Result<bool, ServiceError> {
+601 |     pub async fn can_access_annotation(&self, user_id: i32, annotation_id: i32) -> Result<bool, ServiceError> {
     |                  ^^^^^^^^^^^^^^^^^^^^^
 
 warning: struct `UserListResponse` is never constructed
-  --> src/application/dto/user_dto.rs:45:12
+  --> src/application/dto/user_dto.rs:47:12
    |
-45 | pub struct UserListResponse {
+47 | pub struct UserListResponse {
    |            ^^^^^^^^^^^^^^^^
 
 warning: struct `AddProjectMemberRequest` is never constructed
-  --> src/application/dto/user_dto.rs:52:12
+  --> src/application/dto/user_dto.rs:54:12
    |
-52 | pub struct AddProjectMemberRequest {
+54 | pub struct AddProjectMemberRequest {
    |            ^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: struct `UserProjectsResponse` is never constructed
-  --> src/application/dto/user_dto.rs:59:12
+  --> src/application/dto/user_dto.rs:61:12
    |
-59 | pub struct UserProjectsResponse {
+61 | pub struct UserProjectsResponse {
    |            ^^^^^^^^^^^^^^^^^^^^
 
 warning: struct `ProjectSummary` is never constructed
-  --> src/application/dto/user_dto.rs:65:12
+  --> src/application/dto/user_dto.rs:67:12
    |
-65 | pub struct ProjectSummary {
+67 | pub struct ProjectSummary {
    |            ^^^^^^^^^^^^^^
 
 warning: struct `ProjectAssignRoleRequest` is never constructed
-  --> src/application/dto/project_dto.rs:52:12
+  --> src/application/dto/project_dto.rs:54:12
    |
-52 | pub struct ProjectAssignRoleRequest {
+54 | pub struct ProjectAssignRoleRequest {
    |            ^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: struct `ProjectMembersResponse` is never constructed
-  --> src/application/dto/project_dto.rs:58:12
+  --> src/application/dto/project_dto.rs:60:12
    |
-58 | pub struct ProjectMembersResponse {
+60 | pub struct ProjectMembersResponse {
    |            ^^^^^^^^^^^^^^^^^^^^^^
 
 warning: struct `MemberInfo` is never constructed
-  --> src/application/dto/project_dto.rs:65:12
+  --> src/application/dto/project_dto.rs:67:12
    |
-65 | pub struct MemberInfo {
+67 | pub struct MemberInfo {
    |            ^^^^^^^^^^
 
 warning: struct `ProjectRolesResponse` is never constructed
-  --> src/application/dto/project_dto.rs:74:12
+  --> src/application/dto/project_dto.rs:77:12
    |
-74 | pub struct ProjectRolesResponse {
+77 | pub struct ProjectRolesResponse {
    |            ^^^^^^^^^^^^^^^^^^^^
 
 warning: struct `RoleInfo` is never constructed
-  --> src/application/dto/project_dto.rs:80:12
+  --> src/application/dto/project_dto.rs:83:12
    |
-80 | pub struct RoleInfo {
+83 | pub struct RoleInfo {
    |            ^^^^^^^^
 
 warning: struct `CreatePermissionRequest` is never constructed
@@ -1173,102 +1164,102 @@ warning: struct `HpViewport` is never constructed
    |            ^^^^^^^^^^
 
 warning: associated functions `with_defaults`, `with_ai_model`, and `manual` are never used
-   --> src/domain/entities/mask_group.rs:65:12
+   --> src/domain/entities/mask_group.rs:186:12
     |
- 38 | impl NewMaskGroup {
+133 | impl NewMaskGroup {
     | ----------------- associated functions in this implementation
 ...
- 65 |     pub fn with_defaults(annotation_id: i32, created_by: Option<i32>) -> Self {
+186 |     pub fn with_defaults(annotation_id: i32, created_by: Option<i32>) -> Self {
     |            ^^^^^^^^^^^^^
 ...
- 80 |     pub fn with_ai_model(
+215 |     pub fn with_ai_model(
     |            ^^^^^^^^^^^^^
 ...
-103 |     pub fn manual(
+251 |     pub fn manual(
     |            ^^^^^^
 
 warning: methods `add_modality_count` and `add_mask_type_count` are never used
-   --> src/domain/entities/mask_group.rs:236:12
+   --> src/domain/entities/mask_group.rs:525:12
     |
-223 | impl MaskGroupStats {
+493 | impl MaskGroupStats {
     | ------------------- methods in this implementation
 ...
-236 |     pub fn add_modality_count(&mut self, modality: String, count: i64) {
+525 |     pub fn add_modality_count(&mut self, modality: String, count: i64) {
     |            ^^^^^^^^^^^^^^^^^^
 ...
-241 |     pub fn add_mask_type_count(&mut self, mask_type: String, count: i64) {
+544 |     pub fn add_mask_type_count(&mut self, mask_type: String, count: i64) {
     |            ^^^^^^^^^^^^^^^^^^^
 
 warning: multiple associated items are never used
-   --> src/domain/entities/mask.rs:67:12
+   --> src/domain/entities/mask.rs:190:12
     |
- 38 | impl NewMask {
+135 | impl NewMask {
     | ------------ associated items in this implementation
 ...
- 67 |     pub fn with_defaults(mask_group_id: i32, file_path: String) -> Self {
+190 |     pub fn with_defaults(mask_group_id: i32, file_path: String) -> Self {
     |            ^^^^^^^^^^^^^
 ...
- 83 |     pub fn png(
+221 |     pub fn png(
     |            ^^^
 ...
-108 |     pub fn jpeg(
+261 |     pub fn jpeg(
     |            ^^^^
 ...
-133 |     pub fn dicom(
+302 |     pub fn dicom(
     |            ^^^^^
 ...
-158 |     pub fn with_checksum(mut self, checksum: String) -> Self {
+333 |     pub fn with_checksum(mut self, checksum: String) -> Self {
     |            ^^^^^^^^^^^^^
 ...
-164 |     pub fn with_file_size(mut self, file_size: i64) -> Self {
+345 |     pub fn with_file_size(mut self, file_size: i64) -> Self {
     |            ^^^^^^^^^^^^^^
 ...
-170 |     pub fn with_dimensions(mut self, width: i32, height: i32) -> Self {
+358 |     pub fn with_dimensions(mut self, width: i32, height: i32) -> Self {
     |            ^^^^^^^^^^^^^^^
 
 warning: method `with_dimensions` is never used
-   --> src/domain/entities/mask.rs:269:12
+   --> src/domain/entities/mask.rs:559:12
     |
-209 | impl UpdateMask {
+441 | impl UpdateMask {
     | --------------- method in this implementation
 ...
-269 |     pub fn with_dimensions(mut self, width: i32, height: i32) -> Self {
+559 |     pub fn with_dimensions(mut self, width: i32, height: i32) -> Self {
     |            ^^^^^^^^^^^^^^^
 
 warning: methods `add_mime_type_count`, `add_label_name_count`, and `calculate_average_file_size` are never used
-   --> src/domain/entities/mask.rs:309:12
+   --> src/domain/entities/mask.rs:658:12
     |
-294 | impl MaskStats {
+624 | impl MaskStats {
     | -------------- methods in this implementation
 ...
-309 |     pub fn add_mime_type_count(&mut self, mime_type: String, count: i64) {
+658 |     pub fn add_mime_type_count(&mut self, mime_type: String, count: i64) {
     |            ^^^^^^^^^^^^^^^^^^^
 ...
-314 |     pub fn add_label_name_count(&mut self, label_name: String, count: i64) {
+677 |     pub fn add_label_name_count(&mut self, label_name: String, count: i64) {
     |            ^^^^^^^^^^^^^^^^^^^^
 ...
-319 |     pub fn calculate_average_file_size(&mut self) {
+693 |     pub fn calculate_average_file_size(&mut self) {
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: struct `MaskFileInfo` is never constructed
-   --> src/domain/entities/mask.rs:334:12
+   --> src/domain/entities/mask.rs:735:12
     |
-334 | pub struct MaskFileInfo {
+735 | pub struct MaskFileInfo {
     |            ^^^^^^^^^^^^
 
 warning: associated functions `new`, `png`, and `jpeg` are never used
-   --> src/domain/entities/mask.rs:348:12
+   --> src/domain/entities/mask.rs:774:12
     |
-346 | impl MaskFileInfo {
+756 | impl MaskFileInfo {
     | ----------------- associated functions in this implementation
-347 |     /// 새로운 마스크 파일 정보 생성
-348 |     pub fn new(
+...
+774 |     pub fn new(
     |            ^^^
 ...
-373 |     pub fn png(
+814 |     pub fn png(
     |            ^^^
 ...
-396 |     pub fn jpeg(
+852 |     pub fn jpeg(
     |            ^^^^
 
 warning: methods `find_by_email`, `find_all`, and `delete` are never used
@@ -1347,12 +1338,18 @@ warning: methods `find_by_time_range` and `count_by_user_id` are never used
 12 |     async fn count_by_user_id(&self, user_id: i32) -> Result<i64, sqlx::Error>;
    |              ^^^^^^^^^^^^^^^^
 
-warning: methods `find_by_series_uid`, `find_by_instance_uid`, `find_by_project_and_study`, `find_shared_annotations`, and `get_history` are never used
-  --> src/domain/repositories/annotation_repository.rs:11:14
+warning: multiple methods are never used
+  --> src/domain/repositories/annotation_repository.rs:8:14
    |
  6 | pub trait AnnotationRepository: Send + Sync {
    |           -------------------- methods in this trait
-...
+ 7 |     async fn find_by_id(&self, id: i32) -> Result<Option<Annotation>, sqlx::Error>;
+ 8 |     async fn find_by_project_id(&self, project_id: i32) -> Result<Vec<Annotation>, sqlx::Error>;
+   |              ^^^^^^^^^^^^^^^^^^
+ 9 |     async fn find_by_user_id(&self, user_id: i32) -> Result<Vec<Annotation>, sqlx::Error>;
+   |              ^^^^^^^^^^^^^^^
+10 |     async fn find_by_study_uid(&self, study_uid: &str) -> Result<Vec<Annotation>, sqlx::Error>;
+   |              ^^^^^^^^^^^^^^^^^
 11 |     async fn find_by_series_uid(&self, series_uid: &str) -> Result<Vec<Annotation>, sqlx::Error>;
    |              ^^^^^^^^^^^^^^^^^^
 12 |     async fn find_by_instance_uid(&self, instance_uid: &str) -> Result<Vec<Annotation>, sqlx::Error>;
@@ -1362,14 +1359,20 @@ warning: methods `find_by_series_uid`, `find_by_instance_uid`, `find_by_project_
 14 |     async fn find_shared_annotations(&self, project_id: i32) -> Result<Vec<Annotation>, sqlx::Error>;
    |              ^^^^^^^^^^^^^^^^^^^^^^^
 ...
-19 |     async fn get_history(&self, annotation_id: i32) -> Result<Vec<AnnotationHistory>, sqlx::Error>;
+21 |     async fn update(&self, id: i32, data: serde_json::Value, is_shared: bool) -> Result<Option<Annotation>, sqlx::Error>;
+   |              ^^^^^^
+...
+25 |     async fn get_history(&self, annotation_id: i32) -> Result<Vec<AnnotationHistory>, sqlx::Error>;
    |              ^^^^^^^^^^^
 
-warning: method `get_masks_in_group` is never used
-  --> src/domain/repositories/mask_group_repository.rs:32:14
+warning: methods `create` and `get_masks_in_group` are never used
+  --> src/domain/repositories/mask_group_repository.rs:9:14
    |
  7 | pub trait MaskGroupRepository: Send + Sync {
-   |           ------------------- method in this trait
+   |           ------------------- methods in this trait
+ 8 |     /// 마스크 그룹 생성
+ 9 |     async fn create(&self, mask_group: &NewMaskGroup) -> Result<MaskGroup, ServiceError>;
+   |              ^^^^^^
 ...
 32 |     async fn get_masks_in_group(&self, mask_group_id: i32) -> Result<Vec<Mask>, ServiceError>;
    |              ^^^^^^^^^^^^^^^^^^
@@ -1516,42 +1519,41 @@ warning: methods `refresh_token` and `logout` are never used
 21 |     async fn logout(&self, _token: &str) -> Result<(), ServiceError>;
    |              ^^^^^^
 
-warning: methods `get_annotations_by_series`, `get_annotations_by_instance`, `get_annotations_by_project_and_study`, `get_shared_annotations`, `get_annotation_history`, and `can_access_annotation` are never used
-  --> src/domain/services/annotation_service.rs:24:14
+warning: multiple methods are never used
+  --> src/domain/services/annotation_service.rs:16:14
    |
- 7 | pub trait AnnotationService: Send + Sync {
+ 8 | pub trait AnnotationService: Send + Sync {
    |           ----------------- methods in this trait
 ...
-24 |     async fn get_annotations_by_series(&self, series_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
+16 |     async fn get_annotations_by_project(&self, project_id: i32) -> Result<Vec<Annotation>, ServiceError>;
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+19 |     async fn get_annotations_by_user(&self, user_id: i32) -> Result<Vec<Annotation>, ServiceError>;
+   |              ^^^^^^^^^^^^^^^^^^^^^^^
+...
+22 |     async fn get_annotations_by_study(&self, study_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+35 |     async fn get_annotations_by_series(&self, series_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-27 |     async fn get_annotations_by_instance(&self, instance_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
+38 |     async fn get_annotations_by_instance(&self, instance_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-30 |     async fn get_annotations_by_project_and_study(&self, project_id: i32, study_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
+41 |     async fn get_annotations_by_project_and_study(&self, project_id: i32, study_uid: &str) -> Result<Vec<Annotation>, ServiceError>;
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ...
-33 |     async fn get_shared_annotations(&self, project_id: i32) -> Result<Vec<Annotation>, ServiceError>;
+44 |     async fn get_shared_annotations(&self, project_id: i32) -> Result<Vec<Annotation>, ServiceError>;
    |              ^^^^^^^^^^^^^^^^^^^^^^
 ...
-45 |     async fn get_annotation_history(&self, annotation_id: i32) -> Result<Vec<AnnotationHistory>, ServiceError>;
+47 |     async fn update_annotation(&self, id: i32, data: serde_json::Value, is_shared: bool) -> Result<Annotation, ServiceError>;
+   |              ^^^^^^^^^^^^^^^^^
+...
+59 |     async fn get_annotation_history(&self, annotation_id: i32) -> Result<Vec<AnnotationHistory>, ServiceError>;
    |              ^^^^^^^^^^^^^^^^^^^^^^
 ...
-48 |     async fn can_access_annotation(&self, user_id: i32, annotation_id: i32) -> Result<bool, ServiceError>;
+62 |     async fn can_access_annotation(&self, user_id: i32, annotation_id: i32) -> Result<bool, ServiceError>;
    |              ^^^^^^^^^^^^^^^^^^^^^
-
-warning: variants `AlreadyExists` and `ValidationError` are never constructed
-   --> src/domain/services/annotation_service.rs:230:5
-    |
-228 | pub enum ServiceError {
-    |          ------------ variants in this enum
-229 |     NotFound(String),
-230 |     AlreadyExists(String),
-    |     ^^^^^^^^^^^^^
-231 |     ValidationError(String),
-    |     ^^^^^^^^^^^^^^^
-    |
-    = note: `ServiceError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
 
 warning: method `get_masks_in_group` is never used
   --> src/domain/services/mask_group_service.rs:36:14
@@ -1570,6 +1572,12 @@ warning: method `can_create_mask` is never used
 ...
 50 |     async fn can_create_mask(&self, user_id: i32, mask_group_id: i32) -> Result<bool, ServiceError>;
    |              ^^^^^^^^^^^^^^^
+
+warning: enum `ServiceError` is never used
+ --> src/domain/errors.rs:3:10
+  |
+3 | pub enum ServiceError {
+  |          ^^^^^^^^^^^^
 
 warning: field `pool` is never read
  --> src/infrastructure/repositories/permission_repository_impl.rs:8:5
@@ -1795,17 +1803,17 @@ warning: associated function `new` is never used
    |            ^^^
 
 warning: struct `AnnotationController` is never constructed
-  --> src/presentation/controllers/annotation_controller.rs:13:12
+  --> src/presentation/controllers/annotation_controller.rs:14:12
    |
-13 | pub struct AnnotationController;
+14 | pub struct AnnotationController;
    |            ^^^^^^^^^^^^^^^^^^^^
 
 warning: associated function `new` is never used
-  --> src/presentation/controllers/annotation_controller.rs:16:12
+  --> src/presentation/controllers/annotation_controller.rs:17:12
    |
-15 | impl AnnotationController {
+16 | impl AnnotationController {
    | ------------------------- associated function in this implementation
-16 |     pub fn new() -> Self {
+17 |     pub fn new() -> Self {
    |            ^^^
 
 warning: struct `MaskGroupController` is never constructed
@@ -1845,11 +1853,11 @@ warning: associated function `new` is never used
 26 |       pub fn new(use_case: Arc<MaskUseCase<MS, MGS, SUS>>) -> Self {
    |              ^^^
 
-warning: `pacs_server` (bin "pacs_server") generated 191 warnings (63 duplicates) (run `cargo fix --bin "pacs_server"` to apply 15 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.77s
+warning: `pacs_server` (bin "pacs_server") generated 188 warnings (59 duplicates) (run `cargo fix --bin "pacs_server"` to apply 15 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.21s
 warning: the following packages contain code that will be rejected by a future version of Rust: sqlx-postgres v0.7.4
 note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
-     Running `target/debug/pacs_server`
+     Running `target/release/pacs_server`
 
 ================================================================================
 🚀 PACS Extension Server - Initialization
@@ -1874,3 +1882,9 @@ note: to see what the problems were, use the option `--future-incompat-report`, 
 🔌 API Endpoints: http://0.0.0.0:8080/api/
 ================================================================================
 
+DEBUG: Checking user_id: 1
+DEBUG: User result: Some(User { id: 1, keycloak_id: 550e8400-e29b-41d4-a716-446655440000, username: "TestUser2", email: "user2@example.com", created_at: 2025-10-17T14:33:32.964837Z })
+🔍 [MaskGroupController] 마스크 그룹 생성 요청: annotation_id = 112
+🔍 [MaskGroupController] user_id = 1
+🔍 [MaskGroupService] 어노테이션 존재 확인: annotation_id = 112
+🔍 [MaskGroupService] 어노테이션 존재 여부: true

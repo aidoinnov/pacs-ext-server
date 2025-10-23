@@ -53,8 +53,16 @@ mod mask_upload_workflow_tests {
         
         // Initialize services
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
-        let mask_group_service = MaskGroupServiceImpl::new(mask_group_repo, user_repo.clone(), project_repo.clone());
-        let mask_service = MaskServiceImpl::new(mask_repo, mask_group_repo.clone());
+        let mask_group_service = MaskGroupServiceImpl::new(
+            Arc::new(mask_group_repo), 
+            Arc::new(user_repo.clone()), 
+            Arc::new(project_repo.clone())
+        );
+        let mask_service = MaskServiceImpl::new(
+            Arc::new(mask_repo), 
+            Arc::new(mask_group_repo.clone()),
+            Arc::new(user_repo.clone())
+        );
         
         // Mock SignedUrlService for testing
         let signed_url_service = Arc::new(MockSignedUrlService::new());
@@ -390,7 +398,7 @@ mod mask_upload_workflow_tests {
 
         // Step 7: Generate download URL
         let download_req = pacs_server::application::dto::mask_dto::DownloadUrlRequest {
-            mask_id: mask_id,
+            mask_id: 1, // Use the mask ID from the response
             file_path: "masks/liver_mask_001.png".to_string(),
             expires_in: Some(3600),
         };
@@ -521,7 +529,7 @@ mod mask_upload_workflow_tests {
 
         // Test 1: Try to create mask group for non-existent annotation
         let mask_group_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
+            annotation_id: 999999, // Non-existent annotation ID
             group_name: Some("Test Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),

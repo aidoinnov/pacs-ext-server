@@ -6,11 +6,6 @@ use crate::domain::entities::mask_group::MaskGroupStats;
 /// 마스크 그룹 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateMaskGroupRequest {
-    /// 어노테이션 ID
-    /// 마스크 그룹이 속할 어노테이션의 ID
-    #[schema(example = 1)]
-    pub annotation_id: i32,
-    
     /// 그룹 이름
     /// 마스크 그룹을 식별하는 이름 (예: Liver_Segmentation_v2)
     #[schema(example = "Liver_Segmentation_v2")]

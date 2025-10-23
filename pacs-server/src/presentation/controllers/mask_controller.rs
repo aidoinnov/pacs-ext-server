@@ -490,7 +490,7 @@ where
 {
     cfg.app_data(web::Data::new(use_case))
         .service(
-            web::scope("/api/annotations/{annotation_id}/mask-groups/{group_id}/masks")
+            web::scope("/annotations/{annotation_id}/mask-groups/{group_id}/masks")
                 .route("", web::post().to(create_mask::<MS, MGS, SUS>))
                 .route("", web::get().to(list_masks::<MS, MGS, SUS>))
                 .route("/stats", web::get().to(get_mask_stats::<MS, MGS, SUS>))
