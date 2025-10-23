@@ -334,9 +334,9 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| project_controller::configure_routes(cfg, project_use_case.clone()))
                     .configure(|cfg| permission_controller::configure_routes(cfg, permission_use_case.clone()))
                     .configure(|cfg| access_control_controller::configure_routes(cfg, access_control_use_case.clone()))
+                    .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
                     .configure(|cfg| mask_group_controller::configure_routes(cfg, mask_group_use_case.clone()))
                     .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
-                    .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

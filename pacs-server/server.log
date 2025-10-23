@@ -1,4 +1,5 @@
 nohup: ignoring input
+   Compiling pacs_server v0.1.0 (/home/dl-server02/workspace/pacs-extension-server/pacs-ext-server/pacs-server)
 warning: unused import: `UserListResponse`
  --> src/application/use_cases/user_use_case.rs:2:38
   |
@@ -1854,7 +1855,7 @@ warning: associated function `new` is never used
    |              ^^^
 
 warning: `pacs_server` (bin "pacs_server") generated 188 warnings (59 duplicates) (run `cargo fix --bin "pacs_server"` to apply 15 suggestions)
-    Finished `release` profile [optimized] target(s) in 0.21s
+    Finished `release` profile [optimized] target(s) in 33.04s
 warning: the following packages contain code that will be rejected by a future version of Rust: sqlx-postgres v0.7.4
 note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
      Running `target/release/pacs_server`
@@ -1884,7 +1885,19 @@ note: to see what the problems were, use the option `--future-incompat-report`, 
 
 DEBUG: Checking user_id: 1
 DEBUG: User result: Some(User { id: 1, keycloak_id: 550e8400-e29b-41d4-a716-446655440000, username: "TestUser2", email: "user2@example.com", created_at: 2025-10-17T14:33:32.964837Z })
-🔍 [MaskGroupController] 마스크 그룹 생성 요청: annotation_id = 112
+🔍 [MaskGroupController] 마스크 그룹 생성 요청: annotation_id = 115
 🔍 [MaskGroupController] user_id = 1
-🔍 [MaskGroupService] 어노테이션 존재 확인: annotation_id = 112
+🔍 [MaskGroupService] 어노테이션 존재 확인: annotation_id = 115
 🔍 [MaskGroupService] 어노테이션 존재 여부: true
+DEBUG: can_access_mask_group - user_id=1, annotation.user_id=1, mask_group.created_by=Some(1), annotation_owner=true, group_creator=true
+DEBUG: list_masks called with annotation_id=115, group_id=4
+DEBUG: can_access_mask_group - user_id=1, annotation.user_id=1, mask_group.created_by=Some(1), annotation_owner=true, group_creator=true
+DEBUG: Checking user_id: 1
+DEBUG: User result: Some(User { id: 1, keycloak_id: 550e8400-e29b-41d4-a716-446655440000, username: "TestUser2", email: "user2@example.com", created_at: 2025-10-17T14:33:32.964837Z })
+🔍 [MaskGroupController] 마스크 그룹 생성 요청: annotation_id = 116
+🔍 [MaskGroupController] user_id = 1
+🔍 [MaskGroupService] 어노테이션 존재 확인: annotation_id = 116
+🔍 [MaskGroupService] 어노테이션 존재 여부: true
+DEBUG: can_access_mask_group - user_id=1, annotation.user_id=1, mask_group.created_by=Some(1), annotation_owner=true, group_creator=true
+DEBUG: list_masks called with annotation_id=116, group_id=5
+DEBUG: can_access_mask_group - user_id=1, annotation.user_id=1, mask_group.created_by=Some(1), annotation_owner=true, group_creator=true
