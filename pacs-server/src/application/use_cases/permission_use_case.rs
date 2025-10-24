@@ -1,8 +1,9 @@
 use crate::application::dto::{
-    CreateRoleRequest, RoleResponse, PermissionResponse, AssignPermissionRequest,
+    CreateRoleRequest, RoleResponse, PermissionResponse,
     RolePermissionsResponse, ProjectPermissionsResponse, ResourcePermissionsResponse,
     RoleWithPermissionsResponse, RolesWithPermissionsListResponse,
 };
+use crate::application::dto::permission_dto::AssignPermissionRequest;
 use crate::domain::services::PermissionService;
 use crate::domain::ServiceError;
 use crate::domain::entities::RoleScope;

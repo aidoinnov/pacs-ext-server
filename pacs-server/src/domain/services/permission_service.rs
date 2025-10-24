@@ -46,8 +46,19 @@ pub trait PermissionService: Send + Sync {
 
     /// 프로젝트에 할당된 모든 권한 조회
     async fn get_project_permissions(&self, project_id: i32) -> Result<Vec<Permission>, ServiceError>;
+
+    // === 매트릭스 API 지원 ===
+
+    /// 글로벌 역할-권한 매트릭스 조회
+    async fn get_global_role_permission_matrix(&self) 
+        -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError>;
+
+    /// 프로젝트별 역할-권한 매트릭스 조회
+    async fn get_project_role_permission_matrix(&self, project_id: i32) 
+        -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError>;
 }
 
+#[derive(Clone)]
 pub struct PermissionServiceImpl<P: PermissionRepository, R: RoleRepository> {
     permission_repository: P,
     role_repository: R,
@@ -254,5 +265,71 @@ impl<P: PermissionRepository, R: RoleRepository> PermissionService for Permissio
         .await?;
 
         Ok(permissions)
+    }
+
+    // === 매트릭스 API 구현 ===
+
+    async fn get_global_role_permission_matrix(&self) 
+        -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError> {
+        // 글로벌 역할 조회
+        let roles = self.role_repository.find_by_scope("GLOBAL").await?;
+        
+        // 모든 권한 조회
+        let permissions = self.permission_repository.find_all().await?;
+        
+        // 역할-권한 할당 정보 조회
+        let assignments = sqlx::query_as::<_, (i32, i32)>(
+            "SELECT role_id, permission_id FROM security_role_permission
+             WHERE role_id IN (
+                 SELECT id FROM security_role WHERE scope = 'GLOBAL'
+             )"
+        )
+        .fetch_all(self.role_repository.pool())
+        .await?;
+
+        Ok((roles, permissions, assignments))
+    }
+
+    async fn get_project_role_permission_matrix(&self, project_id: i32) 
+        -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError> {
+        // 프로젝트 존재 확인
+        let project_exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM security_project WHERE id = $1)"
+        )
+        .bind(project_id)
+        .fetch_one(self.role_repository.pool())
+        .await?;
+
+        if !project_exists {
+            return Err(ServiceError::NotFound("Project not found".into()));
+        }
+
+        // 프로젝트별 역할 조회
+        let roles = sqlx::query_as::<_, Role>(
+            "SELECT r.id, r.name, r.description, r.scope, r.created_at
+             FROM security_role r
+             INNER JOIN security_project_role pr ON r.id = pr.role_id
+             WHERE pr.project_id = $1
+             ORDER BY r.name"
+        )
+        .bind(project_id)
+        .fetch_all(self.role_repository.pool())
+        .await?;
+        
+        // 모든 권한 조회
+        let permissions = self.permission_repository.find_all().await?;
+        
+        // 프로젝트별 역할-권한 할당 정보 조회
+        let assignments = sqlx::query_as::<_, (i32, i32)>(
+            "SELECT rp.role_id, rp.permission_id 
+             FROM security_role_permission rp
+             INNER JOIN security_project_role pr ON rp.role_id = pr.role_id
+             WHERE pr.project_id = $1"
+        )
+        .bind(project_id)
+        .fetch_all(self.role_repository.pool())
+        .await?;
+
+        Ok((roles, permissions, assignments))
     }
 }

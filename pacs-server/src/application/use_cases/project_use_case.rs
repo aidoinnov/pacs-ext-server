@@ -1,7 +1,8 @@
 use crate::application::dto::{
     CreateProjectRequest, ProjectResponse, ProjectListResponse, ProjectAssignRoleRequest,
-    MemberInfo, ProjectRolesResponse, RoleInfo,
+    MemberInfo, ProjectRolesResponse,
 };
+use crate::application::dto::project_dto::RoleInfo;
 use crate::application::dto::project_dto::ProjectMembersResponse;
 use crate::domain::services::ProjectService;
 use crate::domain::ServiceError;

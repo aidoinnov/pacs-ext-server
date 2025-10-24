@@ -45,6 +45,7 @@ mod presentation;
 use application::use_cases::{
     AuthUseCase, UserUseCase, ProjectUseCase, PermissionUseCase, AccessControlUseCase,
     AnnotationUseCase, MaskGroupUseCase, MaskUseCase, ProjectUserUseCase, ProjectUserMatrixUseCase,
+    RolePermissionMatrixUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
@@ -71,7 +72,7 @@ use infrastructure::middleware::{CacheHeaders, configure_cors};
 use presentation::controllers::{
     auth_controller, user_controller, project_controller, permission_controller,
     access_control_controller, annotation_controller, mask_group_controller, mask_controller,
-    project_user_controller, project_user_matrix_controller,
+    project_user_controller, project_user_matrix_controller, role_permission_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -267,7 +268,7 @@ async fn main() -> std::io::Result<()> {
     let auth_use_case = Arc::new(AuthUseCase::new(auth_service));
     let user_use_case = Arc::new(UserUseCase::new(user_service.clone()));
     let project_use_case = Arc::new(ProjectUseCase::new(project_service.clone()));
-    let permission_use_case = Arc::new(PermissionUseCase::new(permission_service));
+    let permission_use_case = Arc::new(PermissionUseCase::new(permission_service.clone()));
     let access_control_use_case = Arc::new(AccessControlUseCase::new(access_control_service));
     let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
     let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
@@ -286,6 +287,9 @@ async fn main() -> std::io::Result<()> {
     let project_user_matrix_use_case = Arc::new(ProjectUserMatrixUseCase::new(
         Arc::new(project_service),
         Arc::new(user_service),
+    ));
+    let role_permission_matrix_use_case = Arc::new(RolePermissionMatrixUseCase::new(
+        Arc::new(permission_service.clone()),
     ));
     println!("✅ Done");
 
@@ -358,6 +362,7 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
                     .configure(|cfg| project_user_controller::configure_routes(cfg, project_user_use_case.clone()))
                     .configure(|cfg| project_user_matrix_controller::configure_routes(cfg, project_user_matrix_use_case.clone()))
+                    .configure(|cfg| role_permission_matrix_controller::configure_routes(cfg, role_permission_matrix_use_case.clone()))
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

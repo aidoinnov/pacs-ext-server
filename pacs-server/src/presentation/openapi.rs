@@ -4,6 +4,7 @@ use crate::presentation::controllers::annotation_controller::*;
 use crate::presentation::controllers::project_controller::*;
 use crate::presentation::controllers::mask_group_controller::*;
 use crate::presentation::controllers::project_user_matrix_controller::*;
+use crate::presentation::controllers::role_permission_matrix_controller::*;
 use crate::application::dto::auth_dto::*;
 use crate::application::dto::user_dto::*;
 use crate::application::dto::project_dto::*;
@@ -12,6 +13,7 @@ use crate::application::dto::mask_group_dto::*;
 use crate::application::dto::permission_dto::*;
 use crate::application::dto::project_user_dto::{UserWithRoleResponse, ProjectWithRoleResponse, AssignRoleRequest, BatchAssignRolesRequest, UserRoleAssignment, RoleAssignmentResponse, BatchRoleAssignmentResponse, FailedAssignment};
 use crate::application::dto::project_user_matrix_dto::*;
+use crate::application::dto::role_permission_matrix_dto::*;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -40,6 +42,11 @@ use crate::application::dto::project_user_matrix_dto::*;
         complete_upload,
         // Project User Matrix endpoints
         get_matrix,
+        // Role Permission Matrix endpoints
+        get_global_matrix,
+        get_project_matrix,
+        update_global_permission_assignment,
+        update_project_permission_assignment,
     ),
     components(
         schemas(
@@ -92,6 +99,13 @@ use crate::application::dto::project_user_matrix_dto::*;
             UserInfo,
             MatrixPagination,
             MatrixQueryParams,
+            // Role Permission Matrix DTOs
+            crate::application::dto::role_permission_matrix_dto::RoleInfo,
+            crate::application::dto::role_permission_matrix_dto::PermissionInfo,
+            RolePermissionAssignment,
+            RolePermissionMatrixResponse,
+            crate::application::dto::role_permission_matrix_dto::AssignPermissionRequest,
+            AssignPermissionResponse,
         )
     ),
     tags(
@@ -105,6 +119,7 @@ use crate::application::dto::project_user_matrix_dto::*;
         (name = "mask-groups", description = "Mask Group management endpoints - 마스크 그룹 관리 API"),
         (name = "project-users", description = "Project User Role management endpoints - 프로젝트 사용자 역할 관리 API"),
         (name = "project-user-matrix", description = "Project User Matrix endpoints - 프로젝트 사용자 매트릭스 API"),
+        (name = "role-permission-matrix", description = "Role Permission Matrix endpoints - 역할 권한 매트릭스 API"),
     ),
     info(
         title = "PACS Extension Server API",

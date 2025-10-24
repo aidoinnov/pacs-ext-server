@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2024-12-19
+
+#### **Role-Permission Matrix API**
+- **New API Endpoints**: 역할-권한 매트릭스를 표 형태로 조회하고 개별 권한을 ON/OFF할 수 있는 API 구현
+  - `GET /api/roles/global/permissions/matrix` - 글로벌 역할-권한 매트릭스 조회
+  - `GET /api/projects/{project_id}/roles/permissions/matrix` - 프로젝트별 역할-권한 매트릭스 조회
+  - `PUT /api/roles/{role_id}/permissions/{permission_id}` - 글로벌 역할에 권한 할당/제거
+  - `PUT /api/projects/{project_id}/roles/{role_id}/permissions/{permission_id}` - 프로젝트별 역할에 권한 할당/제거
+
+- **Enhanced DTOs**: 새로운 매트릭스 DTO 추가
+  - `RolePermissionMatrixResponse`: 매트릭스 조회 응답
+  - `RoleInfo`: 역할 정보 (id, name, description, scope)
+  - `PermissionInfo`: 권한 정보 (id, resource_type, action)
+  - `RolePermissionAssignment`: 역할-권한 할당 정보 (role_id, permission_id, assigned)
+  - `AssignPermissionRequest`: 권한 할당/제거 요청 (assign: bool)
+  - `AssignPermissionResponse`: 권한 할당/제거 응답 (success, message)
+
+- **Database Migration**: `009_add_permission_category.sql`
+  - 기존 `resource_type` 필드를 카테고리로 활용하는 주석 추가
+  - 새로운 컬럼 추가 없이 기존 구조 활용
+
+- **Service Layer Extensions**: PermissionService에 매트릭스 기능 추가
+  - `get_global_role_permission_matrix()`: 글로벌 역할-권한 매트릭스 조회
+  - `get_project_role_permission_matrix(project_id)`: 프로젝트별 역할-권한 매트릭스 조회
+  - 기존 권한 할당/제거 메서드 활용
+
+- **Use Case Layer**: `RolePermissionMatrixUseCase` 구현
+  - 매트릭스 데이터 조회 및 변환
+  - 권한 할당/제거 오케스트레이션
+  - 에러 처리 및 검증
+
+- **Controller Layer**: `role_permission_matrix_controller.rs` 구현
+  - 4개 엔드포인트 구현
+  - OpenAPI 문서화 완료
+  - 에러 처리 및 응답 변환
+
+- **OpenAPI Documentation**: 완전한 API 문서화
+  - Swagger UI에서 테스트 가능
+  - "role-permission-matrix" 태그로 그룹화
+  - 모든 DTO 스키마 문서화
+
+- **Testing**: 완전한 테스트 커버리지
+  - 단위 테스트: 6개 테스트 (Use Case + DTO)
+  - 통합 테스트: 6개 테스트 (API 엔드포인트)
+  - Mock 테스트 및 실제 데이터베이스 연동 테스트
+
 ### Added - 2025-01-23
 
 #### **Global Roles with Permissions API**

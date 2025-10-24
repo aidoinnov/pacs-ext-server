@@ -1,7 +1,8 @@
 use crate::application::dto::{
     LogDicomAccessRequest, AccessLogResponse, AccessLogListResponse, CheckPermissionRequest,
-    CheckPermissionResponse, UserPermissionsResponse, PermissionInfo, ProjectAccessResponse,
+    CheckPermissionResponse, UserPermissionsResponse, ProjectAccessResponse,
 };
+use crate::application::dto::access_control_dto::PermissionInfo;
 use crate::domain::services::AccessControlService;
 use crate::domain::ServiceError;
 

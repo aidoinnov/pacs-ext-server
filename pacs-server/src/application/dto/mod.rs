@@ -8,6 +8,7 @@ pub mod mask_group_dto;
 pub mod mask_dto;
 pub mod project_user_dto;
 pub mod project_user_matrix_dto;
+pub mod role_permission_matrix_dto;
 
 pub use auth_dto::*;
 pub use user_dto::*;
@@ -19,3 +20,4 @@ pub use mask_group_dto::*;
 pub use mask_dto::*;
 pub use project_user_dto::*;
 pub use project_user_matrix_dto::*;
+pub use role_permission_matrix_dto::*;
