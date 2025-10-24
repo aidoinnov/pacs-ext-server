@@ -38,6 +38,8 @@ pub struct KeycloakConfig {
     pub realm: String,
     pub client_id: String,
     pub client_secret: String,
+    pub admin_username: String,
+    pub admin_password: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -171,13 +173,19 @@ impl Settings {
                     .unwrap_or_else(|_| "http://localhost:8080".to_string()),
                 realm: env::var("APP_KEYCLOAK__REALM")
                     .or_else(|_| env::var("KEYCLOAK_REALM"))
-                    .unwrap_or_else(|_| "pacs".to_string()),
+                    .unwrap_or_else(|_| "dcm4che".to_string()),
                 client_id: env::var("APP_KEYCLOAK__CLIENT_ID")
                     .or_else(|_| env::var("KEYCLOAK_CLIENT_ID"))
                     .unwrap_or_else(|_| "pacs-server".to_string()),
                 client_secret: env::var("APP_KEYCLOAK__CLIENT_SECRET")
                     .or_else(|_| env::var("KEYCLOAK_CLIENT_SECRET"))
                     .unwrap_or_else(|_| "".to_string()),
+                admin_username: env::var("APP_KEYCLOAK__ADMIN_USERNAME")
+                    .or_else(|_| env::var("KEYCLOAK_ADMIN_USERNAME"))
+                    .unwrap_or_else(|_| "admin".to_string()),
+                admin_password: env::var("APP_KEYCLOAK__ADMIN_PASSWORD")
+                    .or_else(|_| env::var("KEYCLOAK_ADMIN_PASSWORD"))
+                    .unwrap_or_else(|_| "adminPassword123!".to_string()),
             },
             logging: LoggingConfig {
                 level: env::var("APP_LOGGING__LEVEL")
@@ -341,6 +349,8 @@ mod tests {
                 realm: "test".to_string(),
                 client_id: "test-client".to_string(),
                 client_secret: "secret".to_string(),
+                admin_username: "admin".to_string(),
+                admin_password: "adminPassword123!".to_string(),
             },
             logging: LoggingConfig {
                 level: "info".to_string(),
@@ -400,6 +410,8 @@ mod tests {
                 realm: "test".to_string(),
                 client_id: "test-client".to_string(),
                 client_secret: "secret".to_string(),
+                admin_username: "admin".to_string(),
+                admin_password: "adminPassword123!".to_string(),
             },
             logging: LoggingConfig {
                 level: "info".to_string(),

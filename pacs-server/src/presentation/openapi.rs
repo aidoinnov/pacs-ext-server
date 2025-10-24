@@ -16,6 +16,7 @@ use crate::application::dto::project_user_dto::{UserWithRoleResponse, ProjectWit
 use crate::application::dto::project_user_matrix_dto::*;
 use crate::application::dto::role_permission_matrix_dto::*;
 use crate::application::dto::project_data_access_dto::*;
+use crate::application::dto::user_registration_dto::*;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -57,6 +58,12 @@ use crate::application::dto::project_data_access_dto::*;
         request_data_access,
         get_access_by_status,
         get_user_access_list,
+        // User Registration endpoints (TODO: Add OpenAPI annotations)
+        // signup,
+        // verify_email,
+        // approve_user,
+        // delete_account,
+        // get_user_status,
     ),
     components(
         schemas(
@@ -130,6 +137,11 @@ use crate::application::dto::project_data_access_dto::*;
             RequestDataAccessResponse,
             GetProjectDataListRequest,
             ProjectDataListResponse,
+            // User Registration DTOs
+            SignupRequest,
+            VerifyEmailRequest,
+            ApproveUserRequest,
+            UserStatusResponse,
         )
     ),
     tags(
@@ -145,6 +157,7 @@ use crate::application::dto::project_data_access_dto::*;
         (name = "project-user-matrix", description = "Project User Matrix endpoints - 프로젝트 사용자 매트릭스 API"),
         (name = "role-permission-matrix", description = "Role Permission Matrix endpoints - 역할 권한 매트릭스 API"),
         (name = "project-data-access", description = "Project Data Access endpoints - 프로젝트 데이터 접근 관리 API"),
+        (name = "user-registration", description = "User Registration endpoints - 사용자 등록 및 계정 관리 API"),
     ),
     info(
         title = "PACS Extension Server API",

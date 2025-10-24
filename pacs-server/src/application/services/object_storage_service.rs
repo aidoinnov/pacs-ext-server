@@ -13,6 +13,9 @@ pub enum ObjectStorageError {
     #[error("Configuration error: {0}")]
     ConfigError(String),
     
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+    
     #[error("File not found: {0}")]
     FileNotFound(String),
     
@@ -122,13 +125,15 @@ impl ObjectStorageServiceFactory {
     ) -> Result<Box<dyn ObjectStorageService>, ObjectStorageError> {
         match provider.to_lowercase().as_str() {
             "s3" => {
-                let s3_service = crate::infrastructure::external::s3_service::S3ObjectStorageService::new(
-                    bucket_name,
-                    region,
-                    access_key,
-                    secret_key,
-                ).await?;
-                Ok(Box::new(s3_service))
+                // TODO: S3ObjectStorageService 구현 필요
+                return Err(ObjectStorageError::ConfigurationError("S3 service not implemented".to_string()));
+                // let s3_service = crate::infrastructure::external::S3ObjectStorageService::new(
+                //     bucket_name,
+                //     region,
+                //     access_key,
+                //     secret_key,
+                // ).await?;
+                // Ok(Box::new(s3_service))
             }
             _ => Err(ObjectStorageError::ConfigError(
                 format!("Unsupported object storage provider: {}. Only 's3' is supported.", provider)

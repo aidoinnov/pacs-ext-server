@@ -26,6 +26,7 @@ PACS (Picture Archiving and Communication System) Extension Server는 의료 영
 - **프로젝트 관리**: 사용자별 프로젝트 할당
 - **역할-권한 매트릭스**: 표 형태로 역할과 권한 관계 관리 ✨
 - **프로젝트 데이터 접근 관리**: 프로젝트 참여자의 데이터 접근 상태 관리 ✨
+- **사용자 회원가입 및 계정 삭제**: Keycloak 연동 사용자 생명주기 관리 ✨
 
 ### 🌐 웹 서버 기능
 - **CORS 지원**: 크로스 오리진 요청 처리
@@ -133,6 +134,14 @@ APP_OBJECT_STORAGE__SECRET_KEY=your-secret-key
 # CORS
 CORS_ENABLED=true
 CORS_ALLOWED_ORIGINS=["http://localhost:3000"]
+
+# Keycloak (사용자 인증)
+APP_KEYCLOAK_URL=http://localhost:8080
+APP_KEYCLOAK_REALM=dcm4che
+APP_KEYCLOAK_CLIENT_ID=pacs-server
+APP_KEYCLOAK_CLIENT_SECRET=your-client-secret
+APP_KEYCLOAK_ADMIN_USERNAME=admin
+APP_KEYCLOAK_ADMIN_PASSWORD=adminPassword123!
 ```
 
 ### 데이터베이스 스키마
@@ -184,6 +193,53 @@ CREATE TABLE annotation_mask (
 ```
 
 ## 📚 API 사용 예시
+
+### 사용자 회원가입
+```bash
+curl -X POST http://localhost:8080/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123",
+    "full_name": "Test User",
+    "organization": "Test Org",
+    "department": "Test Dept",
+    "phone": "010-1234-5678"
+  }'
+```
+
+### 이메일 인증
+```bash
+curl -X POST http://localhost:8080/api/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "token": "verification_token"
+  }'
+```
+
+### 관리자 승인
+```bash
+curl -X POST http://localhost:8080/api/admin/users/approve \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <admin-token>" \
+  -d '{
+    "user_id": 1
+  }'
+```
+
+### 계정 삭제
+```bash
+curl -X DELETE http://localhost:8080/api/users/1 \
+  -H "Authorization: Bearer <admin-token>"
+```
+
+### 사용자 상태 조회
+```bash
+curl -X GET http://localhost:8080/api/users/1/status \
+  -H "Authorization: Bearer <user-token>"
+```
 
 ### 어노테이션 생성
 ```bash

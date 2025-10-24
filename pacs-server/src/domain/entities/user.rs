@@ -13,6 +13,70 @@ use sqlx::FromRow;
 // UUID 생성 및 처리를 위한 라이브러리
 use uuid::Uuid;
 
+/// 사용자 계정 상태를 나타내는 열거형
+/// 
+/// 사용자의 계정이 현재 어떤 상태인지를 나타냅니다.
+/// 회원가입부터 활성화까지의 전체 프로세스를 추적합니다.
+#[derive(Debug, Clone, sqlx::Type, Serialize, Deserialize, PartialEq)]
+#[sqlx(type_name = "user_account_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum UserAccountStatus {
+    /// 이메일 인증 대기 상태
+    PendingEmail,
+    /// 관리자 승인 대기 상태
+    PendingApproval,
+    /// 활성 상태 (정상 사용 가능)
+    Active,
+    /// 정지 상태
+    Suspended,
+    /// 삭제된 상태
+    Deleted,
+}
+
+/// 사용자 계정 감사 로그 엔티티
+/// 
+/// 사용자의 모든 계정 관련 활동을 추적하는 로그입니다.
+/// 사용자가 삭제된 후에도 로그는 영구 보관됩니다.
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct UserAuditLog {
+    /// 로그 고유 ID
+    pub id: i32,
+    /// 사용자 ID (삭제 후에도 NULL이 아닌 ID 유지)
+    pub user_id: Option<i32>,
+    /// 수행된 작업 (SIGNUP_REQUESTED, EMAIL_VERIFIED, APPROVED, DELETED 등)
+    pub action: String,
+    /// 작업을 수행한 사용자 ID (시스템 작업의 경우 NULL)
+    pub actor_id: Option<i32>,
+    /// Keycloak 동기화 상태 (SUCCESS, FAILED, PENDING, ROLLED_BACK)
+    pub keycloak_sync_status: Option<String>,
+    /// Keycloak에서의 사용자 ID
+    pub keycloak_user_id: Option<String>,
+    /// 오류 발생 시 오류 메시지
+    pub error_message: Option<String>,
+    /// 추가 메타데이터 (IP, User-Agent, 요청 데이터 등)
+    pub metadata: Option<serde_json::Value>,
+    /// 로그 생성 시간
+    pub created_at: DateTime<Utc>,
+}
+
+/// 새로운 사용자 감사 로그 생성을 위한 DTO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewUserAuditLog {
+    /// 사용자 ID (삭제 후에도 NULL이 아닌 ID 유지)
+    pub user_id: Option<i32>,
+    /// 수행된 작업
+    pub action: String,
+    /// 작업을 수행한 사용자 ID
+    pub actor_id: Option<i32>,
+    /// Keycloak 동기화 상태
+    pub keycloak_sync_status: Option<String>,
+    /// Keycloak에서의 사용자 ID
+    pub keycloak_user_id: Option<String>,
+    /// 오류 발생 시 오류 메시지
+    pub error_message: Option<String>,
+    /// 추가 메타데이터
+    pub metadata: Option<serde_json::Value>,
+}
+
 /// 시스템 사용자를 나타내는 엔티티
 /// 
 /// 이 구조체는 데이터베이스의 `security_user` 테이블과 매핑되며,
@@ -67,6 +131,24 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     /// 마지막 업데이트 시각
     pub updated_at: Option<DateTime<Utc>>,
+    /// 사용자 계정 상태
+    pub account_status: UserAccountStatus,
+    /// 이메일 인증 완료 여부
+    pub email_verified: bool,
+    /// 이메일 인증 토큰
+    pub email_verification_token: Option<String>,
+    /// 이메일 인증 토큰 만료 시간
+    pub email_verification_expires_at: Option<DateTime<Utc>>,
+    /// 승인한 관리자 ID
+    pub approved_by: Option<i32>,
+    /// 승인 시간
+    pub approved_at: Option<DateTime<Utc>>,
+    /// 정지 시간
+    pub suspended_at: Option<DateTime<Utc>>,
+    /// 정지 사유
+    pub suspended_reason: Option<String>,
+    /// 삭제 시간
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 /// 새로운 사용자 생성을 위한 DTO(Data Transfer Object)

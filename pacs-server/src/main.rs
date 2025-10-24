@@ -45,7 +45,7 @@ mod presentation;
 use application::use_cases::{
     AuthUseCase, UserUseCase, ProjectUseCase, PermissionUseCase, AccessControlUseCase,
     AnnotationUseCase, MaskGroupUseCase, MaskUseCase, ProjectUserUseCase, ProjectUserMatrixUseCase,
-    RolePermissionMatrixUseCase, ProjectDataAccessUseCase,
+    RolePermissionMatrixUseCase, ProjectDataAccessUseCase, UserRegistrationUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
@@ -60,7 +60,8 @@ use infrastructure::repositories::{
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
     ProjectDataRepositoryImpl, ProjectDataAccessRepositoryImpl,
 };
-use infrastructure::services::ProjectDataServiceImpl;
+use infrastructure::services::{ProjectDataServiceImpl, UserRegistrationServiceImpl};
+use infrastructure::external::KeycloakClient;
 
 // JWT 인증 서비스
 use infrastructure::auth::JwtService;
@@ -75,7 +76,7 @@ use presentation::controllers::{
     auth_controller, user_controller, project_controller, permission_controller,
     access_control_controller, annotation_controller, mask_group_controller, mask_controller,
     project_user_controller, project_user_matrix_controller, role_permission_matrix_controller,
-    project_data_access_controller,
+    project_data_access_controller, user_registration_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -255,6 +256,17 @@ async fn main() -> std::io::Result<()> {
         project_data_repo.clone(),
         project_data_access_repo.clone(),
     ));
+    
+    // Keycloak 클라이언트 초기화
+    print!("🔐 Initializing Keycloak client... ");
+    let keycloak_client = KeycloakClient::new(settings.keycloak.clone());
+    println!("✅ Done (Realm: {})", settings.keycloak.realm);
+    
+    // 사용자 등록 서비스: 회원가입, 이메일 인증, 계정 삭제 등
+    let user_registration_service = UserRegistrationServiceImpl::new(
+        pool.clone(),
+        keycloak_client,
+    );
     // Initialize Object Storage service
     print!("☁️  Initializing Object Storage service... ");
     let object_storage = ObjectStorageServiceFactory::create(
@@ -305,6 +317,9 @@ async fn main() -> std::io::Result<()> {
     ));
     let project_data_access_use_case = Arc::new(ProjectDataAccessUseCase::new(
         project_data_service.clone(),
+    ));
+    let user_registration_use_case = Arc::new(UserRegistrationUseCase::new(
+        user_registration_service,
     ));
     println!("✅ Done");
 
@@ -379,6 +394,7 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| project_user_matrix_controller::configure_routes(cfg, project_user_matrix_use_case.clone()))
                     .configure(|cfg| role_permission_matrix_controller::configure_routes(cfg, role_permission_matrix_use_case.clone()))
                     .configure(|cfg| project_data_access_controller::configure_routes(cfg, project_data_access_use_case.clone()))
+                    .configure(|cfg| user_registration_controller::configure(cfg, user_registration_use_case.clone()))
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

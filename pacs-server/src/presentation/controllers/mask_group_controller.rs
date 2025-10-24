@@ -91,6 +91,10 @@ where
             "error": "Database Error",
             "message": msg
         })),
+        Err(ServiceError::ExternalServiceError(msg)) => HttpResponse::InternalServerError().json(json!({
+            "error": "External Service Error",
+            "message": msg
+        })),
     }
 }
 
