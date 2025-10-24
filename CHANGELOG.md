@@ -6,6 +6,96 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-01-23
+
+#### **User Profile Management Enhancement**
+- **Extended User Profile Fields**: Added comprehensive user profile management with additional fields
+  - `full_name` - 사용자 실명 (한글명/영문명)
+  - `organization` - 소속 기관 (예: "서울대학교병원")
+  - `department` - 소속 부서/그룹 (예: "영상의학과")
+  - `phone` - 연락처 (예: "010-1234-5678")
+  - `updated_at` - 마지막 업데이트 시각
+
+- **User Update API**: Implemented `PUT /api/users/{user_id}` endpoint for updating user profile information
+  - Partial update support - 사용자는 개별 필드만 업데이트 가능
+  - Email uniqueness validation - 이메일 중복 검사
+  - Username과 keycloak_id는 변경 불가 (시스템 식별자)
+
+- **Database Schema Enhancement**
+  - Added migration `006_add_user_profile_fields.sql`
+  - Automatic `updated_at` trigger for timestamp management
+  - Performance indexes for name and organization search
+  - Proper column documentation and constraints
+
+- **Enhanced DTOs and Entities**
+  - Updated `CreateUserRequest`, `UpdateUserRequest`, `UserResponse` with new profile fields
+  - Created `UpdateUser` entity with builder pattern for flexible updates
+  - OpenAPI documentation with comprehensive examples
+
+#### **Configuration Management Improvements**
+- **Environment Variable Priority**: Fixed configuration loading to ensure environment variables take precedence over TOML files
+- **S3 Configuration Fix**: Resolved S3 signed URL generation error by removing hardcoded credentials from config files
+- **Cleaned Configuration Files**: Removed duplicate and commented-out environment variable definitions
+
+### Fixed - 2025-01-23
+
+#### **Critical Bug Fixes**
+- **S3 Signed URL Generation**: Fixed "액세스키가 없다" (Access key is missing) error
+  - Root cause: TOML config files contained hardcoded S3 credentials overriding environment variables
+  - Solution: Removed all hardcoded sensitive values from config files
+  - Result: S3 signed URL generation now works correctly with proper credential loading
+
+- **Database Query Fixes**: Fixed annotation DELETE API error
+  - Resolved "Database error: no column found for name: measurement_values"
+  - Added missing `measurement_values` column to SQL queries
+  - Fixed `find_shared_annotations` query with proper column references
+
+#### **Configuration Cleanup**
+- **Environment Variable Loading**: Fixed duplicate keys in `.env` file causing environment variables to not load properly
+- **Config File Hardcoded Values**: Removed hardcoded S3 credentials from TOML config files
+- **Configuration Priority**: Ensured proper environment variable priority over TOML file values
+
+### Technical Details - 2025-01-23
+
+#### **Database Migration**
+```sql
+-- 006_add_user_profile_fields.sql
+ALTER TABLE security_user
+ADD COLUMN full_name TEXT,
+ADD COLUMN organization TEXT,
+ADD COLUMN department TEXT,
+ADD COLUMN phone TEXT,
+ADD COLUMN updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+-- Performance indexes
+CREATE INDEX idx_user_full_name ON security_user(full_name);
+CREATE INDEX idx_user_organization ON security_user(organization);
+
+-- Auto-update trigger
+CREATE OR REPLACE FUNCTION update_user_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+#### **API Usage Examples**
+```bash
+# Update user profile
+PUT /api/users/123
+Content-Type: application/json
+
+{
+  "full_name": "홍길동",
+  "email": "hong@example.com",
+  "organization": "서울대학교병원",
+  "department": "영상의학과",
+  "phone": "010-1234-5678"
+}
+```
+
 ### Added - 2025-10-05
 
 #### Presentation Layer - HTTP Controllers (25 통합 테스트)
