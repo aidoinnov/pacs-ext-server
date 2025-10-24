@@ -59,9 +59,6 @@ COPY --from=builder /app/target/release/pacs_server /app/pacs_server
 COPY --from=builder /app/config ./config
 COPY --from=builder /app/migrations ./migrations
 
-COPY --from=builder /app/target ./taraget
-
-
 # 시작 스크립트 생성
 RUN echo '#!/bin/bash\n\
 echo "🔄 Running database migrations..."\n\

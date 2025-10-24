@@ -8,6 +8,7 @@ use crate::application::dto::user_dto::*;
 use crate::application::dto::project_dto::*;
 use crate::application::dto::annotation_dto::*;
 use crate::application::dto::mask_group_dto::*;
+use crate::application::dto::permission_dto::*;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -66,12 +67,17 @@ use crate::application::dto::mask_group_dto::*;
             SignedUrlResponse,
             CompleteUploadRequest,
             CompleteUploadResponse,
+            // Permission DTOs
+            RoleWithPermissionsResponse,
+            RolesWithPermissionsListResponse,
+            PaginationQuery,
         )
     ),
     tags(
         (name = "auth", description = "Authentication endpoints - 인증 관련 API"),
         (name = "users", description = "User management endpoints - 사용자 관리 API"),
         (name = "projects", description = "Project management endpoints - 프로젝트 관리 API"),
+        (name = "roles", description = "Role management endpoints - 역할 관리 API"),
         (name = "permissions", description = "Permission management endpoints - 권한 관리 API"),
         (name = "access-control", description = "Access control endpoints - 접근 제어 API"),
         (name = "annotations", description = "Annotation management endpoints - 어노테이션 관리 API"),

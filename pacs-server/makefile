@@ -5,7 +5,7 @@
 # 프로젝트 정보
 PROJECT_NAME=pacs-server
 IMAGE_NAME=aido/pacs-extension-server
-VERSION=0.1.23
+VERSION=0.1.25
 CONTAINER_NAME ?= pacs-server
 
 # 레지스트리 정보
@@ -103,7 +103,9 @@ clean-cargo:
 docker-build:
 	@echo ">>> Building Docker image: $(LOCAL_VERSION)"
 	# docker build --no-cache -t $(LOCAL_LATEST) -t $(LOCAL_VERSION) .
-	docker build -t $(LOCAL_LATEST) -t $(LOCAL_VERSION) .
+	docker build \
+		--compress \
+		-t $(LOCAL_LATEST) -t $(LOCAL_VERSION) .
 	@echo ">>> Tagging for push registry"
 	docker tag $(LOCAL_LATEST)  $(PUSH_LATEST)
 	docker tag $(LOCAL_VERSION) $(PUSH_VERSION)

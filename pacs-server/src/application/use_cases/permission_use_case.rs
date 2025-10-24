@@ -1,6 +1,7 @@
 use crate::application::dto::{
     CreateRoleRequest, RoleResponse, PermissionResponse, AssignPermissionRequest,
     RolePermissionsResponse, ProjectPermissionsResponse, ResourcePermissionsResponse,
+    RoleWithPermissionsResponse, RolesWithPermissionsListResponse,
 };
 use crate::domain::services::PermissionService;
 use crate::domain::ServiceError;
@@ -185,6 +186,61 @@ impl<P: PermissionService> PermissionUseCase<P> {
         Ok(ResourcePermissionsResponse {
             resource_type: resource_type.to_string(),
             permissions: permission_responses,
+        })
+    }
+
+    /// Global 역할 목록 조회 (권한 정보 포함, 페이지네이션)
+    pub async fn get_global_roles_with_permissions(
+        &self,
+        page: Option<i32>,
+        page_size: Option<i32>,
+    ) -> Result<RolesWithPermissionsListResponse, ServiceError> {
+        let page = page.unwrap_or(1).max(1);
+        let page_size = page_size.unwrap_or(20).clamp(1, 100);
+        let offset = (page - 1) * page_size;
+        
+        // 전체 Global 역할 조회
+        let all_roles = self.permission_service.get_global_roles().await?;
+        let total_count = all_roles.len() as i64;
+        
+        // 페이지네이션 적용
+        let paginated_roles: Vec<_> = all_roles
+            .into_iter()
+            .skip(offset as usize)
+            .take(page_size as usize)
+            .collect();
+        
+        // 각 역할의 권한 조회
+        let mut roles_with_permissions = Vec::new();
+        for role in paginated_roles {
+            let permissions = self.permission_service
+                .get_role_permissions(role.id)
+                .await?;
+            
+            roles_with_permissions.push(RoleWithPermissionsResponse {
+                id: role.id,
+                name: role.name,
+                description: role.description,
+                scope: role.scope,
+                permissions: permissions
+                    .into_iter()
+                    .map(|p| PermissionResponse {
+                        id: p.id,
+                        resource_type: p.resource_type,
+                        action: p.action,
+                    })
+                    .collect(),
+            });
+        }
+        
+        let total_pages = ((total_count + page_size as i64 - 1) / page_size as i64) as i32;
+        
+        Ok(RolesWithPermissionsListResponse {
+            roles: roles_with_permissions,
+            total_count,
+            page,
+            page_size,
+            total_pages,
         })
     }
 }

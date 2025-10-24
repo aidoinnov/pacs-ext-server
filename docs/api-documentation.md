@@ -391,6 +391,47 @@ GET /api/roles/global
 Authorization: Bearer <jwt_token>
 ```
 
+### 글로벌 역할 목록 (권한 정보 포함, 페이지네이션)
+
+```http
+GET /api/roles/global/with-permissions?page=1&page_size=20
+Authorization: Bearer <jwt_token>
+```
+
+**쿼리 매개변수:**
+- `page` (optional): 페이지 번호 (기본값: 1)
+- `page_size` (optional): 페이지당 항목 수 (기본값: 20, 최대: 100)
+
+**응답:**
+```json
+{
+  "roles": [
+    {
+      "id": 1,
+      "name": "시스템 관리자",
+      "description": "전체 시스템 관리 권한",
+      "scope": "GLOBAL",
+      "permissions": [
+        {
+          "id": 1,
+          "resource_type": "user",
+          "action": "create"
+        },
+        {
+          "id": 2,
+          "resource_type": "user",
+          "action": "delete"
+        }
+      ]
+    }
+  ],
+  "total_count": 5,
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 1
+}
+```
+
 ### 프로젝트 역할 목록
 
 ```http

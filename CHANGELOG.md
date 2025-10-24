@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added - 2025-01-23
 
+#### **Global Roles with Permissions API**
+- **New API Endpoint**: `GET /api/roles/global/with-permissions` - 글로벌 역할 목록을 권한 정보와 함께 페이지네이션으로 조회
+  - 페이지네이션 지원: `page` (기본값: 1), `page_size` (기본값: 20, 최대: 100)
+  - 각 역할에 할당된 권한 정보를 포함하여 반환
+  - 하위 호환성 보장: 기존 `/api/roles/global` API 유지
+
+- **Enhanced DTOs**: 새로운 응답 DTO 추가
+  - `RoleWithPermissionsResponse`: 역할 정보 + 권한 목록
+  - `RolesWithPermissionsListResponse`: 페이지네이션 정보 포함
+  - `PaginationQuery`: 페이지네이션 쿼리 파라미터
+
+- **OpenAPI Documentation**: 완전한 API 문서화
+  - Swagger UI에서 테스트 가능
+  - 상세한 파라미터 및 응답 스키마 문서화
+
 #### **User Profile Management Enhancement**
 - **Extended User Profile Fields**: Added comprehensive user profile management with additional fields
   - `full_name` - 사용자 실명 (한글명/영문명)

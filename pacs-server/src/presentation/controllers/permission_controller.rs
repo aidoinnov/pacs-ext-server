@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::dto::permission_dto::CreateRoleRequest;
+use crate::application::dto::permission_dto::{CreateRoleRequest, PaginationQuery};
 use crate::application::use_cases::permission_use_case::PermissionUseCase;
 use crate::domain::services::permission_service::PermissionService;
 
@@ -62,6 +62,22 @@ impl<P: PermissionService> PermissionController<P> {
             })),
         }
     }
+
+    /// Global 역할 목록 조회 (권한 정보 포함, 페이지네이션)
+    pub async fn get_global_roles_with_permissions(
+        permission_use_case: web::Data<Arc<PermissionUseCase<P>>>,
+        query: web::Query<PaginationQuery>,
+    ) -> impl Responder {
+        match permission_use_case
+            .get_global_roles_with_permissions(query.page, query.page_size)
+            .await
+        {
+            Ok(response) => HttpResponse::Ok().json(response),
+            Err(e) => HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to get global roles with permissions: {}", e)
+            })),
+        }
+    }
 }
 
 pub fn configure_routes<P: PermissionService + 'static>(
@@ -73,6 +89,7 @@ pub fn configure_routes<P: PermissionService + 'static>(
             web::scope("/roles")
                 .route("", web::post().to(PermissionController::<P>::create_role))
                 .route("/global", web::get().to(PermissionController::<P>::get_global_roles))
+                .route("/global/with-permissions", web::get().to(PermissionController::<P>::get_global_roles_with_permissions))
                 .route("/project", web::get().to(PermissionController::<P>::get_project_roles))
                 .route("/{role_id}", web::get().to(PermissionController::<P>::get_role)),
         );
