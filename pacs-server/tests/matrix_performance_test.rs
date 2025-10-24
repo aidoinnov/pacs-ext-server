@@ -1,0 +1,355 @@
+use std::time::Instant;
+use actix_web::{test, web, App};
+use std::sync::Arc;
+
+use pacs_server::{
+    application::use_cases::ProjectUserMatrixUseCase,
+    domain::services::{
+        project_service::ProjectServiceImpl,
+        user_service::UserServiceImpl,
+    },
+    infrastructure::repositories::{
+        project_repository_impl::ProjectRepositoryImpl,
+        user_repository_impl::UserRepositoryImpl,
+        role_repository_impl::RoleRepositoryImpl,
+    },
+    presentation::controllers::project_user_matrix_controller,
+};
+
+/// 대용량 데이터 성능 테스트
+#[tokio::test]
+async fn test_matrix_large_dataset_performance() {
+    // Given: 대용량 테스트 데이터 설정
+    let pool = setup_test_database().await;
+    setup_large_dataset(&pool, 100, 50).await; // 100개 프로젝트, 50명 사용자
+    
+    let app = create_test_app(pool).await;
+    
+    // When: 매트릭스 조회 (성능 측정)
+    let start_time = Instant::now();
+    
+    let req = test::TestRequest::get()
+        .uri("/api/project-user-matrix?project_page=1&project_page_size=20&user_page=1&user_page_size=20")
+        .to_request();
+    
+    let resp = test::call_service(&app, req).await;
+    
+    let duration = start_time.elapsed();
+    
+    // Then: 성공적으로 응답하고 성능 기준을 만족해야 함
+    assert!(resp.status().is_success());
+    
+    // 성능 기준: 5초 이내 응답
+    assert!(duration.as_secs() < 5, "응답 시간이 5초를 초과함: {:?}", duration);
+    
+    let matrix_response: serde_json::Value = test::read_body_json(resp).await;
+    let matrix = matrix_response.get("matrix").unwrap().as_array().unwrap();
+    let users = matrix_response.get("users").unwrap().as_array().unwrap();
+    
+    // 페이지네이션이 올바르게 작동하는지 확인
+    assert_eq!(matrix.len(), 20); // 프로젝트 페이지 크기
+    assert_eq!(users.len(), 20); // 사용자 페이지 크기
+}
+
+/// 상태 필터링 성능 테스트
+#[tokio::test]
+async fn test_matrix_status_filtering_performance() {
+    let pool = setup_test_database().await;
+    setup_large_dataset(&pool, 200, 100).await; // 200개 프로젝트, 100명 사용자
+    
+    let app = create_test_app(pool).await;
+    
+    // When: 상태 필터링으로 조회 (성능 측정)
+    let start_time = Instant::now();
+    
+    let req = test::TestRequest::get()
+        .uri("/api/project-user-matrix?project_statuses=IN_PROGRESS&project_page=1&project_page_size=10")
+        .to_request();
+    
+    let resp = test::call_service(&app, req).await;
+    
+    let duration = start_time.elapsed();
+    
+    // Then: 성공적으로 응답하고 성능 기준을 만족해야 함
+    assert!(resp.status().is_success());
+    
+    // 상태 필터링은 더 빠르게 응답해야 함 (3초 이내)
+    assert!(duration.as_secs() < 3, "상태 필터링 응답 시간이 3초를 초과함: {:?}", duration);
+    
+    let matrix_response: serde_json::Value = test::read_body_json(resp).await;
+    let matrix = matrix_response.get("matrix").unwrap().as_array().unwrap();
+    
+    // 모든 프로젝트가 IN_PROGRESS 상태인지 확인
+    for project in matrix {
+        let status = project.get("status").unwrap().as_str().unwrap();
+        assert_eq!(status, "IN_PROGRESS");
+    }
+}
+
+/// 페이지네이션 성능 테스트
+#[tokio::test]
+async fn test_matrix_pagination_performance() {
+    let pool = setup_test_database().await;
+    setup_large_dataset(&pool, 500, 200).await; // 500개 프로젝트, 200명 사용자
+    
+    let app = create_test_app(pool).await;
+    
+    // When: 여러 페이지 조회 (성능 측정)
+    let mut total_duration = std::time::Duration::new(0, 0);
+    
+    for page in 1..=5 {
+        let start_time = Instant::now();
+        
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/project-user-matrix?project_page={}&project_page_size=10", page))
+            .to_request();
+        
+        let resp = test::call_service(&app, req).await;
+        
+        let duration = start_time.elapsed();
+        total_duration += duration;
+        
+        // Then: 각 페이지가 성공적으로 응답해야 함
+        assert!(resp.status().is_success());
+        
+        // 각 페이지 응답 시간이 2초 이내여야 함
+        assert!(duration.as_secs() < 2, "페이지 {} 응답 시간이 2초를 초과함: {:?}", page, duration);
+    }
+    
+    // 전체 페이지네이션 성능 기준: 10초 이내
+    assert!(total_duration.as_secs() < 10, "전체 페이지네이션 시간이 10초를 초과함: {:?}", total_duration);
+}
+
+/// 복합 필터링 성능 테스트
+#[tokio::test]
+async fn test_matrix_complex_filtering_performance() {
+    let pool = setup_test_database().await;
+    setup_large_dataset(&pool, 300, 150).await; // 300개 프로젝트, 150명 사용자
+    
+    let app = create_test_app(pool).await;
+    
+    // When: 복합 필터링으로 조회 (성능 측정)
+    let start_time = Instant::now();
+    
+    let req = test::TestRequest::get()
+        .uri("/api/project-user-matrix?project_statuses=IN_PROGRESS,COMPLETED&project_page=1&project_page_size=15&user_page=1&user_page_size=15")
+        .to_request();
+    
+    let resp = test::call_service(&app, req).await;
+    
+    let duration = start_time.elapsed();
+    
+    // Then: 성공적으로 응답하고 성능 기준을 만족해야 함
+    assert!(resp.status().is_success());
+    
+    // 복합 필터링은 4초 이내 응답해야 함
+    assert!(duration.as_secs() < 4, "복합 필터링 응답 시간이 4초를 초과함: {:?}", duration);
+    
+    let matrix_response: serde_json::Value = test::read_body_json(resp).await;
+    let matrix = matrix_response.get("matrix").unwrap().as_array().unwrap();
+    
+    // 필터링된 상태만 포함되는지 확인
+    for project in matrix {
+        let status = project.get("status").unwrap().as_str().unwrap();
+        assert!(status == "IN_PROGRESS" || status == "COMPLETED");
+    }
+}
+
+/// 메모리 사용량 테스트
+#[tokio::test]
+async fn test_matrix_memory_usage() {
+    let pool = setup_test_database().await;
+    setup_large_dataset(&pool, 1000, 500).await; // 1000개 프로젝트, 500명 사용자
+    
+    let app = create_test_app(pool).await;
+    
+    // When: 대용량 데이터 조회
+    let req = test::TestRequest::get()
+        .uri("/api/project-user-matrix?project_page=1&project_page_size=50&user_page=1&user_page_size=50")
+        .to_request();
+    
+    let resp = test::call_service(&app, req).await;
+    
+    // Then: 성공적으로 응답해야 함
+    assert!(resp.status().is_success());
+    
+    let matrix_response: serde_json::Value = test::read_body_json(resp).await;
+    
+    // 응답 크기가 합리적인 범위 내에 있는지 확인
+    let response_size = serde_json::to_string(&matrix_response).unwrap().len();
+    
+    // 응답 크기가 10MB를 초과하지 않아야 함
+    assert!(response_size < 10 * 1024 * 1024, "응답 크기가 10MB를 초과함: {} bytes", response_size);
+}
+
+/// 동시 요청 성능 테스트
+#[tokio::test]
+async fn test_matrix_concurrent_requests_performance() {
+    let pool = setup_test_database().await;
+    setup_large_dataset(&pool, 200, 100).await;
+    
+    let app = create_test_app(pool).await;
+    
+    // When: 동시에 여러 요청 처리 (성능 측정)
+    let start_time = Instant::now();
+    
+    let mut handles = vec![];
+    
+    for i in 1..=10 {
+        let app_clone = app.clone();
+        let handle = tokio::spawn(async move {
+            let req = test::TestRequest::get()
+                .uri(&format!("/api/project-user-matrix?project_page={}&project_page_size=10", i))
+                .to_request();
+            
+            test::call_service(&app_clone, req).await
+        });
+        handles.push(handle);
+    }
+    
+    // 모든 요청 완료 대기
+    for handle in handles {
+        let resp = handle.await.unwrap();
+        assert!(resp.status().is_success());
+    }
+    
+    let duration = start_time.elapsed();
+    
+    // Then: 모든 동시 요청이 성공적으로 처리되어야 함
+    // 10개의 동시 요청이 15초 이내에 완료되어야 함
+    assert!(duration.as_secs() < 15, "동시 요청 처리 시간이 15초를 초과함: {:?}", duration);
+}
+
+/// 데이터베이스 쿼리 최적화 테스트
+#[tokio::test]
+async fn test_matrix_database_query_optimization() {
+    let pool = setup_test_database().await;
+    setup_large_dataset(&pool, 1000, 1000).await; // 1000개 프로젝트, 1000명 사용자
+    
+    let app = create_test_app(pool).await;
+    
+    // When: 인덱스가 있는 컬럼으로 필터링
+    let start_time = Instant::now();
+    
+    let req = test::TestRequest::get()
+        .uri("/api/project-user-matrix?project_statuses=IN_PROGRESS&project_page=1&project_page_size=20")
+        .to_request();
+    
+    let resp = test::call_service(&app, req).await;
+    
+    let duration = start_time.elapsed();
+    
+    // Then: 인덱스를 활용한 빠른 쿼리가 실행되어야 함
+    assert!(resp.status().is_success());
+    
+    // 인덱스 활용 시 2초 이내 응답해야 함
+    assert!(duration.as_secs() < 2, "인덱스 활용 쿼리 시간이 2초를 초과함: {:?}", duration);
+}
+
+/// 캐시 성능 테스트 (캐시가 구현된 경우)
+#[tokio::test]
+async fn test_matrix_cache_performance() {
+    let pool = setup_test_database().await;
+    setup_large_dataset(&pool, 500, 300).await;
+    
+    let app = create_test_app(pool).await;
+    
+    // When: 동일한 요청을 여러 번 수행
+    let mut durations = vec![];
+    
+    for _ in 0..5 {
+        let start_time = Instant::now();
+        
+        let req = test::TestRequest::get()
+            .uri("/api/project-user-matrix?project_page=1&project_page_size=20")
+            .to_request();
+        
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        
+        let duration = start_time.elapsed();
+        durations.push(duration);
+    }
+    
+    // Then: 후속 요청들이 더 빨라야 함 (캐시 효과)
+    if durations.len() >= 2 {
+        let first_duration = durations[0];
+        let last_duration = durations[durations.len() - 1];
+        
+        // 마지막 요청이 첫 번째 요청보다 빠르거나 같아야 함
+        assert!(last_duration <= first_duration, "캐시 효과가 없음: 첫 번째 {:?}, 마지막 {:?}", first_duration, last_duration);
+    }
+}
+
+/// 헬퍼 함수들
+async fn setup_test_database() -> sqlx::PgPool {
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://admin:admin123@localhost:5432/pacs_db".to_string());
+    
+    sqlx::PgPool::connect(&database_url).await.unwrap()
+}
+
+async fn setup_large_dataset(pool: &sqlx::PgPool, project_count: i32, user_count: i32) {
+    // 대량의 프로젝트 생성
+    for i in 1..=project_count {
+        let status = match i % 5 {
+            0 => "PREPARING",
+            1 => "IN_PROGRESS",
+            2 => "COMPLETED",
+            3 => "ON_HOLD",
+            _ => "CANCELLED",
+        };
+        
+        sqlx::query!(
+            "INSERT INTO security_project (name, description, is_active, status) 
+             VALUES ($1, 'Performance Test Description', true, $2::project_status)",
+            format!("Performance Test Project {}", i),
+            status
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+    
+    // 대량의 사용자 생성
+    for i in 1..=user_count {
+        sqlx::query!(
+            "INSERT INTO security_user (keycloak_id, username, email) 
+             VALUES (gen_random_uuid(), $1, $2)",
+            format!("perf_user_{:04}", i),
+            format!("perf{}@example.com", i)
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+}
+
+async fn create_test_app(pool: sqlx::PgPool) -> impl actix_web::dev::Service<actix_web::dev::ServiceRequest, Response = actix_web::dev::ServiceResponse, Error = actix_web::Error> {
+    let project_repository = Arc::new(ProjectRepositoryImpl::new(pool.clone()));
+    let user_repository = Arc::new(UserRepositoryImpl::new(pool.clone()));
+    let role_repository = Arc::new(RoleRepositoryImpl::new(pool.clone()));
+    
+    let project_service = Arc::new(ProjectServiceImpl::new(
+        project_repository.clone(),
+        user_repository.clone(),
+        role_repository.clone(),
+    ));
+    
+    let user_service = Arc::new(UserServiceImpl::new(
+        user_repository.clone(),
+        project_repository.clone(),
+    ));
+    
+    let matrix_use_case = Arc::new(ProjectUserMatrixUseCase::new(
+        project_service.clone(),
+        user_service.clone(),
+    ));
+    
+    App::new()
+        .app_data(web::Data::new(matrix_use_case.clone()))
+        .service(
+            web::scope("/api")
+                .configure(|cfg| project_user_matrix_controller::configure_routes(cfg, matrix_use_case.clone()))
+        )
+}

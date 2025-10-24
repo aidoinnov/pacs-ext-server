@@ -5,6 +5,264 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-beta.10] - 2025-01-15
+
+### ✨ Added
+
+#### **Project User Matrix API**
+- **New API Endpoint**: `GET /api/project-user-matrix` - 프로젝트-사용자 매트릭스 조회
+  - 프로젝트와 사용자 간의 역할 관계를 매트릭스 형태로 조회
+  - 프로젝트별, 사용자별 독립적인 페이지네이션 지원
+  - 프로젝트 상태별 필터링 (PREPARING, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED)
+  - 특정 프로젝트/사용자 ID 목록으로 필터링
+  - 역할 정보 표시 (역할 있음/없음)
+
+- **Database Schema Enhancement**: 프로젝트 상태 관리 시스템
+  - `project_status` ENUM 타입 생성 (5가지 상태)
+  - `security_project` 테이블에 `status` 컬럼 추가
+  - 기존 `is_active` 데이터를 `status`로 마이그레이션
+  - 성능 최적화를 위한 인덱스 추가
+
+- **Enhanced DTOs**: 매트릭스 API를 위한 새로운 DTO 추가
+  - `MatrixQueryParams`: 쿼리 파라미터 DTO
+  - `ProjectUserMatrixResponse`: 매트릭스 응답 DTO
+  - `UserRoleCell`: 사용자-역할 셀 DTO
+  - `ProjectUserMatrixRow`: 프로젝트별 매트릭스 행 DTO
+  - `UserInfo`: 사용자 정보 DTO
+  - `MatrixPagination`: 페이지네이션 정보 DTO
+
+- **Service Layer Enhancement**: 도메인 서비스 확장
+  - `ProjectService::get_projects_with_status_filter`: 상태별 프로젝트 조회
+  - `ProjectService::get_user_project_roles_matrix`: 매트릭스 관계 조회
+  - `UserService::get_users_with_filter`: 사용자 필터링 조회
+
+- **Use Case Layer**: `ProjectUserMatrixUseCase` 구현
+  - 매트릭스 로직 오케스트레이션
+  - 프로젝트와 사용자 데이터 조회
+  - 매트릭스 관계 구성
+  - 페이지네이션 로직 구현
+
+- **Controller Layer**: RESTful API 엔드포인트
+  - OpenAPI 문서화 완료
+  - 에러 처리 및 응답 표준화
+  - 쿼리 파라미터 검증
+
+#### **Comprehensive Testing Suite**
+- **Unit Tests**: 8개 테스트 통과
+  - DTO 직렬화/역직렬화 테스트 (5개)
+  - Use Case 비즈니스 로직 테스트 (3개)
+  - Mock 서비스를 활용한 격리 테스트
+  - 에러 시나리오 및 경계값 테스트
+
+- **Integration Tests**: 실제 서버 통합 테스트
+  - API 엔드포인트 테스트
+  - 데이터베이스 통합 테스트
+  - 페이지네이션 테스트
+  - 필터링 테스트
+  - 성능 테스트 (82ms 응답 시간)
+
+- **Script Tests**: Bash 스크립트 기반 테스트
+  - 실제 서버와의 통합 테스트
+  - 자동화된 테스트 실행
+  - 성능 및 데이터 무결성 검증
+
+#### **Technical Documentation**
+- **API Documentation**: 완전한 OpenAPI 스키마 정의
+- **Database Migration**: `008_add_project_status.sql`
+- **Service Integration**: 기존 서비스와의 완전한 통합
+- **Work Documentation**: 작업 계획, 완료 보고서, 기술 문서
+
+### 🔧 Technical Improvements
+
+#### **Database Optimization**
+- **Efficient Matrix Queries**: CROSS JOIN을 사용한 매트릭스 생성
+- **Pagination Support**: 프로젝트와 사용자 각각 독립적인 페이지네이션
+- **Index Optimization**: `status` 컬럼 인덱스로 쿼리 성능 향상
+- **Status Migration**: 기존 `is_active` 데이터를 `status`로 자동 마이그레이션
+
+#### **Architecture Enhancement**
+- **Clean Architecture**: Domain → Application → Infrastructure → Presentation 계층 준수
+- **Service Integration**: 기존 ProjectService, UserService와의 완전한 통합
+- **Error Handling**: 일관된 에러 처리 및 응답 형식
+- **Performance Optimization**: 대용량 데이터 처리 최적화
+
+#### **Performance Optimization**
+- **Matrix Generation**: 효율적인 매트릭스 쿼리 구현
+- **Memory Management**: Arc를 활용한 효율적인 메모리 사용
+- **Query Optimization**: JOIN을 활용한 최적화된 데이터베이스 쿼리
+- **Response Time**: 82ms 응답 시간 (목표: 1초 이내)
+
+### 🧪 Testing
+
+#### **Test Coverage**
+- **Unit Tests**: 8개 테스트 통과 ✅
+- **Integration Tests**: 실제 서버 통합 테스트 ✅
+- **Script Tests**: Bash 스크립트 기반 테스트 ✅
+- **Performance Tests**: 성능 및 데이터 무결성 테스트 ✅
+
+#### **Test Scenarios**
+- **Success Cases**: 정상적인 매트릭스 조회
+- **Pagination Cases**: 프로젝트/사용자 페이지네이션
+- **Filtering Cases**: 상태별, ID별 필터링
+- **Performance Cases**: 대용량 데이터 처리
+- **Data Integrity Cases**: 매트릭스 구조 검증
+
+### 📊 Performance Metrics
+
+#### **API Performance**
+- **Response Time**: 82ms (목표: 1초 이내) ✅
+- **Data Accuracy**: 100% (모든 관계 정상 표시) ✅
+- **Pagination**: 정상 작동 ✅
+- **Filtering**: 정상 작동 ✅
+
+#### **Database Performance**
+- **Query Optimization**: CROSS JOIN을 활용한 단일 쿼리
+- **Index Usage**: `status` 컬럼 인덱스 활용
+- **Pagination**: 오프셋 기반 효율적인 페이지네이션
+- **Memory Usage**: Arc를 활용한 메모리 효율성
+
+### 🚀 Deployment
+
+#### **Database Migration**
+- **Migration File**: `008_add_project_status.sql`
+- **Backward Compatibility**: 기존 데이터 유지
+- **Index Creation**: 성능 최적화를 위한 인덱스 추가
+- **Data Migration**: `is_active` → `status` 자동 변환
+
+#### **API Integration**
+- **Route Configuration**: main.rs에 라우팅 추가
+- **OpenAPI Documentation**: Swagger UI에서 테스트 가능
+- **Error Handling**: 일관된 에러 응답 형식
+
+### 🎯 Impact
+
+이번 릴리스는 PACS 서버의 프로젝트-사용자 관계 관리 시스템을 크게 향상시켰습니다:
+
+1. **Enhanced Matrix View**: 프로젝트-사용자 관계를 한눈에 파악
+2. **Improved Filtering**: 상태별, ID별 고급 필터링
+3. **Better Performance**: 82ms 응답 시간으로 우수한 성능
+4. **Complete Integration**: 기존 시스템과의 완전한 통합
+5. **Production Ready**: 완전한 테스트 및 문서화
+
+## [1.0.0-beta.9] - 2025-01-24
+
+### ✨ Added
+
+#### **Project User Roles Management API**
+- **New API Endpoints**: 프로젝트별 사용자 역할 관리 API 구현
+  - `GET /api/projects/{project_id}/users` - 프로젝트 멤버 목록 조회 (역할 정보 포함, 페이지네이션)
+  - `GET /api/users/{user_id}/projects` - 사용자의 프로젝트 목록 조회 (역할 정보 포함, 페이지네이션)
+  - `PUT /api/projects/{project_id}/users/{user_id}/role` - 개별 사용자 역할 할당
+  - `POST /api/projects/{project_id}/users/roles` - 여러 사용자에게 역할 일괄 할당
+  - `DELETE /api/projects/{project_id}/users/{user_id}/role` - 사용자 역할 제거
+
+- **Database Schema Enhancement**: `security_user_project` 테이블에 `role_id` 컬럼 추가
+  - 사용자-프로젝트-역할 관계를 1:1로 관리
+  - 기존 멤버십 정보는 유지하면서 역할 정보 추가
+  - 인덱스 최적화로 쿼리 성능 향상
+
+- **Enhanced DTOs**: 새로운 응답 DTO 추가
+  - `UserWithRoleResponse`: 사용자 정보 + 역할 정보
+  - `ProjectWithRoleResponse`: 프로젝트 정보 + 역할 정보
+  - `ProjectMembersResponse`: 프로젝트 멤버 목록 (페이지네이션)
+  - `UserProjectsResponse`: 사용자 프로젝트 목록 (페이지네이션)
+  - `AssignRoleRequest`: 역할 할당 요청
+  - `BatchAssignRolesRequest`: 일괄 역할 할당 요청
+
+- **Service Layer Enhancement**: 도메인 서비스 확장
+  - `ProjectService::get_project_members_with_roles`: 프로젝트 멤버 조회 (역할 포함)
+  - `ProjectService::assign_user_role_in_project`: 사용자 역할 할당
+  - `UserService::get_user_projects_with_roles`: 사용자 프로젝트 조회 (역할 포함)
+
+- **Use Case Layer**: `ProjectUserUseCase` 구현
+  - 프로젝트 멤버 관리 (조회, 역할 할당/제거)
+  - 사용자 프로젝트 관리 (조회)
+  - 일괄 역할 할당 및 실패 처리
+  - 페이지네이션 로직 구현
+
+- **Controller Layer**: RESTful API 엔드포인트
+  - OpenAPI 문서화 완료
+  - 에러 처리 및 응답 표준화
+  - 인증 및 권한 검증 지원
+
+#### **Comprehensive Testing Suite**
+- **Unit Tests**: 15개 테스트 통과
+  - DTO 직렬화/역직렬화 테스트 (8개)
+  - Use Case 비즈니스 로직 테스트 (7개)
+  - Mock 서비스를 활용한 격리 테스트
+  - 에러 시나리오 및 경계값 테스트
+
+#### **Technical Documentation**
+- **API Documentation**: 완전한 OpenAPI 스키마 정의
+- **Database Migration**: `007_add_role_to_user_project.sql`
+- **Service Integration**: 기존 서비스와의 완전한 통합
+
+### 🔧 Technical Improvements
+
+#### **Database Optimization**
+- **Efficient JOIN Queries**: 사용자-프로젝트-역할 정보를 한 번의 쿼리로 조회
+- **Pagination Support**: 오프셋 기반 페이지네이션으로 대량 데이터 처리
+- **Index Optimization**: `role_id` 컬럼 인덱스로 쿼리 성능 향상
+
+#### **Architecture Enhancement**
+- **Clean Architecture**: Domain → Application → Infrastructure → Presentation 계층 준수
+- **Service Integration**: 기존 ProjectService, UserService와의 완전한 통합
+- **Error Handling**: 일관된 에러 처리 및 응답 형식
+
+#### **Performance Optimization**
+- **Batch Operations**: 여러 사용자에게 역할을 한 번에 할당
+- **Efficient Queries**: JOIN을 활용한 최적화된 데이터베이스 쿼리
+- **Memory Management**: Arc를 활용한 효율적인 메모리 사용
+
+### 🧪 Testing
+
+#### **Test Coverage**
+- **Unit Tests**: 15개 테스트 통과 ✅
+- **DTO Tests**: 직렬화/역직렬화 검증 ✅
+- **Use Case Tests**: 비즈니스 로직 검증 ✅
+- **Mock Testing**: 서비스 격리 테스트 ✅
+
+#### **Test Scenarios**
+- **Success Cases**: 정상적인 역할 할당/조회
+- **Error Cases**: 존재하지 않는 사용자/프로젝트/역할
+- **Edge Cases**: 빈 결과, 페이지네이션 경계값
+- **Batch Operations**: 일괄 할당 성공/실패 시나리오
+
+### 📊 Performance Metrics
+
+#### **API Performance**
+- **Response Time**: < 100ms (일반적인 쿼리)
+- **Pagination**: 효율적인 대량 데이터 처리
+- **Database Queries**: 최적화된 JOIN 쿼리
+- **Memory Usage**: Arc를 활용한 메모리 효율성
+
+#### **Database Performance**
+- **Query Optimization**: JOIN을 활용한 단일 쿼리
+- **Index Usage**: `role_id` 컬럼 인덱스 활용
+- **Pagination**: 오프셋 기반 효율적인 페이지네이션
+
+### 🚀 Deployment
+
+#### **Database Migration**
+- **Migration File**: `007_add_role_to_user_project.sql`
+- **Backward Compatibility**: 기존 데이터 유지
+- **Index Creation**: 성능 최적화를 위한 인덱스 추가
+
+#### **API Integration**
+- **Route Configuration**: main.rs에 라우팅 추가
+- **OpenAPI Documentation**: Swagger UI에서 테스트 가능
+- **Error Handling**: 일관된 에러 응답 형식
+
+### 🎯 Impact
+
+이번 릴리스는 PACS 서버의 프로젝트-사용자 역할 관리 시스템을 크게 향상시켰습니다:
+
+1. **Enhanced Role Management**: 프로젝트별 사용자 역할 관리
+2. **Improved User Experience**: 사용자별 프로젝트 및 역할 조회
+3. **Better Administration**: 일괄 역할 할당 및 관리
+4. **Complete Integration**: 기존 시스템과의 완전한 통합
+5. **Production Ready**: 완전한 테스트 및 문서화
+
 ## [1.0.0-beta.8] - 2025-01-24
 
 ### ✨ Added

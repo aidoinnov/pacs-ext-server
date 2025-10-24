@@ -44,7 +44,7 @@ mod presentation;
 // 애플리케이션 레이어 - Use Case 인터페이스들
 use application::use_cases::{
     AuthUseCase, UserUseCase, ProjectUseCase, PermissionUseCase, AccessControlUseCase,
-    AnnotationUseCase, MaskGroupUseCase, MaskUseCase,
+    AnnotationUseCase, MaskGroupUseCase, MaskUseCase, ProjectUserUseCase, ProjectUserMatrixUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
@@ -71,6 +71,7 @@ use infrastructure::middleware::{CacheHeaders, configure_cors};
 use presentation::controllers::{
     auth_controller, user_controller, project_controller, permission_controller,
     access_control_controller, annotation_controller, mask_group_controller, mask_controller,
+    project_user_controller, project_user_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -264,8 +265,8 @@ async fn main() -> std::io::Result<()> {
     // Initialize use cases
     print!("📋 Initializing use cases... ");
     let auth_use_case = Arc::new(AuthUseCase::new(auth_service));
-    let user_use_case = Arc::new(UserUseCase::new(user_service));
-    let project_use_case = Arc::new(ProjectUseCase::new(project_service));
+    let user_use_case = Arc::new(UserUseCase::new(user_service.clone()));
+    let project_use_case = Arc::new(ProjectUseCase::new(project_service.clone()));
     let permission_use_case = Arc::new(PermissionUseCase::new(permission_service));
     let access_control_use_case = Arc::new(AccessControlUseCase::new(access_control_service));
     let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
@@ -277,6 +278,14 @@ async fn main() -> std::io::Result<()> {
         mask_service,
         mask_group_service.clone(),
         signed_url_service.clone(),
+    ));
+    let project_user_use_case = Arc::new(ProjectUserUseCase::new(
+        Arc::new(project_service.clone()),
+        Arc::new(user_service.clone()),
+    ));
+    let project_user_matrix_use_case = Arc::new(ProjectUserMatrixUseCase::new(
+        Arc::new(project_service),
+        Arc::new(user_service),
     ));
     println!("✅ Done");
 
@@ -347,6 +356,8 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
                     .configure(|cfg| mask_group_controller::configure_routes(cfg, mask_group_use_case.clone()))
                     .configure(|cfg| annotation_controller::configure_routes(cfg, annotation_use_case.clone()))
+                    .configure(|cfg| project_user_controller::configure_routes(cfg, project_user_use_case.clone()))
+                    .configure(|cfg| project_user_matrix_controller::configure_routes(cfg, project_user_matrix_use_case.clone()))
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

@@ -3,12 +3,15 @@ use crate::presentation::controllers::auth_controller_docs::*;
 use crate::presentation::controllers::annotation_controller::*;
 use crate::presentation::controllers::project_controller::*;
 use crate::presentation::controllers::mask_group_controller::*;
+use crate::presentation::controllers::project_user_matrix_controller::*;
 use crate::application::dto::auth_dto::*;
 use crate::application::dto::user_dto::*;
 use crate::application::dto::project_dto::*;
 use crate::application::dto::annotation_dto::*;
 use crate::application::dto::mask_group_dto::*;
 use crate::application::dto::permission_dto::*;
+use crate::application::dto::project_user_dto::{UserWithRoleResponse, ProjectWithRoleResponse, AssignRoleRequest, BatchAssignRolesRequest, UserRoleAssignment, RoleAssignmentResponse, BatchRoleAssignmentResponse, FailedAssignment};
+use crate::application::dto::project_user_matrix_dto::*;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -35,6 +38,8 @@ use crate::application::dto::permission_dto::*;
         delete_mask_group,
         generate_upload_url,
         complete_upload,
+        // Project User Matrix endpoints
+        get_matrix,
     ),
     components(
         schemas(
@@ -71,6 +76,22 @@ use crate::application::dto::permission_dto::*;
             RoleWithPermissionsResponse,
             RolesWithPermissionsListResponse,
             PaginationQuery,
+            // Project User DTOs
+            UserWithRoleResponse,
+            ProjectWithRoleResponse,
+            AssignRoleRequest,
+            BatchAssignRolesRequest,
+            UserRoleAssignment,
+            RoleAssignmentResponse,
+            BatchRoleAssignmentResponse,
+            FailedAssignment,
+            // Project User Matrix DTOs
+            UserRoleCell,
+            ProjectUserMatrixRow,
+            ProjectUserMatrixResponse,
+            UserInfo,
+            MatrixPagination,
+            MatrixQueryParams,
         )
     ),
     tags(
@@ -82,6 +103,8 @@ use crate::application::dto::permission_dto::*;
         (name = "access-control", description = "Access control endpoints - 접근 제어 API"),
         (name = "annotations", description = "Annotation management endpoints - 어노테이션 관리 API"),
         (name = "mask-groups", description = "Mask Group management endpoints - 마스크 그룹 관리 API"),
+        (name = "project-users", description = "Project User Role management endpoints - 프로젝트 사용자 역할 관리 API"),
+        (name = "project-user-matrix", description = "Project User Matrix endpoints - 프로젝트 사용자 매트릭스 API"),
     ),
     info(
         title = "PACS Extension Server API",

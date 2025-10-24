@@ -6,6 +6,8 @@ pub mod access_control_use_case;
 pub mod annotation_use_case;
 pub mod mask_group_use_case;
 pub mod mask_use_case;
+pub mod project_user_use_case;
+pub mod project_user_matrix_use_case;
 
 pub use auth_use_case::AuthUseCase;
 pub use user_use_case::UserUseCase;
@@ -15,3 +17,5 @@ pub use access_control_use_case::AccessControlUseCase;
 pub use annotation_use_case::AnnotationUseCase;
 pub use mask_group_use_case::MaskGroupUseCase;
 pub use mask_use_case::MaskUseCase;
+pub use project_user_use_case::ProjectUserUseCase;
+pub use project_user_matrix_use_case::ProjectUserMatrixUseCase;

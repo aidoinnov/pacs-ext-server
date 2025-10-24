@@ -7,3 +7,5 @@ pub mod access_control_controller;
 pub mod annotation_controller;
 pub mod mask_group_controller;
 pub mod mask_controller;
+pub mod project_user_controller;
+pub mod project_user_matrix_controller;

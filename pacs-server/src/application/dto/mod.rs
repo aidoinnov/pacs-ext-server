@@ -6,6 +6,8 @@ pub mod access_control_dto;
 pub mod annotation_dto;
 pub mod mask_group_dto;
 pub mod mask_dto;
+pub mod project_user_dto;
+pub mod project_user_matrix_dto;
 
 pub use auth_dto::*;
 pub use user_dto::*;
@@ -15,3 +17,5 @@ pub use access_control_dto::*;
 pub use annotation_dto::*;
 pub use mask_group_dto::*;
 pub use mask_dto::*;
+pub use project_user_dto::*;
+pub use project_user_matrix_dto::*;

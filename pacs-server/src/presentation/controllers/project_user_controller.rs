@@ -1,0 +1,226 @@
+use actix_web::{web, HttpResponse, Responder};
+use serde_json::json;
+use std::sync::Arc;
+use utoipa::OpenApi;
+
+use crate::application::use_cases::project_user_use_case::ProjectUserUseCase;
+use crate::application::dto::project_user_dto::{
+    AssignRoleRequest, BatchAssignRolesRequest, RoleAssignmentResponse, BatchRoleAssignmentResponse
+};
+use crate::application::dto::permission_dto::PaginationQuery;
+use crate::domain::services::{ProjectService, UserService};
+
+/// 프로젝트 멤버 목록 조회 (역할 정보 포함, 페이지네이션)
+#[utoipa::path(
+    get,
+    path = "/api/projects/{project_id}/users",
+    params(
+        ("project_id" = i32, Path, description = "Project ID"),
+        ("page" = Option<i32>, Query, description = "Page number (default: 1)"),
+        ("page_size" = Option<i32>, Query, description = "Page size (default: 20, max: 100)")
+    ),
+    responses(
+        (status = 200, description = "Project members retrieved successfully"),
+        (status = 404, description = "Project not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "project-users"
+)]
+pub async fn get_project_members<P, U>(
+    path: web::Path<i32>,
+    query: web::Query<PaginationQuery>,
+    use_case: web::Data<Arc<ProjectUserUseCase<P, U>>>,
+) -> impl Responder
+where
+    P: ProjectService,
+    U: UserService,
+{
+    let project_id = path.into_inner();
+    
+    match use_case
+        .get_project_members_with_roles(project_id, query.page, query.page_size)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to get project members: {}", e)
+        })),
+    }
+}
+
+/// 사용자의 프로젝트 목록 조회 (역할 정보 포함, 페이지네이션)
+#[utoipa::path(
+    get,
+    path = "/api/users/{user_id}/projects",
+    params(
+        ("user_id" = i32, Path, description = "User ID"),
+        ("page" = Option<i32>, Query, description = "Page number (default: 1)"),
+        ("page_size" = Option<i32>, Query, description = "Page size (default: 20, max: 100)")
+    ),
+    responses(
+        (status = 200, description = "User projects retrieved successfully"),
+        (status = 404, description = "User not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "project-users"
+)]
+pub async fn get_user_projects<P, U>(
+    path: web::Path<i32>,
+    query: web::Query<PaginationQuery>,
+    use_case: web::Data<Arc<ProjectUserUseCase<P, U>>>,
+) -> impl Responder
+where
+    P: ProjectService,
+    U: UserService,
+{
+    let user_id = path.into_inner();
+    
+    match use_case
+        .get_user_projects_with_roles(user_id, query.page, query.page_size)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to get user projects: {}", e)
+        })),
+    }
+}
+
+/// 프로젝트 내 사용자에게 역할 할당
+#[utoipa::path(
+    put,
+    path = "/api/projects/{project_id}/users/{user_id}/role",
+    params(
+        ("project_id" = i32, Path, description = "Project ID"),
+        ("user_id" = i32, Path, description = "User ID")
+    ),
+    request_body = AssignRoleRequest,
+    responses(
+        (status = 200, description = "Role assigned successfully", body = RoleAssignmentResponse),
+        (status = 404, description = "Project, user, or role not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "project-users"
+)]
+pub async fn assign_user_role<P, U>(
+    path: web::Path<(i32, i32)>,
+    req: web::Json<AssignRoleRequest>,
+    use_case: web::Data<Arc<ProjectUserUseCase<P, U>>>,
+) -> impl Responder
+where
+    P: ProjectService,
+    U: UserService,
+{
+    let (project_id, user_id) = path.into_inner();
+    
+    match use_case
+        .assign_role_to_user(project_id, user_id, req.role_id)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to assign role: {}", e)
+        })),
+    }
+}
+
+/// 프로젝트 내 여러 사용자에게 역할 일괄 할당
+#[utoipa::path(
+    post,
+    path = "/api/projects/{project_id}/users/roles",
+    params(
+        ("project_id" = i32, Path, description = "Project ID")
+    ),
+    request_body = BatchAssignRolesRequest,
+    responses(
+        (status = 200, description = "Roles assigned successfully", body = BatchRoleAssignmentResponse),
+        (status = 404, description = "Project not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "project-users"
+)]
+pub async fn batch_assign_roles<P, U>(
+    path: web::Path<i32>,
+    req: web::Json<BatchAssignRolesRequest>,
+    use_case: web::Data<Arc<ProjectUserUseCase<P, U>>>,
+) -> impl Responder
+where
+    P: ProjectService,
+    U: UserService,
+{
+    let project_id = path.into_inner();
+    
+    // DTO를 (user_id, role_id) 튜플로 변환
+    let assignments: Vec<(i32, i32)> = req.assignments
+        .iter()
+        .map(|assignment| (assignment.user_id, assignment.role_id))
+        .collect();
+    
+    match use_case
+        .batch_assign_roles(project_id, assignments)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to batch assign roles: {}", e)
+        })),
+    }
+}
+
+/// 프로젝트 내 사용자의 역할 제거
+#[utoipa::path(
+    delete,
+    path = "/api/projects/{project_id}/users/{user_id}/role",
+    params(
+        ("project_id" = i32, Path, description = "Project ID"),
+        ("user_id" = i32, Path, description = "User ID")
+    ),
+    responses(
+        (status = 200, description = "User role removed successfully", body = RoleAssignmentResponse),
+        (status = 404, description = "Project or user not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "project-users"
+)]
+pub async fn remove_user_role<P, U>(
+    path: web::Path<(i32, i32)>,
+    use_case: web::Data<Arc<ProjectUserUseCase<P, U>>>,
+) -> impl Responder
+where
+    P: ProjectService,
+    U: UserService,
+{
+    let (project_id, user_id) = path.into_inner();
+    
+    match use_case
+        .remove_user_role(project_id, user_id)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to remove user role: {}", e)
+        })),
+    }
+}
+
+/// 라우팅 설정
+pub fn configure_routes<P, U>(
+    cfg: &mut web::ServiceConfig,
+    project_user_use_case: Arc<ProjectUserUseCase<P, U>>,
+) where
+    P: ProjectService + 'static,
+    U: UserService + 'static,
+{
+    cfg.app_data(web::Data::new(project_user_use_case))
+        .service(
+            web::scope("/projects")
+                .route("/{project_id}/users", web::get().to(get_project_members::<P, U>))
+                .route("/{project_id}/users/{user_id}/role", web::put().to(assign_user_role::<P, U>))
+                .route("/{project_id}/users/{user_id}/role", web::delete().to(remove_user_role::<P, U>))
+                .route("/{project_id}/users/roles", web::post().to(batch_assign_roles::<P, U>))
+        )
+        .service(
+            web::scope("/users")
+                .route("/{user_id}/projects", web::get().to(get_user_projects::<P, U>))
+        );
+}

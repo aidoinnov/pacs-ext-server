@@ -9,7 +9,27 @@ use chrono::{DateTime, Utc};
 // JSON 직렬화/역직렬화를 위한 serde 라이브러리
 use serde::{Deserialize, Serialize};
 // SQLx를 통한 데이터베이스 행 매핑을 위한 트레이트
-use sqlx::FromRow;
+use sqlx::{FromRow, Type};
+
+/// 프로젝트 상태를 나타내는 열거형
+/// 
+/// 프로젝트의 생명주기 상태를 나타내며, 데이터베이스의 `project_status` ENUM과 매핑됩니다.
+/// 
+/// # Variants
+/// - `Preparing`: 준비중 - 프로젝트가 생성되었지만 아직 시작되지 않음
+/// - `InProgress`: 진행중 - 프로젝트가 활발히 진행 중
+/// - `Completed`: 완료 - 프로젝트가 성공적으로 완료됨
+/// - `OnHold`: 보류 - 프로젝트가 일시적으로 중단됨
+/// - `Cancelled`: 취소 - 프로젝트가 취소됨
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[sqlx(type_name = "project_status", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ProjectStatus {
+    Preparing,
+    InProgress,
+    Completed,
+    OnHold,
+    Cancelled,
+}
 
 /// 시스템 프로젝트를 나타내는 엔티티
 /// 
@@ -21,6 +41,7 @@ use sqlx::FromRow;
 /// - `name`: 프로젝트의 고유한 이름
 /// - `description`: 프로젝트에 대한 상세 설명 (선택사항)
 /// - `is_active`: 프로젝트 활성화 상태 (true: 활성, false: 비활성)
+/// - `status`: 프로젝트의 생명주기 상태 (PREPARING, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED)
 /// - `created_at`: 프로젝트가 생성된 시각
 /// 
 /// # 예시
@@ -44,6 +65,8 @@ pub struct Project {
     pub description: Option<String>,
     /// 프로젝트 활성화 상태 (true: 활성, false: 비활성)
     pub is_active: bool,
+    /// 프로젝트의 생명주기 상태
+    pub status: ProjectStatus,
     /// 프로젝트가 생성된 시각
     pub created_at: DateTime<Utc>,
 }

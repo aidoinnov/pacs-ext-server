@@ -1,7 +1,8 @@
 use crate::application::dto::{
     CreateUserRequest, UpdateUserRequest, UserResponse, UserListResponse, AddProjectMemberRequest,
-    UserProjectsResponse, ProjectSummary,
+    ProjectSummary,
 };
+use crate::application::dto::user_dto::UserProjectsResponse;
 use crate::domain::services::UserService;
 use crate::domain::ServiceError;
 
