@@ -10,3 +10,4 @@ pub mod mask_controller;
 pub mod project_user_controller;
 pub mod project_user_matrix_controller;
 pub mod role_permission_matrix_controller;
+pub mod project_data_access_controller;

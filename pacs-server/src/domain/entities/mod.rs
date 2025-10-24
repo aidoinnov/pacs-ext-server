@@ -10,6 +10,7 @@ pub mod viewer;
 pub mod annotation;
 pub mod mask_group;
 pub mod mask;
+pub mod project_data;
 
 pub use user::*;
 pub use project::*;
@@ -23,3 +24,4 @@ pub use viewer::*;
 pub use annotation::*;
 pub use mask_group::*;
 pub use mask::*;
+pub use project_data::*;

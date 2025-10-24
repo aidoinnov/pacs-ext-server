@@ -45,7 +45,7 @@ mod presentation;
 use application::use_cases::{
     AuthUseCase, UserUseCase, ProjectUseCase, PermissionUseCase, AccessControlUseCase,
     AnnotationUseCase, MaskGroupUseCase, MaskUseCase, ProjectUserUseCase, ProjectUserMatrixUseCase,
-    RolePermissionMatrixUseCase,
+    RolePermissionMatrixUseCase, ProjectDataAccessUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
@@ -58,7 +58,9 @@ use domain::services::{
 use infrastructure::repositories::{
     UserRepositoryImpl, ProjectRepositoryImpl, RoleRepositoryImpl, PermissionRepositoryImpl,
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
+    ProjectDataRepositoryImpl, ProjectDataAccessRepositoryImpl,
 };
+use infrastructure::services::ProjectDataServiceImpl;
 
 // JWT 인증 서비스
 use infrastructure::auth::JwtService;
@@ -73,6 +75,7 @@ use presentation::controllers::{
     auth_controller, user_controller, project_controller, permission_controller,
     access_control_controller, annotation_controller, mask_group_controller, mask_controller,
     project_user_controller, project_user_matrix_controller, role_permission_matrix_controller,
+    project_data_access_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -201,6 +204,10 @@ async fn main() -> std::io::Result<()> {
     let mask_group_repo = Arc::new(MaskGroupRepositoryImpl::new(pool.clone()));
     // 마스크 관련 데이터 접근을 위한 리포지토리 (Arc로 래핑하여 공유 소유권)
     let mask_repo = Arc::new(MaskRepositoryImpl::new(pool.clone()));
+    // 프로젝트 데이터 관련 데이터 접근을 위한 리포지토리
+    let project_data_repo = Arc::new(ProjectDataRepositoryImpl::new(pool.clone()));
+    // 프로젝트 데이터 접근 권한 관련 데이터 접근을 위한 리포지토리
+    let project_data_access_repo = Arc::new(ProjectDataAccessRepositoryImpl::new(pool.clone()));
     println!("✅ Done");
 
     // JWT(JSON Web Token) 서비스 초기화
@@ -242,6 +249,11 @@ async fn main() -> std::io::Result<()> {
         mask_repo.clone(),
         mask_group_repo.clone(),
         Arc::new(user_repo.clone()),
+    ));
+    // 프로젝트 데이터 서비스: 프로젝트 데이터 CRUD, 접근 권한 관리 등
+    let project_data_service = Arc::new(ProjectDataServiceImpl::new(
+        project_data_repo.clone(),
+        project_data_access_repo.clone(),
     ));
     // Initialize Object Storage service
     print!("☁️  Initializing Object Storage service... ");
@@ -290,6 +302,9 @@ async fn main() -> std::io::Result<()> {
     ));
     let role_permission_matrix_use_case = Arc::new(RolePermissionMatrixUseCase::new(
         Arc::new(permission_service.clone()),
+    ));
+    let project_data_access_use_case = Arc::new(ProjectDataAccessUseCase::new(
+        project_data_service.clone(),
     ));
     println!("✅ Done");
 
@@ -363,6 +378,7 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| project_user_controller::configure_routes(cfg, project_user_use_case.clone()))
                     .configure(|cfg| project_user_matrix_controller::configure_routes(cfg, project_user_matrix_use_case.clone()))
                     .configure(|cfg| role_permission_matrix_controller::configure_routes(cfg, role_permission_matrix_use_case.clone()))
+                    .configure(|cfg| project_data_access_controller::configure_routes(cfg, project_data_access_use_case.clone()))
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

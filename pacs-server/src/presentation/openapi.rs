@@ -5,6 +5,7 @@ use crate::presentation::controllers::project_controller::*;
 use crate::presentation::controllers::mask_group_controller::*;
 use crate::presentation::controllers::project_user_matrix_controller::*;
 use crate::presentation::controllers::role_permission_matrix_controller::*;
+use crate::presentation::controllers::project_data_access_controller::*;
 use crate::application::dto::auth_dto::*;
 use crate::application::dto::user_dto::*;
 use crate::application::dto::project_dto::*;
@@ -14,6 +15,7 @@ use crate::application::dto::permission_dto::*;
 use crate::application::dto::project_user_dto::{UserWithRoleResponse, ProjectWithRoleResponse, AssignRoleRequest, BatchAssignRolesRequest, UserRoleAssignment, RoleAssignmentResponse, BatchRoleAssignmentResponse, FailedAssignment};
 use crate::application::dto::project_user_matrix_dto::*;
 use crate::application::dto::role_permission_matrix_dto::*;
+use crate::application::dto::project_data_access_dto::*;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -47,6 +49,14 @@ use crate::application::dto::role_permission_matrix_dto::*;
         get_project_matrix,
         update_global_permission_assignment,
         update_project_permission_assignment,
+        // Project Data Access endpoints
+        get_project_data_access_matrix,
+        create_project_data,
+        update_data_access,
+        batch_update_data_access,
+        request_data_access,
+        get_access_by_status,
+        get_user_access_list,
     ),
     components(
         schemas(
@@ -96,7 +106,7 @@ use crate::application::dto::role_permission_matrix_dto::*;
             UserRoleCell,
             ProjectUserMatrixRow,
             ProjectUserMatrixResponse,
-            UserInfo,
+            crate::application::dto::project_user_matrix_dto::UserInfo,
             MatrixPagination,
             MatrixQueryParams,
             // Role Permission Matrix DTOs
@@ -106,6 +116,20 @@ use crate::application::dto::role_permission_matrix_dto::*;
             RolePermissionMatrixResponse,
             crate::application::dto::role_permission_matrix_dto::AssignPermissionRequest,
             AssignPermissionResponse,
+            // Project Data Access DTOs
+            ProjectDataInfo,
+            DataAccessInfo,
+            PaginationInfo,
+            ProjectDataAccessMatrixResponse,
+            CreateProjectDataRequest,
+            CreateProjectDataResponse,
+            UpdateDataAccessRequest,
+            UpdateDataAccessResponse,
+            BatchUpdateDataAccessRequest,
+            BatchUpdateDataAccessResponse,
+            RequestDataAccessResponse,
+            GetProjectDataListRequest,
+            ProjectDataListResponse,
         )
     ),
     tags(
@@ -120,6 +144,7 @@ use crate::application::dto::role_permission_matrix_dto::*;
         (name = "project-users", description = "Project User Role management endpoints - 프로젝트 사용자 역할 관리 API"),
         (name = "project-user-matrix", description = "Project User Matrix endpoints - 프로젝트 사용자 매트릭스 API"),
         (name = "role-permission-matrix", description = "Role Permission Matrix endpoints - 역할 권한 매트릭스 API"),
+        (name = "project-data-access", description = "Project Data Access endpoints - 프로젝트 데이터 접근 관리 API"),
     ),
     info(
         title = "PACS Extension Server API",

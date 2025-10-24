@@ -25,6 +25,7 @@ PACS (Picture Archiving and Communication System) Extension Server는 의료 영
 - **권한 관리**: 역할 기반 접근 제어
 - **프로젝트 관리**: 사용자별 프로젝트 할당
 - **역할-권한 매트릭스**: 표 형태로 역할과 권한 관계 관리 ✨
+- **프로젝트 데이터 접근 관리**: 프로젝트 참여자의 데이터 접근 상태 관리 ✨
 
 ### 🌐 웹 서버 기능
 - **CORS 지원**: 크로스 오리진 요청 처리
@@ -47,14 +48,16 @@ Presentation Layer (Controllers)
 ├── User Controller
 ├── Project Controller
 ├── Mask Controller ✅
-└── Role Permission Matrix Controller ✨
+├── Role Permission Matrix Controller ✨
+└── Project Data Access Controller ✨
 
 Application Layer (Use Cases)
 ├── Annotation Use Case
 ├── User Use Case
 ├── Project Use Case
 ├── Mask Use Case ✅
-└── Role Permission Matrix Use Case ✨
+├── Role Permission Matrix Use Case ✨
+└── Project Data Access Use Case ✨
 
 Domain Layer (Entities & Services)
 ├── Annotation Entity
@@ -284,9 +287,9 @@ cargo test --test annotation_use_case_test --test mask_group_controller_test --t
 ```
 
 ### 테스트 커버리지
-- **단위 테스트**: 49개 테스트, 100% 통과 ✅
+- **단위 테스트**: 70개 테스트, 100% 통과 ✅
 - **통합 테스트**: 85개 테스트, 100% 통과 ✅
-- **총 테스트**: 134개 테스트, 100% 통과 ✅
+- **총 테스트**: 155개 테스트, 100% 통과 ✅
 
 ### 테스트 카테고리
 - **Domain Entities**: 16개 테스트 (mask, mask_group)
@@ -296,6 +299,7 @@ cargo test --test annotation_use_case_test --test mask_group_controller_test --t
 - **Service Layer**: 52개 테스트 (user, project, permission, access_control, annotation)
 - **Use Cases**: 7개 테스트 (annotation business logic)
 - **Role Permission Matrix**: 12개 테스트 (단위 6개 + 통합 6개) ✨
+- **Project Data Access**: 21개 테스트 (단위 21개) ✨
 
 ### 통합 테스트 세부사항
 - **annotation_controller_test**: 4개 테스트 (API 엔드포인트)
@@ -425,6 +429,13 @@ CMD ["pacs-server"]
 자세한 변경 이력은 [CHANGELOG.md](docs/technical/CHANGELOG.md)를 참조하세요.
 
 ### 주요 버전
+- **v1.0.0-beta.6**: 프로젝트 데이터 접근 관리 API (2025-01-27) ✨
+  - 프로젝트 참여자의 데이터 접근 상태 관리
+  - 페이지네이션, 검색, 필터링 지원
+  - 데이터 접근 매트릭스 조회
+  - 완전한 테스트 커버리지 (21개 테스트)
+  - OpenAPI 문서화 완료
+
 - **v1.0.0-beta.5**: 역할-권한 매트릭스 API (2024-12-19) ✨
   - 역할과 권한 간의 관계를 매트릭스 형태로 조회
   - 개별 권한 할당/제거 API 구현
@@ -470,6 +481,6 @@ CMD ["pacs-server"]
 - **v1.3.0**: AI 통합 및 자동 마스크 생성
 
 ---
-**최종 업데이트**: 2024-12-19  
+**최종 업데이트**: 2025-01-27  
 **작성자**: AI Assistant  
-**버전**: 1.0.0-beta.5
+**버전**: 1.0.0-beta.6

@@ -30,6 +30,10 @@ mod user_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("testuser_{}", Uuid::new_v4()),
             email: format!("test_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
 
         // Create user
@@ -69,6 +73,10 @@ mod user_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("testuser_{}", Uuid::new_v4()),
             email: format!("test_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
 
         let created = repo.create(new_user).await.unwrap();
@@ -90,6 +98,10 @@ mod user_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("testuser_{}", Uuid::new_v4()),
             email: format!("test_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
 
         let created = repo.create(new_user).await.unwrap();
@@ -401,6 +413,10 @@ mod access_log_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("loguser_{}", Uuid::new_v4()),
             email: format!("log_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
         let user = user_repo.create(new_user).await.unwrap();
 
@@ -444,6 +460,10 @@ mod access_log_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("loguser_{}", Uuid::new_v4()),
             email: format!("log_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
         let user = user_repo.create(new_user).await.unwrap();
 
@@ -488,6 +508,10 @@ mod access_log_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("loguser_{}", Uuid::new_v4()),
             email: format!("log_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
         let user = user_repo.create(new_user).await.unwrap();
 
@@ -541,6 +565,10 @@ mod annotation_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("testuser_{}", Uuid::new_v4()),
             email: format!("test_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
         let user = user_repo.create(new_user).await.unwrap();
 
@@ -570,6 +598,7 @@ mod annotation_repository_tests {
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("test_viewer".to_string()),
             description: Some("Test annotation".to_string()),
+            measurement_values: Some(json!([{"type": "length", "value": 10.5, "unit": "mm"}])),
             data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             is_shared: false,
         };
@@ -626,6 +655,10 @@ mod annotation_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("testuser_{}", Uuid::new_v4()),
             email: format!("test_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
         let user = user_repo.create(new_user).await.unwrap();
 
@@ -655,6 +688,7 @@ mod annotation_repository_tests {
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("test_viewer".to_string()),
             description: Some("Test annotation".to_string()),
+            measurement_values: Some(json!([{"type": "length", "value": 10.5, "unit": "mm"}])),
             data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             is_shared: false,
         };
@@ -690,6 +724,10 @@ mod annotation_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("testuser_{}", Uuid::new_v4()),
             email: format!("test_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
         let user = user_repo.create(new_user).await.unwrap();
 
@@ -719,6 +757,7 @@ mod annotation_repository_tests {
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("test_viewer".to_string()),
             description: Some("Test annotation".to_string()),
+            measurement_values: Some(json!([{"type": "length", "value": 10.5, "unit": "mm"}])),
             data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             is_shared: false,
         };
@@ -753,6 +792,10 @@ mod annotation_repository_tests {
             keycloak_id: Uuid::new_v4(),
             username: format!("testuser_{}", Uuid::new_v4()),
             email: format!("test_{}@example.com", Uuid::new_v4()),
+            full_name: Some("Test User".to_string()),
+            organization: Some("Test Organization".to_string()),
+            department: Some("Test Department".to_string()),
+            phone: Some("010-1234-5678".to_string()),
         };
         let user = user_repo.create(new_user).await.unwrap();
 
@@ -782,6 +825,7 @@ mod annotation_repository_tests {
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("test_viewer".to_string()),
             description: Some("Test annotation".to_string()),
+            measurement_values: Some(json!([{"type": "length", "value": 10.5, "unit": "mm"}])),
             data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             is_shared: false,
         };

@@ -6,6 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-01-27
+
+#### **Project Data Access Management API**
+- **New API Endpoints**: 프로젝트 참여자가 프로젝트 데이터에 대한 접근 상태를 조회하고 수정할 수 있는 API 구현
+  - `GET /api/projects/{project_id}/data-access` - 데이터 접근 상태 조회 (페이지네이션, 검색, 필터링 지원)
+  - `PUT /api/projects/{project_id}/data-access/{data_id}` - 데이터 접근 상태 수정
+  - `GET /api/projects/{project_id}/data-access/matrix` - 데이터 접근 매트릭스 조회
+
+- **Enhanced DTOs**: 새로운 데이터 접근 관리 DTO 추가
+  - `ProjectDataAccessDto`: 데이터 접근 상태 정보
+  - `ProjectDataAccessMatrixDto`: 데이터별 사용자 접근 상태 매트릭스
+  - `UpdateDataAccessStatusRequest`: 접근 상태 수정 요청
+  - `ProjectDataDto`: 프로젝트 데이터 메타데이터
+  - `UserDto`: 사용자 정보 (간소화된 버전)
+
+- **Database Migration**: `010_create_project_data_access.sql`
+  - `data_access_status_enum`: APPROVED, DENIED, PENDING 상태 정의
+  - `project_data`: 프로젝트 데이터 메타데이터 테이블 (DICOM Study 정보)
+  - `project_data_access`: 사용자별 데이터 접근 상태 테이블
+  - 성능 최적화를 위한 인덱스 및 트리거 설정
+
+- **Service Layer Extensions**: ProjectDataService에 데이터 접근 관리 기능 추가
+  - `get_project_data_access()`: 데이터 접근 상태 조회 (페이지네이션, 검색, 필터링)
+  - `update_data_access_status()`: 데이터 접근 상태 수정
+  - `get_data_access_matrix()`: 데이터 접근 매트릭스 조회
+  - `create_project_data()`: 프로젝트 데이터 생성
+  - `get_project_data_by_id()`: 프로젝트 데이터 조회
+
+- **Use Case Layer**: `ProjectDataAccessUseCase` 구현
+  - 데이터 접근 관리 비즈니스 로직 오케스트레이션
+  - 페이지네이션 및 검색 로직 처리
+  - 에러 처리 및 검증
+
+- **Controller Layer**: `project_data_access_controller.rs` 구현
+  - 3개 엔드포인트 구현
+  - OpenAPI 문서화 완료
+  - 에러 처리 및 응답 변환
+
+- **OpenAPI Documentation**: 완전한 API 문서화
+  - Swagger UI에서 테스트 가능
+  - "project-data-access" 태그로 그룹화
+  - 모든 DTO 스키마 문서화
+
+- **Testing**: 완전한 테스트 커버리지
+  - 단위 테스트: 70개 테스트 통과
+  - 통합 테스트: API 엔드포인트 테스트
+  - Mock 테스트 및 실제 데이터베이스 연동 테스트
+
 ### Added - 2024-12-19
 
 #### **Role-Permission Matrix API**
