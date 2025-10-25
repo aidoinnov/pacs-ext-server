@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed - 2025-10-25
+
+#### **Role-Capability Assignment API 라우팅 충돌 문제 해결** 🔧
+- **문제**: `PUT /api/roles/{role_id}/capabilities/{capability_id}` API에서 404 Not Found 에러 발생
+- **원인**: `role_capability_matrix_controller.rs`에서 라우팅 설정 충돌
+  - `web::scope("/roles")`와 `web::resource("/roles/{role_id}/capabilities/{capability_id}")` 분리 등록으로 인한 충돌
+- **해결**: 모든 `/roles` 관련 라우트를 하나의 `web::scope("/roles")` 내에 통합
+- **결과**: API 정상 작동 확인 (HTTP 200 OK 응답)
+  - Capability 할당: `{"message":"Capability assigned successfully"}`
+  - Capability 제거: `{"message":"Capability removed successfully"}`
+
+- **기술적 개선사항**:
+  - 라우팅 구조 최적화로 충돌 방지
+  - 코드 유지보수성 향상
+  - API 가용성 개선
+
+- **관련 파일**:
+  - `pacs-server/src/presentation/controllers/role_capability_matrix_controller.rs`
+  - 작업 문서: `work/role_capability_assignment_api_fix/`
+
 ### Added - 2025-01-27
 
 #### **Token Refresh API** 🔄

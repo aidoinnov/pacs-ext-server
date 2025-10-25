@@ -285,6 +285,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<RoleCapabili
             web::scope("/roles")
                 .route("/global/capabilities/matrix", web::get().to(get_global_matrix_paginated))
                 .route("/global/capabilities/matrix/all", web::get().to(get_global_matrix))
+                .route("/{role_id}/capabilities/{capability_id}", web::put().to(update_capability_assignment))
         )
         .service(
             web::scope("/projects/{project_id}/roles")
@@ -295,9 +296,5 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<RoleCapabili
                 .route("", web::get().to(get_all_capabilities))
                 .route("/{capability_id}", web::get().to(get_capability_detail))
                 .route("/category/{category}", web::get().to(get_capabilities_by_category))
-        )
-        .service(
-            web::resource("/roles/{role_id}/capabilities/{capability_id}")
-                .put(update_capability_assignment)
         );
 }
