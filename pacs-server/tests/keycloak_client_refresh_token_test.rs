@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use mockito::mock;
+use mockito;
 use serde_json::json;
 use tokio;
 

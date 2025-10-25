@@ -19,64 +19,64 @@ ON CONFLICT (name) DO NOTHING;
 -- ==========================
 
 -- User management permissions
-INSERT INTO security_permission (resource_type, action) VALUES
-    ('USER', 'CREATE'),
-    ('USER', 'READ'),
-    ('USER', 'UPDATE'),
-    ('USER', 'DELETE')
+INSERT INTO security_permission (category, resource_type, action) VALUES
+    ('사용자 및 권한 관리', 'USER', 'CREATE'),
+    ('사용자 및 권한 관리', 'USER', 'READ'),
+    ('사용자 및 권한 관리', 'USER', 'UPDATE'),
+    ('사용자 및 권한 관리', 'USER', 'DELETE')
 ON CONFLICT (resource_type, action) DO NOTHING;
 
 -- Project management permissions
-INSERT INTO security_permission (resource_type, action) VALUES
-    ('PROJECT', 'CREATE'),
-    ('PROJECT', 'READ'),
-    ('PROJECT', 'UPDATE'),
-    ('PROJECT', 'DELETE')
+INSERT INTO security_permission (category, resource_type, action) VALUES
+    ('프로젝트 관리', 'PROJECT', 'CREATE'),
+    ('프로젝트 관리', 'PROJECT', 'READ'),
+    ('프로젝트 관리', 'PROJECT', 'UPDATE'),
+    ('프로젝트 관리', 'PROJECT', 'DELETE')
 ON CONFLICT (resource_type, action) DO NOTHING;
 
 -- Study permissions
-INSERT INTO security_permission (resource_type, action) VALUES
-    ('STUDY', 'READ'),
-    ('STUDY', 'DOWNLOAD'),
-    ('STUDY', 'SHARE')
+INSERT INTO security_permission (category, resource_type, action) VALUES
+    ('DICOM 데이터 관리', 'STUDY', 'READ'),
+    ('DICOM 데이터 관리', 'STUDY', 'DOWNLOAD'),
+    ('DICOM 데이터 관리', 'STUDY', 'SHARE')
 ON CONFLICT (resource_type, action) DO NOTHING;
 
 -- Series permissions
-INSERT INTO security_permission (resource_type, action) VALUES
-    ('SERIES', 'READ'),
-    ('SERIES', 'DOWNLOAD')
+INSERT INTO security_permission (category, resource_type, action) VALUES
+    ('DICOM 데이터 관리', 'SERIES', 'READ'),
+    ('DICOM 데이터 관리', 'SERIES', 'DOWNLOAD')
 ON CONFLICT (resource_type, action) DO NOTHING;
 
 -- Instance permissions
-INSERT INTO security_permission (resource_type, action) VALUES
-    ('INSTANCE', 'READ'),
-    ('INSTANCE', 'DOWNLOAD')
+INSERT INTO security_permission (category, resource_type, action) VALUES
+    ('DICOM 데이터 관리', 'INSTANCE', 'READ'),
+    ('DICOM 데이터 관리', 'INSTANCE', 'DOWNLOAD')
 ON CONFLICT (resource_type, action) DO NOTHING;
 
 -- Annotation permissions
-INSERT INTO security_permission (resource_type, action) VALUES
-    ('ANNOTATION', 'CREATE'),
-    ('ANNOTATION', 'READ'),
-    ('ANNOTATION', 'UPDATE'),
-    ('ANNOTATION', 'DELETE'),
-    ('ANNOTATION', 'SHARE')
+INSERT INTO security_permission (category, resource_type, action) VALUES
+    ('어노테이션 관리', 'ANNOTATION', 'CREATE'),
+    ('어노테이션 관리', 'ANNOTATION', 'READ'),
+    ('어노테이션 관리', 'ANNOTATION', 'UPDATE'),
+    ('어노테이션 관리', 'ANNOTATION', 'DELETE'),
+    ('어노테이션 관리', 'ANNOTATION', 'SHARE')
 ON CONFLICT (resource_type, action) DO NOTHING;
 
 -- Mask permissions
-INSERT INTO security_permission (resource_type, action) VALUES
-    ('MASK', 'CREATE'),
-    ('MASK', 'READ'),
-    ('MASK', 'UPDATE'),
-    ('MASK', 'DELETE'),
-    ('MASK', 'DOWNLOAD')
+INSERT INTO security_permission (category, resource_type, action) VALUES
+    ('어노테이션 관리', 'MASK', 'CREATE'),
+    ('어노테이션 관리', 'MASK', 'READ'),
+    ('어노테이션 관리', 'MASK', 'UPDATE'),
+    ('어노테이션 관리', 'MASK', 'DELETE'),
+    ('어노테이션 관리', 'MASK', 'DOWNLOAD')
 ON CONFLICT (resource_type, action) DO NOTHING;
 
 -- Hanging Protocol permissions
-INSERT INTO security_permission (resource_type, action) VALUES
-    ('HANGING_PROTOCOL', 'CREATE'),
-    ('HANGING_PROTOCOL', 'READ'),
-    ('HANGING_PROTOCOL', 'UPDATE'),
-    ('HANGING_PROTOCOL', 'DELETE')
+INSERT INTO security_permission (category, resource_type, action) VALUES
+    ('어노테이션 관리', 'HANGING_PROTOCOL', 'CREATE'),
+    ('어노테이션 관리', 'HANGING_PROTOCOL', 'READ'),
+    ('어노테이션 관리', 'HANGING_PROTOCOL', 'UPDATE'),
+    ('어노테이션 관리', 'HANGING_PROTOCOL', 'DELETE')
 ON CONFLICT (resource_type, action) DO NOTHING;
 
 -- ==========================

@@ -60,16 +60,19 @@ mod tests {
         vec![
             Permission {
                 id: 1,
+                category: "사용자 및 권한 관리".to_string(),
                 resource_type: "USER".to_string(),
                 action: "READ".to_string(),
             },
             Permission {
                 id: 2,
+                category: "사용자 및 권한 관리".to_string(),
                 resource_type: "USER".to_string(),
                 action: "WRITE".to_string(),
             },
             Permission {
                 id: 3,
+                category: "프로젝트 관리".to_string(),
                 resource_type: "PROJECT".to_string(),
                 action: "READ".to_string(),
             },
@@ -109,10 +112,10 @@ mod tests {
         assert_eq!(matrix.roles[1].name, "User");
 
         // Check permissions by category
-        assert!(matrix.permissions_by_category.contains_key("USER"));
-        assert!(matrix.permissions_by_category.contains_key("PROJECT"));
-        assert_eq!(matrix.permissions_by_category["USER"].len(), 2);
-        assert_eq!(matrix.permissions_by_category["PROJECT"].len(), 1);
+        assert!(matrix.permissions_by_category.contains_key("사용자 및 권한 관리"));
+        assert!(matrix.permissions_by_category.contains_key("프로젝트 관리"));
+        assert_eq!(matrix.permissions_by_category["사용자 및 권한 관리"].len(), 2);
+        assert_eq!(matrix.permissions_by_category["프로젝트 관리"].len(), 1);
 
         // Check assignments
         assert_eq!(matrix.assignments.len(), 6); // 2 roles * 3 permissions
@@ -264,14 +267,23 @@ impl RolePermissionMatrixUseCase {
         for permission in permissions {
             let permission_info = PermissionInfo {
                 id: permission.id,
+                category: permission.category.clone(),
                 resource_type: permission.resource_type.clone(),
                 action: permission.action,
             };
             
             permissions_by_category
-                .entry(permission.resource_type)
+                .entry(permission.category)
                 .or_insert_with(Vec::new)
                 .push(permission_info);
+        }
+
+        // 각 카테고리 내에서 권한 정렬 (resource_type, action 순)
+        for permissions in permissions_by_category.values_mut() {
+            permissions.sort_by(|a, b| {
+                a.resource_type.cmp(&b.resource_type)
+                    .then_with(|| a.action.cmp(&b.action))
+            });
         }
 
         // 할당 정보 변환
@@ -320,14 +332,23 @@ impl RolePermissionMatrixUseCase {
         for permission in permissions {
             let permission_info = PermissionInfo {
                 id: permission.id,
+                category: permission.category.clone(),
                 resource_type: permission.resource_type.clone(),
                 action: permission.action,
             };
             
             permissions_by_category
-                .entry(permission.resource_type)
+                .entry(permission.category)
                 .or_insert_with(Vec::new)
                 .push(permission_info);
+        }
+
+        // 각 카테고리 내에서 권한 정렬 (resource_type, action 순)
+        for permissions in permissions_by_category.values_mut() {
+            permissions.sort_by(|a, b| {
+                a.resource_type.cmp(&b.resource_type)
+                    .then_with(|| a.action.cmp(&b.action))
+            });
         }
 
         // 할당 정보 변환

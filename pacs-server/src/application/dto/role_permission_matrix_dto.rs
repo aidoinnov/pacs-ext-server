@@ -60,6 +60,7 @@ mod tests {
     fn test_permission_info_serialization() {
         let permission_info = PermissionInfo {
             id: 1,
+            category: "사용자 및 권한 관리".to_string(),
             resource_type: "USER".to_string(),
             action: "READ".to_string(),
         };
@@ -74,6 +75,7 @@ mod tests {
     fn test_permission_info_deserialization() {
         let json = r#"{
             "id": 1,
+            "category": "사용자 및 권한 관리",
             "resource_type": "USER",
             "action": "READ"
         }"#;
@@ -81,6 +83,7 @@ mod tests {
         let permission_info: PermissionInfo = serde_json::from_str(json).unwrap();
         
         assert_eq!(permission_info.id, 1);
+        assert_eq!(permission_info.category, "사용자 및 권한 관리");
         assert_eq!(permission_info.resource_type, "USER");
         assert_eq!(permission_info.action, "READ");
     }
@@ -181,21 +184,24 @@ mod tests {
         ];
 
         let mut permissions_by_category = HashMap::new();
-        permissions_by_category.insert("USER".to_string(), vec![
+        permissions_by_category.insert("사용자 및 권한 관리".to_string(), vec![
             PermissionInfo {
                 id: 1,
+                category: "사용자 및 권한 관리".to_string(),
                 resource_type: "USER".to_string(),
                 action: "READ".to_string(),
             },
             PermissionInfo {
                 id: 2,
+                category: "사용자 및 권한 관리".to_string(),
                 resource_type: "USER".to_string(),
                 action: "WRITE".to_string(),
             },
         ]);
-        permissions_by_category.insert("PROJECT".to_string(), vec![
+        permissions_by_category.insert("프로젝트 관리".to_string(), vec![
             PermissionInfo {
                 id: 3,
+                category: "프로젝트 관리".to_string(),
                 resource_type: "PROJECT".to_string(),
                 action: "READ".to_string(),
             },
@@ -286,7 +292,9 @@ pub struct RoleInfo {
 pub struct PermissionInfo {
     /// 권한 ID
     pub id: i32,
-    /// 리소스 타입 (카테고리)
+    /// 권한 카테고리
+    pub category: String,
+    /// 리소스 타입
     pub resource_type: String,
     /// 액션
     pub action: String,

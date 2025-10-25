@@ -168,23 +168,20 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<RolePermissi
     let use_case = web::Data::new(use_case);
     
     cfg.service(
-        web::scope("/api")
-            .service(
-                web::resource("/roles/global/permissions/matrix")
-                    .route(web::get().to(get_global_matrix))
-            )
-            .service(
-                web::resource("/projects/{project_id}/roles/permissions/matrix")
-                    .route(web::get().to(get_project_matrix))
-            )
-            .service(
-                web::resource("/roles/{role_id}/permissions/{permission_id}")
-                    .route(web::put().to(update_global_permission_assignment))
-            )
-            .service(
-                web::resource("/projects/{project_id}/roles/{role_id}/permissions/{permission_id}")
-                    .route(web::put().to(update_project_permission_assignment))
-            )
-            .app_data(use_case)
-    );
+        web::resource("/roles/global/permissions/matrix")
+            .route(web::get().to(get_global_matrix))
+    )
+    .service(
+        web::resource("/projects/{project_id}/roles/permissions/matrix")
+            .route(web::get().to(get_project_matrix))
+    )
+    .service(
+        web::resource("/roles/{role_id}/permissions/{permission_id}")
+            .route(web::put().to(update_global_permission_assignment))
+    )
+    .service(
+        web::resource("/projects/{project_id}/roles/{role_id}/permissions/{permission_id}")
+            .route(web::put().to(update_project_permission_assignment))
+    )
+    .app_data(use_case);
 }
