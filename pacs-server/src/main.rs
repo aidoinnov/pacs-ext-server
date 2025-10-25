@@ -45,7 +45,7 @@ mod presentation;
 use application::use_cases::{
     AccessControlUseCase, AnnotationUseCase, AuthUseCase, MaskGroupUseCase, MaskUseCase,
     PermissionUseCase, ProjectDataAccessUseCase, ProjectUseCase, ProjectUserMatrixUseCase,
-    ProjectUserUseCase, RolePermissionMatrixUseCase, UserRegistrationUseCase, UserUseCase,
+    ProjectUserUseCase, RolePermissionMatrixUseCase, RoleCapabilityMatrixUseCase, UserRegistrationUseCase, UserUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
@@ -57,11 +57,11 @@ use domain::services::{
 // 인프라스트럭처 레이어 - 리포지토리 구현체들
 use infrastructure::external::KeycloakClient;
 use infrastructure::repositories::{
-    AccessLogRepositoryImpl, AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
+    AccessLogRepositoryImpl, AnnotationRepositoryImpl, CapabilityRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
     PermissionRepositoryImpl, ProjectDataAccessRepositoryImpl, ProjectDataRepositoryImpl,
     ProjectRepositoryImpl, RoleRepositoryImpl, UserRepositoryImpl,
 };
-use infrastructure::services::{ProjectDataServiceImpl, UserRegistrationServiceImpl};
+use infrastructure::services::{CapabilityServiceImpl, ProjectDataServiceImpl, UserRegistrationServiceImpl};
 
 // JWT 인증 서비스
 use infrastructure::auth::JwtService;
@@ -76,7 +76,7 @@ use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
     mask_group_controller, permission_controller, project_controller,
     project_data_access_controller, project_user_controller, project_user_matrix_controller,
-    role_permission_matrix_controller, user_controller, user_registration_controller,
+    role_permission_matrix_controller, role_capability_matrix_controller, user_controller, user_registration_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -328,6 +328,12 @@ async fn main() -> std::io::Result<()> {
     let role_permission_matrix_use_case = Arc::new(RolePermissionMatrixUseCase::new(Arc::new(
         permission_service.clone(),
     )));
+    
+    // Capability 서비스 및 Use Case 초기화
+    let capability_repository = Arc::new(CapabilityRepositoryImpl::new(pool.clone()));
+    let capability_service = Arc::new(CapabilityServiceImpl::new(capability_repository));
+    let role_capability_matrix_use_case = Arc::new(RoleCapabilityMatrixUseCase::new(capability_service));
+    
     let project_data_access_use_case =
         Arc::new(ProjectDataAccessUseCase::new(project_data_service.clone()));
     let user_registration_use_case =
@@ -435,6 +441,12 @@ async fn main() -> std::io::Result<()> {
                         role_permission_matrix_controller::configure_routes(
                             cfg,
                             role_permission_matrix_use_case.clone(),
+                        )
+                    })
+                    .configure(|cfg| {
+                        role_capability_matrix_controller::configure_routes(
+                            cfg,
+                            role_capability_matrix_use_case.clone(),
                         )
                     })
                     .configure(|cfg| {

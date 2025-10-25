@@ -9,6 +9,7 @@ pub mod mask_use_case;
 pub mod project_user_use_case;
 pub mod project_user_matrix_use_case;
 pub mod role_permission_matrix_use_case;
+pub mod role_capability_matrix_use_case;
 pub mod project_data_access_use_case;
 pub mod user_registration_use_case;
 
@@ -23,5 +24,6 @@ pub use mask_use_case::MaskUseCase;
 pub use project_user_use_case::ProjectUserUseCase;
 pub use project_user_matrix_use_case::ProjectUserMatrixUseCase;
 pub use role_permission_matrix_use_case::RolePermissionMatrixUseCase;
+pub use role_capability_matrix_use_case::RoleCapabilityMatrixUseCase;
 pub use project_data_access_use_case::ProjectDataAccessUseCase;
 pub use user_registration_use_case::UserRegistrationUseCase;
