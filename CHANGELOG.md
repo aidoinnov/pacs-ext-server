@@ -6,6 +6,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-10-25
+
+#### **User Signup and Deletion API** ✨
+- **New API Endpoints**: 사용자 회원가입 및 계정 삭제 기능 구현
+  - `POST /api/auth/signup` - 사용자 회원가입
+  - `POST /api/auth/verify-email` - 이메일 인증
+  - `POST /api/auth/admin/users/approve` - 관리자 승인
+  - `DELETE /api/auth/users/{user_id}` - 계정 삭제
+
+- **Keycloak Integration**: Keycloak과 연동한 사용자 인증 시스템
+  - Keycloak Admin API 클라이언트 구현
+  - 사용자 생성/삭제 자동화
+  - 이메일 인증 요청 기능
+  - 역할 자동 할당
+  - 원자적 트랜잭션을 통한 Keycloak과 DB 동기화
+
+- **Enhanced Database Schema**: 사용자 계정 상태 및 감사 로그 테이블 추가
+  - `user_account_status_enum`: PENDING_EMAIL, PENDING_APPROVAL, ACTIVE, SUSPENDED, DELETED
+  - `security_user` 테이블 확장 (계정 상태, 이메일 인증, 승인 정보)
+  - `security_user_audit_log` 테이블 생성 (사용자 액션 추적)
+- **S3 Object Storage Integration**: AWS S3 연동 완료
+  - 파일 업로드/다운로드 URL 생성
+  - 파일 메타데이터 관리
+  - 파일 삭제 및 이동 기능
+
+- **Comprehensive Audit Logging**: 포괄적인 사용자 활동 추적
+  - 모든 API 호출 및 상태 변경 기록
+  - IP 주소 및 User-Agent 추적
+  - JSON 형태의 상세 정보 저장
+  - 사용자 삭제 후에도 영구 보관되는 감사 로그
+  - 상세한 메타데이터 수집 (IP, User-Agent, 요청 데이터 등)
+
+- **Clean Architecture Implementation**: 4계층 아키텍처 패턴 적용
+  - Domain Layer: 엔티티, 서비스 트레이트, 비즈니스 규칙
+  - Application Layer: Use Case, DTO, 비즈니스 로직 오케스트레이션
+  - Infrastructure Layer: 데이터베이스, 외부 서비스 연동
+  - Presentation Layer: API 컨트롤러, HTTP 핸들러
+
+- **New DTOs**: 사용자 등록 관련 DTO 추가
+  - `SignupRequest/Response`: 회원가입 요청/응답
+  - `VerifyEmailRequest/Response`: 이메일 인증 요청/응답
+  - `ApproveUserRequest/Response`: 사용자 승인 요청/응답
+  - `DeleteAccountResponse`: 계정 삭제 응답
+
+- **Testing**: 포괄적인 테스트 구현
+  - 단위 테스트: Service, Use Case, Controller 계층
+  - 통합 테스트: API 엔드포인트 및 데이터베이스 연동
+  - Mock을 활용한 의존성 격리 테스트
+  - Service Layer: Mock을 사용한 비즈니스 로직 테스트
+  - Use Case Layer: Mock Service를 사용한 오케스트레이션 테스트
+  - Controller Layer: Mock Use Case를 사용한 API 테스트
+  - Integration Tests: 실제 Keycloak 서버와의 연동 테스트
+
 ### Added - 2025-01-27
 
 #### **Project Data Access Management API**

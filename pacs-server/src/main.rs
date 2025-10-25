@@ -382,7 +382,7 @@ async fn main() -> std::io::Result<()> {
             // API routes
             .service(
                 web::scope("/api")
-                    .configure(|cfg| auth_controller::configure_routes(cfg, auth_use_case.clone()))
+                    .configure(|cfg| auth_controller::configure_routes(cfg, auth_use_case.clone(), user_registration_use_case.clone()))
                     .configure(|cfg| user_controller::configure_routes(cfg, user_use_case.clone()))
                     .configure(|cfg| project_controller::configure_routes(cfg, project_use_case.clone()))
                     .configure(|cfg| permission_controller::configure_routes(cfg, permission_use_case.clone()))
@@ -394,7 +394,6 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| project_user_matrix_controller::configure_routes(cfg, project_user_matrix_use_case.clone()))
                     .configure(|cfg| role_permission_matrix_controller::configure_routes(cfg, role_permission_matrix_use_case.clone()))
                     .configure(|cfg| project_data_access_controller::configure_routes(cfg, project_data_access_use_case.clone()))
-                    .configure(|cfg| user_registration_controller::configure(cfg, user_registration_use_case.clone()))
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

@@ -14,8 +14,4 @@ mod tests {
     pub mod user_registration_controller_unit_test;
 }
 
-// 통합 테스트
-#[cfg(test)]
-mod integration_tests {
-    pub mod user_registration_integration_test;
-}
+    // 통합 테스트는 tests/ 디렉토리에 있음

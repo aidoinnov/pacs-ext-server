@@ -29,6 +29,12 @@ pub enum ObjectStorageError {
     NetworkError(String),
 }
 
+impl From<crate::domain::ServiceError> for ObjectStorageError {
+    fn from(err: crate::domain::ServiceError) -> Self {
+        ObjectStorageError::S3Error(err.to_string())
+    }
+}
+
 /// 업로드된 파일 정보
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UploadedFile {
@@ -125,15 +131,13 @@ impl ObjectStorageServiceFactory {
     ) -> Result<Box<dyn ObjectStorageService>, ObjectStorageError> {
         match provider.to_lowercase().as_str() {
             "s3" => {
-                // TODO: S3ObjectStorageService 구현 필요
-                return Err(ObjectStorageError::ConfigurationError("S3 service not implemented".to_string()));
-                // let s3_service = crate::infrastructure::external::S3ObjectStorageService::new(
-                //     bucket_name,
-                //     region,
-                //     access_key,
-                //     secret_key,
-                // ).await?;
-                // Ok(Box::new(s3_service))
+                let s3_service = crate::infrastructure::external::S3ObjectStorageService::new(
+                    bucket_name.to_string(),
+                    region.to_string(),
+                    access_key.to_string(),
+                    secret_key.to_string(),
+                ).await?;
+                Ok(Box::new(s3_service))
             }
             _ => Err(ObjectStorageError::ConfigError(
                 format!("Unsupported object storage provider: {}. Only 's3' is supported.", provider)

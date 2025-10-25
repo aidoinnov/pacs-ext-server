@@ -194,15 +194,12 @@ pub async fn get_user_status(
 /// 
 /// # Arguments
 /// * `cfg` - Actix-web 서비스 설정
-pub fn configure(cfg: &mut web::ServiceConfig, use_case: Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>) {
+pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>) {
     cfg
         .app_data(web::Data::new(use_case))
-        .service(
-            web::scope("/api")
-                .route("/auth/signup", web::post().to(signup))
-                .route("/auth/verify-email", web::post().to(verify_email))
-                .route("/admin/users/approve", web::post().to(approve_user))
-                .route("/users/{user_id}", web::delete().to(delete_account))
-                .route("/users/{user_id}/status", web::get().to(get_user_status))
-        );
+        .route("/auth/signup", web::post().to(signup))
+        .route("/auth/verify-email", web::post().to(verify_email))
+        .route("/admin/users/approve", web::post().to(approve_user))
+        .route("/users/{user_id}", web::delete().to(delete_account))
+        .route("/users/{user_id}/status", web::get().to(get_user_status));
 }
