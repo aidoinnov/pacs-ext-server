@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use crate::domain::ServiceError;
 use crate::infrastructure::config::KeycloakConfig;
 
+#[derive(Clone)]
 pub struct KeycloakClient {
     base_url: String,
     realm: String,
+    client_id: String,
     admin_username: String,
     admin_password: String,
     http_client: Client,
@@ -51,11 +53,28 @@ struct UpdateUserRequest {
     email_verified: bool,
 }
 
+#[derive(Serialize)]
+struct RefreshTokenRequest {
+    grant_type: String,
+    refresh_token: String,
+    client_id: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct KeycloakTokenResponse {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: i64,
+    pub refresh_expires_in: i64,
+    pub token_type: String,
+}
+
 impl KeycloakClient {
     pub fn new(config: KeycloakConfig) -> Self {
         Self {
             base_url: config.url,
             realm: config.realm,
+            client_id: config.client_id,
             admin_username: config.admin_username,
             admin_password: config.admin_password,
             http_client: Client::new(),
@@ -268,5 +287,36 @@ impl KeycloakClient {
         }
         
         Ok(())
+    }
+
+    /// Refresh access token using Keycloak's refresh token endpoint
+    pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<KeycloakTokenResponse, ServiceError> {
+        let url = format!("{}/realms/{}/protocol/openid-connect/token", self.base_url, self.realm);
+        
+        let request = RefreshTokenRequest {
+            grant_type: "refresh_token".to_string(),
+            refresh_token: refresh_token.to_string(),
+            client_id: self.client_id.clone(),
+        };
+        
+        let response = self.http_client
+            .post(&url)
+            .form(&request)
+            .send()
+            .await
+            .map_err(|e| ServiceError::ExternalServiceError(format!("Refresh token request failed: {}", e)))?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ServiceError::ExternalServiceError(
+                format!("Refresh token failed ({}): {}", status, body)
+            ));
+        }
+        
+        let token_response: KeycloakTokenResponse = response.json().await
+            .map_err(|e| ServiceError::ExternalServiceError(format!("Failed to parse refresh token response: {}", e)))?;
+        
+        Ok(token_response)
     }
 }

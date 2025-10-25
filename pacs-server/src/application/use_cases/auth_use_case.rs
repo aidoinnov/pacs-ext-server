@@ -1,5 +1,5 @@
 use crate::application::dto::{
-    LoginRequest, LoginResponse, RefreshTokenResponse, VerifyTokenResponse,
+    LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, VerifyTokenResponse,
 };
 use crate::domain::services::AuthService;
 use crate::domain::ServiceError;
@@ -45,19 +45,10 @@ impl<A: AuthService> AuthUseCase<A> {
         })
     }
 
-    /// 토큰 갱신
-    pub async fn refresh_token(&self, token: &str) -> Result<RefreshTokenResponse, ServiceError> {
-        // 먼저 토큰 검증
-        let user = self.auth_service.verify_and_get_user(token).await?;
-
-        // 새 토큰 생성
-        let new_token = self.auth_service.refresh_token(&user).await?;
-
-        Ok(RefreshTokenResponse {
-            token: new_token,
-            token_type: "Bearer".to_string(),
-            expires_in: 24 * 60 * 60,
-        })
+    /// 토큰 갱신 (Keycloak 사용)
+    pub async fn refresh_token(&self, request: RefreshTokenRequest) -> Result<RefreshTokenResponse, ServiceError> {
+        // Keycloak의 refresh token endpoint를 통해 토큰 갱신
+        self.auth_service.refresh_token_with_keycloak(&request.refresh_token).await
     }
 
     /// 로그아웃

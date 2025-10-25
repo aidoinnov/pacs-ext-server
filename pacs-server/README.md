@@ -22,6 +22,7 @@ PACS (Picture Archiving and Communication System) Extension Server는 의료 영
 
 ### 👥 사용자 관리
 - **JWT 인증**: 토큰 기반 인증 시스템
+- **토큰 갱신**: Refresh token을 사용한 Access token 갱신 ✨
 - **권한 관리**: 역할 기반 접근 제어
 - **프로젝트 관리**: 사용자별 프로젝트 할당
 - **역할-권한 매트릭스**: 표 형태로 역할과 권한 관계 관리 ✨
@@ -77,10 +78,11 @@ Infrastructure Layer (Repositories & External)
 ### 기술 스택
 - **Backend**: Rust + Actix Web
 - **Database**: PostgreSQL + SQLx
-- **Authentication**: JWT
+- **Authentication**: JWT + Keycloak
+- **Token Management**: Keycloak Refresh Token
 - **Object Storage**: AWS S3 / MinIO
 - **Documentation**: Swagger/OpenAPI
-- **Testing**: Rust built-in testing
+- **Testing**: Rust built-in testing + Mockall + Mockito
 
 ## 🚀 빠른 시작
 

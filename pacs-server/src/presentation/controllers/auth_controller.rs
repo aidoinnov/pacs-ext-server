@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::dto::auth_dto::{LoginRequest, LoginResponse};
+use crate::application::dto::auth_dto::{LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse};
 use crate::application::dto::user_registration_dto::*;
 use crate::application::use_cases::auth_use_case::AuthUseCase;
 use crate::application::use_cases::user_registration_use_case::UserRegistrationUseCase;
@@ -95,6 +95,18 @@ impl<A: AuthService> AuthController<A> {
         }
     }
 
+    pub async fn refresh_token(
+        auth_use_case: web::Data<Arc<AuthUseCase<A>>>,
+        req: web::Json<RefreshTokenRequest>,
+    ) -> impl Responder {
+        match auth_use_case.refresh_token(req.into_inner()).await {
+            Ok(response) => HttpResponse::Ok().json(response),
+            Err(e) => HttpResponse::Unauthorized().json(json!({
+                "error": format!("Token refresh failed: {}", e)
+            })),
+        }
+    }
+
 }
 
 pub fn configure_routes<A: AuthService + 'static>(
@@ -111,6 +123,7 @@ pub fn configure_routes<A: AuthService + 'static>(
                     "/verify/{token}",
                     web::get().to(AuthController::<A>::verify_token),
                 )
+                .route("/refresh", web::post().to(AuthController::<A>::refresh_token))
                 .route("/signup", web::post().to(AuthController::<A>::signup))
                 .route("/verify-email", web::post().to(AuthController::<A>::verify_email))
                 .route("/admin/users/approve", web::post().to(AuthController::<A>::approve_user))

@@ -1,7 +1,7 @@
 use actix_web::{web, Responder};
 use std::sync::Arc;
 
-use crate::application::dto::auth_dto::{LoginRequest, LoginResponse, VerifyTokenResponse};
+use crate::application::dto::auth_dto::{LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, VerifyTokenResponse};
 use crate::application::use_cases::auth_use_case::AuthUseCase;
 use crate::domain::services::AuthServiceImpl;
 use crate::infrastructure::repositories::UserRepositoryImpl;
@@ -48,4 +48,25 @@ pub async fn verify_token_doc(
 ) -> impl Responder {
     use crate::presentation::controllers::auth_controller::AuthController;
     AuthController::<AuthServiceImpl<UserRepositoryImpl>>::verify_token(auth_use_case, token).await
+}
+
+/// 토큰 갱신
+///
+/// Keycloak의 refresh token을 사용하여 새로운 access token을 발급받습니다.
+#[utoipa::path(
+    post,
+    path = "/api/auth/refresh",
+    tag = "auth",
+    request_body = RefreshTokenRequest,
+    responses(
+        (status = 200, description = "토큰 갱신 성공", body = RefreshTokenResponse),
+        (status = 401, description = "유효하지 않은 refresh token"),
+    )
+)]
+pub async fn refresh_token_doc(
+    auth_use_case: web::Data<Arc<AuthUseCase<AuthServiceImpl<UserRepositoryImpl>>>>,
+    req: web::Json<RefreshTokenRequest>,
+) -> impl Responder {
+    use crate::presentation::controllers::auth_controller::AuthController;
+    AuthController::<AuthServiceImpl<UserRepositoryImpl>>::refresh_token(auth_use_case, req).await
 }

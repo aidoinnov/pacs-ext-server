@@ -6,6 +6,68 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-01-27
+
+#### **Token Refresh API** 🔄
+- **New API Endpoint**: 토큰 갱신 기능 구현
+  - `POST /api/auth/refresh` - Refresh token을 사용한 Access token 갱신
+  - Keycloak과의 완전한 통합을 통한 안전한 토큰 관리
+  - 별도의 토큰 저장소 없이 Keycloak 중계 역할 수행
+
+- **Keycloak Integration Enhancement**: Keycloak 클라이언트 확장
+  - `KeycloakClient::refresh_access_token()` 메서드 구현
+  - Keycloak의 `/realms/{realm}/protocol/openid-connect/token` endpoint 호출
+  - `grant_type=refresh_token` 파라미터를 사용한 토큰 갱신
+  - `KeycloakTokenResponse` DTO 추가 (access_token, refresh_token, expires_in 등)
+
+- **Enhanced Auth Service**: 인증 서비스 계층 확장
+  - `AuthService::refresh_token_with_keycloak()` 메서드 추가
+  - KeycloakClient 의존성 주입을 통한 느슨한 결합
+  - 에러 처리 및 로깅 구현
+
+- **Use Case Layer**: 비즈니스 로직 오케스트레이션
+  - `AuthUseCase::refresh_token()` 메서드 추가
+  - DTO 변환 및 비즈니스 규칙 적용
+  - Clean Architecture 패턴 준수
+
+- **Controller Layer**: HTTP 요청/응답 처리
+  - `AuthController::refresh_token()` 핸들러 구현
+  - JSON 요청/응답 처리
+  - 적절한 HTTP 상태 코드 반환 (200 OK, 401 Unauthorized)
+
+- **OpenAPI Documentation**: API 문서화 완료
+  - `refresh_token_doc()` 함수 추가
+  - 요청/응답 스키마 정의
+  - 에러 응답 문서화
+
+- **Comprehensive Testing**: 포괄적인 테스트 구현
+  - **단위 테스트**: 각 계층별 테스트 (5개 테스트 통과)
+    - `auth_use_case_refresh_token_test.rs`: Use Case 테스트
+    - `keycloak_client_refresh_token_test.rs`: KeycloakClient 테스트
+    - `auth_service_refresh_token_test.rs`: AuthService 테스트
+    - `auth_controller_refresh_token_test.rs`: Controller 테스트
+  - **통합 테스트**: 전체 플로우 테스트
+    - `refresh_token_integration_test.rs`: Mockito를 사용한 HTTP 모킹
+  - **성능 테스트**: 응답 시간 측정
+    - `refresh_token_performance_test.rs`: 동시 요청 처리 테스트
+
+- **Security Features**: 보안 기능 구현
+  - Keycloak의 refresh token rotation 활용
+  - 토큰 만료 정책을 Keycloak에서 중앙 관리
+  - HTTPS를 통한 안전한 토큰 전송
+  - 민감한 정보는 로그에 기록하지 않음
+
+- **Error Handling**: 강화된 에러 처리
+  - ServiceError를 통한 일관된 에러 처리
+  - HTTP 상태 코드 매핑
+  - 사용자 친화적인 에러 메시지
+  - Keycloak 서버 장애 시 적절한 에러 응답
+
+- **New DTOs**: 토큰 갱신 관련 DTO 추가
+  - `RefreshTokenRequest`: refresh_token 필드
+  - `RefreshTokenResponse`: token, token_type, expires_in 필드
+  - `KeycloakTokenResponse`: Keycloak 응답을 위한 내부 DTO
+
 ### Added - 2025-10-25
 
 #### **User Signup and Deletion API** ✨

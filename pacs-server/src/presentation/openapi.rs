@@ -24,6 +24,7 @@ use crate::application::dto::user_registration_dto::*;
         // Auth endpoints
         login_doc,
         verify_token_doc,
+        refresh_token_doc,
         // Annotation endpoints
         create_annotation,
         get_annotation,

@@ -1,8 +1,10 @@
 use async_trait::async_trait;
 use uuid::Uuid;
+use std::sync::Arc;
 use crate::domain::entities::User;
 use crate::domain::repositories::UserRepository;
 use crate::infrastructure::auth::{JwtService, Claims};
+use crate::infrastructure::external::KeycloakClient;
 use crate::domain::ServiceError;
 
 /// 인증 도메인 서비스
@@ -19,18 +21,23 @@ pub trait AuthService: Send + Sync {
 
     /// 로그아웃 (토큰 무효화) - 현재는 단순히 성공 반환
     async fn logout(&self, _token: &str) -> Result<(), ServiceError>;
+
+    /// Keycloak을 사용한 토큰 갱신
+    async fn refresh_token_with_keycloak(&self, refresh_token: &str) -> Result<crate::application::dto::auth_dto::RefreshTokenResponse, ServiceError>;
 }
 
 pub struct AuthServiceImpl<U: UserRepository> {
     user_repository: U,
     jwt_service: JwtService,
+    keycloak_client: Arc<KeycloakClient>,
 }
 
 impl<U: UserRepository> AuthServiceImpl<U> {
-    pub fn new(user_repository: U, jwt_service: JwtService) -> Self {
+    pub fn new(user_repository: U, jwt_service: JwtService, keycloak_client: Arc<KeycloakClient>) -> Self {
         Self {
             user_repository,
             jwt_service,
+            keycloak_client,
         }
     }
 }
@@ -109,6 +116,18 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
         // 실제 구현에서는 토큰 블랙리스트에 추가하거나 Redis 등에서 세션 제거
         // 현재는 단순히 성공 반환
         Ok(())
+    }
+
+    async fn refresh_token_with_keycloak(&self, refresh_token: &str) -> Result<crate::application::dto::auth_dto::RefreshTokenResponse, ServiceError> {
+        // Keycloak의 refresh token endpoint 호출
+        let keycloak_response = self.keycloak_client.refresh_access_token(refresh_token).await?;
+        
+        // Keycloak 응답을 우리 DTO로 변환
+        Ok(crate::application::dto::auth_dto::RefreshTokenResponse {
+            token: keycloak_response.access_token,
+            token_type: keycloak_response.token_type,
+            expires_in: keycloak_response.expires_in,
+        })
     }
 }
 

@@ -29,7 +29,7 @@ pub struct RefreshTokenRequest {
 }
 
 /// 토큰 갱신 응답 DTO
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 pub struct RefreshTokenResponse {
     pub token: String,
     pub token_type: String,

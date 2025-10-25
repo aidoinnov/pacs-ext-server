@@ -217,12 +217,17 @@ async fn main() -> std::io::Result<()> {
     let jwt_service = JwtService::new(&settings.jwt);
     println!("✅ Done (TTL: {}h)", settings.jwt.expiration_hours);
 
+    // Keycloak 클라이언트 초기화
+    print!("🔐 Initializing Keycloak client... ");
+    let keycloak_client = Arc::new(KeycloakClient::new(settings.keycloak.clone()));
+    println!("✅ Done (Realm: {})", settings.keycloak.realm);
+
     // 도메인 서비스 계층 초기화
     // 비즈니스 로직을 담당하는 서비스들을 생성
     print!("⚙️  Initializing domain services... ");
     
     // 인증 서비스: 로그인, 토큰 생성/검증 등
-    let auth_service = AuthServiceImpl::new(user_repo.clone(), jwt_service);
+    let auth_service = AuthServiceImpl::new(user_repo.clone(), jwt_service, keycloak_client.clone());
     // 사용자 서비스: 사용자 CRUD, 프로젝트 멤버십 관리 등
     let user_service = UserServiceImpl::new(user_repo.clone(), project_repo.clone());
     // 프로젝트 서비스: 프로젝트 CRUD, 사용자 관리 등
@@ -257,15 +262,10 @@ async fn main() -> std::io::Result<()> {
         project_data_access_repo.clone(),
     ));
     
-    // Keycloak 클라이언트 초기화
-    print!("🔐 Initializing Keycloak client... ");
-    let keycloak_client = KeycloakClient::new(settings.keycloak.clone());
-    println!("✅ Done (Realm: {})", settings.keycloak.realm);
-    
     // 사용자 등록 서비스: 회원가입, 이메일 인증, 계정 삭제 등
     let user_registration_service = UserRegistrationServiceImpl::new(
         pool.clone(),
-        keycloak_client,
+        (*keycloak_client).clone(),
     );
     // Initialize Object Storage service
     print!("☁️  Initializing Object Storage service... ");
