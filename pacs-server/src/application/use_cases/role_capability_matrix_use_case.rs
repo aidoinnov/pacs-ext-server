@@ -61,8 +61,10 @@ impl RoleCapabilityMatrixUseCase {
                 id: capability.id,
                 name: capability.name,
                 display_name: capability.display_name,
+                display_label: capability.display_label,
                 description: capability.description,
                 category: capability.category.clone(),
+                category_label: capability.category_label.clone(),
                 permission_count: permissions.len() as i32,
             };
             
@@ -131,8 +133,10 @@ impl RoleCapabilityMatrixUseCase {
                 id: capability.id,
                 name: capability.name,
                 display_name: capability.display_name,
+                display_label: capability.display_label,
                 description: capability.description,
                 category: capability.category.clone(),
+                category_label: capability.category_label.clone(),
                 permission_count: permissions.len() as i32,
             };
             
@@ -211,8 +215,10 @@ impl RoleCapabilityMatrixUseCase {
                 id: capability.id,
                 name: capability.name,
                 display_name: capability.display_name,
+                display_label: capability.display_label,
                 description: capability.description,
                 category: capability.category.clone(),
+                category_label: capability.category_label.clone(),
                 permission_count: permissions.len() as i32,
             };
             
@@ -272,8 +278,10 @@ impl RoleCapabilityMatrixUseCase {
             id: capability.id,
             name: capability.name,
             display_name: capability.display_name,
+            display_label: capability.display_label,
             description: capability.description,
             category: capability.category,
+            category_label: capability.category_label,
             permission_count: permissions.len() as i32,
         };
 
@@ -328,8 +336,10 @@ impl RoleCapabilityMatrixUseCase {
                 id: capability.id,
                 name: capability.name,
                 display_name: capability.display_name,
+                display_label: capability.display_label,
                 description: capability.description,
                 category: capability.category,
+                category_label: capability.category_label,
                 permission_count: permissions.len() as i32,
             };
 
@@ -356,8 +366,10 @@ impl RoleCapabilityMatrixUseCase {
                 id: capability.id,
                 name: capability.name,
                 display_name: capability.display_name,
+                display_label: capability.display_label,
                 description: capability.description,
                 category: capability.category,
+                category_label: capability.category_label,
                 permission_count: permissions.len() as i32,
             };
 

@@ -18,7 +18,7 @@ impl CapabilityRepositoryImpl {
 impl CapabilityRepository for CapabilityRepositoryImpl {
     async fn find_by_id(&self, id: i32) -> Result<Option<Capability>, sqlx::Error> {
         sqlx::query_as::<_, Capability>(
-            "SELECT id, name, display_name, description, category, is_active, created_at, updated_at
+            "SELECT id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at
              FROM security_capability
              WHERE id = $1"
         )
@@ -29,7 +29,7 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
 
     async fn find_all(&self) -> Result<Vec<Capability>, sqlx::Error> {
         sqlx::query_as::<_, Capability>(
-            "SELECT id, name, display_name, description, category, is_active, created_at, updated_at
+            "SELECT id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at
              FROM security_capability
              WHERE is_active = true
              ORDER BY category, display_name"
@@ -40,7 +40,7 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
 
     async fn find_by_category(&self, category: &str) -> Result<Vec<Capability>, sqlx::Error> {
         sqlx::query_as::<_, Capability>(
-            "SELECT id, name, display_name, description, category, is_active, created_at, updated_at
+            "SELECT id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at
              FROM security_capability
              WHERE category = $1 AND is_active = true
              ORDER BY display_name"
@@ -78,14 +78,16 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
 
     async fn create(&self, new_capability: NewCapability) -> Result<Capability, sqlx::Error> {
         sqlx::query_as::<_, Capability>(
-            "INSERT INTO security_capability (name, display_name, description, category)
-             VALUES ($1, $2, $3, $4)
-             RETURNING id, name, display_name, description, category, is_active, created_at, updated_at"
+            "INSERT INTO security_capability (name, display_name, display_label, description, category, category_label)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at"
         )
         .bind(new_capability.name)
         .bind(new_capability.display_name)
+        .bind(new_capability.display_label)
         .bind(new_capability.description)
         .bind(new_capability.category)
+        .bind(new_capability.category_label)
         .fetch_one(&self.pool)
         .await
     }
@@ -99,6 +101,11 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
             param_count += 1;
         }
 
+        if update.display_label.is_some() {
+            query.push_str(&format!(", display_label = ${}", param_count));
+            param_count += 1;
+        }
+
         if update.description.is_some() {
             query.push_str(&format!(", description = ${}", param_count));
             param_count += 1;
@@ -109,23 +116,34 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
             param_count += 1;
         }
 
+        if update.category_label.is_some() {
+            query.push_str(&format!(", category_label = ${}", param_count));
+            param_count += 1;
+        }
+
         if update.is_active.is_some() {
             query.push_str(&format!(", is_active = ${}", param_count));
             param_count += 1;
         }
 
-        query.push_str(&format!(" WHERE id = ${} RETURNING id, name, display_name, description, category, is_active, created_at, updated_at", param_count));
+        query.push_str(&format!(" WHERE id = ${} RETURNING id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at", param_count));
 
         let mut query_builder = sqlx::query_as::<_, Capability>(&query);
         
         if let Some(display_name) = update.display_name {
             query_builder = query_builder.bind(display_name);
         }
+        if let Some(display_label) = update.display_label {
+            query_builder = query_builder.bind(display_label);
+        }
         if let Some(description) = update.description {
             query_builder = query_builder.bind(description);
         }
         if let Some(category) = update.category {
             query_builder = query_builder.bind(category);
+        }
+        if let Some(category_label) = update.category_label {
+            query_builder = query_builder.bind(category_label);
         }
         if let Some(is_active) = update.is_active {
             query_builder = query_builder.bind(is_active);
@@ -270,7 +288,7 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
 
         // 모든 활성 Capability 조회 (변경 없음)
         let capabilities = sqlx::query_as::<_, Capability>(
-            "SELECT id, name, display_name, description, category, is_active, created_at, updated_at
+            "SELECT id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at
              FROM security_capability
              WHERE is_active = true
              ORDER BY category, display_name"
@@ -322,7 +340,7 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
 
         // 모든 활성 Capability 조회
         let capabilities = sqlx::query_as::<_, Capability>(
-            "SELECT id, name, display_name, description, category, is_active, created_at, updated_at
+            "SELECT id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at
              FROM security_capability
              WHERE is_active = true
              ORDER BY category, display_name"
@@ -356,7 +374,7 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
 
         // 모든 활성 Capability 조회
         let capabilities = sqlx::query_as::<_, Capability>(
-            "SELECT id, name, display_name, description, category, is_active, created_at, updated_at
+            "SELECT id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at
              FROM security_capability
              WHERE is_active = true
              ORDER BY category, display_name"

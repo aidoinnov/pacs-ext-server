@@ -24,10 +24,14 @@ pub struct CapabilityInfo {
     pub name: String,
     /// UI 표시 이름 (예: "사용자 관리")
     pub display_name: String,
+    /// UI 표시용 짧은 레이블 (예: "Admin", "User")
+    pub display_label: String,
     /// 설명
     pub description: Option<String>,
     /// 카테고리
     pub category: String,
+    /// UI 카테고리 짧은 레이블 (예: "MANAGE", "PROJECT")
+    pub category_label: String,
     /// 매핑된 Permission 개수
     pub permission_count: i32,
 }

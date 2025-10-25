@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-10-25
+
+#### **Capability 테이블에 UI 레이블 필드 추가** ✨
+- **새로운 필드**: `display_label`, `category_label` 필드를 `security_capability` 테이블에 추가
+- **목적**: UI 표에서 사용할 짧은 레이블 제공
+  - `display_label`: UI 표시용 짧은 레이블 (예: "Admin", "User")
+  - `category_label`: UI 카테고리 짧은 레이블 (예: "MANAGE", "PROJECT")
+- **데이터베이스 마이그레이션**: `014_add_capability_ui_labels.sql` 생성 및 실행
+- **코드 업데이트**:
+  - `Capability` 엔티티에 새 필드 추가
+  - `CapabilityInfo` DTO에 새 필드 추가
+  - Repository SQL 쿼리 업데이트
+  - Use Case에서 새 필드 매핑
+- **기존 데이터 업데이트**: 모든 기존 capability에 적절한 레이블 값 설정
+  - MANAGE 카테고리: Admin, Users, Roles, Projects
+  - PROJECT 카테고리: CREATE, ASSIGN, EDIT
+  - DICOM 카테고리: READ, WRITE, DELETE, SHARE
+  - ANNOTATION 카테고리: READ OWN, READ ALL, WRITE, DELETE, SHARE
+  - MASK 카테고리: READ, WRITE, DELETE
+  - HANGING_PROTOCOL 카테고리: MANAGE
+
 ### Fixed - 2025-10-25
 
 #### **Role-Capability Assignment API 라우팅 충돌 문제 해결** 🔧
