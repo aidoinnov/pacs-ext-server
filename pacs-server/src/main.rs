@@ -74,9 +74,9 @@ use infrastructure::middleware::{configure_cors, CacheHeaders};
 // 프레젠테이션 레이어 - 컨트롤러들
 use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
-    mask_group_controller, permission_controller, project_controller,
+    mask_group_controller, project_controller, role_controller,
     project_data_access_controller, project_user_controller, project_user_matrix_controller,
-    role_permission_matrix_controller, role_capability_matrix_controller, user_controller, user_registration_controller,
+    role_permission_matrix_controller, user_controller, user_registration_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -242,7 +242,8 @@ async fn main() -> std::io::Result<()> {
     let project_service =
         ProjectServiceImpl::new(project_repo.clone(), user_repo.clone(), role_repo.clone());
     // 권한 서비스: 권한 CRUD, 역할-권한 매핑 등
-    let permission_service = PermissionServiceImpl::new(permission_repo.clone(), role_repo.clone());
+    let permission_service: PermissionServiceImpl<PermissionRepositoryImpl, RoleRepositoryImpl> = 
+        PermissionServiceImpl::new(permission_repo.clone(), role_repo.clone());
     // 접근 제어 서비스: 권한 검증, 접근 로그 기록 등
     let access_control_service = AccessControlServiceImpl::new(
         access_log_repo,
@@ -444,13 +445,11 @@ async fn main() -> std::io::Result<()> {
                         )
                     })
                     .configure(|cfg| {
-                        role_capability_matrix_controller::configure_routes(
+                        role_controller::configure_routes(
                             cfg,
+                            permission_use_case.clone(),
                             role_capability_matrix_use_case.clone(),
                         )
-                    })
-                    .configure(|cfg| {
-                        permission_controller::configure_routes(cfg, permission_use_case.clone())
                     })
                     .configure(|cfg| {
                         access_control_controller::configure_routes(

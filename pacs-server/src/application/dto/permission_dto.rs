@@ -24,6 +24,13 @@ pub struct CreateRoleRequest {
     pub description: Option<String>,
 }
 
+/// 역할 업데이트 요청 DTO
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdateRoleRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
 /// 역할 응답 DTO
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RoleResponse {

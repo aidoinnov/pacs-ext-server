@@ -47,6 +47,13 @@ pub struct RoleCapabilityAssignment {
     pub assigned: bool,
 }
 
+/// Capability 할당 요청
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct CapabilityAssignmentRequest {
+    /// 할당 여부
+    pub assign: bool,
+}
+
 /// 역할-Capability 매트릭스 응답
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct RoleCapabilityMatrixResponse {

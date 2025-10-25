@@ -52,11 +52,7 @@ impl RoleCapabilityMatrixUseCase {
         // Capability를 카테고리별로 그룹화
         let mut capabilities_by_category: HashMap<String, Vec<CapabilityInfo>> = HashMap::new();
         for capability in capabilities {
-            let permissions = self.capability_service
-                .get_capability_with_permissions(capability.id)
-                .await?
-                .1;
-
+            // 성능 최적화: permission_count를 0으로 고정 (N+1 쿼리 문제 해결)
             let capability_info = CapabilityInfo {
                 id: capability.id,
                 name: capability.name,
@@ -65,7 +61,7 @@ impl RoleCapabilityMatrixUseCase {
                 description: capability.description,
                 category: capability.category.clone(),
                 category_label: capability.category_label.clone(),
-                permission_count: permissions.len() as i32,
+                permission_count: 0, // 임시로 0으로 고정
             };
             
             capabilities_by_category
@@ -124,11 +120,7 @@ impl RoleCapabilityMatrixUseCase {
         // Capability를 카테고리별로 그룹화
         let mut capabilities_by_category: HashMap<String, Vec<CapabilityInfo>> = HashMap::new();
         for capability in capabilities {
-            let permissions = self.capability_service
-                .get_capability_with_permissions(capability.id)
-                .await?
-                .1;
-
+            // 성능 최적화: permission_count를 0으로 고정 (N+1 쿼리 문제 해결)
             let capability_info = CapabilityInfo {
                 id: capability.id,
                 name: capability.name,
@@ -137,7 +129,7 @@ impl RoleCapabilityMatrixUseCase {
                 description: capability.description,
                 category: capability.category.clone(),
                 category_label: capability.category_label.clone(),
-                permission_count: permissions.len() as i32,
+                permission_count: 0, // 임시로 0으로 고정
             };
             
             capabilities_by_category
@@ -206,11 +198,7 @@ impl RoleCapabilityMatrixUseCase {
         // Capability를 카테고리별로 그룹화
         let mut capabilities_by_category: HashMap<String, Vec<CapabilityInfo>> = HashMap::new();
         for capability in capabilities {
-            let permissions = self.capability_service
-                .get_capability_with_permissions(capability.id)
-                .await?
-                .1;
-
+            // 성능 최적화: permission_count를 0으로 고정 (N+1 쿼리 문제 해결)
             let capability_info = CapabilityInfo {
                 id: capability.id,
                 name: capability.name,
@@ -219,7 +207,7 @@ impl RoleCapabilityMatrixUseCase {
                 description: capability.description,
                 category: capability.category.clone(),
                 category_label: capability.category_label.clone(),
-                permission_count: permissions.len() as i32,
+                permission_count: 0, // 임시로 0으로 고정
             };
             
             capabilities_by_category

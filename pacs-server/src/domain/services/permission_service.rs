@@ -18,6 +18,12 @@ pub trait PermissionService: Send + Sync {
     /// 역할 조회
     async fn get_role(&self, id: i32) -> Result<Role, ServiceError>;
 
+    /// 역할 업데이트
+    async fn update_role(&self, id: i32, name: Option<String>, description: Option<String>) -> Result<Role, ServiceError>;
+
+    /// 역할 삭제
+    async fn delete_role(&self, id: i32) -> Result<(), ServiceError>;
+
     /// Scope별 역할 조회
     async fn get_roles_by_scope(&self, scope: RoleScope) -> Result<Vec<Role>, ServiceError>;
 
@@ -115,6 +121,57 @@ impl<P: PermissionRepository, R: RoleRepository> PermissionService for Permissio
             .find_by_id(id)
             .await?
             .ok_or(ServiceError::NotFound("Role not found".into()))
+    }
+
+    async fn update_role(&self, id: i32, name: Option<String>, description: Option<String>) -> Result<Role, ServiceError> {
+        // 기존 역할 조회
+        let existing_role = self.get_role(id).await?;
+        
+        // 업데이트할 이름 검증
+        if let Some(ref new_name) = name {
+            if new_name.trim().is_empty() {
+                return Err(ServiceError::ValidationError("Role name cannot be empty".into()));
+            }
+            if new_name.len() > 100 {
+                return Err(ServiceError::ValidationError("Role name too long (max 100 characters)".into()));
+            }
+            // 같은 이름의 다른 역할이 이미 존재하는지 확인
+            if let Some(other_role) = self.role_repository.find_by_name(new_name).await? {
+                if other_role.id != id {
+                    return Err(ServiceError::AlreadyExists("Role name already exists".into()));
+                }
+            }
+        }
+
+        let scope = match existing_role.scope.as_str() {
+            "GLOBAL" => RoleScope::Global,
+            "PROJECT" => RoleScope::Project,
+            _ => RoleScope::Global,
+        };
+
+        let updated_role = crate::domain::entities::NewRole {
+            name: name.unwrap_or(existing_role.name),
+            scope,
+            description: description.or(existing_role.description),
+        };
+
+        self.role_repository
+            .update(id, updated_role)
+            .await?
+            .ok_or(ServiceError::NotFound("Role not found".into()))
+    }
+
+    async fn delete_role(&self, id: i32) -> Result<(), ServiceError> {
+        // 기존 역할 조회 (존재 여부 확인)
+        self.get_role(id).await?;
+
+        // 역할 삭제
+        let deleted = self.role_repository.delete(id).await?;
+        if !deleted {
+            return Err(ServiceError::NotFound("Role not found".into()));
+        }
+
+        Ok(())
     }
 
     async fn get_roles_by_scope(&self, scope: RoleScope) -> Result<Vec<Role>, ServiceError> {

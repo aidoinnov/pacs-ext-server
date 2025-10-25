@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use crate::domain::entities::{Capability, NewCapability, UpdateCapability, Permission, Role};
 use crate::domain::repositories::CapabilityRepository;
 
@@ -249,80 +249,112 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
 
         let where_clause = where_conditions.join(" AND ");
 
-        // 총 개수 조회
-        let count_query = format!(
-            "SELECT COUNT(*) FROM security_role WHERE {}",
-            where_clause
-        );
-        
-        let mut count_query = sqlx::query_scalar::<_, i64>(&count_query);
-        if let Some(ref search) = search_param {
-            count_query = count_query.bind(search).bind(search);
-        }
-        if let Some(ref scope) = scope_param {
-            count_query = count_query.bind(scope);
-        }
-        let total_count = count_query.fetch_one(&self.pool).await?;
+        // 성능 최적화: 병렬 쿼리 실행
+        let start_time = std::time::Instant::now();
+        let (roles, capabilities, assignments, total_count) = tokio::try_join!(
+            // 1. 페이지네이션된 역할들 조회
+            async {
+                let roles_query = format!(
+                    "SELECT id, name, description, scope, created_at
+                     FROM security_role
+                     WHERE {}
+                     ORDER BY name
+                     LIMIT ${} OFFSET ${}",
+                    where_clause,
+                    param_count + 1,
+                    param_count + 2
+                );
 
-        // 페이지네이션된 역할들 조회
-        let roles_query = format!(
-            "SELECT id, name, description, scope, created_at
-             FROM security_role
-             WHERE {}
-             ORDER BY name
-             LIMIT ${} OFFSET ${}",
-            where_clause,
-            param_count + 1,
-            param_count + 2
-        );
+                let mut roles_query = sqlx::query_as::<_, Role>(&roles_query);
+                if let Some(ref search) = search_param {
+                    roles_query = roles_query.bind(search).bind(search);
+                }
+                if let Some(ref scope) = scope_param {
+                    roles_query = roles_query.bind(scope);
+                }
+                roles_query = roles_query.bind(size).bind(offset);
+                roles_query.fetch_all(&self.pool).await
+            },
+            // 2. 모든 활성 Capability 조회
+            async {
+                sqlx::query_as::<_, Capability>(
+                    "SELECT id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at
+                     FROM security_capability
+                     WHERE is_active = true
+                     ORDER BY category, display_name"
+                )
+                .fetch_all(&self.pool)
+                .await
+            },
+            // 3. 역할-Capability 할당 조회 (조회된 역할들에 대해서만)
+            async {
+                // 먼저 역할들을 조회해서 ID를 얻어야 함
+                let roles_query = format!(
+                    "SELECT id FROM security_role
+                     WHERE {}
+                     ORDER BY name
+                     LIMIT ${} OFFSET ${}",
+                    where_clause,
+                    param_count + 1,
+                    param_count + 2
+                );
 
-        let mut roles_query = sqlx::query_as::<_, Role>(&roles_query);
-        if let Some(ref search) = search_param {
-            roles_query = roles_query.bind(search).bind(search);
-        }
-        if let Some(ref scope) = scope_param {
-            roles_query = roles_query.bind(scope);
-        }
-        roles_query = roles_query.bind(size).bind(offset);
-        let roles = roles_query.fetch_all(&self.pool).await?;
+                let mut roles_query = sqlx::query_scalar::<_, i32>(&roles_query);
+                if let Some(ref search) = search_param {
+                    roles_query = roles_query.bind(search).bind(search);
+                }
+                if let Some(ref scope) = scope_param {
+                    roles_query = roles_query.bind(scope);
+                }
+                roles_query = roles_query.bind(size).bind(offset);
+                let role_ids: Vec<i32> = roles_query.fetch_all(&self.pool).await?;
 
-        // 모든 활성 Capability 조회 (변경 없음)
-        let capabilities = sqlx::query_as::<_, Capability>(
-            "SELECT id, name, display_name, display_label, description, category, category_label, is_active, created_at, updated_at
-             FROM security_capability
-             WHERE is_active = true
-             ORDER BY category, display_name"
-        )
-        .fetch_all(&self.pool)
-        .await?;
+                if role_ids.is_empty() {
+                    return Ok(Vec::new());
+                }
 
-        // 역할-Capability 할당 조회 (조회된 역할들에 대해서만)
-        let role_ids: Vec<i32> = roles.iter().map(|r| r.id).collect();
-        let assignments = if role_ids.is_empty() {
-            Vec::new()
-        } else {
-            // IN 절을 위한 동적 쿼리 생성
-            let placeholders = role_ids.iter().enumerate()
-                .map(|(i, _)| format!("${}", i + 1))
-                .collect::<Vec<_>>()
-                .join(",");
-            
-            let query_string = format!(
-                "SELECT role_id, capability_id
-                 FROM security_role_capability
-                 WHERE role_id IN ({})",
-                placeholders
-            );
-            
-            let mut query = sqlx::query_as::<_, (i32, i32)>(&query_string);
-            
-            // 각 role_id를 개별적으로 바인딩
-            for role_id in &role_ids {
-                query = query.bind(role_id);
+                // IN 절을 위한 동적 쿼리 생성
+                let placeholders = role_ids.iter().enumerate()
+                    .map(|(i, _)| format!("${}", i + 1))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                
+                let query_string = format!(
+                    "SELECT role_id, capability_id
+                     FROM security_role_capability
+                     WHERE role_id IN ({})",
+                    placeholders
+                );
+                
+                let mut query = sqlx::query_as::<_, (i32, i32)>(&query_string);
+                
+                // 각 role_id를 개별적으로 바인딩
+                for role_id in &role_ids {
+                    query = query.bind(role_id);
+                }
+                
+                query.fetch_all(&self.pool).await
+            },
+            // 4. 총 개수 조회
+            async {
+                let count_query = format!(
+                    "SELECT COUNT(*) FROM security_role WHERE {}",
+                    where_clause
+                );
+                
+                let mut count_query = sqlx::query_scalar::<_, i64>(&count_query);
+                if let Some(ref search) = search_param {
+                    count_query = count_query.bind(search).bind(search);
+                }
+                if let Some(ref scope) = scope_param {
+                    count_query = count_query.bind(scope);
+                }
+                count_query.fetch_one(&self.pool).await
             }
-            
-            query.fetch_all(&self.pool).await?
-        };
+        )?;
+
+        let query_time = start_time.elapsed();
+        println!("🔍 Database query time: {:?}", query_time);
 
         Ok((roles, capabilities, assignments, total_count))
     }

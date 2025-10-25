@@ -1,5 +1,5 @@
 use crate::application::dto::{
-    CreateRoleRequest, RoleResponse, PermissionResponse,
+    CreateRoleRequest, UpdateRoleRequest, RoleResponse, PermissionResponse,
     RolePermissionsResponse, ProjectPermissionsResponse, ResourcePermissionsResponse,
     RoleWithPermissionsResponse, RolesWithPermissionsListResponse,
 };
@@ -49,6 +49,23 @@ impl<P: PermissionService> PermissionUseCase<P> {
             description: role.description,
             scope: role.scope,
         })
+    }
+
+    /// 역할 업데이트
+    pub async fn update_role(&self, role_id: i32, request: UpdateRoleRequest) -> Result<RoleResponse, ServiceError> {
+        let role = self.permission_service.update_role(role_id, request.name, request.description).await?;
+
+        Ok(RoleResponse {
+            id: role.id,
+            name: role.name,
+            description: role.description,
+            scope: role.scope,
+        })
+    }
+
+    /// 역할 삭제
+    pub async fn delete_role(&self, role_id: i32) -> Result<(), ServiceError> {
+        self.permission_service.delete_role(role_id).await
     }
 
     /// Global 역할 목록 조회
