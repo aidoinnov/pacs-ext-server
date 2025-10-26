@@ -1,4 +1,4 @@
-use crate::domain::entities::project_data::{ProjectData, NewProjectData, UpdateProjectData};
+use crate::domain::entities::project_data::{ProjectData, ProjectDataStudy, ProjectDataSeries, NewProjectData, UpdateProjectData};
 use crate::domain::repositories::ProjectDataRepository;
 use sqlx::{PgPool, FromRow};
 
@@ -213,5 +213,104 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
 
     fn pool(&self) -> &PgPool {
         &self.pool
+    }
+    
+    // ========== 새로운 계층 구조 메서드 구현 ==========
+    
+    async fn find_study_by_id(&self, id: i32) -> Result<Option<ProjectDataStudy>, sqlx::Error> {
+        let result = sqlx::query_as::<_, ProjectDataStudy>(
+            "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, patient_birth_date, study_date, created_at, updated_at
+             FROM project_data_study WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        
+        Ok(result)
+    }
+    
+    async fn find_study_by_uid(&self, project_id: i32, study_uid: &str) -> Result<Option<ProjectDataStudy>, sqlx::Error> {
+        let result = sqlx::query_as::<_, ProjectDataStudy>(
+            "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, patient_birth_date, study_date, created_at, updated_at
+             FROM project_data_study WHERE project_id = $1 AND study_uid = $2"
+        )
+        .bind(project_id)
+        .bind(study_uid)
+        .fetch_optional(&self.pool)
+        .await?;
+        
+        Ok(result)
+    }
+    
+    async fn find_studies_by_project_id(
+        &self,
+        project_id: i32,
+        page: i32,
+        page_size: i32
+    ) -> Result<Vec<ProjectDataStudy>, sqlx::Error> {
+        let offset = (page - 1) * page_size;
+        
+        let results = sqlx::query_as::<_, ProjectDataStudy>(
+            "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, patient_birth_date, study_date, created_at, updated_at
+             FROM project_data_study 
+             WHERE project_id = $1
+             ORDER BY study_date DESC NULLS LAST, created_at DESC
+             LIMIT $2 OFFSET $3"
+        )
+        .bind(project_id)
+        .bind(page_size)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await?;
+        
+        Ok(results)
+    }
+    
+    async fn count_studies_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error> {
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM project_data_study WHERE project_id = $1"
+        )
+        .bind(project_id)
+        .fetch_one(&self.pool)
+        .await?;
+        
+        Ok(count)
+    }
+    
+    async fn find_series_by_id(&self, id: i32) -> Result<Option<ProjectDataSeries>, sqlx::Error> {
+        let result = sqlx::query_as::<_, ProjectDataSeries>(
+            "SELECT id, study_id, series_uid, series_description, modality, series_number, created_at
+             FROM project_data_series WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        
+        Ok(result)
+    }
+    
+    async fn find_series_by_study_id(&self, study_id: i32) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
+        let results = sqlx::query_as::<_, ProjectDataSeries>(
+            "SELECT id, study_id, series_uid, series_description, modality, series_number, created_at
+             FROM project_data_series 
+             WHERE study_id = $1
+             ORDER BY series_number ASC NULLS LAST, created_at ASC"
+        )
+        .bind(study_id)
+        .fetch_all(&self.pool)
+        .await?;
+        
+        Ok(results)
+    }
+    
+    async fn count_series_by_study_id(&self, study_id: i32) -> Result<i64, sqlx::Error> {
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM project_data_series WHERE study_id = $1"
+        )
+        .bind(study_id)
+        .fetch_one(&self.pool)
+        .await?;
+        
+        Ok(count)
     }
 }

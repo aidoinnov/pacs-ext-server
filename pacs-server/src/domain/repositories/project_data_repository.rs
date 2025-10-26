@@ -1,4 +1,4 @@
-use crate::domain::entities::project_data::{ProjectData, NewProjectData, UpdateProjectData};
+use crate::domain::entities::project_data::{ProjectData, ProjectDataStudy, ProjectDataSeries, NewProjectData, UpdateProjectData};
 use sqlx::PgPool;
 
 #[async_trait::async_trait]
@@ -51,4 +51,32 @@ pub trait ProjectDataRepository: Send + Sync {
     
     /// 데이터베이스 연결 풀 반환
     fn pool(&self) -> &PgPool;
+    
+    // ========== 새로운 계층 구조 메서드 ==========
+    
+    /// Study 조회 (by ID)
+    async fn find_study_by_id(&self, id: i32) -> Result<Option<ProjectDataStudy>, sqlx::Error>;
+    
+    /// Study 조회 (by project_id and study_uid)
+    async fn find_study_by_uid(&self, project_id: i32, study_uid: &str) -> Result<Option<ProjectDataStudy>, sqlx::Error>;
+    
+    /// 프로젝트별 Study 목록 조회 (페이지네이션)
+    async fn find_studies_by_project_id(
+        &self,
+        project_id: i32,
+        page: i32,
+        page_size: i32
+    ) -> Result<Vec<ProjectDataStudy>, sqlx::Error>;
+    
+    /// 프로젝트별 Study 총 개수
+    async fn count_studies_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error>;
+    
+    /// Series 조회 (by ID)
+    async fn find_series_by_id(&self, id: i32) -> Result<Option<ProjectDataSeries>, sqlx::Error>;
+    
+    /// Study별 Series 목록 조회
+    async fn find_series_by_study_id(&self, study_id: i32) -> Result<Vec<ProjectDataSeries>, sqlx::Error>;
+    
+    /// Study별 Series 총 개수
+    async fn count_series_by_study_id(&self, study_id: i32) -> Result<i64, sqlx::Error>;
 }
