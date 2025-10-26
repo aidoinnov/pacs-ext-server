@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 🏗️ Planned
+### 🏗️ In Progress (70% 완료)
 
 #### **Project Data Access Management API - 계층 구조 지원**
+
+**✅ 완료된 작업**:
 - **Database Schema Enhancement**: DICOM 계층 구조 지원
   - `project_data_study` 테이블: Study 레벨 데이터
   - `project_data_series` 테이블: Series 레벨 데이터 (Study와 연계)
@@ -17,15 +19,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `resource_level` 컬럼: STUDY/SERIES 레벨 구분
     - `study_id`, `series_id` 컬럼: 계층 관계 표현
   - 단계별 접근 권한 (Study 권한 → Series 권한 → Modality별 권한)
+  - **마이그레이션 실행 완료** ✅
 - **Enhanced DTOs**: 행 중심 매트릭스 구조
-  - `DataAccessMatrixRow`: 데이터별 접근 상태 행
-  - `UserAccessCell`: 사용자별 접근 셀
-  - `HierarchicalDataAccessMatrixResponse`: 계층 구조 응답
-- **Comprehensive API Documentation**: `docs/api/project-data-access-matrix-api.md`
+  - `DataAccessMatrixRow`: 데이터별 접근 상태 행 ✅
+  - `UserAccessCell`: 사용자별 접근 셀 ✅
+  - `HierarchicalDataAccessMatrixResponse`: 계층 구조 응답 ✅
+- **Repository Layer**: Study/Series 조회 메서드 6개 추가 ✅
+  - `find_study_by_id()`, `find_study_by_uid()`, `find_studies_by_project_id()`
+  - `find_series_by_id()`, `find_series_by_study_id()`
+- **Service Layer**: 계층 구조 지원 메서드 5개 추가 ✅
+  - `get_study_by_id()`, `get_study_by_uid()`, `get_studies_by_project()`
+  - `get_series_by_id()`, `get_series_by_study()`
+- **Use Case Layer**: Study/Series 조회 메서드 5개 추가 ✅
+  - `get_study()`, `get_study_by_uid()`, `get_studies()`
+  - `get_series()`, `get_series_by_study()`
+- **Comprehensive API Documentation**: `docs/api/project-data-access-matrix-api.md` ✅
   - API 엔드포인트 상세 설명
   - 요청/응답 예시
   - UI 구현 가이드
-- **Migration Files**: `016_create_project_data_tables.sql` 생성 및 실행 완료
+- **Migration Files**: `016_create_project_data_tables.sql` 생성 및 실행 완료 ✅
+
+**⏸️ 남은 작업**:
+- Controller Layer 구현 (쿼리 파라미터 확장, OpenAPI 문서화)
+- 테스트 작성 (단위 테스트, 통합 테스트, 성능 테스트)
+
+**참고 문서**:
+- `docs/project_data_access_matrix_status.md` - 구현 상태 상세 보고서
+- `docs/project_data_access_matrix_completion_summary.md` - 완료 요약
 
 ## [1.0.0-beta.10] - 2025-01-15
 
