@@ -53,49 +53,49 @@ where
         let user_sort_by = params.user_sort_by.unwrap_or_else(|| "username".to_string());
         let user_sort_order = params.user_sort_order.unwrap_or_else(|| "asc".to_string());
 
-        // 1. 유저 목록 조회 (정렬, 필터링, 페이지네이션)
-        let (users, user_total_count) = self.user_service
-            .get_users_with_sorting(
+        // 1. 유저 목록 및 프로젝트 목록 병렬 조회 (성능 최적화)
+        let ((users, user_total_count), (projects, project_total_count)) = tokio::try_join!(
+            self.user_service.get_users_with_sorting(
                 user_page,
                 user_page_size,
                 &user_sort_by,
                 &user_sort_order,
                 params.user_search.as_deref(),
                 params.user_ids.as_deref(),
-            )
-            .await?;
-
-        // 2. 프로젝트 목록 조회 (필터링, 페이지네이션)
-        let (projects, project_total_count) = self.project_service
-            .get_projects_with_status_filter(
+            ),
+            self.project_service.get_projects_with_status_filter(
                 None, // project_status는 현재 지원하지 않음
                 params.project_ids,
                 project_page,
                 project_page_size,
             )
-            .await?;
+        )?;
 
-        // 3. 각 유저의 프로젝트 역할 매핑 조회
+        // 3. 모든 유저-프로젝트 멤버십 일괄 조회 (N+1 쿼리 문제 해결)
+        let user_ids: Vec<i32> = users.iter().map(|u| u.id).collect();
+        let project_ids: Vec<i32> = projects.iter().map(|p| p.id).collect();
+        
+        let memberships = self.user_service
+            .get_memberships_batch(&user_ids, &project_ids)
+            .await?;
+        
+        // 4. 매트릭스 구조 생성 (메모리에서 O(1) 조회)
         let mut matrix_rows = Vec::new();
         
         for user in users {
-            let mut project_roles = Vec::new();
-            
-            for project in &projects {
-                // 유저의 프로젝트 역할 조회
-                let membership = self.user_service
-                    .get_project_membership(user.id, project.id)
-                    .await?;
-                
-                let project_role = ProjectRoleCell {
-                    project_id: project.id,
-                    project_name: project.name.clone(),
-                    role_id: membership.as_ref().and_then(|m| m.role_id),
-                    role_name: membership.as_ref().and_then(|m| m.role_name.clone()),
-                };
-                
-                project_roles.push(project_role);
-            }
+            let project_roles: Vec<ProjectRoleCell> = projects
+                .iter()
+                .map(|project| {
+                    let membership = memberships.get(&(user.id, project.id));
+                    
+                    ProjectRoleCell {
+                        project_id: project.id,
+                        project_name: project.name.clone(),
+                        role_id: membership.and_then(|m| m.role_id),
+                        role_name: membership.and_then(|m| m.role_name.clone()),
+                    }
+                })
+                .collect();
             
             let matrix_row = UserProjectMatrixRow {
                 user_id: user.id,
@@ -108,7 +108,7 @@ where
             matrix_rows.push(matrix_row);
         }
 
-        // 4. 프로젝트 정보 목록 생성 (열 헤더용)
+        // 5. 프로젝트 정보 목록 생성 (열 헤더용)
         let project_infos: Vec<ProjectInfo> = projects
             .into_iter()
             .map(|project| ProjectInfo {
@@ -119,7 +119,7 @@ where
             })
             .collect();
 
-        // 5. 페이지네이션 정보 계산
+        // 6. 페이지네이션 정보 계산
         let user_total_pages = ((user_total_count as f64) / (user_page_size as f64)).ceil() as i32;
         let project_total_pages = ((project_total_count as f64) / (project_page_size as f64)).ceil() as i32;
 
@@ -134,7 +134,7 @@ where
             project_total_pages,
         };
 
-        // 6. 최종 응답 구성
+        // 7. 최종 응답 구성
         Ok(UserProjectMatrixResponse {
             matrix: matrix_rows,
             projects: project_infos,

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Performance - 2025-01-26
+
+#### **User-Centered Matrix API 성능 추가 최적화** 🚀
+- **성능 개선**: 응답 시간 0.294초 → 0.137~0.173초 (52% 향상)
+- **최적화 항목**:
+  - 불필요한 `joined_at` 필드 제거로 데이터 조회 최소화
+  - HashMap 사전 용량 할당으로 재할당 방지
+  - `(user_id, project_id)` 복합 인덱스 추가로 데이터베이스 조회 최적화
+- **전체 개선율**: 초기 대비 96.5% 향상 (4.0초 → 0.137~0.173초)
+- **변경된 파일**:
+  - `pacs-server/src/application/dto/user_project_matrix_dto.rs` - MembershipInfo 최적화
+  - `pacs-server/src/domain/services/user_service.rs` - SQL 쿼리 및 HashMap 최적화
+  - `pacs-server/migrations/015_add_user_project_composite_index.sql` - 복합 인덱스 추가
+
 ### Added - 2025-01-26
 
 #### **User-Centered Matrix API 구현** ✨

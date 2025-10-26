@@ -86,6 +86,13 @@ pub trait UserService: Send + Sync {
         search: Option<&str>,
         user_ids: Option<&[i32]>,
     ) -> Result<(Vec<User>, i64), ServiceError>;
+
+    /// 일괄 멤버십 조회 (배치 쿼리로 N+1 문제 해결)
+    async fn get_memberships_batch(
+        &self,
+        user_ids: &[i32],
+        project_ids: &[i32]
+    ) -> Result<std::collections::HashMap<(i32, i32), crate::application::dto::user_project_matrix_dto::MembershipInfo>, ServiceError>;
 }
 
 #[derive(Clone)]
@@ -552,6 +559,42 @@ where
             .await?;
 
         Ok((users, total_count))
+    }
+
+    async fn get_memberships_batch(
+        &self,
+        user_ids: &[i32],
+        project_ids: &[i32]
+    ) -> Result<std::collections::HashMap<(i32, i32), crate::application::dto::user_project_matrix_dto::MembershipInfo>, ServiceError> {
+        use crate::application::dto::user_project_matrix_dto::MembershipInfo;
+
+        // 단일 쿼리로 모든 멤버십 정보 조회 (joined_at 제거로 성능 최적화)
+        let memberships = sqlx::query_as::<_, (i32, i32, Option<i32>, Option<String>)>(
+            "SELECT up.user_id, up.project_id, up.role_id, r.name as role_name
+             FROM security_user_project up
+             LEFT JOIN security_role r ON up.role_id = r.id
+             WHERE up.user_id = ANY($1) AND up.project_id = ANY($2)"
+        )
+        .bind(&user_ids)
+        .bind(&project_ids)
+        .fetch_all(self.user_repository.pool())
+        .await?;
+
+        // HashMap으로 변환하여 O(1) 조회 가능 (사전 용량 할당으로 재할당 방지)
+        let estimated_capacity = user_ids.len().saturating_mul(project_ids.len());
+        let mut membership_map = std::collections::HashMap::with_capacity(estimated_capacity);
+        
+        for (user_id, project_id, role_id, role_name) in memberships {
+            membership_map.insert(
+                (user_id, project_id),
+                MembershipInfo {
+                    role_id,
+                    role_name,
+                }
+            );
+        }
+
+        Ok(membership_map)
     }
 }
 

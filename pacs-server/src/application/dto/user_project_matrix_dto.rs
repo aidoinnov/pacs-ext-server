@@ -7,6 +7,17 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// 멤버십 정보
+/// 
+/// 일괄 조회를 위한 멤버십 정보 구조체입니다.
+#[derive(Debug, Clone)]
+pub struct MembershipInfo {
+    /// 역할 ID
+    pub role_id: Option<i32>,
+    /// 역할명
+    pub role_name: Option<String>,
+}
+
 /// 매트릭스에서 프로젝트-역할 정보
 /// 
 /// 각 셀은 특정 유저가 특정 프로젝트에서 가진 역할 정보를 나타냅니다.
