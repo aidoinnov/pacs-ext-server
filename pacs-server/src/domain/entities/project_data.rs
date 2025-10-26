@@ -49,7 +49,8 @@ pub struct ProjectDataSeries {
 }
 
 /// 프로젝트 데이터 접근 권한 (Study, Series, Instance 레벨)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// NOTE: project_data_id는 하위 호환성을 위한 임시 필드 (기존 project_data 테이블 참조)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ProjectDataAccess {
     pub id: i32,
     pub project_id: i32,
@@ -65,9 +66,8 @@ pub struct ProjectDataAccess {
     pub review_note: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    /// 하위 호환성을 위한 임시 필드 (기존 테이블 project_data 참조용)
-    #[serde(skip)]
-    pub project_data_id: i32,
+    #[sqlx(default)]
+    pub project_data_id: i32, // 임시 필드: 기존 테이블 호환성 유지
 }
 
 // 기존 ProjectData는 하위 호환성을 위해 유지
