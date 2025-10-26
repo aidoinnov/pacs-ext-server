@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed - 2025-01-26
 
+#### **프로젝트 Repository Status 컬럼 에러 수정** 🔧
+- **문제 해결**: `PUT /api/projects/{project_id}/users/{user_id}/role` API의 "no column found for name: status" 에러 완전 해결
+- **원인**: `Project` 엔티티에는 `status: ProjectStatus` 필드가 있지만, `project_repository_impl.rs`의 SQL 쿼리들이 이 컬럼을 SELECT하지 않아 SQLx 매핑 에러 발생
+- **해결 방법**:
+  - `project_repository_impl.rs`의 모든 SQL 쿼리에 `status` 컬럼 추가
+  - `find_by_id`, `find_by_name`, `find_all`, `find_active`, `create`, `update` 함수 수정
+  - SELECT 및 RETURNING 절에 `status` 컬럼 포함
+- **결과**:
+  - 500 Internal Server Error → 200 OK
+  - "Role assigned successfully" 메시지 정상 출력
+  - 프로젝트 관련 모든 API 정상화
+  - 기존 API 기능에 영향 없음
+- **기술적 개선사항**:
+  - SQL 쿼리 완전성 향상 (모든 Project 필드 조회)
+  - 엔티티-데이터베이스 매핑 일치성 확보
+  - 런타임 에러 방지 및 시스템 안정성 향상
+- **관련 파일**:
+  - `src/infrastructure/repositories/project_repository_impl.rs`
+  - 작업 문서: `work/project_repository_status_fix/`
+
 #### **User Projects API 라우팅 충돌 문제 해결** 🔧
 - **문제 해결**: `/api/users/{user_id}/projects` API의 404 에러 완전 해결
 - **원인**: `user_controller`와 `project_user_controller`의 `/users` 스코프 충돌

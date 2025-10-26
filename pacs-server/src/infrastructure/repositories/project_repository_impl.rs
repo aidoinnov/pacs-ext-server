@@ -18,7 +18,7 @@ impl ProjectRepositoryImpl {
 impl ProjectRepository for ProjectRepositoryImpl {
     async fn find_by_id(&self, id: i32) -> Result<Option<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, is_active, created_at
+            "SELECT id, name, description, is_active, status, created_at
              FROM security_project
              WHERE id = $1"
         )
@@ -29,7 +29,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
 
     async fn find_by_name(&self, name: &str) -> Result<Option<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, is_active, created_at
+            "SELECT id, name, description, is_active, status, created_at
              FROM security_project
              WHERE name = $1"
         )
@@ -40,7 +40,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
 
     async fn find_all(&self) -> Result<Vec<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, is_active, created_at
+            "SELECT id, name, description, is_active, status, created_at
              FROM security_project
              ORDER BY created_at DESC"
         )
@@ -50,7 +50,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
 
     async fn find_active(&self) -> Result<Vec<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, is_active, created_at
+            "SELECT id, name, description, is_active, status, created_at
              FROM security_project
              WHERE is_active = true
              ORDER BY created_at DESC"
@@ -63,7 +63,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
         sqlx::query_as::<_, Project>(
             "INSERT INTO security_project (name, description)
              VALUES ($1, $2)
-             RETURNING id, name, description, is_active, created_at"
+             RETURNING id, name, description, is_active, status, created_at"
         )
         .bind(new_project.name)
         .bind(new_project.description)
@@ -76,7 +76,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
             "UPDATE security_project
              SET name = $2, description = $3
              WHERE id = $1
-             RETURNING id, name, description, is_active, created_at"
+             RETURNING id, name, description, is_active, status, created_at"
         )
         .bind(id)
         .bind(new_project.name)
