@@ -9,6 +9,7 @@ pub mod mask_group_controller;
 pub mod mask_controller;
 pub mod project_user_controller;
 pub mod project_user_matrix_controller;
+pub mod user_project_matrix_controller;
 pub mod role_permission_matrix_controller;
 pub mod project_data_access_controller;
 pub mod user_registration_controller;

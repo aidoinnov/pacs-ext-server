@@ -4,6 +4,7 @@ use crate::presentation::controllers::annotation_controller::*;
 use crate::presentation::controllers::project_controller::*;
 use crate::presentation::controllers::mask_group_controller::*;
 use crate::presentation::controllers::project_user_matrix_controller::*;
+use crate::presentation::controllers::user_project_matrix_controller;
 use crate::presentation::controllers::role_permission_matrix_controller::*;
 use crate::presentation::controllers::project_data_access_controller::*;
 use crate::application::dto::auth_dto::*;
@@ -14,6 +15,7 @@ use crate::application::dto::mask_group_dto::*;
 use crate::application::dto::permission_dto::*;
 use crate::application::dto::project_user_dto::{UserWithRoleResponse, ProjectWithRoleResponse, AssignRoleRequest, BatchAssignRolesRequest, UserRoleAssignment, RoleAssignmentResponse, BatchRoleAssignmentResponse, FailedAssignment};
 use crate::application::dto::project_user_matrix_dto::*;
+use crate::application::dto::user_project_matrix_dto::*;
 use crate::application::dto::role_permission_matrix_dto::*;
 use crate::application::dto::project_data_access_dto::*;
 use crate::application::dto::user_registration_dto::*;
@@ -46,6 +48,8 @@ use crate::application::dto::user_registration_dto::*;
         complete_upload,
         // Project User Matrix endpoints
         get_matrix,
+        // User Project Matrix endpoints
+        user_project_matrix_controller::get_matrix,
         // Role Permission Matrix endpoints
         get_global_matrix,
         get_project_matrix,
@@ -117,6 +121,13 @@ use crate::application::dto::user_registration_dto::*;
             crate::application::dto::project_user_matrix_dto::UserInfo,
             MatrixPagination,
             MatrixQueryParams,
+            // User Project Matrix DTOs
+            ProjectRoleCell,
+            UserProjectMatrixRow,
+            UserProjectMatrixResponse,
+            ProjectInfo,
+            UserProjectMatrixPagination,
+            UserProjectMatrixQueryParams,
             // Role Permission Matrix DTOs
             crate::application::dto::role_permission_matrix_dto::RoleInfo,
             crate::application::dto::role_permission_matrix_dto::PermissionInfo,
@@ -156,6 +167,7 @@ use crate::application::dto::user_registration_dto::*;
         (name = "mask-groups", description = "Mask Group management endpoints - 마스크 그룹 관리 API"),
         (name = "project-users", description = "Project User Role management endpoints - 프로젝트 사용자 역할 관리 API"),
         (name = "project-user-matrix", description = "Project User Matrix endpoints - 프로젝트 사용자 매트릭스 API"),
+        (name = "user-project-matrix", description = "User Project Matrix endpoints - 유저 프로젝트 매트릭스 API"),
         (name = "role-permission-matrix", description = "Role Permission Matrix endpoints - 역할 권한 매트릭스 API"),
         (name = "project-data-access", description = "Project Data Access endpoints - 프로젝트 데이터 접근 관리 API"),
         (name = "user-registration", description = "User Registration endpoints - 사용자 등록 및 계정 관리 API"),

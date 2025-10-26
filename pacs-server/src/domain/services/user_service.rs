@@ -75,6 +75,17 @@ pub trait UserService: Send + Sync {
         page: i32,
         page_size: i32,
     ) -> Result<(Vec<User>, i64), ServiceError>;
+
+    /// 정렬 및 필터링을 지원하는 사용자 목록 조회
+    async fn get_users_with_sorting(
+        &self,
+        page: i32,
+        page_size: i32,
+        sort_by: &str,
+        sort_order: &str,
+        search: Option<&str>,
+        user_ids: Option<&[i32]>,
+    ) -> Result<(Vec<User>, i64), ServiceError>;
 }
 
 #[derive(Clone)]
@@ -468,6 +479,77 @@ where
         .bind(&user_ids)
         .fetch_one(self.user_repository.pool())
         .await?;
+
+        Ok((users, total_count))
+    }
+
+    async fn get_users_with_sorting(
+        &self,
+        page: i32,
+        page_size: i32,
+        sort_by: &str,
+        sort_order: &str,
+        search: Option<&str>,
+        user_ids: Option<&[i32]>,
+    ) -> Result<(Vec<User>, i64), ServiceError> {
+        let offset = (page - 1) * page_size;
+
+        // 정렬 필드 검증 및 ORDER BY 절 구성
+        let order_by = match sort_by {
+            "username" => "username",
+            "email" => "email", 
+            "created_at" => "created_at",
+            _ => "username", // 기본값
+        };
+
+        let order_direction = match sort_order {
+            "desc" => "DESC",
+            _ => "ASC", // 기본값
+        };
+
+        // 검색 조건 구성
+        let search_condition = if let Some(search_term) = search {
+            format!("AND (username ILIKE '%{}%' OR email ILIKE '%{}%')", search_term, search_term)
+        } else {
+            String::new()
+        };
+
+        // 사용자 조회 쿼리
+        let query = format!(
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, 
+                    created_at, updated_at, account_status, email_verified, 
+                    email_verification_token, email_verification_expires_at, 
+                    approved_by, approved_at, suspended_at, suspended_reason, deleted_at
+             FROM security_user
+             WHERE ($1::int[] IS NULL OR id = ANY($1))
+               AND account_status != 'DELETED'
+               {}
+             ORDER BY {} {}
+             LIMIT $2 OFFSET $3",
+            search_condition, order_by, order_direction
+        );
+
+        let users = sqlx::query_as::<_, User>(&query)
+            .bind(&user_ids)
+            .bind(page_size)
+            .bind(offset)
+            .fetch_all(self.user_repository.pool())
+            .await?;
+
+        // 총 개수 조회
+        let count_query = format!(
+            "SELECT COUNT(*)
+             FROM security_user
+             WHERE ($1::int[] IS NULL OR id = ANY($1))
+               AND account_status != 'DELETED'
+               {}",
+            search_condition
+        );
+
+        let total_count = sqlx::query_scalar::<_, i64>(&count_query)
+            .bind(&user_ids)
+            .fetch_one(self.user_repository.pool())
+            .await?;
 
         Ok((users, total_count))
     }

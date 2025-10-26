@@ -6,6 +6,81 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-01-26
+
+#### **User-Centered Matrix API 구현** ✨
+- **새로운 기능**: 사용자 중심의 프로젝트-역할 매트릭스 API 구현
+- **구현된 API**:
+  - `GET /api/user-project-matrix` - 사용자 중심 매트릭스 조회
+- **주요 특징**:
+  - **이중 페이지네이션**: 사용자 페이지네이션 + 프로젝트 페이지네이션
+  - **사용자 정렬**: username, email, created_at 기준 정렬 (asc/desc)
+  - **사용자 검색**: username, email로 부분 일치 검색
+  - **다양한 필터링**: role_id, project_ids, user_ids로 필터링
+  - **매트릭스 구조**: 사용자별로 프로젝트 역할 정보 표시
+- **기술적 구현**:
+  - Clean Architecture 패턴 준수
+  - Domain Layer: `UserService`에 `get_users_with_sorting()` 메서드 추가
+  - Application Layer: 새로운 DTO 및 Use Case 구현
+  - Infrastructure Layer: 동적 SQL 쿼리 구성 및 성능 최적화
+  - Presentation Layer: OpenAPI 문서화 및 라우팅 설정
+- **성능 최적화**:
+  - 동적 SQL 쿼리 구성으로 불필요한 데이터 조회 방지
+  - 페이지네이션을 통한 대용량 데이터 처리
+  - 평균 응답 시간 400-500ms (58명 사용자, 37개 프로젝트 기준)
+- **테스트 결과**:
+  - 기본 조회: 58명 사용자, 37개 프로젝트 정상 조회
+  - 이메일 기준 내림차순 정렬 정상 작동
+  - 사용자명 검색 ("testuser") 정상 작동
+  - 모든 쿼리 파라미터 조합 정상 처리
+- **기존 API와의 호환성**:
+  - 기존 프로젝트 중심 API (`/api/project-user-matrix`) 완전 유지
+  - 새로운 사용자 중심 API (`/api/user-project-matrix`) 추가
+  - 두 API 모두 독립적으로 사용 가능
+- **문서화**:
+  - 완전한 클라이언트 가이드 제공 (`docs/api/user-centered-matrix-api-client-guide.md`)
+  - TypeScript 인터페이스 및 React 컴포넌트 예시 포함
+  - OpenAPI 문서 완전성 확보
+- **관련 파일**:
+  - `src/application/dto/user_project_matrix_dto.rs` - 새로운 DTO 정의
+  - `src/application/use_cases/user_project_matrix_use_case.rs` - Use Case 구현
+  - `src/presentation/controllers/user_project_matrix_controller.rs` - API 컨트롤러
+  - `src/domain/services/user_service.rs` - 서비스 인터페이스 확장
+  - `src/infrastructure/services/user_service_impl.rs` - 서비스 구현
+  - `src/main.rs` - 라우팅 및 OpenAPI 설정
+  - 작업 문서: `work/user_centered_matrix_api/`
+
+### Added - 2025-01-26
+
+#### **프로젝트 멤버 관리 API 구현** ✨
+- **새로운 기능**: 프로젝트 멤버를 추가, 삭제, 확인하는 3개의 API 구현
+- **구현된 API**:
+  - `POST /api/projects/{project_id}/members` - 프로젝트에 멤버 추가
+  - `DELETE /api/projects/{project_id}/members/{user_id}` - 프로젝트에서 멤버 제거
+  - `GET /api/projects/{project_id}/members/{user_id}/membership` - 멤버십 상태 확인
+- **주요 특징**:
+  - 역할 자동 할당 (role_id 미제공 시 기본 역할 할당)
+  - 중복 멤버십 체크 및 409 Conflict 응답
+  - 사용자/프로젝트/역할 존재 여부 검증
+  - 멤버십 정보에 역할명 및 가입일 포함
+- **기술적 구현**:
+  - Clean Architecture 패턴 준수
+  - Domain Layer: `UserService` 인터페이스 확장
+  - Application Layer: 새로운 DTO 및 Use Case 메서드 추가
+  - Infrastructure Layer: SQL 쿼리 구현 및 트랜잭션 처리
+  - Presentation Layer: OpenAPI 문서화 및 라우팅 설정
+- **테스트 결과**:
+  - 모든 API 엔드포인트 정상 작동 확인
+  - HTTP 200 OK 응답 및 적절한 에러 처리
+  - 멤버 추가 → 멤버십 확인 → 멤버 제거 → 멤버십 재확인 전체 플로우 검증
+- **관련 파일**:
+  - `src/application/dto/project_user_dto.rs` - 새로운 DTO 정의
+  - `src/domain/services/user_service.rs` - 서비스 인터페이스 확장
+  - `src/infrastructure/services/user_service_impl.rs` - 서비스 구현
+  - `src/application/use_cases/project_user_use_case.rs` - Use Case 확장
+  - `src/presentation/controllers/project_user_controller.rs` - API 엔드포인트 추가
+  - 작업 문서: `work/project_member_management_api/`
+
 ### Fixed - 2025-01-26
 
 #### **프로젝트 Repository Status 컬럼 에러 수정** 🔧

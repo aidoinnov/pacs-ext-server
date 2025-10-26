@@ -46,6 +46,7 @@ use application::use_cases::{
     AccessControlUseCase, AnnotationUseCase, AuthUseCase, MaskGroupUseCase, MaskUseCase,
     PermissionUseCase, ProjectDataAccessUseCase, ProjectUseCase, ProjectUserMatrixUseCase,
     ProjectUserUseCase, RolePermissionMatrixUseCase, RoleCapabilityMatrixUseCase, UserRegistrationUseCase, UserUseCase,
+    UserProjectMatrixUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
@@ -76,6 +77,7 @@ use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
     mask_group_controller, project_controller, role_controller,
     project_data_access_controller, project_user_controller, project_user_matrix_controller,
+    user_project_matrix_controller,
     role_permission_matrix_controller, user_controller, user_registration_controller,
 };
 // OpenAPI 문서 생성
@@ -323,8 +325,12 @@ async fn main() -> std::io::Result<()> {
         Arc::new(user_service.clone()),
     ));
     let project_user_matrix_use_case = Arc::new(ProjectUserMatrixUseCase::new(
-        Arc::new(project_service),
-        Arc::new(user_service),
+        Arc::new(project_service.clone()),
+        Arc::new(user_service.clone()),
+    ));
+    let user_project_matrix_use_case = Arc::new(UserProjectMatrixUseCase::new(
+        Arc::new(user_service.clone()),
+        Arc::new(project_service.clone()),
     ));
     let role_permission_matrix_use_case = Arc::new(RolePermissionMatrixUseCase::new(Arc::new(
         permission_service.clone(),
@@ -470,6 +476,12 @@ async fn main() -> std::io::Result<()> {
                         project_user_matrix_controller::configure_routes(
                             cfg,
                             project_user_matrix_use_case.clone(),
+                        )
+                    })
+                    .configure(|cfg| {
+                        user_project_matrix_controller::configure_routes(
+                            cfg,
+                            user_project_matrix_use_case.clone(),
                         )
                     })
                     // ========================================
