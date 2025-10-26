@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed - 2025-01-27
+
+#### **Data Access Status Update API 수정** 🔧
+- **문제 해결**: 데이터 접근 권한 상태 업데이트 시 발생하는 데이터베이스 오류 수정
+- **주요 변경사항**:
+  - Status 필드 enum 타입 캐스팅 명시 (`$1::data_access_status_enum`)
+  - 동적 쿼리를 단일 prepared statement로 재구현
+  - 바인딩 파라미터 불일치 해결 (6개 파라미터 정확히 바인딩)
+  - NULL 컬럼 디코딩 오류 해결 (project_id, study_id)
+- **파일 수정**:
+  - `pacs-server/src/infrastructure/repositories/project_data_access_repository_impl.rs`
+  - `pacs-server/src/domain/entities/project_data.rs`
+
+#### **자동 권한 부여 기능 구현** 🎁
+- **기능 추가**: 사용자를 프로젝트에 추가하면 모든 데이터에 대해 APPROVED 권한 자동 부여
+- **구현 내용**:
+  - `ProjectUserUseCase`에 `ProjectDataService` 의존성 추가
+  - `add_member_to_project`에서 `grant_default_access_to_user` 자동 호출
+  - 에러 발생 시 로깅만 하고 계속 진행
+- **파일 수정**:
+  - `pacs-server/src/application/use_cases/project_user_use_case.rs`
+  - `pacs-server/src/presentation/controllers/project_user_controller.rs`
+  - `pacs-server/src/main.rs`
+
+#### **매트릭스 정렬 안정화** 📊
+- **문제 해결**: 매트릭스 반환 순서가 매번 달라지는 문제 해결
+- **개선 내용**:
+  - 데이터 정렬: `ORDER BY created_at DESC` → `ORDER BY id ASC`
+  - 사용자 정렬: HashSet 대신 Vec에 저장하고 ID로 정렬
+- **파일 수정**:
+  - `pacs-server/src/infrastructure/repositories/project_data_repository_impl.rs`
+  - `pacs-server/src/application/use_cases/project_data_access_use_case.rs`
+
 ### Added - 2025-01-27
 
 #### **Project Data Access Management API 문서화** 📚

@@ -265,24 +265,22 @@ pub async fn get_user_access_list(
 
 /// 라우트 설정
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataAccessUseCase>) {
-    let use_case = web::Data::new(use_case);
-    cfg.service(
-        web::scope("/projects/{project_id}")
-            .app_data(use_case.clone())
-            .route("/data-access/matrix", web::get().to(get_project_data_access_matrix))
-            .route("/data", web::post().to(create_project_data))
-            .route("/data/{data_id}/access/{user_id}", web::put().to(update_data_access))
-            .route("/data/{data_id}/access/batch", web::put().to(batch_update_data_access))
-            .route("/data/{data_id}/access/request", web::post().to(request_data_access))
-    )
-    .service(
-        web::scope("/data-access")
-            .app_data(use_case.clone())
-            .route("/status/{status}", web::get().to(get_access_by_status))
-    )
-    .service(
-        web::scope("/users/{user_id}")
-            .app_data(use_case)
-            .route("/data-access", web::get().to(get_user_access_list))
-    );
+    cfg.app_data(web::Data::new(use_case))
+        .service(
+            // 별도 scope 사용하여 경로 충돌 방지
+            web::scope("/project-data")
+                .route("/{project_id}/data-access/matrix", web::get().to(get_project_data_access_matrix))
+                .route("/{project_id}/data", web::post().to(create_project_data))
+                .route("/{project_id}/data/{data_id}/access/{user_id}", web::put().to(update_data_access))
+                .route("/{project_id}/data/{data_id}/access/batch", web::put().to(batch_update_data_access))
+                .route("/{project_id}/data/{data_id}/access/request", web::post().to(request_data_access))
+        )
+        .service(
+            web::scope("/data-access")
+                .route("/status/{status}", web::get().to(get_access_by_status))
+        )
+        .service(
+            web::scope("/users/{user_id}")
+                .route("/data-access", web::get().to(get_user_access_list))
+        );
 }

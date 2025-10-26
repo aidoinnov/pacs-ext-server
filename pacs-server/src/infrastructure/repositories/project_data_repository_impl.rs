@@ -57,7 +57,7 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
             "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at
              FROM project_data 
              WHERE project_id = $1
-             ORDER BY created_at DESC
+             ORDER BY id ASC
              LIMIT $2 OFFSET $3"
         )
         .bind(project_id)
@@ -113,7 +113,7 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
              FROM project_data 
              WHERE project_id = $1 
              AND (study_uid ILIKE $2 OR patient_id ILIKE $2 OR patient_name ILIKE $2)
-             ORDER BY created_at DESC
+             ORDER BY id ASC
              LIMIT $3 OFFSET $4"
         )
         .bind(project_id)

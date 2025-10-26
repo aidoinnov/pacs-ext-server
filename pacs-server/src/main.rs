@@ -323,6 +323,7 @@ async fn main() -> std::io::Result<()> {
     let project_user_use_case = Arc::new(ProjectUserUseCase::new(
         Arc::new(project_service.clone()),
         Arc::new(user_service.clone()),
+        project_data_service.clone(),
     ));
     let project_user_matrix_use_case = Arc::new(ProjectUserMatrixUseCase::new(
         Arc::new(project_service.clone()),
@@ -432,12 +433,13 @@ async fn main() -> std::io::Result<()> {
                         )
                     })
                     // ========================================
-                    // 📊 프로젝트-사용자 매트릭스 API (먼저 등록)
+                    // 📊 프로젝트-사용자 매트릭스 API (병합됨)
                     // ========================================
                     .configure(|cfg| {
                         project_user_controller::configure_routes(
                             cfg,
                             project_user_use_case.clone(),
+                            project_data_access_use_case.clone(),
                         )
                     })
                     // ========================================
@@ -482,15 +484,6 @@ async fn main() -> std::io::Result<()> {
                         user_project_matrix_controller::configure_routes(
                             cfg,
                             user_project_matrix_use_case.clone(),
-                        )
-                    })
-                    // ========================================
-                    // 📁 데이터 접근 관리 API
-                    // ========================================
-                    .configure(|cfg| {
-                        project_data_access_controller::configure_routes(
-                            cfg,
-                            project_data_access_use_case.clone(),
                         )
                     })
                     // ========================================

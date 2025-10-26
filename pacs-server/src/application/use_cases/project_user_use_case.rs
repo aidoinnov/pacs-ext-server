@@ -1,30 +1,34 @@
 use std::sync::Arc;
 use crate::domain::ServiceError;
-use crate::domain::services::{ProjectService, UserService};
+use crate::domain::services::{ProjectService, UserService, ProjectDataService};
 use crate::application::dto::project_user_dto::{
     ProjectMembersResponse, UserProjectsResponse, RoleAssignmentResponse, BatchRoleAssignmentResponse, FailedAssignment,
     AddMemberRequest, AddMemberResponse, RemoveMemberResponse, MembershipResponse
 };
 
 /// 프로젝트-사용자 역할 관리 Use Case
-pub struct ProjectUserUseCase<P, U>
+pub struct ProjectUserUseCase<P, U, D>
 where
     P: ProjectService,
     U: UserService,
+    D: ProjectDataService,
 {
     project_service: Arc<P>,
     user_service: Arc<U>,
+    project_data_service: Arc<D>,
 }
 
-impl<P, U> ProjectUserUseCase<P, U>
+impl<P, U, D> ProjectUserUseCase<P, U, D>
 where
     P: ProjectService,
     U: UserService,
+    D: ProjectDataService,
 {
-    pub fn new(project_service: Arc<P>, user_service: Arc<U>) -> Self {
+    pub fn new(project_service: Arc<P>, user_service: Arc<U>, project_data_service: Arc<D>) -> Self {
         Self {
             project_service,
             user_service,
+            project_data_service,
         }
     }
 
@@ -165,6 +169,16 @@ where
         self.user_service
             .add_user_to_project_with_role(request.user_id, project_id, request.role_id)
             .await?;
+
+        // ✅ 프로젝트의 모든 데이터에 대한 기본 접근 권한 자동 부여
+        let _ = self.project_data_service
+            .grant_default_access_to_user(project_id, request.user_id)
+            .await
+            .map_err(|e| {
+                // 로깅만 하고 계속 진행 (access 권한은 옵셔널)
+                eprintln!("Warning: Failed to grant default access to user: {}", e);
+                e
+            });
 
         // 추가된 멤버의 역할 정보 조회
         let membership = self.user_service

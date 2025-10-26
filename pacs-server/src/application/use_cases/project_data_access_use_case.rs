@@ -54,15 +54,21 @@ impl ProjectDataAccessUseCase {
             })
             .collect();
 
-        // Get users from access list
-        let user_ids: std::collections::HashSet<i32> = access_list
+        // Get users from access list (preserve order by using Vec instead of HashSet)
+        let user_ids: Vec<i32> = access_list
             .iter()
             .map(|access| access.user_id)
+            .collect::<std::collections::HashSet<i32>>()
+            .into_iter()
             .collect();
+        
+        // Sort user_ids by ID for consistent ordering
+        let mut sorted_user_ids = user_ids;
+        sorted_user_ids.sort();
 
         // TODO: Get user information from UserService
         // For now, create mock user info
-        let users: Vec<UserInfo> = user_ids
+        let users: Vec<UserInfo> = sorted_user_ids
             .into_iter()
             .map(|id| UserInfo {
                 id,

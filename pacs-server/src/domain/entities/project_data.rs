@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// 리소스 레벨 (STUDY, SERIES, INSTANCE)
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, Default)]
 #[sqlx(type_name = "resource_level_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ResourceLevel {
+    #[default]
     Study,
     Series,
     Instance,
@@ -53,11 +54,17 @@ pub struct ProjectDataSeries {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ProjectDataAccess {
     pub id: i32,
+    #[sqlx(default)]
     pub project_id: i32,
-    pub user_id: i32,
+    #[sqlx(default)]
     pub resource_level: ResourceLevel,
-    pub study_id: i32,
+    #[sqlx(default)]
+    pub study_id: Option<i32>, // NULL 허용 (기존 데이터 호환성)
+    #[sqlx(default)]
     pub series_id: Option<i32>,
+    #[sqlx(default)]
+    pub project_data_id: i32, // 임시 필드: 기존 테이블 호환성 유지
+    pub user_id: i32,
     pub status: DataAccessStatus,
     pub requested_at: Option<DateTime<Utc>>,
     pub requested_by: Option<i32>,
@@ -66,8 +73,6 @@ pub struct ProjectDataAccess {
     pub review_note: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    #[sqlx(default)]
-    pub project_data_id: i32, // 임시 필드: 기존 테이블 호환성 유지
 }
 
 // 기존 ProjectData는 하위 호환성을 위해 유지

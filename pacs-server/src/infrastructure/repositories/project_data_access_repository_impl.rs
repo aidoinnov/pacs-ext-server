@@ -193,42 +193,35 @@ impl ProjectDataAccessRepository for ProjectDataAccessRepositoryImpl {
 
     async fn update(&self, id: i32, update_access: &UpdateProjectDataAccess) -> Result<Option<ProjectDataAccess>, sqlx::Error> {
         let mut query = String::from("UPDATE project_data_access SET ");
-        let mut params: Vec<Box<dyn sqlx::Encode<'_, sqlx::Postgres> + Send + Sync>> = Vec::new();
         let mut param_count = 1;
 
         if let Some(status) = &update_access.status {
-            query.push_str(&format!("status = ${}, ", param_count));
-            params.push(Box::new(status.clone()));
+            query.push_str(&format!("status = ${}::data_access_status_enum, ", param_count));
             param_count += 1;
         }
 
         if let Some(requested_at) = &update_access.requested_at {
             query.push_str(&format!("requested_at = ${}, ", param_count));
-            params.push(Box::new(requested_at.clone()));
             param_count += 1;
         }
 
         if let Some(requested_by) = &update_access.requested_by {
             query.push_str(&format!("requested_by = ${}, ", param_count));
-            params.push(Box::new(requested_by.clone()));
             param_count += 1;
         }
 
         if let Some(reviewed_at) = &update_access.reviewed_at {
             query.push_str(&format!("reviewed_at = ${}, ", param_count));
-            params.push(Box::new(reviewed_at.clone()));
             param_count += 1;
         }
 
         if let Some(reviewed_by) = &update_access.reviewed_by {
             query.push_str(&format!("reviewed_by = ${}, ", param_count));
-            params.push(Box::new(reviewed_by.clone()));
             param_count += 1;
         }
 
         if let Some(review_note) = &update_access.review_note {
             query.push_str(&format!("review_note = ${}, ", param_count));
-            params.push(Box::new(review_note.clone()));
             param_count += 1;
         }
 
@@ -241,14 +234,44 @@ impl ProjectDataAccessRepository for ProjectDataAccessRepositoryImpl {
         query.pop();
         query.pop();
 
-        query.push_str(&format!(" WHERE id = ${} RETURNING id, project_data_id, user_id, status, requested_at, requested_by, reviewed_at, reviewed_by, review_note, created_at, updated_at", param_count));
-        params.push(Box::new(id));
+        query.push_str(" WHERE id = $");
+        query.push_str(&(param_count as i32 + 1).to_string());
+        query.push_str(" RETURNING id, project_id, user_id, resource_level, study_id, series_id, status, requested_at, requested_by, reviewed_at, reviewed_by, review_note, created_at, updated_at, project_data_id");
+        
+        // Build the bind parameters in the correct order
+        let mut bind_query = sqlx::query_as::<_, ProjectDataAccess>(&query);
+        
+        // Bind status if present
+        if let Some(status) = &update_access.status {
+            bind_query = bind_query.bind(status);
+        }
+        
+        // Bind other fields if present
+        if let Some(requested_at) = &update_access.requested_at {
+            bind_query = bind_query.bind(requested_at);
+        }
+        
+        if let Some(requested_by) = &update_access.requested_by {
+            bind_query = bind_query.bind(requested_by);
+        }
+        
+        if let Some(reviewed_at) = &update_access.reviewed_at {
+            bind_query = bind_query.bind(reviewed_at);
+        }
+        
+        if let Some(reviewed_by) = &update_access.reviewed_by {
+            bind_query = bind_query.bind(reviewed_by);
+        }
+        
+        if let Some(review_note) = &update_access.review_note {
+            bind_query = bind_query.bind(review_note);
+        }
+        
+        // Bind WHERE clause parameter (id)
+        bind_query = bind_query.bind(id);
 
         // Execute the query
-          let result = sqlx::query_as::<_, ProjectDataAccess>(&query)
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await?;
+        let result = bind_query.fetch_optional(&self.pool).await?;
 
         Ok(result)
     }
@@ -259,67 +282,32 @@ impl ProjectDataAccessRepository for ProjectDataAccessRepositoryImpl {
         user_id: i32,
         update_access: &UpdateProjectDataAccess
     ) -> Result<Option<ProjectDataAccess>, sqlx::Error> {
-        let mut query = String::from("UPDATE project_data_access SET ");
-        let mut params: Vec<Box<dyn sqlx::Encode<'_, sqlx::Postgres> + Send + Sync>> = Vec::new();
-        let mut param_count = 1;
-
+        // Simple approach: update only status field
         if let Some(status) = &update_access.status {
-            query.push_str(&format!("status = ${}, ", param_count));
-            params.push(Box::new(status.clone()));
-            param_count += 1;
-        }
-
-        if let Some(requested_at) = &update_access.requested_at {
-            query.push_str(&format!("requested_at = ${}, ", param_count));
-            params.push(Box::new(requested_at.clone()));
-            param_count += 1;
-        }
-
-        if let Some(requested_by) = &update_access.requested_by {
-            query.push_str(&format!("requested_by = ${}, ", param_count));
-            params.push(Box::new(requested_by.clone()));
-            param_count += 1;
-        }
-
-        if let Some(reviewed_at) = &update_access.reviewed_at {
-            query.push_str(&format!("reviewed_at = ${}, ", param_count));
-            params.push(Box::new(reviewed_at.clone()));
-            param_count += 1;
-        }
-
-        if let Some(reviewed_by) = &update_access.reviewed_by {
-            query.push_str(&format!("reviewed_by = ${}, ", param_count));
-            params.push(Box::new(reviewed_by.clone()));
-            param_count += 1;
-        }
-
-        if let Some(review_note) = &update_access.review_note {
-            query.push_str(&format!("review_note = ${}, ", param_count));
-            params.push(Box::new(review_note.clone()));
-            param_count += 1;
-        }
-
-        if param_count == 1 {
-            // No fields to update
-            return self.find_by_project_data_and_user(project_data_id, user_id).await;
-        }
-
-        // Remove trailing comma and space
-        query.pop();
-        query.pop();
-
-        query.push_str(&format!(" WHERE project_data_id = ${} AND user_id = ${} RETURNING id, project_data_id, user_id, status, requested_at, requested_by, reviewed_at, reviewed_by, review_note, created_at, updated_at", param_count, param_count + 1));
-        params.push(Box::new(project_data_id));
-        params.push(Box::new(user_id));
-
-        // Execute the query
-          let result = sqlx::query_as::<_, ProjectDataAccess>(&query)
+            let result = sqlx::query_as::<_, ProjectDataAccess>(
+                "UPDATE project_data_access 
+                 SET status = $1::data_access_status_enum,
+                     reviewed_at = COALESCE($2, reviewed_at),
+                     reviewed_by = COALESCE($3, reviewed_by),
+                     review_note = COALESCE($4, review_note),
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE project_data_id = $5 AND user_id = $6
+                 RETURNING id, 0 as project_id, user_id, resource_level, study_id, series_id, status, requested_at, requested_by, reviewed_at, reviewed_by, review_note, created_at, updated_at, project_data_id"
+            )
+            .bind(status)
+            .bind(&update_access.reviewed_at)
+            .bind(&update_access.reviewed_by)
+            .bind(&update_access.review_note)
             .bind(project_data_id)
             .bind(user_id)
             .fetch_optional(&self.pool)
             .await?;
 
-        Ok(result)
+            Ok(result)
+        } else {
+            // No status update, just return current record
+            self.find_by_project_data_and_user(project_data_id, user_id).await
+        }
     }
 
     async fn create_batch(&self, access_list: &[NewProjectDataAccess]) -> Result<Vec<ProjectDataAccess>, sqlx::Error> {
