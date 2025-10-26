@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed - 2025-01-26
+
+#### **User Projects API 라우팅 충돌 문제 해결** 🔧
+- **문제 해결**: `/api/users/{user_id}/projects` API의 404 에러 완전 해결
+- **원인**: `user_controller`와 `project_user_controller`의 `/users` 스코프 충돌
+- **해결 방법**:
+  - `project_user_controller.rs`에서 `/users` 스코프 제거하고 직접 라우트 등록
+  - `main.rs`에서 컨트롤러 등록 순서 최적화
+  - `user_repository_impl.rs`의 모든 `find_*` 함수에서 User 엔티티의 모든 필드 SELECT
+- **결과**:
+  - 404 Not Found → 200 OK
+  - 사용자별 프로젝트 목록 조회 기능 정상화
+  - 페이지네이션 기능 정상 작동 (page, page_size, total_count, total_pages)
+  - 기존 API 기능에 영향 없음
+- **기술적 개선사항**:
+  - 라우팅 충돌 근본적 해결
+  - SQL 쿼리 완전성 향상 (모든 User 필드 조회)
+  - 코드 품질 및 유지보수성 개선
+- **관련 파일**:
+  - `src/presentation/controllers/project_user_controller.rs`
+  - `src/main.rs`
+  - `src/infrastructure/repositories/user_repository_impl.rs`
+  - 작업 문서: `work/routing_conflict_fix/`
+  - 이슈 문서: `docs/issues/routing-conflict-user-projects-api.md`
+
 ### Fixed - 2025-01-23
 
 #### **Project User Matrix API account_status 에러 수정** 🔧

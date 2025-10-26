@@ -219,8 +219,5 @@ pub fn configure_routes<P, U>(
                 .route("/{project_id}/users/{user_id}/role", web::delete().to(remove_user_role::<P, U>))
                 .route("/{project_id}/users/roles", web::post().to(batch_assign_roles::<P, U>))
         )
-        .service(
-            web::scope("/users")
-                .route("/{user_id}/projects", web::get().to(get_user_projects::<P, U>))
-        );
+        .route("/users/{user_id}/projects", web::get().to(get_user_projects::<P, U>));
 }

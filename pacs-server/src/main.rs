@@ -426,6 +426,15 @@ async fn main() -> std::io::Result<()> {
                         )
                     })
                     // ========================================
+                    // 📊 프로젝트-사용자 매트릭스 API (먼저 등록)
+                    // ========================================
+                    .configure(|cfg| {
+                        project_user_controller::configure_routes(
+                            cfg,
+                            project_user_use_case.clone(),
+                        )
+                    })
+                    // ========================================
                     // 👥 사용자 관리 API
                     // ========================================
                     .configure(|cfg| user_controller::configure_routes(cfg, user_use_case.clone()))
@@ -455,15 +464,6 @@ async fn main() -> std::io::Result<()> {
                         access_control_controller::configure_routes(
                             cfg,
                             access_control_use_case.clone(),
-                        )
-                    })
-                    // ========================================
-                    // 📊 프로젝트-사용자 매트릭스 API
-                    // ========================================
-                    .configure(|cfg| {
-                        project_user_controller::configure_routes(
-                            cfg,
-                            project_user_use_case.clone(),
                         )
                     })
                     .configure(|cfg| {

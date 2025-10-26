@@ -19,7 +19,10 @@ impl UserRepositoryImpl {
 impl UserRepository for UserRepositoryImpl {
     async fn find_by_id(&self, id: i32) -> Result<Option<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
-            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, created_at, updated_at
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, 
+                    created_at, updated_at, account_status, email_verified,
+                    email_verification_token, email_verification_expires_at,
+                    approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
              WHERE id = $1"
         )
@@ -30,7 +33,10 @@ impl UserRepository for UserRepositoryImpl {
 
     async fn find_by_keycloak_id(&self, keycloak_id: Uuid) -> Result<Option<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
-            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, created_at, updated_at
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, 
+                    created_at, updated_at, account_status, email_verified,
+                    email_verification_token, email_verification_expires_at,
+                    approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
              WHERE keycloak_id = $1"
         )
@@ -41,7 +47,10 @@ impl UserRepository for UserRepositoryImpl {
 
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
-            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, created_at, updated_at
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, 
+                    created_at, updated_at, account_status, email_verified,
+                    email_verification_token, email_verification_expires_at,
+                    approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
              WHERE username = $1"
         )
@@ -52,7 +61,10 @@ impl UserRepository for UserRepositoryImpl {
 
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
-            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, created_at, updated_at
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, 
+                    created_at, updated_at, account_status, email_verified,
+                    email_verification_token, email_verification_expires_at,
+                    approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
              WHERE email = $1"
         )
@@ -63,7 +75,10 @@ impl UserRepository for UserRepositoryImpl {
 
     async fn find_all(&self) -> Result<Vec<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
-            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, created_at, updated_at
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, 
+                    created_at, updated_at, account_status, email_verified,
+                    email_verification_token, email_verification_expires_at,
+                    approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
              ORDER BY created_at DESC"
         )
