@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::domain::services::ProjectDataService;
 use crate::domain::ServiceError;
 use crate::application::dto::project_data_access_dto::*;
-use crate::domain::entities::project_data::{NewProjectData, UpdateProjectData, UpdateProjectDataAccess, DataAccessStatus};
+use crate::domain::entities::project_data::{NewProjectData, UpdateProjectData, UpdateProjectDataAccess, DataAccessStatus, ProjectDataStudy, ProjectDataSeries};
 
 pub struct ProjectDataAccessUseCase {
     project_data_service: Arc<dyn ProjectDataService>,
@@ -273,5 +273,47 @@ impl ProjectDataAccessUseCase {
             .collect();
 
         Ok(access_matrix)
+    }
+    
+    // ========== 새로운 계층 구조 메서드 ==========
+    
+    /// Study 조회 (by ID)
+    pub async fn get_study(&self, study_id: i32) -> Result<ProjectDataStudy, ServiceError> {
+        self.project_data_service
+            .get_study_by_id(study_id)
+            .await
+    }
+    
+    /// Study 조회 (by project_id and study_uid)
+    pub async fn get_study_by_uid(&self, project_id: i32, study_uid: String) -> Result<ProjectDataStudy, ServiceError> {
+        self.project_data_service
+            .get_study_by_uid(project_id, &study_uid)
+            .await
+    }
+    
+    /// 프로젝트별 Study 목록 조회 (페이지네이션)
+    pub async fn get_studies(
+        &self,
+        project_id: i32,
+        page: i32,
+        page_size: i32,
+    ) -> Result<(Vec<ProjectDataStudy>, i64), ServiceError> {
+        self.project_data_service
+            .get_studies_by_project(project_id, page, page_size)
+            .await
+    }
+    
+    /// Series 조회 (by ID)
+    pub async fn get_series(&self, series_id: i32) -> Result<ProjectDataSeries, ServiceError> {
+        self.project_data_service
+            .get_series_by_id(series_id)
+            .await
+    }
+    
+    /// Study별 Series 목록 조회
+    pub async fn get_series_by_study(&self, study_id: i32) -> Result<Vec<ProjectDataSeries>, ServiceError> {
+        self.project_data_service
+            .get_series_by_study(study_id)
+            .await
     }
 }
