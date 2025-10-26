@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-01-27
+
+#### **Project Data Access Management API 문서화** 📚
+- **새로운 API 문서**: `docs/api/project-data-access-matrix-api.md`
+- **문서 내용**:
+  - DICOM 계층 구조 (Study → Series → Instance) 설명
+  - 접근 권한 레벨 (STUDY, SERIES, INSTANCE) 정의
+  - 접근 상태 (APPROVED, DENIED, PENDING) 정의
+  - 7개 API 엔드포인트 상세 설명
+  - 요청/응답 예시 제공
+  - UI 구현 가이드 (표 구조, 필터링, 페이지네이션, 일괄 작업)
+  - 향후 계획 및 개선 사항
+
+#### **Database Schema 개선** 🗄️
+- **새로운 테이블**: `project_data_study`, `project_data_series`
+- **테이블 수정**: `project_data_access`에 계층 구조 컬럼 추가
+  - `resource_level` (resource_level_enum)
+  - `study_id`, `series_id` (계층 구조 지원)
+  - `project_id` (프로젝트 레벨 관리)
+- **인덱스 최적화**: Study, Series, Access 테이블에 성능 최적화 인덱스 추가
+- **마이그레이션 파일**: `pacs-server/migrations/016_create_project_data_tables.sql`
+
+#### **Domain Entity 개선** 🏗️
+- **새로운 엔티티**: `ProjectDataStudy`, `ProjectDataSeries`
+- **새로운 Enum**: `ResourceLevel` (Study, Series, Instance)
+- **확장된 접근 권한**: `ProjectDataAccess`에 `resource_level`, `study_id`, `series_id` 추가
+- **하위 호환성**: 기존 `ProjectData` 구조 유지
+
+### Changed - 2025-01-27
+
+#### **Project Data Access API 재설계**
+- **변경 사항**: 기존 Study 레벨만 지원하던 구조에서 계층적 접근 제어로 확장
+- **향후 계획**:
+  - Study-Series-Modality 평탄화된 개별 행 표시
+  - 사용자 컬럼 페이지네이션 지원
+  - 양방향 페이지네이션 (데이터 행 + 사용자 열)
+  - 세밀한 접근 제어 (Study/Series/Modality 조합)
+
+## [Unreleased]
+
 ### Performance - 2025-01-26
 
 #### **User-Centered Matrix API 성능 추가 최적화** 🚀
