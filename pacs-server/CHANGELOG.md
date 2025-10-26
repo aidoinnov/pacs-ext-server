@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🏗️ Planned
+
+#### **Project Data Access Management API - 계층 구조 지원**
+- **Database Schema Enhancement**: DICOM 계층 구조 지원
+  - `project_data_study` 테이블: Study 레벨 데이터
+  - `project_data_series` 테이블: Series 레벨 데이터 (Study와 연계)
+  - `project_data_access` 테이블: 계층적 접근 권한 관리
+    - `resource_level` 컬럼: STUDY/SERIES 레벨 구분
+    - `study_id`, `series_id` 컬럼: 계층 관계 표현
+  - 단계별 접근 권한 (Study 권한 → Series 권한 → Modality별 권한)
+- **Enhanced DTOs**: 행 중심 매트릭스 구조
+  - `DataAccessMatrixRow`: 데이터별 접근 상태 행
+  - `UserAccessCell`: 사용자별 접근 셀
+  - `HierarchicalDataAccessMatrixResponse`: 계층 구조 응답
+- **Comprehensive API Documentation**: `docs/api/project-data-access-matrix-api.md`
+  - API 엔드포인트 상세 설명
+  - 요청/응답 예시
+  - UI 구현 가이드
+- **Migration Files**: `016_create_project_data_tables.sql` 생성 및 실행 완료
+
 ## [1.0.0-beta.10] - 2025-01-15
 
 ### ✨ Added

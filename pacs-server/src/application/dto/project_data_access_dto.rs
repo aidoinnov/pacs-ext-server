@@ -177,6 +177,55 @@ pub struct ProjectDataListResponse {
     pub pagination: PaginationInfo,
 }
 
+// ========== 새로운 계층 구조 DTO (향후 구현) ==========
+
+/// 사용자 접근 셀
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct UserAccessCell {
+    /// 사용자 ID
+    pub user_id: i32,
+    /// 사용자명
+    pub username: String,
+    /// 접근 상태
+    pub status: String, // "APPROVED", "DENIED", "PENDING"
+}
+
+/// 데이터 접근 매트릭스 행
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DataAccessMatrixRow {
+    /// 데이터 ID (Study ID 또는 Series ID)
+    pub data_id: String,
+    /// 리소스 레벨
+    pub resource_level: String, // "STUDY", "SERIES"
+    /// Study UID
+    pub study_uid: String,
+    /// Series UID (Series 레벨인 경우에만)
+    pub series_uid: Option<String>,
+    /// Modality (Series 레벨)
+    pub modality: Option<String>,
+    /// 환자 ID
+    pub patient_id: Option<String>,
+    /// 환자 이름
+    pub patient_name: Option<String>,
+    /// Study 날짜
+    pub study_date: Option<String>,
+    /// 사용자별 접근 상태
+    pub user_access: Vec<UserAccessCell>,
+}
+
+/// 데이터 접근 매트릭스 응답 (새 구조)
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct HierarchicalDataAccessMatrixResponse {
+    /// 행 목록 (데이터별 사용자 접근 상태)
+    pub rows: Vec<DataAccessMatrixRow>,
+    /// 사용자 목록 (열 헤더용)
+    pub users: Vec<UserInfo>,
+    /// 데이터 페이지네이션 정보
+    pub data_pagination: PaginationInfo,
+    /// 사용자 페이지네이션 정보
+    pub user_pagination: PaginationInfo,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
