@@ -343,9 +343,13 @@ where
 
         // 사용자 조회 쿼리
         let users = sqlx::query_as::<_, User>(
-            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, created_at, updated_at
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, 
+                    created_at, updated_at, account_status, email_verified, 
+                    email_verification_token, email_verification_expires_at, 
+                    approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
              WHERE ($1::int[] IS NULL OR id = ANY($1))
+               AND account_status != 'DELETED'
              ORDER BY username
              LIMIT $2 OFFSET $3"
         )
@@ -359,7 +363,8 @@ where
         let total_count = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*)
              FROM security_user
-             WHERE ($1::int[] IS NULL OR id = ANY($1))"
+             WHERE ($1::int[] IS NULL OR id = ANY($1))
+               AND account_status != 'DELETED'"
         )
         .bind(&user_ids)
         .fetch_one(self.user_repository.pool())

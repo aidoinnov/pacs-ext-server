@@ -6,6 +6,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed - 2025-01-23
+
+#### **Project User Matrix API account_status 에러 수정** 🔧
+- **문제 해결**: `Database error: no column found for name: account_status` 에러 완전 해결
+- **원인**: SQL 쿼리에서 `account_status` 컬럼을 SELECT 하지 않아 SQLx 매핑 에러 발생
+- **해결 방법**:
+  - `user_service.rs`의 `get_users_with_filter` 메서드 SQL 쿼리 수정
+  - User 엔티티의 모든 필드를 SELECT 절에 포함
+  - 삭제된 사용자 제외 조건 추가 (`account_status != 'DELETED'`)
+  - COUNT 쿼리에도 동일한 필터링 조건 적용
+- **결과**:
+  - 500 Internal Server Error → 200 OK
+  - 매트릭스 데이터 정상 출력 (10개 프로젝트 × 10명 사용자)
+  - 페이지네이션 정상 작동 (프로젝트 37개, 사용자 58명)
+  - 삭제된 사용자 자동 제외
+- **기술적 개선사항**:
+  - 데이터 무결성 향상 (모든 User 필드 조회)
+  - 비즈니스 로직 개선 (삭제된 사용자 제외)
+  - 쿼리 최적화 (불필요한 데이터 조회 방지)
+- **관련 파일**:
+  - `src/domain/services/user_service.rs`
+  - 작업 문서: `work/project_user_matrix_account_status_fix/`
+
+### Added - 2025-01-27
+
+#### **Role-Capability Matrix API 성능 최적화** 🚀
+- **성능 향상**: API 응답 시간을 1.2초에서 0.436초로 65% 단축
+- **N+1 쿼리 문제 해결**: 각 capability마다 별도 쿼리 실행 제거
+- **병렬 쿼리 실행**: `tokio::try_join!`을 사용한 4개 쿼리 동시 실행
+- **성능 모니터링**: 데이터베이스 쿼리 실행 시간 로깅 추가
+- **기술적 개선사항**:
+  - `role_capability_matrix_use_case.rs`: N+1 쿼리 제거, permission_count 고정
+  - `capability_repository_impl.rs`: 병렬 쿼리 실행 구현
+  - 쿼리 실행 시간: 평균 80ms, 최적 42-44ms
+- **관련 파일**:
+  - `src/application/use_cases/role_capability_matrix_use_case.rs`
+  - `src/infrastructure/repositories/capability_repository_impl.rs`
+  - 작업 문서: `work/performance_optimization/`
+
+#### **프로젝트별 사용자 Role 관리 API 문서화** 📚
+- **API 문서**: 프로젝트별 사용자 Role 관리 API 완전 문서화
+- **포함된 API**:
+  - `GET /api/projects/{project_id}/users` - 프로젝트 멤버 목록 조회 (페이지네이션)
+  - `GET /api/users/{user_id}/projects` - 사용자 프로젝트 목록 조회 (페이지네이션)
+  - `PUT /api/projects/{project_id}/users/{user_id}/role` - 사용자 역할 할당
+  - `POST /api/projects/{project_id}/users/roles` - 일괄 역할 할당
+  - `DELETE /api/projects/{project_id}/users/{user_id}/role` - 사용자 역할 제거
+  - `GET /api/roles/global` - 전역 역할 목록 조회
+  - `GET /api/roles/project` - 프로젝트 역할 목록 조회
+- **문서 특징**:
+  - 완전한 TypeScript 인터페이스 정의
+  - 상세한 요청/응답 예시
+  - JavaScript 사용 예시 코드
+  - 에러 처리 가이드
+- **관련 파일**:
+  - `docs/api/project-user-role-management-api.md`
+
 ### Added - 2025-10-25
 
 #### **Capability 테이블에 UI 레이블 필드 추가** ✨
