@@ -1,4 +1,4 @@
-use crate::domain::entities::project_data::{ProjectData, ProjectDataAccess, NewProjectData, UpdateProjectData, NewProjectDataAccess, UpdateProjectDataAccess, DataAccessStatus};
+use crate::domain::entities::project_data::{ProjectData, ProjectDataAccess, ProjectDataStudy, ProjectDataSeries, NewProjectData, UpdateProjectData, NewProjectDataAccess, UpdateProjectDataAccess, DataAccessStatus};
 use crate::domain::ServiceError;
 
 #[async_trait::async_trait]
@@ -99,4 +99,26 @@ pub trait ProjectDataService: Send + Sync {
     
     /// 프로젝트 데이터 접근 권한 삭제
     async fn delete_data_access(&self, project_data_id: i32, user_id: i32) -> Result<(), ServiceError>;
+    
+    // ========== 새로운 계층 구조 메서드 ==========
+    
+    /// Study 조회 (by ID)
+    async fn get_study_by_id(&self, id: i32) -> Result<ProjectDataStudy, ServiceError>;
+    
+    /// Study 조회 (by project_id and study_uid)
+    async fn get_study_by_uid(&self, project_id: i32, study_uid: &str) -> Result<ProjectDataStudy, ServiceError>;
+    
+    /// 프로젝트별 Study 목록 조회 (페이지네이션)
+    async fn get_studies_by_project(
+        &self,
+        project_id: i32,
+        page: i32,
+        page_size: i32
+    ) -> Result<(Vec<ProjectDataStudy>, i64), ServiceError>;
+    
+    /// Series 조회 (by ID)
+    async fn get_series_by_id(&self, id: i32) -> Result<ProjectDataSeries, ServiceError>;
+    
+    /// Study별 Series 목록 조회
+    async fn get_series_by_study(&self, study_id: i32) -> Result<Vec<ProjectDataSeries>, ServiceError>;
 }

@@ -1,4 +1,4 @@
-use crate::domain::entities::project_data::{ProjectData, ProjectDataAccess, NewProjectData, UpdateProjectData, NewProjectDataAccess, UpdateProjectDataAccess, DataAccessStatus};
+use crate::domain::entities::project_data::{ProjectData, ProjectDataAccess, ProjectDataStudy, ProjectDataSeries, NewProjectData, UpdateProjectData, NewProjectDataAccess, UpdateProjectDataAccess, DataAccessStatus};
 use crate::domain::repositories::{ProjectDataRepository, ProjectDataAccessRepository};
 use crate::domain::services::ProjectDataService;
 use crate::domain::ServiceError;
@@ -293,5 +293,57 @@ where
         }
 
         Ok(())
+    }
+    
+    // ========== 새로운 계층 구조 메서드 구현 ==========
+    
+    async fn get_study_by_id(&self, id: i32) -> Result<ProjectDataStudy, ServiceError> {
+        self.project_data_repository
+            .find_study_by_id(id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| ServiceError::NotFound("Study not found".to_string()))
+    }
+    
+    async fn get_study_by_uid(&self, project_id: i32, study_uid: &str) -> Result<ProjectDataStudy, ServiceError> {
+        self.project_data_repository
+            .find_study_by_uid(project_id, study_uid)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| ServiceError::NotFound("Study not found".to_string()))
+    }
+    
+    async fn get_studies_by_project(
+        &self,
+        project_id: i32,
+        page: i32,
+        page_size: i32
+    ) -> Result<(Vec<ProjectDataStudy>, i64), ServiceError> {
+        let studies = self.project_data_repository
+            .find_studies_by_project_id(project_id, page, page_size)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        
+        let total = self.project_data_repository
+            .count_studies_by_project_id(project_id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        
+        Ok((studies, total))
+    }
+    
+    async fn get_series_by_id(&self, id: i32) -> Result<ProjectDataSeries, ServiceError> {
+        self.project_data_repository
+            .find_series_by_id(id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| ServiceError::NotFound("Series not found".to_string()))
+    }
+    
+    async fn get_series_by_study(&self, study_id: i32) -> Result<Vec<ProjectDataSeries>, ServiceError> {
+        self.project_data_repository
+            .find_series_by_study_id(study_id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))
     }
 }
