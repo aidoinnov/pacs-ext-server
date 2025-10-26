@@ -2,10 +2,9 @@ use std::sync::Arc;
 use crate::domain::ServiceError;
 use crate::domain::services::{ProjectService, UserService};
 use crate::application::dto::project_user_dto::{
-    ProjectMembersResponse, UserProjectsResponse, AssignRoleRequest, BatchAssignRolesRequest,
-    RoleAssignmentResponse, BatchRoleAssignmentResponse, FailedAssignment
+    ProjectMembersResponse, UserProjectsResponse, RoleAssignmentResponse, BatchRoleAssignmentResponse, FailedAssignment,
+    AddMemberRequest, AddMemberResponse, RemoveMemberResponse, MembershipResponse
 };
-use crate::application::dto::permission_dto::PaginationQuery;
 
 /// 프로젝트-사용자 역할 관리 Use Case
 pub struct ProjectUserUseCase<P, U>
@@ -151,5 +150,84 @@ where
             project_id,
             role_id: 0, // NULL 역할
         })
+    }
+
+    /// 프로젝트에 멤버 추가
+    pub async fn add_member_to_project(
+        &self,
+        project_id: i32,
+        request: AddMemberRequest,
+    ) -> Result<AddMemberResponse, ServiceError> {
+        // 프로젝트 존재 확인
+        self.project_service.get_project(project_id).await?;
+
+        // 사용자를 프로젝트에 추가
+        self.user_service
+            .add_user_to_project_with_role(request.user_id, project_id, request.role_id)
+            .await?;
+
+        // 추가된 멤버의 역할 정보 조회
+        let membership = self.user_service
+            .get_project_membership(request.user_id, project_id)
+            .await?;
+
+        let (role_name, role_id) = match membership {
+            Some(m) => (
+                m.role_name.unwrap_or_else(|| "Unknown".to_string()),
+                m.role_id.unwrap_or(0)
+            ),
+            None => ("Unknown".to_string(), 0)
+        };
+
+        Ok(AddMemberResponse {
+            message: "Member added to project successfully".to_string(),
+            user_id: request.user_id,
+            project_id,
+            role_id,
+            role_name,
+        })
+    }
+
+    /// 프로젝트에서 멤버 제거
+    pub async fn remove_member_from_project(
+        &self,
+        project_id: i32,
+        user_id: i32,
+    ) -> Result<RemoveMemberResponse, ServiceError> {
+        // 프로젝트 존재 확인
+        self.project_service.get_project(project_id).await?;
+
+        // 사용자를 프로젝트에서 제거
+        self.user_service
+            .remove_user_from_project(user_id, project_id)
+            .await?;
+
+        Ok(RemoveMemberResponse {
+            message: "Member removed from project successfully".to_string(),
+            user_id,
+            project_id,
+        })
+    }
+
+    /// 프로젝트 멤버십 확인
+    pub async fn check_project_membership(
+        &self,
+        project_id: i32,
+        user_id: i32,
+    ) -> Result<MembershipResponse, ServiceError> {
+        // 프로젝트 존재 확인
+        self.project_service.get_project(project_id).await?;
+
+        // 멤버십 정보 조회
+        let membership = self.user_service
+            .get_project_membership(user_id, project_id)
+            .await?;
+
+        Ok(membership.unwrap_or(MembershipResponse {
+            is_member: false,
+            role_id: None,
+            role_name: None,
+            joined_at: None,
+        }))
     }
 }

@@ -5,7 +5,8 @@ use utoipa::OpenApi;
 
 use crate::application::use_cases::project_user_use_case::ProjectUserUseCase;
 use crate::application::dto::project_user_dto::{
-    AssignRoleRequest, BatchAssignRolesRequest, RoleAssignmentResponse, BatchRoleAssignmentResponse
+    AssignRoleRequest, BatchAssignRolesRequest, RoleAssignmentResponse, BatchRoleAssignmentResponse,
+    AddMemberRequest
 };
 use crate::application::dto::permission_dto::PaginationQuery;
 use crate::domain::services::{ProjectService, UserService};
@@ -203,6 +204,136 @@ where
     }
 }
 
+/// 프로젝트에 멤버 추가
+#[utoipa::path(
+    post,
+    path = "/api/projects/{project_id}/members",
+    params(
+        ("project_id" = i32, Path, description = "Project ID")
+    ),
+    request_body = AddMemberRequest,
+    responses(
+        (status = 200, description = "Member added successfully"),
+        (status = 400, description = "Bad request"),
+        (status = 404, description = "Project or user not found"),
+        (status = 409, description = "User is already a member"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "project-members"
+)]
+pub async fn add_project_member<P, U>(
+    path: web::Path<i32>,
+    request: web::Json<AddMemberRequest>,
+    use_case: web::Data<Arc<ProjectUserUseCase<P, U>>>,
+) -> impl Responder
+where
+    P: ProjectService,
+    U: UserService,
+{
+    let project_id = path.into_inner();
+    
+    match use_case
+        .add_member_to_project(project_id, request.into_inner())
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            let status = match e.to_string().as_str() {
+                s if s.contains("not found") => actix_web::http::StatusCode::NOT_FOUND,
+                s if s.contains("already") => actix_web::http::StatusCode::CONFLICT,
+                _ => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            HttpResponse::build(status).json(json!({
+                "error": format!("Failed to add member: {}", e)
+            }))
+        }
+    }
+}
+
+/// 프로젝트에서 멤버 제거
+#[utoipa::path(
+    delete,
+    path = "/api/projects/{project_id}/members/{user_id}",
+    params(
+        ("project_id" = i32, Path, description = "Project ID"),
+        ("user_id" = i32, Path, description = "User ID")
+    ),
+    responses(
+        (status = 200, description = "Member removed successfully"),
+        (status = 404, description = "Project or user not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "project-members"
+)]
+pub async fn remove_project_member<P, U>(
+    path: web::Path<(i32, i32)>,
+    use_case: web::Data<Arc<ProjectUserUseCase<P, U>>>,
+) -> impl Responder
+where
+    P: ProjectService,
+    U: UserService,
+{
+    let (project_id, user_id) = path.into_inner();
+    
+    match use_case
+        .remove_member_from_project(project_id, user_id)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            let status = match e.to_string().as_str() {
+                s if s.contains("not found") => actix_web::http::StatusCode::NOT_FOUND,
+                _ => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            HttpResponse::build(status).json(json!({
+                "error": format!("Failed to remove member: {}", e)
+            }))
+        }
+    }
+}
+
+/// 프로젝트 멤버십 확인
+#[utoipa::path(
+    get,
+    path = "/api/projects/{project_id}/members/{user_id}/membership",
+    params(
+        ("project_id" = i32, Path, description = "Project ID"),
+        ("user_id" = i32, Path, description = "User ID")
+    ),
+    responses(
+        (status = 200, description = "Membership status retrieved successfully"),
+        (status = 404, description = "Project not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "project-members"
+)]
+pub async fn check_project_membership<P, U>(
+    path: web::Path<(i32, i32)>,
+    use_case: web::Data<Arc<ProjectUserUseCase<P, U>>>,
+) -> impl Responder
+where
+    P: ProjectService,
+    U: UserService,
+{
+    let (project_id, user_id) = path.into_inner();
+    
+    match use_case
+        .check_project_membership(project_id, user_id)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            let status = match e.to_string().as_str() {
+                s if s.contains("not found") => actix_web::http::StatusCode::NOT_FOUND,
+                _ => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            HttpResponse::build(status).json(json!({
+                "error": format!("Failed to check membership: {}", e)
+            }))
+        }
+    }
+}
+
 /// 라우팅 설정
 pub fn configure_routes<P, U>(
     cfg: &mut web::ServiceConfig,
@@ -218,6 +349,9 @@ pub fn configure_routes<P, U>(
                 .route("/{project_id}/users/{user_id}/role", web::put().to(assign_user_role::<P, U>))
                 .route("/{project_id}/users/{user_id}/role", web::delete().to(remove_user_role::<P, U>))
                 .route("/{project_id}/users/roles", web::post().to(batch_assign_roles::<P, U>))
+                .route("/{project_id}/members", web::post().to(add_project_member::<P, U>))
+                .route("/{project_id}/members/{user_id}", web::delete().to(remove_project_member::<P, U>))
+                .route("/{project_id}/members/{user_id}/membership", web::get().to(check_project_membership::<P, U>))
         )
         .route("/users/{user_id}/projects", web::get().to(get_user_projects::<P, U>));
 }

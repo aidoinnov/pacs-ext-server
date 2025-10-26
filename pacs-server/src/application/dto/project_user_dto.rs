@@ -89,3 +89,37 @@ pub struct FailedAssignment {
     pub role_id: i32,
     pub error: String,
 }
+
+/// Request to add a member to a project
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AddMemberRequest {
+    pub user_id: i32,
+    pub role_id: Option<i32>, // Optional, defaults to Viewer role if not provided
+}
+
+/// Response for membership check
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MembershipResponse {
+    pub is_member: bool,
+    pub role_id: Option<i32>,
+    pub role_name: Option<String>,
+    pub joined_at: Option<String>,
+}
+
+/// Response for successful member addition
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AddMemberResponse {
+    pub message: String,
+    pub user_id: i32,
+    pub project_id: i32,
+    pub role_id: i32,
+    pub role_name: String,
+}
+
+/// Response for successful member removal
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RemoveMemberResponse {
+    pub message: String,
+    pub user_id: i32,
+    pub project_id: i32,
+}

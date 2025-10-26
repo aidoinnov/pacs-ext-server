@@ -50,6 +50,12 @@ pub trait UserService: Send + Sync {
     /// 사용자가 프로젝트 멤버인지 확인
     async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError>;
 
+    /// 사용자를 프로젝트에 역할과 함께 추가
+    async fn add_user_to_project_with_role(&self, user_id: i32, project_id: i32, role_id: Option<i32>) -> Result<(), ServiceError>;
+
+    /// 프로젝트 멤버십 정보 조회 (역할 정보 포함)
+    async fn get_project_membership(&self, user_id: i32, project_id: i32) -> Result<Option<crate::application::dto::project_user_dto::MembershipResponse>, ServiceError>;
+
     // === 사용자-프로젝트 역할 관리 ===
 
     /// 사용자의 프로젝트 목록 조회 (역할 정보 포함, 페이지네이션)
@@ -269,6 +275,99 @@ where
         .await?;
 
         Ok(result > 0)
+    }
+
+    async fn add_user_to_project_with_role(&self, user_id: i32, project_id: i32, role_id: Option<i32>) -> Result<(), ServiceError> {
+        // 사용자 존재 확인
+        if self.user_repository.find_by_id(user_id).await?.is_none() {
+            return Err(ServiceError::NotFound("User not found".into()));
+        }
+
+        // 프로젝트 존재 확인
+        if self.project_repository.find_by_id(project_id).await?.is_none() {
+            return Err(ServiceError::NotFound("Project not found".into()));
+        }
+
+        // 이미 멤버인지 확인
+        if self.is_project_member(user_id, project_id).await? {
+            return Err(ServiceError::AlreadyExists("User is already a member of this project".into()));
+        }
+
+        // 기본 역할 설정 (role_id가 None인 경우 Viewer 역할 사용)
+        let final_role_id = match role_id {
+            Some(id) => {
+                // 역할 존재 확인
+                let role_exists = sqlx::query_scalar::<_, bool>(
+                    "SELECT EXISTS(SELECT 1 FROM security_role WHERE id = $1)"
+                )
+                .bind(id)
+                .fetch_one(self.user_repository.pool())
+                .await?;
+
+                if !role_exists {
+                    return Err(ServiceError::NotFound("Role not found".into()));
+                }
+                id
+            },
+            None => {
+                // 기본 Viewer 역할 ID 조회
+                sqlx::query_scalar::<_, i32>(
+                    "SELECT id FROM security_role WHERE name = 'Viewer' AND scope = 'project' LIMIT 1"
+                )
+                .fetch_one(self.user_repository.pool())
+                .await
+                .map_err(|_| ServiceError::NotFound("Default Viewer role not found".into()))?
+            }
+        };
+
+        // 멤버 추가
+        let result = sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id, role_id)
+             VALUES ($1, $2, $3)
+             RETURNING user_id"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(final_role_id)
+        .fetch_optional(self.user_repository.pool())
+        .await?;
+
+        match result {
+            Some(_) => Ok(()),
+            None => Err(ServiceError::DatabaseError("Failed to add user to project".into()))
+        }
+    }
+
+    async fn get_project_membership(&self, user_id: i32, project_id: i32) -> Result<Option<crate::application::dto::project_user_dto::MembershipResponse>, ServiceError> {
+        let result = sqlx::query_as::<_, (i32, Option<i32>, Option<String>, chrono::DateTime<chrono::Utc>)>(
+            "SELECT up.user_id, up.role_id, r.name as role_name, up.created_at
+             FROM security_user_project up
+             LEFT JOIN security_role r ON up.role_id = r.id
+             WHERE up.user_id = $1 AND up.project_id = $2"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_optional(self.user_repository.pool())
+        .await?;
+
+        match result {
+            Some((_, role_id, role_name, joined_at)) => {
+                Ok(Some(crate::application::dto::project_user_dto::MembershipResponse {
+                    is_member: true,
+                    role_id,
+                    role_name,
+                    joined_at: Some(joined_at.to_rfc3339()),
+                }))
+            },
+            None => {
+                Ok(Some(crate::application::dto::project_user_dto::MembershipResponse {
+                    is_member: false,
+                    role_id: None,
+                    role_name: None,
+                    joined_at: None,
+                }))
+            }
+        }
     }
 
     // === 사용자-프로젝트 역할 관리 구현 ===
