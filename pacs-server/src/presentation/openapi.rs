@@ -138,7 +138,7 @@ use crate::application::dto::user_registration_dto::*;
             // Project Data Access DTOs
             ProjectDataInfo,
             DataAccessInfo,
-            PaginationInfo,
+            crate::application::dto::project_dto::PaginationInfo,
             ProjectDataAccessMatrixResponse,
             CreateProjectDataRequest,
             CreateProjectDataResponse,

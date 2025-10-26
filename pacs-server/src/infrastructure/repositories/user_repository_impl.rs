@@ -111,9 +111,10 @@ impl UserRepository for UserRepositoryImpl {
                  full_name = COALESCE($3, full_name),
                  organization = COALESCE($4, organization),
                  department = COALESCE($5, department),
-                 phone = COALESCE($6, phone)
+                 phone = COALESCE($6, phone),
+                 updated_at = CURRENT_TIMESTAMP
              WHERE id = $1
-             RETURNING id, keycloak_id, username, email, full_name, organization, department, phone, created_at, updated_at"
+             RETURNING id, keycloak_id, username, email, full_name, organization, department, phone, created_at, updated_at, account_status, email_verified, email_verification_token, email_verification_expires_at, approved_by, approved_at, suspended_at, suspended_reason, deleted_at"
         )
         .bind(update_user.id)
         .bind(&update_user.email)

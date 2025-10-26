@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::dto::user_dto::{CreateUserRequest, UpdateUserRequest, UserResponse};
+use crate::application::dto::user_dto::{CreateUserRequest, UpdateUserRequest, UserResponse, UserListQuery, UserListResponse, PaginationInfo};
 use crate::application::use_cases::user_use_case::UserUseCase;
 use crate::domain::services::user_service::UserService;
 
@@ -47,6 +47,40 @@ impl<U: UserService> UserController<U> {
             Ok(user) => HttpResponse::Ok().json(user),
             Err(e) => HttpResponse::NotFound().json(json!({
                 "error": format!("User not found: {}", e)
+            })),
+        }
+    }
+
+    pub async fn list_users(
+        user_use_case: web::Data<Arc<UserUseCase<U>>>,
+        query: web::Query<UserListQuery>,
+    ) -> impl Responder {
+        let page = query.page.unwrap_or(1);
+        let page_size = query.page_size.unwrap_or(20).min(100);
+        let sort_by = query.sort_by.as_deref().unwrap_or("username");
+        let sort_order = query.sort_order.as_deref().unwrap_or("asc");
+        let search = query.search.as_deref();
+
+        match user_use_case.list_users(page, page_size, sort_by, sort_order, search).await {
+            Ok((users, total)) => {
+                let total_pages = if total > 0 {
+                    ((total as f64) / (page_size as f64)).ceil() as i32
+                } else {
+                    0
+                };
+
+                HttpResponse::Ok().json(UserListResponse {
+                    users: users.into_iter().map(|u| u.into()).collect(),
+                    pagination: PaginationInfo {
+                        page,
+                        page_size,
+                        total: total as i32,
+                        total_pages,
+                    },
+                })
+            }
+            Err(e) => HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to list users: {}", e)
             })),
         }
     }
@@ -100,6 +134,7 @@ pub fn configure_routes<U: UserService + 'static>(
     cfg.app_data(web::Data::new(user_use_case))
         .service(
             web::scope("/users")
+                .route("", web::get().to(UserController::<U>::list_users))
                 .route("", web::post().to(UserController::<U>::create_user))
                 .route("/{user_id}", web::get().to(UserController::<U>::get_user))
                 .route("/{user_id}", web::put().to(update_user::<U>))

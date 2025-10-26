@@ -6,6 +6,105 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-01-27
+
+#### **User List API** 👥
+- **기능 추가**: 사용자 목록 조회 API에 페이지네이션, 정렬, 검색 기능 추가
+- **주요 변경사항**:
+  - `GET /api/users` 엔드포인트 추가
+  - 페이지네이션 기능 (page, page_size)
+  - 정렬 기능 (sort_by: username, email, created_at / sort_order: asc, desc)
+  - 검색 기능 (username, email)
+  - 총 항목 수 및 전체 페이지 수 제공
+  - 최대 페이지 크기 제한 (100)
+- **API 파라미터**:
+  - `page`: 페이지 번호 (기본값: 1)
+  - `page_size`: 페이지 크기 (기본값: 20, 최대: 100)
+  - `sort_by`: 정렬 기준 (username, email, created_at)
+  - `sort_order`: 정렬 순서 (asc, desc)
+  - `search`: 검색어 (username, email 검색)
+- **응답 형식**:
+  ```json
+  {
+    "users": [...],
+    "pagination": {
+      "page": 1,
+      "page_size": 20,
+      "total": 58,
+      "total_pages": 3
+    }
+  }
+  ```
+- **파일 수정**:
+  - `pacs-server/src/application/dto/user_dto.rs` - UserListQuery, PaginationInfo 추가
+  - `pacs-server/src/presentation/controllers/user_controller.rs` - list_users 엔드포인트 추가
+  - `pacs-server/src/application/use_cases/user_use_case.rs` - list_users 메서드 추가
+  - `docs/api/user-crud-api-complete.md` - 사용자 목록 API 문서 추가
+- **테스트**: 성공적으로 작동 확인 (58명 중 5명 조회)
+
+#### **Project Delete API** 🗑️
+- **기능 추가**: 프로젝트 삭제 API 엔드포인트 추가
+- **API**:
+  - DELETE `/api/projects/{project_id}` - 프로젝트 삭제
+  - 성공 시 204 No Content 반환
+  - 존재하지 않는 프로젝트 삭제 시 404 반환
+- **파일 수정**:
+  - `pacs-server/src/presentation/controllers/project_controller.rs`
+  - `docs/api/project-crud-api-complete.md`
+  - `CHANGELOG.md`
+
+#### **Project List Pagination and Filtering** 📄
+- **기능 추가**: 프로젝트 목록 API에 페이지네이션, 정렬, 필터링 기능 추가
+- **주요 변경사항**:
+  - `GET /api/projects`에 페이지네이션 파라미터 추가 (page, page_size)
+  - 정렬 기능 추가 (sort_by, sort_order)
+  - 필터링 기능 추가 (status, sponsor, 날짜 범위)
+  - `GET /api/projects/active`에도 페이지네이션 적용
+  - PaginationInfo DTO 추가 (total_pages 포함)
+- **API 파라미터**:
+  - `page`: 페이지 번호 (기본값: 1)
+  - `page_size`: 페이지 크기 (기본값: 20)
+  - `sort_by`: 정렬 기준 (created_at, name, start_date)
+  - `sort_order`: 정렬 순서 (asc, desc)
+  - `status`: 상태 필터
+  - `sponsor`: 스폰서 필터
+  - `start_date_from`, `start_date_to`: 시작일 범위
+  - `end_date_from`, `end_date_to`: 종료일 범위
+- **파일 수정**:
+  - `pacs-server/src/application/dto/project_dto.rs`
+  - `pacs-server/src/domain/repositories/project_repository.rs`
+  - `pacs-server/src/infrastructure/repositories/project_repository_impl.rs`
+  - `pacs-server/src/domain/services/project_service.rs`
+  - `pacs-server/src/application/use_cases/project_use_case.rs`
+  - `pacs-server/src/presentation/controllers/project_controller.rs`
+  - `pacs-server/src/presentation/openapi.rs`
+  - `docs/api/project-crud-api-complete.md`
+
+#### **Project Fields Extension** 🎯
+- **기능 추가**: 프로젝트 엔티티에 새로운 필드 추가 및 상태 관리 확장
+- **주요 변경사항**:
+  - 프로젝트에 sponsor, start_date, end_date, auto_complete 필드 추가
+  - ProjectStatus enum 확장 (PENDING_COMPLETION, OVER_PLANNING 추가)
+  - 프로젝트 생성/수정 API에 새 필드 지원
+  - 기존 PREPARING/IN_PROGRESS/ON_HOLD를 Planning/Active/Suspended로 변경
+- **데이터베이스**:
+  - `security_project` 테이블에 새 컬럼 추가
+  - start_date, end_date 인덱스 추가
+  - 기존 데이터 마이그레이션 (기본값 설정)
+- **API**:
+  - PUT `/api/projects/{project_id}` - 프로젝트 수정 엔드포인트 추가
+  - Create/Update API에 새 필드 포함
+- **파일 수정**:
+  - `pacs-server/migrations/014_extend_project_fields.sql` (신규)
+  - `pacs-server/src/domain/entities/project.rs`
+  - `pacs-server/src/domain/repositories/project_repository.rs`
+  - `pacs-server/src/infrastructure/repositories/project_repository_impl.rs`
+  - `pacs-server/src/application/dto/project_dto.rs`
+  - `pacs-server/src/application/use_cases/project_use_case.rs`
+  - `pacs-server/src/presentation/controllers/project_controller.rs`
+  - `docs/api/project-crud-api.md`
+  - `CHANGELOG.md`
+
 ### Fixed - 2025-01-27
 
 #### **Data Access Status Update API 수정** 🔧

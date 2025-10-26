@@ -5,6 +5,7 @@ use crate::application::dto::{
 use crate::application::dto::user_dto::UserProjectsResponse;
 use crate::domain::services::UserService;
 use crate::domain::ServiceError;
+use crate::domain::entities::User;
 
 /// 사용자 관리 유스케이스
 pub struct UserUseCase<U: UserService> {
@@ -44,6 +45,22 @@ impl<U: UserService> UserUseCase<U> {
     pub async fn get_user_by_username(&self, username: &str) -> Result<UserResponse, ServiceError> {
         let user = self.user_service.get_user_by_username(username).await?;
         Ok(UserResponse::from(user))
+    }
+
+    /// 사용자 목록 조회 (페이지네이션, 정렬, 검색 지원)
+    pub async fn list_users(
+        &self,
+        page: i32,
+        page_size: i32,
+        sort_by: &str,
+        sort_order: &str,
+        search: Option<&str>,
+    ) -> Result<(Vec<User>, i64), ServiceError> {
+        // 유저 서비스에 구현된 get_users_with_sorting 메서드 사용
+        let result = self.user_service
+            .get_users_with_sorting(page, page_size, sort_by, sort_order, search, None)
+            .await?;
+        Ok(result)
     }
 
     /// 사용자 정보 업데이트

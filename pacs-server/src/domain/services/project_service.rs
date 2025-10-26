@@ -1,17 +1,14 @@
-use crate::domain::entities::{NewProject, Project, ProjectStatus, Role, User};
+use crate::domain::entities::{NewProject, Project, ProjectStatus, Role, User, UpdateProject};
 use crate::domain::repositories::{ProjectRepository, RoleRepository, UserRepository};
 use crate::domain::ServiceError;
+use crate::application::dto::project_dto::ProjectListQuery;
 use async_trait::async_trait;
 
 /// 프로젝트 관리 도메인 서비스
 #[async_trait]
 pub trait ProjectService: Send + Sync {
     /// 프로젝트 생성
-    async fn create_project(
-        &self,
-        name: String,
-        description: Option<String>,
-    ) -> Result<Project, ServiceError>;
+    async fn create_project(&self, new_project: NewProject) -> Result<Project, ServiceError>;
 
     /// 프로젝트 조회
     async fn get_project(&self, id: i32) -> Result<Project, ServiceError>;
@@ -21,15 +18,54 @@ pub trait ProjectService: Send + Sync {
 
     /// 모든 프로젝트 조회
     async fn get_all_projects(&self) -> Result<Vec<Project>, ServiceError>;
+    
+    /// 페이지네이션된 프로젝트 조회
+    async fn get_projects_paginated(
+        &self,
+        page: i32,
+        page_size: i32,
+        sort_by: &str,
+        sort_order: &str,
+    ) -> Result<Vec<Project>, ServiceError>;
+    
+    /// 필터링된 프로젝트 조회
+    async fn get_projects_with_filter(
+        &self,
+        query: &ProjectListQuery,
+    ) -> Result<Vec<Project>, ServiceError>;
 
     /// 활성화된 프로젝트만 조회
     async fn get_active_projects(&self) -> Result<Vec<Project>, ServiceError>;
+    
+    /// 페이지네이션된 활성 프로젝트 조회
+    async fn get_active_projects_paginated(
+        &self,
+        page: i32,
+        page_size: i32,
+        sort_by: &str,
+        sort_order: &str,
+    ) -> Result<Vec<Project>, ServiceError>;
+    
+    /// 전체 프로젝트 개수 조회
+    async fn count_all_projects(&self) -> Result<i64, ServiceError>;
+    
+    /// 활성 프로젝트 개수 조회
+    async fn count_active_projects(&self) -> Result<i64, ServiceError>;
+    
+    /// 필터링된 프로젝트 개수 조회
+    async fn count_projects_with_filter(
+        &self,
+        query: &ProjectListQuery,
+    ) -> Result<i64, ServiceError>;
 
     /// 프로젝트 활성화
     async fn activate_project(&self, id: i32) -> Result<Project, ServiceError>;
 
     /// 프로젝트 비활성화
     async fn deactivate_project(&self, id: i32) -> Result<Project, ServiceError>;
+
+    /// 프로젝트 수정
+    async fn update_project(&self, id: i32, update: UpdateProject) -> Result<Project, ServiceError>;
 
     /// 프로젝트 삭제
     async fn delete_project(&self, id: i32) -> Result<(), ServiceError>;
@@ -147,32 +183,26 @@ where
     U: UserRepository,
     R: RoleRepository,
 {
-    async fn create_project(
-        &self,
-        name: String,
-        description: Option<String>,
-    ) -> Result<Project, ServiceError> {
+    async fn create_project(&self, new_project: NewProject) -> Result<Project, ServiceError> {
         // 프로젝트 이름 중복 체크
-        if let Some(_) = self.project_repository.find_by_name(&name).await? {
+        if let Some(_) = self.project_repository.find_by_name(&new_project.name).await? {
             return Err(ServiceError::AlreadyExists(
                 "Project name already exists".into(),
             ));
         }
 
         // 프로젝트 이름 검증
-        if name.trim().is_empty() {
+        if new_project.name.trim().is_empty() {
             return Err(ServiceError::ValidationError(
                 "Project name cannot be empty".into(),
             ));
         }
 
-        if name.len() > 255 {
+        if new_project.name.len() > 255 {
             return Err(ServiceError::ValidationError(
                 "Project name too long (max 255 characters)".into(),
             ));
         }
-
-        let new_project = NewProject { name, description };
 
         Ok(self.project_repository.create(new_project).await?)
     }
@@ -194,9 +224,51 @@ where
     async fn get_all_projects(&self) -> Result<Vec<Project>, ServiceError> {
         Ok(self.project_repository.find_all().await?)
     }
+    
+    async fn get_projects_paginated(
+        &self,
+        page: i32,
+        page_size: i32,
+        sort_by: &str,
+        sort_order: &str,
+    ) -> Result<Vec<Project>, ServiceError> {
+        Ok(self.project_repository.find_with_pagination(page, page_size, sort_by, sort_order).await?)
+    }
+    
+    async fn get_projects_with_filter(
+        &self,
+        query: &ProjectListQuery,
+    ) -> Result<Vec<Project>, ServiceError> {
+        Ok(self.project_repository.find_with_filter(query).await?)
+    }
 
     async fn get_active_projects(&self) -> Result<Vec<Project>, ServiceError> {
         Ok(self.project_repository.find_active().await?)
+    }
+    
+    async fn get_active_projects_paginated(
+        &self,
+        page: i32,
+        page_size: i32,
+        sort_by: &str,
+        sort_order: &str,
+    ) -> Result<Vec<Project>, ServiceError> {
+        Ok(self.project_repository.find_active_with_pagination(page, page_size, sort_by, sort_order).await?)
+    }
+    
+    async fn count_all_projects(&self) -> Result<i64, ServiceError> {
+        Ok(self.project_repository.count_all().await?)
+    }
+    
+    async fn count_active_projects(&self) -> Result<i64, ServiceError> {
+        Ok(self.project_repository.count_active().await?)
+    }
+    
+    async fn count_projects_with_filter(
+        &self,
+        query: &ProjectListQuery,
+    ) -> Result<i64, ServiceError> {
+        Ok(self.project_repository.count_with_filter(query).await?)
     }
 
     async fn activate_project(&self, id: i32) -> Result<Project, ServiceError> {
@@ -205,7 +277,7 @@ where
             "UPDATE security_project
              SET is_active = true
              WHERE id = $1
-             RETURNING id, name, description, is_active, created_at",
+             RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at",
         )
         .bind(id)
         .fetch_optional(self.project_repository.pool())
@@ -221,7 +293,7 @@ where
             "UPDATE security_project
              SET is_active = false
              WHERE id = $1
-             RETURNING id, name, description, is_active, created_at",
+             RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at",
         )
         .bind(id)
         .fetch_optional(self.project_repository.pool())
@@ -229,6 +301,13 @@ where
         .ok_or(ServiceError::NotFound("Project not found".into()))?;
 
         Ok(project)
+    }
+
+    async fn update_project(&self, id: i32, update: UpdateProject) -> Result<Project, ServiceError> {
+        self.project_repository
+            .update(id, &update)
+            .await?
+            .ok_or(ServiceError::NotFound("Project not found".into()))
     }
 
     async fn delete_project(&self, id: i32) -> Result<(), ServiceError> {
@@ -542,18 +621,20 @@ where
             statuses
                 .into_iter()
                 .map(|status| match status {
-                    ProjectStatus::Preparing => "PREPARING".to_string(),
-                    ProjectStatus::InProgress => "IN_PROGRESS".to_string(),
+                    ProjectStatus::Planning => "PLANNING".to_string(),
+                    ProjectStatus::Active => "ACTIVE".to_string(),
                     ProjectStatus::Completed => "COMPLETED".to_string(),
-                    ProjectStatus::OnHold => "ON_HOLD".to_string(),
+                    ProjectStatus::Suspended => "SUSPENDED".to_string(),
                     ProjectStatus::Cancelled => "CANCELLED".to_string(),
+                    ProjectStatus::PendingCompletion => "PENDING_COMPLETION".to_string(),
+                    ProjectStatus::OverPlanning => "OVER_PLANNING".to_string(),
                 })
                 .collect()
         });
 
         // 프로젝트 조회 쿼리
         let projects = sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at
              FROM security_project
              WHERE ($1::text[] IS NULL OR status::text = ANY($1))
                AND ($2::int[] IS NULL OR id = ANY($2))

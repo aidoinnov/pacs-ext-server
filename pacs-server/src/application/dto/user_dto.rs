@@ -86,11 +86,56 @@ impl From<crate::domain::entities::user::User> for UserResponse {
     }
 }
 
+/// 사용자 목록 쿼리 DTO
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UserListQuery {
+    /// 페이지 번호 (기본값: 1)
+    #[serde(default = "default_page")]
+    #[schema(example = 1)]
+    pub page: Option<i32>,
+    
+    /// 페이지 크기 (기본값: 20, 최대: 100)
+    #[serde(default = "default_page_size")]
+    #[schema(example = 20)]
+    pub page_size: Option<i32>,
+    
+    /// 정렬 기준 (username, email, created_at)
+    #[serde(default)]
+    #[schema(example = "username")]
+    pub sort_by: Option<String>,
+    
+    /// 정렬 순서 (asc, desc)
+    #[serde(default)]
+    #[schema(example = "asc")]
+    pub sort_order: Option<String>,
+    
+    /// 검색어 (username, email 검색)
+    #[serde(default)]
+    #[schema(example = "john")]
+    pub search: Option<String>,
+}
+
+fn default_page() -> Option<i32> { Some(1) }
+fn default_page_size() -> Option<i32> { Some(20) }
+
 /// 사용자 목록 응답 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UserListResponse {
     pub users: Vec<UserResponse>,
-    pub total: usize,
+    pub pagination: PaginationInfo,
+}
+
+/// 페이지네이션 정보
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct PaginationInfo {
+    /// 현재 페이지 번호
+    pub page: i32,
+    /// 페이지 크기
+    pub page_size: i32,
+    /// 전체 항목 수
+    pub total: i32,
+    /// 전체 페이지 수
+    pub total_pages: i32,
 }
 
 /// 프로젝트 멤버 추가 요청 DTO
