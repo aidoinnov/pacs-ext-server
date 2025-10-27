@@ -27,6 +27,17 @@ pub trait AuthService: Send + Sync {
 
     /// 사용자 비밀번호 재설정 (Keycloak)
     async fn reset_user_password(&self, keycloak_user_id: &str, new_password: &str) -> Result<(), ServiceError>;
+
+    /// 이메일로 사용자명 찾기
+    async fn find_username_by_email(&self, email: &str) -> Result<User, ServiceError>;
+
+    /// 사용자명과 이메일로 비밀번호 재설정
+    async fn reset_password_by_credentials(
+        &self,
+        username: &str,
+        email: &str,
+        new_password: &str,
+    ) -> Result<(), ServiceError>;
 }
 
 pub struct AuthServiceImpl<U: UserRepository> {
@@ -135,6 +146,46 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
 
     async fn reset_user_password(&self, keycloak_user_id: &str, new_password: &str) -> Result<(), ServiceError> {
         self.keycloak_client.reset_user_password(keycloak_user_id, new_password).await
+    }
+
+    async fn find_username_by_email(&self, email: &str) -> Result<User, ServiceError> {
+        self.user_repository
+            .find_by_email(email)
+            .await?
+            .ok_or(ServiceError::NotFound("해당 이메일로 등록된 사용자가 없습니다.".into()))
+    }
+
+    async fn reset_password_by_credentials(
+        &self,
+        username: &str,
+        email: &str,
+        new_password: &str,
+    ) -> Result<(), ServiceError> {
+        // 1. 비밀번호 강도 검증
+        if new_password.len() < 8 {
+            return Err(ServiceError::ValidationError(
+                "비밀번호는 최소 8자 이상이어야 합니다.".into()
+            ));
+        }
+        
+        // 2. 사용자 존재 확인 (username + email 일치 확인)
+        let user = self.user_repository
+            .find_by_username(username)
+            .await?
+            .ok_or(ServiceError::NotFound("사용자를 찾을 수 없습니다.".into()))?;
+        
+        if user.email != email {
+            return Err(ServiceError::ValidationError(
+                "이메일 정보가 일치하지 않습니다.".into()
+            ));
+        }
+        
+        // 3. Keycloak 비밀번호 재설정
+        self.keycloak_client
+            .reset_user_password(&user.keycloak_id.to_string(), new_password)
+            .await?;
+        
+        Ok(())
     }
 }
 
