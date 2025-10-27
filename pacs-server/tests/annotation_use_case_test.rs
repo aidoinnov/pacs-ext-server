@@ -121,6 +121,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("test_viewer".to_string()),
+            measurement_values: None,
             annotation_data: json!({"type": "circle", "x": 100, "y": 200, "radius": 50}),
             description: Some("Test annotation".to_string()),
         };
@@ -332,6 +333,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("test_viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
@@ -348,6 +350,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("updated_tool".to_string()),
             tool_version: Some("2.0.0".to_string()),
             viewer_software: Some("updated_viewer".to_string()),
+            measurement_values: None,
             annotation_data: Some(json!({"type": "updated", "x": 200, "y": 300})),
             description: Some("Updated annotation".to_string()),
         };
@@ -416,6 +419,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("test_viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
@@ -496,8 +500,6 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             let create_req = CreateAnnotationRequest {
                 user_id: Some(336),
                 project_id: Some(299),
-            user_id: Some(336),
-            project_id: Some(299),
                 study_instance_uid: format!("1.2.3.4.{}", i),
                 series_instance_uid: format!("1.2.3.5.{}", i),
                 sop_instance_uid: format!("1.2.3.6.{}", i),
@@ -506,6 +508,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
                 tool_name: Some("test_tool".to_string()),
                 tool_version: Some("1.0.0".to_string()),
                 viewer_software: Some("test_viewer".to_string()),
+            measurement_values: None,
             };
 
             annotation_use_case.create_annotation(create_req, user_id, project_id).await
@@ -598,6 +601,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("test_viewer".to_string()),
+            measurement_values: None,
         };
 
         let result = annotation_use_case.create_annotation(invalid_req, user_id, project_id).await;
@@ -626,6 +630,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = CreateAnnotationRequest {
@@ -639,6 +644,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("DICOM Viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation3 = CreateAnnotationRequest {
@@ -652,6 +658,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -700,6 +707,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = CreateAnnotationRequest {
@@ -713,6 +721,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("DICOM Viewer".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -757,6 +766,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         let annotation2 = CreateAnnotationRequest {
@@ -770,6 +780,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("DICOM Viewer".to_string()),
+            measurement_values: None,
         };
 
         // 어노테이션들 생성
@@ -809,6 +820,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("Measurement Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
             measurement_values: Some(json!([
                 {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"},
                 {"id": "m2", "type": "mean", "values": [30.5], "unit": "mm"}
@@ -850,6 +862,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("Point Tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("DICOM Viewer".to_string()),
+            measurement_values: None,
             measurement_values: None,
         };
 
