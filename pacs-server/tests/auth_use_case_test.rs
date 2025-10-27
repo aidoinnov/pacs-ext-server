@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 
 use pacs_server::application::dto::auth_dto::{LoginRequest, LoginResponse, VerifyTokenResponse, RefreshTokenResponse};
 use pacs_server::application::use_cases::AuthUseCase;
@@ -59,6 +59,22 @@ impl AuthService for MockAuthService {
     async fn logout(&self, _token: &str) -> Result<(), ServiceError> {
         Ok(())
     }
+
+    async fn refresh_token_with_keycloak(&self, _refresh_token: &str) -> Result<RefreshTokenResponse, ServiceError> {
+        Err(ServiceError::ValidationError("Not implemented in mock".into()))
+    }
+
+    async fn reset_user_password(&self, _keycloak_user_id: &str, _new_password: &str) -> Result<(), ServiceError> {
+        Ok(())
+    }
+
+    async fn find_username_by_email(&self, _email: &str) -> Result<User, ServiceError> {
+        Err(ServiceError::NotFound("User not found".into()))
+    }
+
+    async fn reset_password_by_credentials(&self, _username: &str, _email: &str, _new_password: &str) -> Result<(), ServiceError> {
+        Ok(())
+    }
 }
 
 fn create_test_user() -> User {
@@ -67,7 +83,21 @@ fn create_test_user() -> User {
         keycloak_id: Uuid::new_v4(),
         username: "testuser".to_string(),
         email: "test@example.com".to_string(),
-        created_at: Utc::timestamp_opt(1640995200, 0).unwrap(),
+        full_name: None,
+        organization: None,
+        department: None,
+        phone: None,
+        created_at: Utc::now(),
+        updated_at: None,
+        account_status: pacs_server::domain::entities::UserAccountStatus::Active,
+        email_verified: true,
+        email_verification_token: None,
+        email_verification_expires_at: None,
+        approved_by: None,
+        approved_at: None,
+        suspended_at: None,
+        suspended_reason: None,
+        deleted_at: None,
     }
 }
 
