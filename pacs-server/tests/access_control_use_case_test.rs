@@ -171,7 +171,21 @@ fn create_test_user() -> User {
         keycloak_id: Uuid::new_v4(),
         username: "testuser".to_string(),
         email: "test@example.com".to_string(),
+        full_name: None,
+        organization: None,
+        department: None,
+        phone: None,
         created_at: chrono::Utc::now(),
+        updated_at: None,
+        account_status: pacs_server::domain::entities::UserAccountStatus::Active,
+        email_verified: true,
+        email_verification_token: None,
+        email_verification_expires_at: None,
+        approved_by: None,
+        approved_at: None,
+        suspended_at: None,
+        suspended_reason: None,
+        deleted_at: None,
     }
 }
 
@@ -181,6 +195,10 @@ fn create_test_project() -> Project {
         name: "Test Project".to_string(),
         description: Some("A test project".to_string()),
         is_active: true,
+        sponsor: None,
+        start_date: None,
+        end_date: None,
+        auto_complete: false,
         created_at: chrono::Utc::now(),
     }
 }
@@ -198,6 +216,7 @@ fn create_test_role() -> Role {
 fn create_test_permission() -> Permission {
     Permission {
         id: 1,
+        category: "Imaging".to_string(),
         resource_type: "STUDY".to_string(),
         action: "READ".to_string(),
     }
