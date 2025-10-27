@@ -30,6 +30,8 @@ fn test_project_with_role_response_serialization() {
         project_name: "Test Project".to_string(),
         description: Some("Test Description".to_string()),
         is_active: true,
+        start_date: None,
+        end_date: None,
         role_id: Some(2),
         role_name: Some("Manager".to_string()),
         role_scope: Some("PROJECT".to_string()),
@@ -54,7 +56,7 @@ fn test_project_members_response_serialization() {
     };
     
     let response = ProjectMembersResponse {
-        users: vec![user],
+        members: vec![user],
         total_count: 1,
         page: 1,
         page_size: 20,
@@ -62,7 +64,7 @@ fn test_project_members_response_serialization() {
     };
     
     let serialized = serde_json::to_string(&response).unwrap();
-    assert!(serialized.contains("\"users\""));
+    assert!(serialized.contains("\"members\""));
     assert!(serialized.contains("\"total_count\":1"));
     assert!(serialized.contains("\"page\":1"));
 }
@@ -74,6 +76,8 @@ fn test_user_projects_response_serialization() {
         project_name: "Test Project".to_string(),
         description: Some("Test Description".to_string()),
         is_active: true,
+        start_date: None,
+        end_date: None,
         role_id: Some(2),
         role_name: Some("Manager".to_string()),
         role_scope: Some("PROJECT".to_string()),
