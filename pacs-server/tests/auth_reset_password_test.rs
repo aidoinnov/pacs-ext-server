@@ -374,16 +374,18 @@ mod auth_reset_password_tests {
         );
 
         // Test valid password (will fail at Keycloak but pass length validation)
+        let password1 = "a".repeat(8);
+        let password2 = "a".repeat(100);
         let valid_passwords = vec![
             "12345678",         // Exactly 8 chars
-            "a".repeat(8),     // 8 characters
-            "a".repeat(100),   // 100 characters
-            "Test123!@#",     // Complex password
+            &password1,         // 8 characters
+            &password2,         // 100 characters
+            "Test123!@#",       // Complex password
         ];
 
         for password in valid_passwords {
             let result = auth_service
-                .reset_password_by_credentials("testuser", "test@example.com", &password)
+                .reset_password_by_credentials("testuser", "test@example.com", password)
                 .await;
 
             // Should fail at Keycloak call, but pass length validation
