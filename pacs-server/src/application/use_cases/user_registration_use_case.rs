@@ -72,7 +72,7 @@ impl<S: UserRegistrationService> UserRegistrationUseCase<S> {
             username: user.username,
             email: user.email,
             account_status: format!("{:?}", user.account_status),
-            message: "회원가입이 완료되었습니다. 이메일 인증을 완료해주세요.".to_string(),
+            message: "회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.".to_string(),
         })
     }
     

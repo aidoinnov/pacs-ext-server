@@ -1,5 +1,6 @@
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use crate::domain::ServiceError;
 use crate::infrastructure::config::KeycloakConfig;
 
@@ -283,6 +284,43 @@ impl KeycloakClient {
             let body = response.text().await.unwrap_or_default();
             return Err(ServiceError::ExternalServiceError(
                 format!("Update user failed ({}): {}", status, body)
+            ));
+        }
+        
+        Ok(())
+    }
+
+    /// 사용자 비밀번호 재설정 (관리자 권한)
+    pub async fn reset_user_password(
+        &self,
+        keycloak_user_id: &str,
+        new_password: &str,
+    ) -> Result<(), ServiceError> {
+        let token = self.get_admin_token().await?;
+        
+        let url = format!(
+            "{}/admin/realms/{}/users/{}/reset-password",
+            self.base_url, self.realm, keycloak_user_id
+        );
+        
+        let credential = json!({
+            "type": "password",
+            "value": new_password,
+            "temporary": false
+        });
+        
+        let response = self.http_client
+            .put(&url)
+            .bearer_auth(&token)
+            .json(&credential)
+            .send()
+            .await?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ServiceError::ExternalServiceError(
+                format!("비밀번호 재설정 실패 ({}): {}", status, body)
             ));
         }
         

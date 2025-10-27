@@ -1,5 +1,6 @@
 use crate::application::dto::{
     LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, VerifyTokenResponse,
+    FindUsernameResponse, ResetPasswordResponse, mask_email,
 };
 use crate::domain::services::AuthService;
 use crate::domain::ServiceError;
@@ -54,5 +55,22 @@ impl<A: AuthService> AuthUseCase<A> {
     /// 로그아웃
     pub async fn logout(&self, token: &str) -> Result<(), ServiceError> {
         self.auth_service.logout(token).await
+    }
+
+    /// 아이디 찾기
+    pub async fn find_username(&self, email: &str) -> Result<FindUsernameResponse, ServiceError> {
+        // TODO: AuthService를 확장하여 find_by_email을 추가해야 함
+        Err(ServiceError::ValidationError("아이디 찾기는 아직 구현되지 않았습니다.".into()))
+    }
+
+    /// 비밀번호 재설정
+    pub async fn reset_password(
+        &self,
+        username: &str,
+        email: &str,
+        new_password: &str,
+    ) -> Result<ResetPasswordResponse, ServiceError> {
+        // TODO: AuthService를 확장하여 필요한 메서드를 추가해야 함
+        Err(ServiceError::ValidationError("비밀번호 재설정은 아직 구현되지 않았습니다.".into()))
     }
 }

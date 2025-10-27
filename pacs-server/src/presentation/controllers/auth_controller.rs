@@ -107,6 +107,33 @@ impl<A: AuthService> AuthController<A> {
         }
     }
 
+    pub async fn find_username(
+        auth_use_case: web::Data<Arc<AuthUseCase<A>>>,
+        req: web::Json<crate::application::dto::auth_dto::FindUsernameRequest>,
+    ) -> impl Responder {
+        match auth_use_case.find_username(&req.email).await {
+            Ok(response) => HttpResponse::Ok().json(response),
+            Err(e) => HttpResponse::BadRequest().json(json!({
+                "error": format!("아이디 찾기 실패: {}", e)
+            })),
+        }
+    }
+
+    pub async fn reset_password(
+        auth_use_case: web::Data<Arc<AuthUseCase<A>>>,
+        req: web::Json<crate::application::dto::auth_dto::ResetPasswordRequest>,
+    ) -> impl Responder {
+        match auth_use_case
+            .reset_password(&req.username, &req.email, &req.new_password)
+            .await
+        {
+            Ok(response) => HttpResponse::Ok().json(response),
+            Err(e) => HttpResponse::BadRequest().json(json!({
+                "error": format!("비밀번호 재설정 실패: {}", e)
+            })),
+        }
+    }
+
 }
 
 pub fn configure_routes<A: AuthService + 'static>(
@@ -126,6 +153,8 @@ pub fn configure_routes<A: AuthService + 'static>(
                 .route("/refresh", web::post().to(AuthController::<A>::refresh_token))
                 .route("/signup", web::post().to(AuthController::<A>::signup))
                 .route("/verify-email", web::post().to(AuthController::<A>::verify_email))
+                .route("/find-username", web::post().to(AuthController::<A>::find_username))
+                .route("/reset-password", web::post().to(AuthController::<A>::reset_password))
                 .route("/admin/users/approve", web::post().to(AuthController::<A>::approve_user))
                 .route("/users/{user_id}", web::delete().to(AuthController::<A>::delete_account)),
         );

@@ -24,6 +24,9 @@ pub trait AuthService: Send + Sync {
 
     /// Keycloak을 사용한 토큰 갱신
     async fn refresh_token_with_keycloak(&self, refresh_token: &str) -> Result<crate::application::dto::auth_dto::RefreshTokenResponse, ServiceError>;
+
+    /// 사용자 비밀번호 재설정 (Keycloak)
+    async fn reset_user_password(&self, keycloak_user_id: &str, new_password: &str) -> Result<(), ServiceError>;
 }
 
 pub struct AuthServiceImpl<U: UserRepository> {
@@ -128,6 +131,10 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
             token_type: keycloak_response.token_type,
             expires_in: keycloak_response.expires_in,
         })
+    }
+
+    async fn reset_user_password(&self, keycloak_user_id: &str, new_password: &str) -> Result<(), ServiceError> {
+        self.keycloak_client.reset_user_password(keycloak_user_id, new_password).await
     }
 }
 
