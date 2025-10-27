@@ -121,6 +121,7 @@ mod auth_reset_password_tests {
             client_id: "test_client".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
+            client_secret: "test_secret".to_string(),
         };
         let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
         
@@ -154,6 +155,7 @@ mod auth_reset_password_tests {
             client_id: "test_client".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
+            client_secret: "test_secret".to_string(),
         };
         let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
         
@@ -185,6 +187,7 @@ mod auth_reset_password_tests {
             client_id: "test_client".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
+            client_secret: "test_secret".to_string(),
         };
         let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
         
@@ -218,6 +221,7 @@ mod auth_reset_password_tests {
             client_id: "test_client".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
+            client_secret: "test_secret".to_string(),
         };
         let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
         
@@ -250,6 +254,7 @@ mod auth_reset_password_tests {
             client_id: "test_client".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
+            client_secret: "test_secret".to_string(),
         };
         let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
         
@@ -283,6 +288,7 @@ mod auth_reset_password_tests {
             client_id: "test_client".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
+            client_secret: "test_secret".to_string(),
         };
         let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
         
@@ -315,6 +321,7 @@ mod auth_reset_password_tests {
             client_id: "test_client".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
+            client_secret: "test_secret".to_string(),
         };
         let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
         
@@ -356,6 +363,7 @@ mod auth_reset_password_tests {
             client_id: "test_client".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
+            client_secret: "test_secret".to_string(),
         };
         let keycloak_client = Arc::new(KeycloakClient::new(keycloak_config));
         
