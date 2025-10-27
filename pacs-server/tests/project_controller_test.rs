@@ -53,6 +53,10 @@ mod project_controller_tests {
         let create_req = CreateProjectRequest {
             name: "Test Project".to_string(),
             description: Some("A test project".to_string()),
+            sponsor: "Test Sponsor".to_string(),
+            start_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
+            end_date: None,
+            auto_complete: None,
         };
 
         let req = test::TestRequest::post()
