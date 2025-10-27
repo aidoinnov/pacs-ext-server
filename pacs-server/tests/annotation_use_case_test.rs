@@ -807,7 +807,44 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
     #[tokio::test]
     async fn test_create_annotation_with_measurement_values() {
         let (app, pool) = setup_test_app().await;
-        let (user_id, project_id) = create_test_data(&pool).await;
+        
+        // Create test data
+        let keycloak_id = Uuid::new_v4();
+        let user_result = sqlx::query(
+            "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
+        )
+        .bind(keycloak_id)
+        .bind(&format!("testuser_measurement_{}", keycloak_id))
+        .bind(&format!("test_measurement_{}@example.com", keycloak_id))
+        .fetch_one(pool.as_ref())
+        .await
+        .expect("Failed to create test user");
+
+        let project_result = sqlx::query(
+            "INSERT INTO security_project (name, sponsor, start_date, auto_complete, is_active, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id"
+        )
+        .bind(&format!("Test Project Measurement {}", keycloak_id))
+        .bind("Test Sponsor")
+        .bind(chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap())
+        .bind(false)
+        .bind(true)
+        .bind("ACTIVE")
+        .fetch_one(pool.as_ref())
+        .await
+        .expect("Failed to create test project");
+
+        use sqlx::Row;
+        let user_id: i32 = user_result.get("id");
+        let project_id: i32 = project_result.get("id");
+
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .execute(pool.as_ref())
+        .await
+        .expect("Failed to add user to project");
 
         let annotation_request = CreateAnnotationRequest {
             user_id: Some(user_id),
@@ -820,7 +857,6 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("Measurement Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
-            measurement_values: None,
             measurement_values: Some(json!([
                 {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"},
                 {"id": "m2", "type": "mean", "values": [30.5], "unit": "mm"}
@@ -849,7 +885,44 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
     #[tokio::test]
     async fn test_create_annotation_without_measurement_values() {
         let (app, pool) = setup_test_app().await;
-        let (user_id, project_id) = create_test_data(&pool).await;
+        
+        // Create test data
+        let keycloak_id = Uuid::new_v4();
+        let user_result = sqlx::query(
+            "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
+        )
+        .bind(keycloak_id)
+        .bind(&format!("testuser_no_measurement_{}", keycloak_id))
+        .bind(&format!("test_no_measurement_{}@example.com", keycloak_id))
+        .fetch_one(pool.as_ref())
+        .await
+        .expect("Failed to create test user");
+
+        let project_result = sqlx::query(
+            "INSERT INTO security_project (name, sponsor, start_date, auto_complete, is_active, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id"
+        )
+        .bind(&format!("Test Project No Measurement {}", keycloak_id))
+        .bind("Test Sponsor")
+        .bind(chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap())
+        .bind(false)
+        .bind(true)
+        .bind("ACTIVE")
+        .fetch_one(pool.as_ref())
+        .await
+        .expect("Failed to create test project");
+
+        use sqlx::Row;
+        let user_id: i32 = user_result.get("id");
+        let project_id: i32 = project_result.get("id");
+
+        sqlx::query(
+            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .execute(pool.as_ref())
+        .await
+        .expect("Failed to add user to project");
 
         let annotation_request = CreateAnnotationRequest {
             user_id: Some(user_id),
@@ -862,7 +935,6 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
             tool_name: Some("Point Tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("DICOM Viewer".to_string()),
-            measurement_values: None,
             measurement_values: None,
         };
 
@@ -877,6 +949,26 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
         let body: serde_json::Value = test::read_body_json(resp).await;
         assert!(body["measurement_values"].is_null());
 
-        cleanup_test_data(&pool, user_id, project_id).await;
+        // Cleanup
+        sqlx::query("DELETE FROM annotation WHERE user_id = $1")
+            .bind(user_id)
+            .execute(pool.as_ref())
+            .await
+            .ok();
+        sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
+            .bind(user_id)
+            .execute(pool.as_ref())
+            .await
+            .ok();
+        sqlx::query("DELETE FROM security_project WHERE id = $1")
+            .bind(project_id)
+            .execute(pool.as_ref())
+            .await
+            .ok();
+        sqlx::query("DELETE FROM security_user WHERE id = $1")
+            .bind(user_id)
+            .execute(pool.as_ref())
+            .await
+            .ok();
     }
 }
