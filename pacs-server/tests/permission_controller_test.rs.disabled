@@ -14,10 +14,10 @@ use mockall::mock;
 
 // Mock PermissionService for testing
 mock! {
-    PermissionService {}
+    MyPermissionService {}
 
     #[async_trait]
-    impl PermissionService for PermissionService {
+    impl PermissionService for MyPermissionService {
         async fn get_permissions_for_resource(&self, resource_type: &str) -> Result<Vec<Permission>, ServiceError>;
         async fn validate_permission_exists(&self, resource_type: &str, action: &str) -> Result<bool, ServiceError>;
         async fn create_role(&self, name: String, scope: pacs_server::domain::entities::RoleScope, description: Option<String>) -> Result<Role, ServiceError>;
@@ -40,7 +40,7 @@ mock! {
 
 // 테스트용 핸들러 함수
 async fn get_global_roles_with_permissions_handler(
-    permission_use_case: web::Data<Arc<PermissionUseCase<MockPermissionService>>>,
+    permission_use_case: web::Data<Arc<PermissionUseCase<MockMyPermissionService>>>,
     query: web::Query<PaginationQuery>,
 ) -> HttpResponse {
     match permission_use_case
@@ -54,9 +54,9 @@ async fn get_global_roles_with_permissions_handler(
     }
 }
 
-/// 테스트용 앱 생성 - 더 간단한 방식
+/// 테스트용 앱 생성 - 간단한 방식
 fn create_test_app() -> impl actix_web::dev::ServiceFactory<actix_web::dev::ServiceRequest, actix_web::dev::ServiceResponse, actix_web::Error, actix_web::dev::Config> {
-    let mut mock_service = MockPermissionService::new();
+    let mut mock_service = MockMyPermissionService::new();
     
     // Mock 데이터 설정
     mock_service.expect_get_global_roles()
