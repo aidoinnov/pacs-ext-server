@@ -9,9 +9,9 @@ use pacs_server::{
         user_service::UserServiceImpl,
     },
     infrastructure::repositories::{
-        project_repository_impl::ProjectRepositoryImpl,
-        user_repository_impl::UserRepositoryImpl,
-        role_repository_impl::RoleRepositoryImpl,
+        ProjectRepositoryImpl,
+        UserRepositoryImpl,
+        RoleRepositoryImpl,
     },
     presentation::controllers::project_user_matrix_controller,
 };
