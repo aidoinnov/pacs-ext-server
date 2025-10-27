@@ -6,8 +6,8 @@ use pacs_server::{
         services::user_service::UserServiceImpl,
     },
     infrastructure::repositories::{
-        user_repository_impl::UserRepositoryImpl,
-        project_repository_impl::ProjectRepositoryImpl,
+        UserRepositoryImpl,
+        ProjectRepositoryImpl,
     },
 };
 
@@ -16,12 +16,12 @@ use pacs_server::{
 async fn test_get_users_with_filter() {
     // Given: 테스트 데이터베이스 설정
     let pool = setup_test_database().await;
-    let user_repository = Arc::new(UserRepositoryImpl::new(pool.clone()));
-    let project_repository = Arc::new(ProjectRepositoryImpl::new(pool.clone()));
+    let user_repository = UserRepositoryImpl::new(pool.clone());
+    let project_repository = ProjectRepositoryImpl::new(pool.clone());
     
     let user_service = UserServiceImpl::new(
-        user_repository.clone(),
-        project_repository.clone(),
+        user_repository,
+        project_repository,
     );
     
     // 테스트 데이터 생성
