@@ -21,7 +21,7 @@ mock! {
         async fn find_by_username(&self, username: &str) -> Result<Option<User>, sqlx::Error>;
         async fn find_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error>;
         async fn find_all(&self) -> Result<Vec<User>, sqlx::Error>;
-        async fn create(&self, user: &User) -> Result<User, sqlx::Error>;
+        async fn create(&self, new_user: pacs_server::domain::entities::NewUser) -> Result<User, sqlx::Error>;
         async fn update(&self, user: &pacs_server::domain::entities::UpdateUser) -> Result<pacs_server::domain::entities::User, sqlx::Error>;
         async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;
         fn pool(&self) -> &sqlx::PgPool;
@@ -54,18 +54,16 @@ async fn test_refresh_token_with_keycloak_success() {
         expiration_hours: 24,
     });
     
-    let keycloak_response = pacs_server::infrastructure::external::KeycloakTokenResponse {
-        access_token: "new-access-token".to_string(),
-        refresh_token: "new-refresh-token".to_string(),
-        expires_in: 3600,
-        refresh_expires_in: 7200,
-        token_type: "Bearer".to_string(),
-    };
-    
     mock_keycloak_client
         .expect_refresh_access_token()
         .times(1)
-        .returning(move |_| Ok(keycloak_response));
+        .returning(|_| Ok(pacs_server::infrastructure::external::KeycloakTokenResponse {
+            access_token: "new-access-token".to_string(),
+            refresh_token: "new-refresh-token".to_string(),
+            expires_in: 3600,
+            refresh_expires_in: 7200,
+            token_type: "Bearer".to_string(),
+        }));
     
     // Note: This test is simplified since AuthServiceImpl expects KeycloakClient directly
     // In a real implementation, we would need to modify AuthServiceImpl to accept a trait
