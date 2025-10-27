@@ -271,7 +271,6 @@ use sqlx::Row;
         let (annotation_id, user_id) = create_test_data(&pool).await;
 
         let create_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
             group_name: Some("Test Mask Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
@@ -306,7 +305,6 @@ use sqlx::Row;
 
         // Create a test mask group first
         let create_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
             group_name: Some("Test Mask Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
@@ -366,7 +364,6 @@ use sqlx::Row;
 
         // Create a test mask group first
         let create_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
             group_name: Some("Test Mask Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
@@ -420,7 +417,6 @@ use sqlx::Row;
 
         // Create a test mask group first
         let create_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
             group_name: Some("Test Mask Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
@@ -463,7 +459,6 @@ use sqlx::Row;
 
         // Create a test mask group first
         let create_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
             group_name: Some("Test Mask Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
@@ -502,7 +497,6 @@ use sqlx::Row;
 
         // Create a test mask group first
         let create_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
             group_name: Some("Test Mask Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
@@ -556,7 +550,6 @@ use sqlx::Row;
 
         // Create a test mask group first
         let create_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
             group_name: Some("Test Mask Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
