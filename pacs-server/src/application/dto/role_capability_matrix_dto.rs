@@ -171,8 +171,10 @@ mod tests {
             id: 1,
             name: "MANAGE_USERS".to_string(),
             display_name: "사용자 관리".to_string(),
+            display_label: "Users".to_string(),
             description: Some("사용자 생성, 수정, 삭제".to_string()),
             category: "관리".to_string(),
+            category_label: "MANAGE".to_string(),
             permission_count: 5,
         };
 
@@ -213,8 +215,10 @@ mod tests {
                 id: 1,
                 name: "MANAGE_USERS".to_string(),
                 display_name: "사용자 관리".to_string(),
+                display_label: "Users".to_string(),
                 description: Some("사용자 생성, 수정, 삭제".to_string()),
                 category: "관리".to_string(),
+                category_label: "MANAGE".to_string(),
                 permission_count: 5,
             },
         ]);

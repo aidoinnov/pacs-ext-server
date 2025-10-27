@@ -23,6 +23,8 @@ mod tests {
             async fn validate_permission_exists(&self, resource_type: &str, action: &str) -> Result<bool, ServiceError>;
             async fn create_role(&self, name: String, scope: RoleScope, description: Option<String>) -> Result<Role, ServiceError>;
             async fn get_role(&self, id: i32) -> Result<Role, ServiceError>;
+            async fn update_role(&self, id: i32, name: Option<String>, description: Option<String>) -> Result<Role, ServiceError>;
+            async fn delete_role(&self, id: i32) -> Result<(), ServiceError>;
             async fn get_roles_by_scope(&self, scope: RoleScope) -> Result<Vec<Role>, ServiceError>;
             async fn get_global_roles(&self) -> Result<Vec<Role>, ServiceError>;
             async fn get_project_roles(&self) -> Result<Vec<Role>, ServiceError>;
