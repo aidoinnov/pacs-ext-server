@@ -60,6 +60,14 @@ mod auth_find_username_tests {
             Err(sqlx::Error::RowNotFound)
         }
 
+        async fn update(&self, _update_user: &pacs_server::domain::entities::UpdateUser) -> Result<User, sqlx::Error> {
+            Err(sqlx::Error::RowNotFound)
+        }
+
+        async fn delete(&self, _id: i32) -> Result<bool, sqlx::Error> {
+            Ok(false)
+        }
+
         fn pool(&self) -> &sqlx::PgPool {
             unimplemented!()
         }
