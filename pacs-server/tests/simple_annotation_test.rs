@@ -57,6 +57,7 @@ mod simple_annotation_tests {
             tool_name: Some("test_tool".to_string()),
             tool_version: Some("1.0.0".to_string()),
             viewer_software: Some("OHIF Viewer".to_string()),
+            measurement_values: None,
         };
 
         let req = test::TestRequest::post()
