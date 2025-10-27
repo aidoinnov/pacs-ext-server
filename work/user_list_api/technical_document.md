@@ -242,3 +242,4 @@ let page_size = query.page_size.unwrap_or(20).min(100);
 - Clean Architecture 패턴 준수
 - 사용자 삭제는 논리적 삭제 (account_status = 'DELETED')
 
+

@@ -403,11 +403,18 @@ where
 
         let offset = (page - 1) * page_size;
 
-        // 사용자의 프로젝트와 역할 정보를 함께 조회
-        let projects_with_roles = sqlx::query_as::<_, (i32, String, Option<String>, bool, Option<i32>, Option<String>, Option<String>)>(
+        // 사용자의 프로젝트와 역할 정보를 함께 조회 (기한 정보 포함)
+        let projects_with_roles = sqlx::query_as::<_, (i32, String, Option<String>, bool, Option<String>, Option<String>, Option<i32>, Option<String>, Option<String>)>(
             "SELECT 
-                p.id as project_id, p.name as project_name, p.description, p.is_active,
-                r.id as role_id, r.name as role_name, r.scope as role_scope
+                p.id as project_id, 
+                p.name as project_name, 
+                p.description, 
+                p.is_active,
+                p.start_date,
+                p.end_date,
+                r.id as role_id, 
+                r.name as role_name, 
+                r.scope as role_scope
              FROM security_project p
              INNER JOIN security_user_project up ON p.id = up.project_id
              LEFT JOIN security_role r ON up.role_id = r.id
@@ -432,12 +439,14 @@ where
         // DTO로 변환
         let projects: Vec<crate::application::dto::project_user_dto::ProjectWithRoleResponse> = projects_with_roles
             .into_iter()
-            .map(|(project_id, project_name, description, is_active, role_id, role_name, role_scope)| {
+            .map(|(project_id, project_name, description, is_active, start_date, end_date, role_id, role_name, role_scope)| {
                 crate::application::dto::project_user_dto::ProjectWithRoleResponse {
                     project_id,
                     project_name,
                     description,
                     is_active,
+                    start_date,
+                    end_date,
                     role_id,
                     role_name,
                     role_scope,

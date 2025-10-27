@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+#### User Project List API - 기한 정보 추가
+- **API**: `GET /api/users/{user_id}/projects`
+- **Description**: 사용자 프로젝트 목록 API 응답에 프로젝트 기한 정보 추가
+- **Changes**:
+  - `ProjectWithRoleResponse` DTO에 `start_date`, `end_date` 필드 추가
+  - SQL 쿼리에 프로젝트 기한 정보 포함
+  - 하위 호환성 유지 (Optional 필드 추가)
+
 ### 🏗️ In Progress (70% 완료)
 
 #### **Project Data Access Management API - 계층 구조 지원**
