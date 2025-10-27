@@ -194,11 +194,12 @@ fn create_test_project() -> Project {
         id: 1,
         name: "Test Project".to_string(),
         description: Some("A test project".to_string()),
-        is_active: true,
-        sponsor: None,
-        start_date: None,
+        sponsor: "Test Sponsor".to_string(),
+        start_date: chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
         end_date: None,
         auto_complete: false,
+        is_active: true,
+        status: pacs_server::domain::entities::ProjectStatus::Active,
         created_at: chrono::Utc::now(),
     }
 }
