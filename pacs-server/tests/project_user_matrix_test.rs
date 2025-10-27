@@ -12,10 +12,10 @@ use pacs_server::{
         services::{ProjectService, UserService},
     },
     infrastructure::{
-        config::settings::Settings,
+        config::Settings,
         repositories::{
-            project_repository_impl::ProjectRepositoryImpl,
-            user_repository_impl::UserRepositoryImpl,
+            ProjectRepositoryImpl,
+            UserRepositoryImpl,
         },
     },
     presentation::controllers::project_user_matrix_controller,
