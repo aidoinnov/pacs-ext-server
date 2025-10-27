@@ -43,11 +43,11 @@ mod error_handling_tests {
             .expect("Failed to connect to test database");
 
         // Initialize repositories
-        let annotation_repo = AnnotationRepositoryImpl::new((*pool).clone());
-        let mask_group_repo = MaskGroupRepositoryImpl::new((*pool).clone());
-        let mask_repo = MaskRepositoryImpl::new((*pool).clone());
-        let user_repo = UserRepositoryImpl::new((*pool).clone());
-        let project_repo = ProjectRepositoryImpl::new((*pool).clone());
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.clone());
+        let mask_group_repo = MaskGroupRepositoryImpl::new(pool.clone());
+        let mask_repo = MaskRepositoryImpl::new(pool.clone());
+        let user_repo = UserRepositoryImpl::new(pool.clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.clone());
 
         let pool = Arc::new(pool);
         
