@@ -28,6 +28,8 @@ mod tests {
                 realm: "test".to_string(),
                 client_id: "test-client".to_string(),
                 client_secret: "test-secret".to_string(),
+                admin_username: "admin".to_string(),
+                admin_password: "admin".to_string(),
             },
             logging: LoggingConfig {
                 level: "info".to_string(),
