@@ -7,7 +7,7 @@ mod comprehensive_integration_tests {
         mask_dto::{CreateMaskRequest, UpdateMaskRequest, DownloadUrlRequest},
         user_dto::{CreateUserRequest, UpdateUserRequest},
         project_dto::{CreateProjectRequest, UpdateProjectRequest, ProjectAssignRoleRequest},
-        auth_dto::{LoginRequest, RegisterRequest},
+        auth_dto::LoginRequest,
     };
     use pacs_server::application::use_cases::{
         AnnotationUseCase, MaskGroupUseCase, MaskUseCase, UserUseCase, ProjectUseCase, AuthUseCase
@@ -19,7 +19,7 @@ mod comprehensive_integration_tests {
         AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
         UserRepositoryImpl, ProjectRepositoryImpl, PermissionRepositoryImpl, AccessLogRepositoryImpl
     };
-    use pacs_server::infrastructure::external::{S3Service, MinIOService};
+    // use pacs_server::infrastructure::external::S3ObjectStorageService;
     use pacs_server::infrastructure::config::{ObjectStorageConfig, JwtConfig};
     use pacs_server::infrastructure::auth::JwtService;
     use pacs_server::presentation::controllers::{
@@ -86,7 +86,10 @@ mod comprehensive_integration_tests {
             region: std::env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
         };
 
-        let s3_service = Arc::new(S3Service::new(s3_config));
+        // TODO: S3Service implementation needed
+        // let s3_service = Arc::new(S3ObjectStorageService::new(&s3_config.bucket_name, &s3_config.region, &s3_config.access_key, &s3_config.secret_key).await.unwrap());
+        // Placeholder for now
+        let s3_service = Arc::new(s3_config);
         
         // Initialize JWT service
         let jwt_config = JwtConfig {

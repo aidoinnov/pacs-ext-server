@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc, TimeZone};
 use pacs_server::domain::entities::*;
+use pacs_server::domain::entities::access_condition::ResourceLevel;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -14,8 +15,21 @@ mod user_tests {
             keycloak_id: Uuid::new_v4(),
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
-            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
+            full_name: None,
+            organization: None,
+            department: None,
+            phone: None,
+            created_at: Utc::now(),
+            updated_at: None,
+            account_status: pacs_server::domain::entities::UserAccountStatus::Active,
+            email_verified: true,
+            email_verification_token: None,
+            email_verification_expires_at: None,
+            approved_by: None,
+            approved_at: None,
+            suspended_at: None,
+            suspended_reason: None,
+            deleted_at: None,
         };
 
         assert_eq!(user.id, 1);
@@ -29,7 +43,10 @@ mod user_tests {
             keycloak_id: Uuid::new_v4(),
             username: "newuser".to_string(),
             email: "new@example.com".to_string(),
-            measurement_values: None,
+            full_name: None,
+            organization: None,
+            department: None,
+            phone: None,
         };
 
         assert_eq!(new_user.username, "newuser");
@@ -43,8 +60,21 @@ mod user_tests {
             keycloak_id: Uuid::new_v4(),
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
-            created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
+            full_name: None,
+            organization: None,
+            department: None,
+            phone: None,
+            created_at: Utc::now(),
+            updated_at: None,
+            account_status: pacs_server::domain::entities::UserAccountStatus::Active,
+            email_verified: true,
+            email_verification_token: None,
+            email_verification_expires_at: None,
+            approved_by: None,
+            approved_at: None,
+            suspended_at: None,
+            suspended_reason: None,
+            deleted_at: None,
         };
 
         let json = serde_json::to_string(&user).unwrap();
