@@ -143,7 +143,6 @@ async fn test_mask_group_use_case_create_mask_group_success() {
     );
 
     let request = CreateMaskGroupRequest {
-        annotation_id: 1,
         group_name: Some("Test Group".to_string()),
         model_name: Some("test_model".to_string()),
         version: Some("1.0.0".to_string()),
@@ -153,7 +152,7 @@ async fn test_mask_group_use_case_create_mask_group_success() {
         description: Some("Test description".to_string()),
     };
 
-    let result = mask_group_use_case.create_mask_group(request, 1).await;
+    let result = mask_group_use_case.create_mask_group(request.clone(), 1).await;
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.annotation_id, 1);
