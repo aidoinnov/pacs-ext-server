@@ -110,6 +110,7 @@ mod auth_find_username_tests {
             url: "http://localhost:8080".to_string(),
             realm: "test_realm".to_string(),
             client_id: "test_client".to_string(),
+            client_secret: "test_secret".to_string(),
             admin_username: "admin".to_string(),
             admin_password: "admin".to_string(),
         };
