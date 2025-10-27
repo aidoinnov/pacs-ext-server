@@ -4,7 +4,7 @@ mod auth_find_username_tests {
     use uuid::Uuid;
     use chrono::Utc;
 
-    use pacs_server::application::dto::auth_dto::{FindUsernameRequest, FindUsernameResponse, mask_email};
+    use pacs_server::application::dto::auth_dto::mask_email;
     use pacs_server::domain::entities::User;
     use pacs_server::domain::repositories::UserRepository;
     use pacs_server::domain::services::{AuthService, AuthServiceImpl};
@@ -83,9 +83,9 @@ mod auth_find_username_tests {
             organization: None,
             department: None,
             phone: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
             updated_at: None,
-            account_status: pacs_server::domain::entities::AccountStatus::Active,
+            account_status: pacs_server::domain::entities::UserAccountStatus::Active,
             email_verified: true,
             email_verification_token: None,
             email_verification_expires_at: None,

@@ -8,7 +8,8 @@ mod auth_reset_password_tests {
     use pacs_server::domain::repositories::UserRepository;
     use pacs_server::domain::services::{AuthService, AuthServiceImpl};
     use pacs_server::infrastructure::auth::JwtService;
-    use pacs_server::infrastructure::config::{JwtConfig, KeycloakConfig};
+    use pacs_server::infrastructure::config::JwtConfig;
+    use pacs_server::infrastructure::config::KeycloakConfig;
     use pacs_server::infrastructure::external::KeycloakClient;
     use std::sync::Arc;
 
@@ -82,9 +83,9 @@ mod auth_reset_password_tests {
             organization: None,
             department: None,
             phone: None,
-            created_at: Utc::now().naive_utc(),
+            created_at: Utc::now(),
             updated_at: None,
-            account_status: pacs_server::domain::entities::AccountStatus::Active,
+            account_status: pacs_server::domain::entities::UserAccountStatus::Active,
             email_verified: true,
             email_verification_token: None,
             email_verification_expires_at: None,
