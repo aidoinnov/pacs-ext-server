@@ -7,7 +7,7 @@ use pacs_server::application::dto::permission_dto::{
 };
 use pacs_server::application::use_cases::permission_use_case::PermissionUseCase;
 use pacs_server::domain::services::permission_service::PermissionService;
-use pacs_server::domain::entities::permission::{Role, Permission};
+use pacs_server::domain::entities::{Role, Permission};
 use pacs_server::domain::errors::ServiceError;
 use async_trait::async_trait;
 use mockall::mock;
@@ -18,24 +18,23 @@ mock! {
 
     #[async_trait]
     impl PermissionService for PermissionService {
-        async fn get_global_roles(&self) -> Result<Vec<Role>, ServiceError>;
-        async fn get_role_permissions(&self, role_id: i32) -> Result<Vec<Permission>, ServiceError>;
-        async fn create_role(&self, new_role: &pacs_server::domain::entities::permission::NewRole) -> Result<Role, ServiceError>;
-        async fn get_role_by_id(&self, id: i32) -> Result<Role, ServiceError>;
-        async fn get_project_roles(&self) -> Result<Vec<Role>, ServiceError>;
         async fn get_permissions_for_resource(&self, resource_type: &str) -> Result<Vec<Permission>, ServiceError>;
         async fn validate_permission_exists(&self, resource_type: &str, action: &str) -> Result<bool, ServiceError>;
-        async fn get_permission_by_id(&self, id: i32) -> Result<Permission, ServiceError>;
-        async fn get_permission_by_resource_and_action(&self, resource_type: &str, action: &str) -> Result<Permission, ServiceError>;
-        async fn get_all_permissions(&self) -> Result<Vec<Permission>, ServiceError>;
-        async fn get_permissions_by_resource_type(&self, resource_type: &str) -> Result<Vec<Permission>, ServiceError>;
-        async fn create_permission(&self, new_permission: &pacs_server::domain::entities::permission::NewPermission) -> Result<Permission, ServiceError>;
-        async fn delete_permission(&self, id: i32) -> Result<(), ServiceError>;
+        async fn create_role(&self, name: String, scope: pacs_server::domain::entities::RoleScope, description: Option<String>) -> Result<Role, ServiceError>;
+        async fn get_role(&self, id: i32) -> Result<Role, ServiceError>;
+        async fn update_role(&self, id: i32, name: Option<String>, description: Option<String>) -> Result<Role, ServiceError>;
+        async fn delete_role(&self, id: i32) -> Result<(), ServiceError>;
+        async fn get_roles_by_scope(&self, scope: pacs_server::domain::entities::RoleScope) -> Result<Vec<Role>, ServiceError>;
+        async fn get_global_roles(&self) -> Result<Vec<Role>, ServiceError>;
+        async fn get_project_roles(&self) -> Result<Vec<Role>, ServiceError>;
         async fn assign_permission_to_role(&self, role_id: i32, permission_id: i32) -> Result<(), ServiceError>;
         async fn remove_permission_from_role(&self, role_id: i32, permission_id: i32) -> Result<(), ServiceError>;
+        async fn get_role_permissions(&self, role_id: i32) -> Result<Vec<Permission>, ServiceError>;
         async fn assign_permission_to_project(&self, project_id: i32, permission_id: i32) -> Result<(), ServiceError>;
         async fn remove_permission_from_project(&self, project_id: i32, permission_id: i32) -> Result<(), ServiceError>;
         async fn get_project_permissions(&self, project_id: i32) -> Result<Vec<Permission>, ServiceError>;
+        async fn get_global_role_permission_matrix(&self) -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError>;
+        async fn get_project_role_permission_matrix(&self, project_id: i32) -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError>;
     }
 }
 
