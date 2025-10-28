@@ -257,8 +257,12 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
         .await?;
         
         // Keycloak에서 사용자 삭제
+        // keycloak_id는 UUID이므로 문자열로 변환
+        let keycloak_user_id = user.keycloak_id.to_string();
+        eprintln!("DEBUG: Attempting to delete user from Keycloak: {}", keycloak_user_id);
+        
         let keycloak_result = self.keycloak_client
-            .delete_user(&user.keycloak_id.to_string())
+            .delete_user(&keycloak_user_id)
             .await;
         
         if let Err(e) = &keycloak_result {

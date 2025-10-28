@@ -181,6 +181,7 @@ impl KeycloakClient {
         let token = self.get_admin_token().await?;
         let url = format!("{}/admin/realms/{}/users/{}", self.base_url, self.realm, keycloak_user_id);
         
+        
         let response = self.http_client
             .delete(&url)
             .bearer_auth(&token)
