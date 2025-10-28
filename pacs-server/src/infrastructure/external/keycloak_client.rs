@@ -84,7 +84,9 @@ impl KeycloakClient {
 
     /// 1. Admin 토큰 획득
     async fn get_admin_token(&self) -> Result<String, ServiceError> {
-        let url = format!("{}/realms/{}/protocol/openid-connect/token", self.base_url, self.realm);
+        // Admin 계정은 master realm에서 로그인해야 함
+        // 그런데 실제 realm 작업은 target realm에서 수행
+        let url = format!("{}/realms/master/protocol/openid-connect/token", self.base_url);
         
         let params = [
             ("grant_type", "password"),
