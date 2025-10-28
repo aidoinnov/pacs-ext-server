@@ -155,7 +155,6 @@ pub fn configure_routes<A: AuthService + 'static>(
                 .route("/verify-email", web::post().to(AuthController::<A>::verify_email))
                 .route("/find-username", web::post().to(AuthController::<A>::find_username))
                 .route("/reset-password", web::post().to(AuthController::<A>::reset_password))
-                .route("/admin/users/approve", web::post().to(AuthController::<A>::approve_user))
-                .route("/users/{user_id}", web::delete().to(AuthController::<A>::delete_account)),
+                .route("/admin/users/approve", web::post().to(AuthController::<A>::approve_user)),
         );
 }
