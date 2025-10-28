@@ -156,5 +156,7 @@ pub fn configure_routes<A: AuthService + 'static>(
                 .route("/find-username", web::post().to(AuthController::<A>::find_username))
                 .route("/reset-password", web::post().to(AuthController::<A>::reset_password))
                 .route("/admin/users/approve", web::post().to(AuthController::<A>::approve_user)),
-        );
+        )
+        // Add user registration routes separately
+        .route("/users/{user_id}", web::delete().to(AuthController::<A>::delete_account));
 }
