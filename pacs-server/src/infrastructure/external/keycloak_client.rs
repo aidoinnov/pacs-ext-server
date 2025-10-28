@@ -123,7 +123,7 @@ impl KeycloakClient {
         Ok(token_response.access_token)
     }
 
-    /// 2. 사용자 생성 (이메일 인증 필수, user 역할 자동 할당)
+    /// 2. 사용자 생성 (이메일 인증 없음, 사용자 비활성화 상태로 생성)
     pub async fn create_user(
         &self,
         username: &str,
@@ -136,14 +136,14 @@ impl KeycloakClient {
         let create_request = CreateUserRequest {
             username: username.to_string(),
             email: email.to_string(),
-            enabled: true,
-            email_verified: false,
+            enabled: false,  // 사용자는 비활성화 상태로 생성 (관리자 승인 필요)
+            email_verified: true,  // 이메일은 이미 인증된 것으로 간주
             credentials: vec![Credential {
                 credential_type: "password".to_string(),
                 value: password.to_string(),
                 temporary: false,
             }],
-            required_actions: vec!["VERIFY_EMAIL".to_string()],
+            required_actions: vec![],  // 이메일 인증 필요 없음
         };
         
         let response = self.http_client
@@ -179,8 +179,7 @@ impl KeycloakClient {
         // user 역할 할당
         let _ = self.assign_realm_role(&token, &user_id, "user").await;
         
-        // 이메일 인증 메일 발송
-        let _ = self.send_verification_email(&token, &user_id).await;
+        // 이메일 인증 메일 발송하지 않음 (관리자 승인 방식 사용)
         
         Ok(user_id)
     }
