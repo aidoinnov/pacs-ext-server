@@ -82,12 +82,12 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
         // 3. DB에 사용자 생성 (트랜잭션 시작)
         let mut tx = self.pool.begin().await?;
         
-        // 계정 즉시 활성화: PENDING_APPROVAL → ACTIVE
+        // 관리자 승인 대기 상태로 생성: PENDING_APPROVAL
         let user_result = sqlx::query_as::<_, User>(
             "INSERT INTO security_user 
              (keycloak_id, username, email, full_name, organization, department, phone, 
               account_status, email_verified)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE', true)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING_APPROVAL', true)
              RETURNING id, keycloak_id, username, email, full_name, organization, department, phone, 
                        created_at, updated_at, account_status, email_verified, 
                        email_verification_token, email_verification_expires_at,
