@@ -82,12 +82,12 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
         // 3. DB에 사용자 생성 (트랜잭션 시작)
         let mut tx = self.pool.begin().await?;
         
-        // 이메일 인증 건너뛰기: PENDING_EMAIL → PENDING_APPROVAL
+        // 계정 즉시 활성화: PENDING_APPROVAL → ACTIVE
         let user_result = sqlx::query_as::<_, User>(
             "INSERT INTO security_user 
              (keycloak_id, username, email, full_name, organization, department, phone, 
               account_status, email_verified)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING_APPROVAL', true)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE', true)
              RETURNING id, keycloak_id, username, email, full_name, organization, department, phone, 
                        created_at, updated_at, account_status, email_verified, 
                        email_verification_token, email_verification_expires_at,
@@ -248,13 +248,16 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
     async fn delete_account(&self, user_id: i32, actor_id: Option<i32>) -> Result<(), ServiceError> {
         let mut tx = self.pool.begin().await?;
         
-        // 사용자 조회
+        // 사용자 조회 (존재 확인)
         let user = sqlx::query!(
             "SELECT keycloak_id, username, email FROM security_user WHERE id = $1",
             user_id
         )
-        .fetch_one(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await?;
+        
+        // 사용자가 존재하지 않으면 에러 반환
+        let user = user.ok_or_else(|| ServiceError::NotFound("User not found".into()))?;
         
         // Keycloak에서 사용자 삭제
         // keycloak_id는 UUID이므로 문자열로 변환
