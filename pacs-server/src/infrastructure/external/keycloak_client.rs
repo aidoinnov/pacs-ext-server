@@ -86,13 +86,14 @@ impl KeycloakClient {
 
     /// 1. Admin 토큰 획득
     async fn get_admin_token(&self) -> Result<String, ServiceError> {
-        // Client credentials 방식으로 토큰 획득
+        // dcm4che realm에서 토큰 획득 시도
         let url = format!("{}/realms/{}/protocol/openid-connect/token", self.base_url, self.realm);
         
         let params = [
-            ("grant_type", "client_credentials"),
+            ("grant_type", "password"),
+            ("username", &self.admin_username),
+            ("password", &self.admin_password),
             ("client_id", &self.client_id),
-            ("client_secret", &self.client_secret),
         ];
         
         let response = self.http_client
