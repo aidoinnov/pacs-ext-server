@@ -84,7 +84,7 @@ impl KeycloakClient {
 
     /// 1. Admin 토큰 획득
     async fn get_admin_token(&self) -> Result<String, ServiceError> {
-        let url = format!("{}/realms/master/protocol/openid-connect/token", self.base_url);
+        let url = format!("{}/realms/{}/protocol/openid-connect/token", self.base_url, self.realm);
         
         let params = [
             ("grant_type", "password"),
