@@ -63,6 +63,12 @@ pub struct UserResponse {
     /// 연락처
     #[schema(example = "010-1234-5678")]
     pub phone: Option<String>,
+    /// 계정 상태
+    #[schema(example = "Active")]
+    pub account_status: String,
+    /// 이메일 인증 여부
+    #[schema(example = true)]
+    pub email_verified: bool,
     #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     pub created_at: DateTime<Utc>,
     #[schema(value_type = String, example = "2024-01-02T00:00:00Z")]
@@ -80,6 +86,8 @@ impl From<crate::domain::entities::user::User> for UserResponse {
             organization: user.organization,
             department: user.department,
             phone: user.phone,
+            account_status: format!("{:?}", user.account_status),
+            email_verified: user.email_verified,
             created_at: user.created_at,
             updated_at: user.updated_at,
         }
