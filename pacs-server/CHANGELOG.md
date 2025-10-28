@@ -1,30 +1,48 @@
 # Changelog
 
-## [Unreleased] - 2024-10-27
-
-### Fixed
-- 테스트 파일 컴파일 오류 수정
-  - 25개 테스트 파일 수정 완료
-  - User, Project, Permission 엔티티 필드 변경 반영
-  - Import 경로 수정
-  - Service Trait 시그니처 변경 반영
-  - DTO 변경사항 반영
-  - 통합 테스트 S3Service import 문제 해결
-
-### Changed
-- 테스트 파일 완료율: 80.6% (25/31)
-- 메인 라이브러리 빌드 성공
+## [Unreleased] - 2025-10-28
 
 ### Added
-- TODO_FIX_TESTS.md: 남은 6개 테스트 파일 수정 가이드
-- work/test_fixes/ 작업 문서
-  - work_plan.md: 작업 계획
-  - work_completion.md: 작업 완료 보고
-  - technical_document.md: 기술 문서
+- Keycloak 사용자 삭제 기능 구현
+  - Service Account 방식으로 Keycloak 인증
+  - Client credentials grant type 구현
+  - DELETE `/api/users/{user_id}` API
+  - 사용자 삭제 시 Keycloak과 DB 동시 삭제
+  - 에러 처리 개선 (존재하지 않는 사용자 처리)
+- 사용자 목록 응답에 계정 상태 필드 추가
+  - `account_status` 필드 추가 (Active, PendingApproval 등)
+  - `email_verified` 필드 추가 (이메일 인증 여부)
+  - 활성화 여부 확인 가능
+- 사용자 회원가입 및 활성화 API 문서화
+  - `docs/api/user-signup-and-activation-api.md` 생성
+  - `docs/api/admin-user-approval-api.md` 생성
+  - 상세한 API 사용 가이드 제공
+
+### Changed
+- 회원가입 시 account_status를 PENDING_APPROVAL로 설정
+  - 가입 직후는 관리자 승인 대기 상태
+  - 관리자 승인 후 Active 상태로 변경
+- Keycloak 사용자 생성 시 enabled=false, emailVerified=true 설정
+  - 회원가입 후 관리자 승인이 필요
+  - 이메일 인증 없이 바로 사용 가능
+
+### Fixed
+- Keycloak 토큰 획득 방식 변경
+  - Admin 계정 로그인 방식 → Service Account 방식
+  - Client ID와 Secret 사용
+  - Configured realm 사용
+- 엔드포인트 라우팅 중복 문제 해결
+  - DELETE `/api/users/{user_id}` 라우트 통합
+  - auth_controller에만 등록
+- 사용자 삭제 시 존재하지 않는 사용자 처리 개선
+  - fetch_one → fetch_optional로 변경
+  - 명확한 에러 메시지 제공
 
 ### Deprecated
 - database_cleanup_test.rs: 임시 비활성화
 - permission_controller_test.rs: 비활성화 (복잡한 Mock 문제)
+
+## [Previous] - 2024-10-27
 
 ## [Previous]
 
