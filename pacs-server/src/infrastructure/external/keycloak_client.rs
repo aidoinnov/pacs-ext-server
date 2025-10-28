@@ -9,6 +9,7 @@ pub struct KeycloakClient {
     base_url: String,
     realm: String,
     client_id: String,
+    client_secret: String,
     admin_username: String,
     admin_password: String,
     http_client: Client,
@@ -76,6 +77,7 @@ impl KeycloakClient {
             base_url: config.url,
             realm: config.realm,
             client_id: config.client_id,
+            client_secret: config.client_secret,
             admin_username: config.admin_username,
             admin_password: config.admin_password,
             http_client: Client::new(),
@@ -84,15 +86,13 @@ impl KeycloakClient {
 
     /// 1. Admin 토큰 획득
     async fn get_admin_token(&self) -> Result<String, ServiceError> {
-        // Admin 계정은 master realm에서 로그인해야 함
-        // 그런데 실제 realm 작업은 target realm에서 수행
-        let url = format!("{}/realms/master/protocol/openid-connect/token", self.base_url);
+        // Client credentials 방식으로 토큰 획득
+        let url = format!("{}/realms/{}/protocol/openid-connect/token", self.base_url, self.realm);
         
         let params = [
-            ("grant_type", "password"),
-            ("username", &self.admin_username),
-            ("password", &self.admin_password),
-            ("client_id", "admin-cli"),
+            ("grant_type", "client_credentials"),
+            ("client_id", &self.client_id),
+            ("client_secret", &self.client_secret),
         ];
         
         let response = self.http_client
