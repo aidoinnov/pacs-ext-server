@@ -95,6 +95,8 @@ impl KeycloakClient {
             ("client_secret", &self.client_secret),
         ];
         
+        eprintln!("DEBUG: Requesting Keycloak token from: {}", url);
+        
         let response = self.http_client
             .post(&url)
             .form(&params)
@@ -102,13 +104,18 @@ impl KeycloakClient {
             .await
             .map_err(|e| ServiceError::ExternalServiceError(format!("Keycloak token request failed: {}", e)))?;
         
+        eprintln!("DEBUG: Token request response status: {}", response.status());
+        
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
+            eprintln!("DEBUG: Token request failed: status={}, body={}", status, body);
             return Err(ServiceError::ExternalServiceError(
                 format!("Keycloak token failed ({}): {}", status, body)
             ));
         }
+        
+        eprintln!("DEBUG: Token request successful");
         
         let token_response: TokenResponse = response.json().await
             .map_err(|e| ServiceError::ExternalServiceError(format!("Failed to parse token: {}", e)))?;
