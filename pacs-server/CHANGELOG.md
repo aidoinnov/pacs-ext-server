@@ -17,6 +17,10 @@
   - `docs/api/user-signup-and-activation-api.md` 생성
   - `docs/api/admin-user-approval-api.md` 생성
   - 상세한 API 사용 가이드 제공
+- 비밀번호 재설정 API 문서화
+  - `docs/api/password-reset-api.md` 생성
+  - 비밀번호 재설정 API 상세 가이드 제공
+  - 사용자 인증 및 Keycloak 연동 방식 설명
 
 ### Changed
 - 회원가입 시 account_status를 PENDING_APPROVAL로 설정
