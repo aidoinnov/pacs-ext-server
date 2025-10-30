@@ -1401,6 +1401,9 @@ sqlx migrate run
 ### Testing
 - DICOM GW/Evaluator 미니멀 테스트 안정화, 레거시 테스트 단계적 재활성화 계획 수립
 
+### Performance
+- 핵심 인덱스/고유 제약 추가(`018_core_indices.sql`): UID 매핑, QIDO 필터(StudyDate/PatientID/Modality), 명시 권한/멤버십 조회 가속
+
 ---
 
 **Full Changelog**: This is the initial release.
