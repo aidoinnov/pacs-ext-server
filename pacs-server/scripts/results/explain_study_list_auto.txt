@@ -1,0 +1,15 @@
+-- EXPLAIN captured at 20251030-081304
+-- SQL: SELECT study_uid, modality, study_date, patient_id FROM project_data_study WHERE project_id = 1 AND study_date BETWEEN '2024-01-01' AND '2024-12-31' AND modality = 'CT';
+
+                                                                                                         QUERY PLAN                                                                                                         
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Seq Scan on public.project_data_study  (cost=0.00..0.00 rows=1 width=61) (actual time=0.004..0.005 rows=0 loops=1)
+   Output: study_uid, modality, study_date, patient_id
+   Filter: ((project_data_study.study_date >= '2024-01-01'::date) AND (project_data_study.study_date <= '2024-12-31'::date) AND (project_data_study.project_id = 1) AND ((project_data_study.modality)::text = 'CT'::text))
+ Query Identifier: -4410854879546795688
+ Planning:
+   Buffers: shared hit=176
+ Planning Time: 0.656 ms
+ Execution Time: 0.048 ms
+(8 rows)
+

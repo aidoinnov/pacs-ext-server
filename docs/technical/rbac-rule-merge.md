@@ -45,3 +45,23 @@
 - 기대보다 결과가 적은 경우: LIMIT 조건 교집합 확인
 - 전부 거부되는 경우: 우선순위 높은 DENY 유무, 규칙 부재 확인
 - 성능: 인덱스(018_core_indices.sql) 적용 여부와 쿼리 플랜 확인
+
+## 업스트림 인증/토큰 릴레이 주의
+- 게이트웨이는 수신한 Bearer 토큰을 Dcm4chee로 릴레이한다.
+- Keycloak 보호된 Dcm4chee는 토큰의 aud가 자원서버(Client ID)와 일치해야 한다.
+- 401/403 발생 시 점검 순서:
+  1) 토큰 만료(exp)
+  2) aud 불일치(게이트웨이/아카이브 클라이언트 설정 확인)
+  3) 권한 스코프 부족
+
+### 예시
+```
+요구사항: CT만 허용(ALLOW), 2024-01 범위로 제한(LIMIT), 특정 환자(PAT-001) DENY
+
+- 역할 규칙: ALLOW Modality=CT (priority 20)
+- 프로젝트 규칙: LIMIT StudyDate=20240101-20240131 (priority 10)
+- 프로젝트 규칙: DENY PatientID=PAT-001 (priority 30)
+
+평가: DENY > LIMIT > ALLOW 순서로 적용 → PAT-001은 항상 제외,
+그 외는 CT이면서 2024-01 범위에 한해 허용.
+```

@@ -1,0 +1,22 @@
+-- EXPLAIN captured at 20251030-083342
+-- SQL: SELECT study_uid, modality, study_date, patient_id FROM project_data_study WHERE project_id = (SELECT id FROM security_project WHERE name='PerfProj') AND study_date BETWEEN '2024-01-01' AND '2024-12-31' AND modality = 'CT';
+
+                                                                                                         QUERY PLAN                                                                                                          
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Seq Scan on public.project_data_study  (cost=2.01..3.07 rows=1 width=61) (actual time=0.026..0.026 rows=1 loops=1)
+   Output: project_data_study.study_uid, project_data_study.modality, project_data_study.study_date, project_data_study.patient_id
+   Filter: ((project_data_study.study_date >= '2024-01-01'::date) AND (project_data_study.study_date <= '2024-12-31'::date) AND (project_data_study.project_id = $0) AND ((project_data_study.modality)::text = 'CT'::text))
+   Buffers: shared hit=2
+   InitPlan 1 (returns $0)
+     ->  Seq Scan on public.security_project  (cost=0.00..2.01 rows=1 width=4) (actual time=0.013..0.014 rows=1 loops=1)
+           Output: security_project.id
+           Filter: (security_project.name = 'PerfProj'::text)
+           Rows Removed by Filter: 1
+           Buffers: shared hit=1
+ Query Identifier: 3049709522444875645
+ Planning:
+   Buffers: shared hit=361
+ Planning Time: 0.975 ms
+ Execution Time: 0.064 ms
+(15 rows)
+

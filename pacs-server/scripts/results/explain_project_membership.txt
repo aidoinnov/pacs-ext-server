@@ -1,0 +1,17 @@
+-- EXPLAIN captured at 20251030-081111
+-- SQL: SELECT 1 FROM security_user_project WHERE user_id = 10 AND project_id = 1;
+
+                                                      QUERY PLAN                                                      
+----------------------------------------------------------------------------------------------------------------------
+ Seq Scan on public.security_user_project  (cost=0.00..1.01 rows=1 width=4) (actual time=0.012..0.013 rows=0 loops=1)
+   Output: 1
+   Filter: ((security_user_project.user_id = 10) AND (security_user_project.project_id = 1))
+   Rows Removed by Filter: 1
+   Buffers: shared hit=1
+ Query Identifier: 1682115679454130409
+ Planning:
+   Buffers: shared hit=136
+ Planning Time: 0.513 ms
+ Execution Time: 0.043 ms
+(10 rows)
+

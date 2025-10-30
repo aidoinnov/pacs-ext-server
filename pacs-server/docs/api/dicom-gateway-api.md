@@ -35,9 +35,9 @@ GET /api/dicom/studies/1.2.3.4/series?project_id=1
 Authorization: Bearer <JWT>
 ```
 
-### GET /api/dicom/studies/{study_uid}/instances
+### GET /api/dicom/studies/{study_uid}/series/{series_uid}/instances
 - 설명: QIDO-RS Instances 조회를 프록시합니다. 프로젝트 규칙 병합 + evaluator 사후 필터링 적용.
-- 경로 파라미터: study_uid (StudyInstanceUID)
+- 경로 파라미터: study_uid (StudyInstanceUID), series_uid (SeriesInstanceUID)
 - 쿼리 파라미터:
   - project_id: int
   - QIDO-RS 호환 파라미터 (예: SOPClassUID, InstanceNumber 등)
@@ -45,7 +45,7 @@ Authorization: Bearer <JWT>
 
 예시 요청:
 ```
-GET /api/dicom/studies/1.2.3.4/instances?project_id=1&limit=1
+GET /api/dicom/studies/1.2.3.4/series/1.2.3.4.5/instances?project_id=1&limit=1
 Authorization: Bearer <JWT>
 ```
 
@@ -78,6 +78,17 @@ Authorization: Bearer <JWT>
 - 502 Bad Gateway: Dcm4chee QIDO 요청 실패 시
 - 401 Unauthorized: JWT 검증 실패 시
 - 200 OK + 빈 배열: 규칙/권한에 의해 모두 필터링된 경우
+
+
+## 토큰 릴레이 및 업스트림 인증
+- 게이트웨이는 수신한 Authorization Bearer 토큰을 Dcm4chee로 그대로 릴레이합니다.
+- Dcm4chee가 Keycloak 보호 중인 경우, 토큰의 aud(클라이언트)가 Dcm4chee 리소스 서버와 일치해야 합니다.
+- 401/403 발생 시: 토큰 만료/스코프/오디언스 불일치 여부를 우선 확인하세요.
+
+## 트러블슈팅
+- 404 Not Found: QIDO 경로 확인. 예) `aets/<AET>/rs/studies` 형태여야 하며, 운영 경로는 `aets/iAID_PACS/rs/...` 등 환경에 따라 다릅니다.
+- 401 Unauthorized(업스트림): Bearer 토큰 릴레이 여부, aud 클레임, Dcm4chee Keycloak 설정 확인.
+- 빈 결과: 프로젝트 멤버십/명시 권한 부재 또는 DENY/LIMIT 규칙에 의한 필터링 가능.
 
 
 ## 시나리오 요약(테스트 기준)

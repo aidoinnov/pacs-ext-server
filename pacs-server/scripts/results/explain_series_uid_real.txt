@@ -1,0 +1,31 @@
+-- EXPLAIN captured at 20251030-083342
+-- SQL: SELECT id FROM project_data_series WHERE series_uid = '1.2.840.10008.1.2.1.999.1.1' AND study_id = (SELECT s.id FROM project_data_study s JOIN security_project p ON p.id=s.project_id WHERE p.name='PerfProj' AND s.study_uid='1.2.840.10008.1.2.1.999.1');
+
+                                                            QUERY PLAN                                                             
+-----------------------------------------------------------------------------------------------------------------------------------
+ Seq Scan on public.project_data_series  (cost=3.06..4.06 rows=1 width=4) (actual time=0.046..0.047 rows=1 loops=1)
+   Output: project_data_series.id
+   Filter: ((project_data_series.series_uid = '1.2.840.10008.1.2.1.999.1.1'::text) AND (project_data_series.study_id = $0))
+   Buffers: shared hit=3
+   InitPlan 1 (returns $0)
+     ->  Nested Loop  (cost=0.00..3.06 rows=1 width=4) (actual time=0.025..0.027 rows=1 loops=1)
+           Output: s.id
+           Inner Unique: true
+           Join Filter: (s.project_id = p.id)
+           Buffers: shared hit=2
+           ->  Seq Scan on public.project_data_study s  (cost=0.00..1.04 rows=1 width=8) (actual time=0.009..0.010 rows=1 loops=1)
+                 Output: s.id, s.project_id
+                 Filter: (s.study_uid = '1.2.840.10008.1.2.1.999.1'::text)
+                 Buffers: shared hit=1
+           ->  Seq Scan on public.security_project p  (cost=0.00..2.01 rows=1 width=4) (actual time=0.014..0.014 rows=1 loops=1)
+                 Output: p.id
+                 Filter: (p.name = 'PerfProj'::text)
+                 Rows Removed by Filter: 1
+                 Buffers: shared hit=1
+ Query Identifier: -2278782011020753285
+ Planning:
+   Buffers: shared hit=564
+ Planning Time: 2.897 ms
+ Execution Time: 0.120 ms
+(24 rows)
+
