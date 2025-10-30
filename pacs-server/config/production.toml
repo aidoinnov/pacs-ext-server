@@ -40,3 +40,12 @@ qido_path = "/dcm4chee-arc/aets/DCM4CHEE/rs"
 wado_path = "/dcm4chee-arc/aets/DCM4CHEE/wado"
 aet = "DCM4CHEE"
 timeout_ms = 5000
+
+[dcm4chee.db]
+# Set via environment variables in real production if possible
+# These defaults are placeholders; override with APP_DCM4CHEE__DB__* env vars
+host = "localhost"
+port = 5457
+database = "postgres"
+username = "pacsadmin"
+password = "HhL}qb(tl}?zJ4}("
