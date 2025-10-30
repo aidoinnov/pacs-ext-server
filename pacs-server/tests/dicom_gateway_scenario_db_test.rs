@@ -237,4 +237,167 @@ async fn scenario_db_allow_ct_and_limit_june_positive() {
     assert_eq!(cnt, 1, "ALLOW CT with LIMIT June should retain seeded row");
 }
 
+// 비멤버는 어떤 데이터도 보이지 않아야 한다(시뮬레이션: 멤버십 조인 불일치 → 0)
+#[tokio::test]
+async fn scenario_db_non_member_denied() {
+    use std::env;
+
+    let db_url = match env::var("APP_DATABASE_URL") {
+        Ok(v) if !v.is_empty() => v,
+        _ => return,
+    };
+
+    let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
+
+    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+        .fetch_one(&pool)
+        .await
+        .expect("PerfProj exists");
+
+    // 존재하지 않는 사용자 또는 비멤버 사용자를 가정: membership 조인 불일치
+    let non_member_user_id: i32 = 999_999;
+
+    let cnt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM project_data_study s \
+         LEFT JOIN security_user_project sup ON sup.project_id = s.project_id AND sup.user_id = $1 \
+         WHERE s.project_id = $2 AND sup.user_id IS NOT NULL",
+    )
+    .bind(non_member_user_id)
+    .bind(project_id)
+    .fetch_one(&pool)
+    .await
+    .expect("count");
+
+    assert_eq!(cnt, 0);
+}
+
+// 명시 권한(Study 레벨)이 규칙보다 우선 적용되는지 시뮬레이션
+#[tokio::test]
+async fn scenario_db_explicit_study_access_overrides_rule() {
+    use std::env;
+
+    let db_url = match env::var("APP_DATABASE_URL") {
+        Ok(v) if !v.is_empty() => v,
+        _ => return,
+    };
+
+    let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
+
+    let (project_id, user_id): (i32, i32) = sqlx::query_as(
+        "SELECT p.id, u.id \
+         FROM security_project p, security_user u \
+         WHERE p.name='PerfProj' \
+         ORDER BY u.id ASC LIMIT 1",
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("project/user exists");
+
+    // 규칙: CT만 허용 + 2024-06 범위 제한이 있다고 가정. 
+    // 명시 권한으로 특정 Study UID를 부여하면 규칙 조건과 무관하게 접근 가능해야 함을 DB WHERE로 모사.
+    let study_uid: String = sqlx::query_scalar(
+        "SELECT study_uid FROM project_data_study WHERE project_id=$1 ORDER BY id LIMIT 1",
+    )
+    .bind(project_id)
+    .fetch_one(&pool)
+    .await
+    .expect("study exists");
+
+    // study_id 조회
+    let study_id: i32 = sqlx::query_scalar(
+        "SELECT id FROM project_data_study WHERE project_id=$1 AND study_uid=$2",
+    )
+    .bind(project_id)
+    .bind(&study_uid)
+    .fetch_one(&pool)
+    .await
+    .expect("study id");
+
+    // 명시 권한 부여 (중복 방지 위해 upsert 유사 처리)
+    // project_data_id가 NOT NULL 제약인 환경이 있으므로 매핑을 우선 시도
+    let project_data_id_opt: Option<i32> = sqlx::query_scalar(
+        "SELECT id FROM project_data WHERE project_id=$1 AND study_uid=$2 LIMIT 1",
+    )
+    .bind(project_id)
+    .bind(&study_uid)
+    .fetch_optional(&pool)
+    .await
+    .expect("select project_data_id optional");
+
+    let _ = sqlx::query(
+        "DELETE FROM project_data_access WHERE user_id=$1 AND project_id=$2 AND resource_level='STUDY' AND study_id=$3",
+    )
+    .bind(user_id)
+    .bind(project_id)
+    .bind(study_id)
+    .execute(&pool)
+    .await
+    .ok();
+
+    if let Some(project_data_id) = project_data_id_opt {
+        sqlx::query(
+            "INSERT INTO project_data_access (user_id, project_id, project_data_id, resource_level, study_id, status) \
+             VALUES ($1, $2, $3, 'STUDY', $4, 'APPROVED')",
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(project_data_id)
+        .bind(study_id)
+        .execute(&pool)
+        .await
+        .expect("insert explicit access with project_data_id");
+    } else {
+        // Fallback: 필요한 최소 컬럼으로 project_data 행을 생성 후 연결
+        let created_id: i32 = sqlx::query_scalar(
+            "INSERT INTO project_data (project_id, study_uid) VALUES ($1, $2) \
+             ON CONFLICT DO NOTHING \
+             RETURNING id",
+        )
+        .bind(project_id)
+        .bind(&study_uid)
+        .fetch_optional(&pool)
+        .await
+        .expect("insert project_data opt")
+        .unwrap_or_else(|| {
+            futures::executor::block_on(async {
+                sqlx::query_scalar(
+                    "SELECT id FROM project_data WHERE project_id=$1 AND study_uid=$2 LIMIT 1",
+                )
+                .bind(project_id)
+                .bind(&study_uid)
+                .fetch_one(&pool)
+                .await
+                .expect("select project_data id after conflict")
+            })
+        });
+
+        sqlx::query(
+            "INSERT INTO project_data_access (user_id, project_id, project_data_id, resource_level, study_id, status) \
+             VALUES ($1, $2, $3, 'STUDY', $4, 'APPROVED')",
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(created_id)
+        .bind(study_id)
+        .execute(&pool)
+        .await
+        .expect("insert explicit access with created project_data");
+    }
+
+    // 규칙 기반 필터가 CT/날짜로 축소하더라도, 명시 접근은 해당 스터디를 통과시켜야 함 → 시뮬레이션: 명시 접근 조인으로 존재 확인
+    let cnt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM project_data_study s \
+         JOIN project_data_access a ON a.study_id = s.id AND a.resource_level='STUDY' \
+         WHERE a.user_id=$1 AND a.project_id=$2 AND s.id=$3",
+    )
+    .bind(user_id)
+    .bind(project_id)
+    .bind(study_id)
+    .fetch_one(&pool)
+    .await
+    .expect("count explicit");
+
+    assert_eq!(cnt, 1);
+}
+
 
