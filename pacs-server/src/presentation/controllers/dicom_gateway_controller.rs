@@ -12,6 +12,7 @@ use crate::domain::repositories::{AccessConditionRepository, UserRepository};
 use crate::domain::entities::access_condition::AccessCondition;
 use crate::infrastructure::services::DicomRbacEvaluatorImpl;
 use uuid::Uuid;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct GatewayQuery {
@@ -109,12 +110,20 @@ pub async fn get_studies(
         }
     };
     
-    // 1. 규칙 기반 QIDO 파라미터 병합
-    let mut qido_params = json_to_params(query.extra.clone().into());
-    if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
+    // 1. 규칙 기반 QIDO 파라미터 병합 + 사용자 입력 우선 병합
+    // 사용자 필터/페이지네이션 파라미터 파싱 및 검증
+    let user_params = match build_qido_params_from_user_query(&query.extra) {
+        Ok(p) => p,
+        Err(msg) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
+        }
+    };
+    let qido_params = if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
         let rule_params = build_qido_params_from_conditions(&conditions);
-        qido_params.extend(rule_params);
-    }
+        merge_qido_params(rule_params, user_params) // 사용자 입력이 우선
+    } else {
+        user_params
+    };
     
     // 2. Dcm4chee QIDO 호출
     let bearer_opt = req.headers().get("Authorization").and_then(|h| h.to_str().ok()).and_then(|s| s.strip_prefix("Bearer ")).map(|s| s.to_string());
@@ -182,12 +191,19 @@ pub async fn get_series(
         }
     };
     
-    // 1. 규칙 기반 QIDO 파라미터 병합
-    let mut qido_params = json_to_params(query.extra.clone().into());
-    if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
+    // 1. 규칙 기반 QIDO 파라미터 병합 + 사용자 입력 우선 병합
+    let user_params = match build_qido_params_from_user_query(&query.extra) {
+        Ok(p) => p,
+        Err(msg) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
+        }
+    };
+    let qido_params = if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
         let rule_params = build_qido_params_from_conditions(&conditions);
-        qido_params.extend(rule_params);
-    }
+        merge_qido_params(rule_params, user_params)
+    } else {
+        user_params
+    };
     
     // 2. Dcm4chee QIDO 호출
     let bearer_opt = req.headers().get("Authorization").and_then(|h| h.to_str().ok()).and_then(|s| s.strip_prefix("Bearer ")).map(|s| s.to_string());
@@ -243,12 +259,19 @@ pub async fn get_instances(
         }
     };
     
-    // 1. 규칙 기반 QIDO 파라미터 병합
-    let mut qido_params = json_to_params(query.extra.clone().into());
-    if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
+    // 1. 규칙 기반 QIDO 파라미터 병합 + 사용자 입력 우선 병합
+    let user_params = match build_qido_params_from_user_query(&query.extra) {
+        Ok(p) => p,
+        Err(msg) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
+        }
+    };
+    let qido_params = if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
         let rule_params = build_qido_params_from_conditions(&conditions);
-        qido_params.extend(rule_params);
-    }
+        merge_qido_params(rule_params, user_params)
+    } else {
+        user_params
+    };
     
     // 2. Dcm4chee QIDO 호출
     let bearer_opt = req.headers().get("Authorization").and_then(|h| h.to_str().ok()).and_then(|s| s.strip_prefix("Bearer ")).map(|s| s.to_string());
@@ -364,19 +387,7 @@ fn extract_instance_uid(item: &serde_json::Value) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-fn json_to_params(v: Value) -> Vec<(String, String)> {
-    let mut params = Vec::new();
-    if let Value::Object(map) = v {
-        for (k, v) in map.into_iter() {
-            if let Some(s) = v.as_str() {
-                params.push((k, s.to_string()));
-            } else if v.is_number() || v.is_boolean() {
-                params.push((k, v.to_string()));
-            }
-        }
-    }
-    params
-}
+// json_to_params: 이전 일반 쿼리 전달용 유틸은 사용자 필터 전용 파서로 대체됨
 
 pub(crate) fn build_qido_params_from_conditions(conds: &Vec<AccessCondition>) -> Vec<(String, String)> {
     let mut params = Vec::new();
@@ -391,6 +402,26 @@ pub(crate) fn build_qido_params_from_conditions(conds: &Vec<AccessCondition>) ->
                         "00100020" | "PatientID" => {
                             if let Some(val) = &c.value { params.push(("PatientID".to_string(), val.clone())); }
                         }
+                        "00080050" | "AccessionNumber" => {
+                            if let Some(val) = &c.value { params.push(("AccessionNumber".to_string(), val.clone())); }
+                        }
+                        "00100010" | "PatientName" => {
+                            if let Some(val) = &c.value { params.push(("PatientName".to_string(), val.clone())); }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            // CONTAINS는 QIDO에서도 부분일치로 동작하도록 값 그대로 전달(서버 구현에 의존)
+            "CONTAINS" => {
+                if let Some(tag) = &c.dicom_tag {
+                    match tag.as_str() {
+                        "00080050" | "AccessionNumber" => {
+                            if let Some(val) = &c.value { params.push(("AccessionNumber".to_string(), val.clone())); }
+                        }
+                        "00100010" | "PatientName" => {
+                            if let Some(val) = &c.value { params.push(("PatientName".to_string(), val.clone())); }
+                        }
                         _ => {}
                     }
                 }
@@ -402,18 +433,60 @@ pub(crate) fn build_qido_params_from_conditions(conds: &Vec<AccessCondition>) ->
                     }
                 }
             }
+            // NE(불일치) 등은 QIDO 파라미터로 표현하기 어려워 사후 필터에 위임
             _ => {}
         }
     }
     params
 }
 
+// 사용자 쿼리에서 지원하는 파라미터를 QIDO 파라미터로 변환하며 검증을 수행한다
+fn build_qido_params_from_user_query(extra: &serde_json::Map<String, Value>) -> Result<Vec<(String, String)>, String> {
+    let mut params: HashMap<String, String> = HashMap::new();
+
+    // 필터: modality/patient_id/study_date/optional accession_number/patient_name
+    if let Some(v) = extra.get("modality").and_then(|v| v.as_str()) { params.insert("Modality".to_string(), v.to_string()); }
+    if let Some(v) = extra.get("patient_id").and_then(|v| v.as_str()) { params.insert("PatientID".to_string(), v.to_string()); }
+    if let Some(v) = extra.get("accession_number").and_then(|v| v.as_str()) { params.insert("AccessionNumber".to_string(), v.to_string()); }
+    if let Some(v) = extra.get("patient_name").and_then(|v| v.as_str()) { params.insert("PatientName".to_string(), v.to_string()); }
+
+    if let Some(sd) = extra.get("study_date").and_then(|v| v.as_str()) {
+        if !is_valid_study_date(sd) { return Err("Invalid study_date format. Use YYYYMMDD or YYYYMMDD-YYYYMMDD".to_string()); }
+        params.insert("StudyDate".to_string(), sd.to_string());
+    }
+
+    // 페이지네이션: page(1-base), page_size(default 50, max 200)
+    let page_size = extra.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50).clamp(1, 200) as i64;
+    let page = extra.get("page").and_then(|v| v.as_i64()).unwrap_or(1).max(1);
+    let offset = (page - 1) * page_size;
+    params.insert("limit".to_string(), page_size.to_string());
+    params.insert("offset".to_string(), offset.to_string());
+
+    Ok(params.into_iter().collect())
+}
+
+fn is_valid_study_date(s: &str) -> bool {
+    // YYYYMMDD or YYYYMMDD-YYYYMMDD
+    let bytes = s.as_bytes();
+    if bytes.len() == 8 { return bytes.iter().all(|c| c.is_ascii_digit()); }
+    if bytes.len() == 17 && bytes[8] == b'-' {
+        return bytes[..8].iter().all(|c| c.is_ascii_digit()) && bytes[9..].iter().all(|c| c.is_ascii_digit());
+    }
+    false
+}
+
+fn merge_qido_params(rule_params: Vec<(String, String)>, user_params: Vec<(String, String)>) -> Vec<(String, String)> {
+    // rule 먼저 넣고, 같은 키는 user 값으로 덮어씀
+    let mut map: HashMap<String, String> = HashMap::new();
+    for (k, v) in rule_params { map.insert(k, v); }
+    for (k, v) in user_params { map.insert(k, v); }
+    map.into_iter().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{build_qido_params_from_conditions, decode_keycloak_token_sub, extract_study_uid, extract_series_uid, extract_instance_uid};
     use crate::domain::entities::access_condition::{AccessCondition, ResourceLevel, ConditionType};
-    use actix_web::{App, web, HttpResponse};
-    use actix_web::test;
     use base64::Engine;
 
     fn ac(tag: Option<&str>, op: &str, val: Option<&str>) -> AccessCondition {
