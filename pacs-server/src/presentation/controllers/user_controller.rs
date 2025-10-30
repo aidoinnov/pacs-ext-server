@@ -1,13 +1,47 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse, Responder, HttpRequest};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::dto::user_dto::{CreateUserRequest, UpdateUserRequest, UserResponse, UserListQuery, UserListResponse, PaginationInfo};
+use crate::application::dto::user_dto::{
+    CreateUserRequest, PaginationInfo, UpdateUserRequest, UserListQuery, UserListResponse,
+    UserResponse,
+};
 use crate::application::use_cases::user_use_case::UserUseCase;
 use crate::domain::services::user_service::UserService;
+use crate::infrastructure::auth::{extract_user_id_from_request, JwtService};
+use crate::infrastructure::repositories::UserRepositoryImpl;
+use crate::domain::repositories::UserRepository; // bring trait for find_by_id into scope
 
 pub struct UserController<U: UserService> {
     user_use_case: Arc<UserUseCase<U>>,
+}
+
+/// 내 프로필 조회 (토큰 기반)
+#[utoipa::path(
+    get,
+    path = "/api/users/me",
+    tag = "users",
+    responses(
+        (status = 200, description = "Current user profile", body = UserResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found")
+    )
+)]
+pub async fn get_me(
+    req: HttpRequest,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
+) -> impl Responder {
+    match extract_user_id_from_request(&req, &jwt, &user_repo).await {
+        Some(user_id) if user_id > 0 => match user_repo.find_by_id(user_id).await {
+            Ok(Some(user)) => HttpResponse::Ok().json(UserResponse::from(user)),
+            Ok(None) => HttpResponse::NotFound().json(json!({"error":"User not found"})),
+            Err(e) => HttpResponse::InternalServerError().json(json!({"error": e.to_string()})),
+        },
+        _ => HttpResponse::Unauthorized().json(json!({
+            "error": "Invalid or missing authorization token"
+        })),
+    }
 }
 
 impl<U: UserService> UserController<U> {
@@ -61,7 +95,10 @@ impl<U: UserService> UserController<U> {
         let sort_order = query.sort_order.as_deref().unwrap_or("asc");
         let search = query.search.as_deref();
 
-        match user_use_case.list_users(page, page_size, sort_by, sort_order, search).await {
+        match user_use_case
+            .list_users(page, page_size, sort_by, sort_order, search)
+            .await
+        {
             Ok((users, total)) => {
                 let total_pages = if total > 0 {
                     ((total as f64) / (page_size as f64)).ceil() as i32
@@ -84,7 +121,6 @@ impl<U: UserService> UserController<U> {
             })),
         }
     }
-
 }
 
 /// 사용자 정보 업데이트
@@ -109,7 +145,7 @@ pub async fn update_user<U: UserService + 'static>(
     req: web::Json<UpdateUserRequest>,
 ) -> impl Responder {
     let user_id = path.into_inner();
-    
+
     match user_use_case.update_user(user_id, req.into_inner()).await {
         Ok(user) => HttpResponse::Ok().json(user),
         Err(e) => {
@@ -119,7 +155,7 @@ pub async fn update_user<U: UserService + 'static>(
                 crate::domain::ServiceError::ValidationError(_) => HttpResponse::BadRequest(),
                 _ => HttpResponse::InternalServerError(),
             };
-            
+
             status.json(json!({
                 "error": format!("Failed to update user: {}", e)
             }))
@@ -131,16 +167,16 @@ pub fn configure_routes<U: UserService + 'static>(
     cfg: &mut web::ServiceConfig,
     user_use_case: Arc<UserUseCase<U>>,
 ) {
-    cfg.app_data(web::Data::new(user_use_case))
-        .service(
-            web::scope("/users")
-                .route("", web::get().to(UserController::<U>::list_users))
-                .route("", web::post().to(UserController::<U>::create_user))
-                .route("/{user_id}", web::get().to(UserController::<U>::get_user))
-                .route("/{user_id}", web::put().to(update_user::<U>))
-                .route(
-                    "/username/{username}",
-                    web::get().to(UserController::<U>::get_user_by_username),
-                ),
-        );
+    cfg.app_data(web::Data::new(user_use_case)).service(
+        web::scope("/users")
+            .route("", web::get().to(UserController::<U>::list_users))
+            .route("", web::post().to(UserController::<U>::create_user))
+            .route("/me", web::get().to(get_me))
+            .route("/{user_id}", web::get().to(UserController::<U>::get_user))
+            .route("/{user_id}", web::put().to(update_user::<U>))
+            .route(
+                "/username/{username}",
+                web::get().to(UserController::<U>::get_user_by_username),
+            ),
+    );
 }
