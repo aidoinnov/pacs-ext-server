@@ -165,4 +165,76 @@ async fn scenario_db_limit_date_range_intersection_empty() {
     assert_eq!(cnt, 0, "limit with non-overlapping date range should yield empty set");
 }
 
+#[tokio::test]
+async fn scenario_db_deny_over_allow_simulation() {
+    use std::env;
+
+    let db_url = match env::var("APP_DATABASE_URL") {
+        Ok(v) if !v.is_empty() => v,
+        _ => return,
+    };
+
+    let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
+
+    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+        .fetch_one(&pool)
+        .await
+        .expect("PerfProj exists");
+
+    // 시드: Modality='CT', PatientID='PAT-EXPLAIN-001', StudyDate='2024-06-15'
+    // ALLOW(Modality=CT)와 동시에 DENY(PatientID=PAT-EXPLAIN-001)가 있으면 최종 제외되어야 함
+    // SQL로는 ALLOW 후보셋에서 DENY를 제외한 결과가 0이 되는지 확인
+
+    let allow_ct_cnt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM project_data_study \
+         WHERE project_id=$1 AND modality='CT' AND study_uid='1.2.840.10008.1.2.1.999.1'",
+    )
+    .bind(project_id)
+    .fetch_one(&pool)
+    .await
+    .expect("allow set count");
+    assert_eq!(allow_ct_cnt, 1, "seed should be CT");
+
+    let final_cnt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM project_data_study \
+         WHERE project_id=$1 AND modality='CT' AND patient_id <> 'PAT-EXPLAIN-001' \
+           AND study_uid='1.2.840.10008.1.2.1.999.1'",
+    )
+    .bind(project_id)
+    .fetch_one(&pool)
+    .await
+    .expect("final count after deny");
+    assert_eq!(final_cnt, 0, "DENY must override ALLOW resulting in exclusion");
+}
+
+#[tokio::test]
+async fn scenario_db_allow_ct_and_limit_june_positive() {
+    use std::env;
+
+    let db_url = match env::var("APP_DATABASE_URL") {
+        Ok(v) if !v.is_empty() => v,
+        _ => return,
+    };
+
+    let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
+
+    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+        .fetch_one(&pool)
+        .await
+        .expect("PerfProj exists");
+
+    // ALLOW(Modality=CT) ∩ LIMIT(2024-06-01..2024-06-30) → 시드 1건 유지 기대
+    let cnt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM project_data_study \
+         WHERE project_id=$1 AND modality='CT' \
+           AND study_date BETWEEN '2024-06-01' AND '2024-06-30' \
+           AND study_uid='1.2.840.10008.1.2.1.999.1'",
+    )
+    .bind(project_id)
+    .fetch_one(&pool)
+    .await
+    .expect("allow+limit positive count");
+    assert_eq!(cnt, 1, "ALLOW CT with LIMIT June should retain seeded row");
+}
+
 
