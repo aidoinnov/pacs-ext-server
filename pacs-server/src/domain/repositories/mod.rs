@@ -9,6 +9,8 @@ mod mask_group_repository;
 mod mask_repository;
 mod project_data_repository;
 mod project_data_access_repository;
+mod access_condition_repository;
+mod institution_repository;
 
 pub use user_repository::*;
 pub use project_repository::*;
@@ -21,3 +23,5 @@ pub use mask_group_repository::*;
 pub use mask_repository::*;
 pub use project_data_repository::*;
 pub use project_data_access_repository::*;
+pub use access_condition_repository::*;
+pub use institution_repository::*;

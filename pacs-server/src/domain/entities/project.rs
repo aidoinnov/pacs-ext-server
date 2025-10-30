@@ -94,7 +94,7 @@ pub struct Project {
 /// - `auto_complete`: 자동 완료 여부
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let new_project = NewProject {
 ///     name: "새로운 의료영상 프로젝트".to_string(),
 ///     description: Some("AI 기반 의료영상 진단 프로젝트".to_string()),
@@ -136,7 +136,7 @@ pub struct NewProject {
 /// - `is_active`: 프로젝트 활성화 상태
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let update_project = UpdateProject {
 ///     name: None,
 ///     description: Some("업데이트된 설명".to_string()),

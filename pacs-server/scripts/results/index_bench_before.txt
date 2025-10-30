@@ -1,0 +1,8 @@
+===== BEFORE: EXPLAIN ANALYZE =====
+Timing is on.
+ project_id | study_uid 
+------------+-----------
+(0 rows)
+
+Time: 6.997 ms
+Time: 6.240 ms

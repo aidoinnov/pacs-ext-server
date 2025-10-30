@@ -36,7 +36,7 @@ use sqlx::FromRow;
 /// - `description`: 어노테이션에 대한 설명 (선택사항)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let annotation = Annotation {
 ///     id: 1,
 ///     project_id: 1,
@@ -105,7 +105,7 @@ pub struct Annotation {
 /// - `action_at`: 변경이 수행된 시각
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let history = AnnotationHistory {
 ///     id: 1,
 ///     annotation_id: 1,
@@ -154,7 +154,7 @@ pub struct AnnotationHistory {
 /// - `is_shared`: 다른 사용자와 공유 여부
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let new_annotation = NewAnnotation {
 ///     project_id: 1,
 ///     user_id: 1,

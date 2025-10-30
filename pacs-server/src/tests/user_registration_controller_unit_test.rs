@@ -2,6 +2,7 @@
 mod tests {
     use async_trait::async_trait;
     use actix_web::{test, web, App};
+    use std::sync::Arc;
     use serde_json::json;
     use tokio;
     use crate::application::dto::user_registration_dto::*;
@@ -56,20 +57,17 @@ mod tests {
             .times(1)
             .returning(move |_, _, _, _, _, _, _| Ok(expected_user.clone()));
 
-        let use_case = UserRegistrationUseCase::new(mock_service);
+        let use_case = Arc::new(UserRegistrationUseCase::new(mock_service));
         let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(use_case))
-                .service(
-                    web::scope("/api")
-                        .route("/auth/signup", web::post().to(crate::presentation::controllers::user_registration_controller::signup))
-                )
+            App::new().service(web::scope("/api").configure(|cfg| {
+                crate::presentation::controllers::user_registration_controller::configure_routes(cfg, use_case.clone())
+            }))
         ).await;
 
         let request_body = json!({
             "username": "testuser",
             "email": "test@example.com",
-            "password": "password123",
+            "password": "Password123",
             "full_name": "Test User",
             "organization": "Test Org",
             "department": "Test Dept",
@@ -85,7 +83,7 @@ mod tests {
         let resp = test::call_service(&app, req).await;
 
         // Then
-        assert_eq!(resp.status(), 200);
+        assert_eq!(resp.status(), 201);
     }
 
     #[tokio::test]
@@ -97,14 +95,11 @@ mod tests {
             .times(1)
             .returning(|_| Ok(()));
 
-        let use_case = UserRegistrationUseCase::new(mock_service);
+        let use_case = Arc::new(UserRegistrationUseCase::new(mock_service));
         let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(use_case))
-                .service(
-                    web::scope("/api")
-                        .route("/auth/verify-email", web::post().to(crate::presentation::controllers::user_registration_controller::verify_email))
-                )
+            App::new().service(web::scope("/api").configure(|cfg| {
+                crate::presentation::controllers::user_registration_controller::configure_routes(cfg, use_case.clone())
+            }))
         ).await;
 
         let request_body = json!({
@@ -133,14 +128,11 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let use_case = UserRegistrationUseCase::new(mock_service);
+        let use_case = Arc::new(UserRegistrationUseCase::new(mock_service));
         let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(use_case))
-                .service(
-                    web::scope("/api")
-                        .route("/auth/approve", web::post().to(crate::presentation::controllers::user_registration_controller::approve_user))
-                )
+            App::new().service(web::scope("/api").configure(|cfg| {
+                crate::presentation::controllers::user_registration_controller::configure_routes(cfg, use_case.clone())
+            }))
         ).await;
 
         let request_body = json!({
@@ -149,7 +141,7 @@ mod tests {
 
         // When
         let req = test::TestRequest::post()
-            .uri("/api/auth/approve")
+            .uri("/api/admin/users/approve")
             .set_json(&request_body)
             .to_request();
 
@@ -168,19 +160,16 @@ mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let use_case = UserRegistrationUseCase::new(mock_service);
+        let use_case = Arc::new(UserRegistrationUseCase::new(mock_service));
         let app = test::init_service(
-            App::new()
-                .app_data(web::Data::new(use_case))
-                .service(
-                    web::scope("/api")
-                        .route("/auth/delete/{user_id}", web::delete().to(crate::presentation::controllers::user_registration_controller::delete_account))
-                )
+            App::new().service(web::scope("/api").configure(|cfg| {
+                crate::presentation::controllers::user_registration_controller::configure_routes(cfg, use_case.clone())
+            }))
         ).await;
 
         // When
         let req = test::TestRequest::delete()
-            .uri("/api/auth/delete/1")
+            .uri("/api/users/1")
             .to_request();
 
         let resp = test::call_service(&app, req).await;

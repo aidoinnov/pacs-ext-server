@@ -20,6 +20,7 @@ mod mask_upload_workflow_tests {
         mask_controller::configure_routes as configure_mask_routes,
     };
     use sqlx::postgres::PgPoolOptions;
+    use sqlx::Row;
     use std::sync::Arc;
     use uuid::Uuid;
 
@@ -53,11 +54,11 @@ mod mask_upload_workflow_tests {
         
         // Initialize services
         let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
-        let mask_group_service = MaskGroupServiceImpl::new(
-            Arc::new(mask_group_repo), 
-            Arc::new(user_repo.clone()), 
-            Arc::new(project_repo.clone())
-        );
+        let mask_group_service = Arc::new(MaskGroupServiceImpl::new(
+            Arc::new(mask_group_repo.clone()),
+            Arc::new(AnnotationRepositoryImpl::new(pool.as_ref().clone())),
+            Arc::new(user_repo.clone()),
+        ));
         let mask_service = MaskServiceImpl::new(
             Arc::new(mask_repo), 
             Arc::new(mask_group_repo.clone()),
@@ -70,12 +71,12 @@ mod mask_upload_workflow_tests {
         // Initialize use cases
         let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
         let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
-            Arc::new(mask_group_service),
+            mask_group_service.clone(),
             signed_url_service.clone(),
         ));
         let mask_use_case = Arc::new(MaskUseCase::new(
             Arc::new(mask_service),
-            Arc::new(mask_group_service),
+            mask_group_service.clone(),
             signed_url_service,
         ));
 
@@ -191,7 +192,7 @@ mod mask_upload_workflow_tests {
         }
     }
 
-    async fn create_test_data(pool: &sqlx::Pool<sqlx::Postgres>) -> (i32, i32, i32) {
+    async fn create_test_data(pool: &sqlx::Pool<sqlx::Postgres>) -> (i32, i32, Uuid) {
         // Create test user
         let keycloak_id = Uuid::new_v4();
         let user_result = sqlx::query(
@@ -277,6 +278,8 @@ mod mask_upload_workflow_tests {
 
         // Step 1: Create annotation
         let annotation_req = CreateAnnotationRequest {
+            user_id: Some(user_id),
+            project_id: Some(project_id),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -285,6 +288,7 @@ mod mask_upload_workflow_tests {
             tool_name: Some("Circle Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             description: Some("Test annotation for mask upload workflow".to_string()),
+            measurement_values: None,
         };
 
         let req = test::TestRequest::post()
@@ -301,7 +305,6 @@ mod mask_upload_workflow_tests {
 
         // Step 2: Create mask group
         let mask_group_req = CreateMaskGroupRequest {
-            annotation_id: annotation_id,
             group_name: Some("Liver Segmentation v1.0".to_string()),
             model_name: Some("UNet3D".to_string()),
             version: Some("1.0.0".to_string()),
@@ -325,8 +328,13 @@ mod mask_upload_workflow_tests {
 
         // Step 3: Generate upload URL
         let upload_url_req = SignedUrlRequest {
+            mask_group_id: mask_group_id,
             filename: "liver_mask_001.png".to_string(),
             mime_type: "image/png".to_string(),
+            file_size: Some(102400),
+            slice_index: Some(1),
+            sop_instance_uid: Some("1.2.3.4.5.6.7.8.9.1.1".to_string()),
+            label_name: Some("liver".to_string()),
             ttl_seconds: Some(3600),
         };
 
@@ -452,6 +460,8 @@ mod mask_upload_workflow_tests {
 
         // Create annotation
         let annotation_req = CreateAnnotationRequest {
+            user_id: Some(user_id),
+            project_id: Some(project_id),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -460,6 +470,7 @@ mod mask_upload_workflow_tests {
             tool_name: Some("Circle Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             description: Some("Test annotation for multiple mask groups".to_string()),
+            measurement_values: None,
         };
 
         let req = test::TestRequest::post()
@@ -484,7 +495,6 @@ mod mask_upload_workflow_tests {
 
         for (group_name, model_name, modality, mask_type) in mask_groups {
             let mask_group_req = CreateMaskGroupRequest {
-                annotation_id: annotation_id,
                 group_name: Some(format!("{} v1.0", group_name)),
                 model_name: Some(model_name.to_string()),
                 version: Some("1.0.0".to_string()),
@@ -529,7 +539,6 @@ mod mask_upload_workflow_tests {
 
         // Test 1: Try to create mask group for non-existent annotation
         let mask_group_req = CreateMaskGroupRequest {
-            annotation_id: 999999, // Non-existent annotation ID
             group_name: Some("Test Group".to_string()),
             model_name: Some("Test Model".to_string()),
             version: Some("1.0.0".to_string()),
@@ -549,7 +558,7 @@ mod mask_upload_workflow_tests {
 
         // Test 2: Try to create mask for non-existent mask group
         let mask_req = CreateMaskRequest {
-            mask_group_id: mask_group_id,
+            mask_group_id: 999999,
             file_path: "masks/test.png".to_string(),
             mime_type: "image/png".to_string(),
             slice_index: Some(1),

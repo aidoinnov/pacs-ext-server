@@ -31,6 +31,7 @@ use std::sync::Arc;
 use utoipa::OpenApi;
 // Swagger UI 서비스
 use utoipa_swagger_ui::SwaggerUi;
+use crate::infrastructure::config::ServerMode;
 
 // 애플리케이션 레이어 모듈 (Use Case, Service 등)
 mod application;
@@ -56,7 +57,7 @@ use domain::services::{
 };
 
 // 인프라스트럭처 레이어 - 리포지토리 구현체들
-use infrastructure::external::KeycloakClient;
+use infrastructure::external::{KeycloakClient, Dcm4cheeQidoClient};
 use infrastructure::repositories::{
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, CapabilityRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
     PermissionRepositoryImpl, ProjectDataAccessRepositoryImpl, ProjectDataRepositoryImpl,
@@ -180,6 +181,11 @@ async fn main() -> std::io::Result<()> {
 
     println!("✅ Connected");
 
+    // Dcm4chee QIDO client
+    print!("🏥 Initializing Dcm4chee QIDO client... ");
+    let qido_client = Arc::new(Dcm4cheeQidoClient::new(settings.dcm4chee.clone()));
+    println!("✅ Done");
+
     // Redis 연결 (현재 비활성화 상태)
     // 캐싱 및 세션 저장을 위한 Redis 연결 설정
     // 향후 캐싱 기능 구현 시 활성화 예정
@@ -218,6 +224,11 @@ async fn main() -> std::io::Result<()> {
     let project_data_repo = Arc::new(ProjectDataRepositoryImpl::new(pool.clone()));
     // 프로젝트 데이터 접근 권한 관련 데이터 접근을 위한 리포지토리
     let project_data_access_repo = Arc::new(ProjectDataAccessRepositoryImpl::new(pool.clone()));
+    
+    // DICOM RBAC Evaluator
+    use crate::infrastructure::services::DicomRbacEvaluatorImpl;
+    let dicom_evaluator = Arc::new(DicomRbacEvaluatorImpl::new(pool.clone()));
+    
     println!("✅ Done");
 
     // JWT(JSON Web Token) 서비스 초기화
@@ -407,12 +418,53 @@ async fn main() -> std::io::Result<()> {
         println!("✅ Database connections closed");
     };
 
+    // Sync components (optional by mode)
+    use crate::infrastructure::services::{sync_state::SyncState, sync_worker::SyncServiceImpl, sync_scheduler::run_scheduler};
+    use crate::domain::services::SyncService;
+    let sync_interval = settings.sync.as_ref().map(|s| s.interval_sec).unwrap_or(30);
+    let sync_state = SyncState::new(sync_interval);
+    let sync_service_result = SyncServiceImpl::new(&settings, pool.clone(), sync_state.clone()).await;
+    let sync_service: Arc<SyncServiceImpl> = match sync_service_result {
+        Ok(svc) => Arc::new(svc),
+        Err(e) => {
+            if settings.server.mode == ServerMode::Full || settings.server.mode == ServerMode::SyncOnly {
+                eprintln!("⚠️  Warning: Failed to initialize sync service: {}", e);
+                eprintln!("⚠️  Sync features will be disabled");
+            }
+            // Create a dummy that returns errors but doesn't crash
+            Arc::new(SyncServiceImpl {
+                rbac_pool: pool.clone(),
+                dcm4chee_pool: pool.clone(),
+                state: sync_state.clone(),
+                default_project_id: settings.sync.as_ref().and_then(|s| s.default_project_id).unwrap_or(1),
+            })
+        }
+    };
+
+    // Start scheduler in Full/SyncOnly mode
+    if settings.server.mode == ServerMode::Full || settings.server.mode == ServerMode::SyncOnly {
+        let st = sync_state.clone();
+        let svc = sync_service.clone();
+        tokio::spawn(async move { run_scheduler(st, svc).await; });
+    }
+
+    // Prepare trait-object handle for DI
+    let sync_service_trait: Arc<dyn SyncService> = sync_service.clone();
+
     HttpServer::new(move || {
         App::new()
             // CORS middleware
             .wrap(configure_cors(&settings.cors))
             // Cache headers middleware
             .wrap(CacheHeaders::new(cache_enabled, cache_ttl))
+            // Sync app data at app level (for extractors)
+            .app_data(web::Data::from(sync_state.clone()))
+            .app_data(web::Data::from(sync_service.clone()))
+            .app_data(web::Data::from(sync_service_trait.clone()))
+            // Shared app data for DICOM gateway dependencies
+            .app_data(web::Data::new(dicom_evaluator.clone()))
+            .app_data(web::Data::new(Arc::new(JwtService::new(&settings.jwt))))
+            .app_data(web::Data::new(Arc::new(infrastructure::repositories::AccessConditionRepositoryImpl { pool: pool.clone() })))
             // Swagger UI (commented out for now)
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", openapi.clone()),
@@ -422,6 +474,10 @@ async fn main() -> std::io::Result<()> {
             // API routes
             .service(
                 web::scope("/api")
+                    // Ensure sync dependencies available within scope extractors
+                    .app_data(web::Data::from(sync_state.clone()))
+                    .app_data(web::Data::from(sync_service.clone()))
+                    .app_data(web::Data::from(sync_service_trait.clone()))
                     // ========================================
                     // 🔐 인증 관련 API (가장 먼저 등록)
                     // ========================================
@@ -432,11 +488,34 @@ async fn main() -> std::io::Result<()> {
                             user_registration_use_case.clone(),
                         )
                     })
+                    .configure(|cfg| {
+                        let jwt_svc = Arc::new(JwtService::new(&settings.jwt));
+                        presentation::controllers::dicom_gateway_controller::configure_routes(
+                            cfg,
+                            (*qido_client).clone(),
+                            dicom_evaluator.clone(),
+                            jwt_svc,
+                            Arc::new(infrastructure::repositories::AccessConditionRepositoryImpl { pool: pool.clone() }),
+                            Arc::new(user_repo.clone()),
+                        )
+                    })
+                    // Sync API (only in Full/SyncOnly)
+                    .configure(|cfg| {
+                        if settings.server.mode == ServerMode::Full || settings.server.mode == ServerMode::SyncOnly {
+                            presentation::controllers::sync_controller::configure_routes(
+                                cfg,
+                                sync_state.clone(),
+                                sync_service.clone(),
+                            );
+                        }
+                    })
                     // ========================================
                     // 🏗️ 프로젝트 관리 API (구체적인 경로 우선)
                     // ========================================
                     .configure(|cfg| {
-                        project_controller::configure_routes(cfg, project_use_case.clone())
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            project_controller::configure_routes(cfg, project_use_case.clone())
+                        }
                     })
                     // ========================================
                     // 📊 프로젝트-사용자 매트릭스 API (병합됨)
@@ -451,50 +530,72 @@ async fn main() -> std::io::Result<()> {
                     // ========================================
                     // 👥 사용자 관리 API
                     // ========================================
-                    .configure(|cfg| user_controller::configure_routes(cfg, user_use_case.clone()))
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            user_controller::configure_routes(cfg, user_use_case.clone())
+                        }
+                    })
                     // ========================================
                     // 🔑 권한 관리 API (구체적인 경로 우선)
                     // ========================================
                     .configure(|cfg| {
-                        role_permission_matrix_controller::configure_routes(
-                            cfg,
-                            role_permission_matrix_use_case.clone(),
-                        )
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            role_permission_matrix_controller::configure_routes(
+                                cfg,
+                                role_permission_matrix_use_case.clone(),
+                            )
+                        }
                     })
                     .configure(|cfg| {
-                        role_controller::configure_routes(
-                            cfg,
-                            permission_use_case.clone(),
-                            role_capability_matrix_use_case.clone(),
-                        )
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            role_controller::configure_routes(
+                                cfg,
+                                permission_use_case.clone(),
+                                role_capability_matrix_use_case.clone(),
+                            )
+                        }
                     })
                     .configure(|cfg| {
-                        access_control_controller::configure_routes(
-                            cfg,
-                            access_control_use_case.clone(),
-                        )
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            access_control_controller::configure_routes(
+                                cfg,
+                                access_control_use_case.clone(),
+                            )
+                        }
                     })
                     .configure(|cfg| {
-                        project_user_matrix_controller::configure_routes(
-                            cfg,
-                            project_user_matrix_use_case.clone(),
-                        )
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            project_user_matrix_controller::configure_routes(
+                                cfg,
+                                project_user_matrix_use_case.clone(),
+                            )
+                        }
                     })
                     .configure(|cfg| {
-                        user_project_matrix_controller::configure_routes(
-                            cfg,
-                            user_project_matrix_use_case.clone(),
-                        )
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            user_project_matrix_controller::configure_routes(
+                                cfg,
+                                user_project_matrix_use_case.clone(),
+                            )
+                        }
                     })
                     // ========================================
                     // 🎨 어노테이션 및 마스크 관리 API
                     // ========================================
                     .configure(|cfg| {
-                        annotation_controller::configure_routes(cfg, annotation_use_case.clone())
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            annotation_controller::configure_routes(cfg, annotation_use_case.clone())
+                        }
                     })
-                    .configure(|cfg| mask_controller::configure_routes(cfg, mask_use_case.clone()))
                     .configure(|cfg| {
-                        mask_group_controller::configure_routes(cfg, mask_group_use_case.clone())
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            mask_controller::configure_routes(cfg, mask_use_case.clone())
+                        }
+                    })
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            mask_group_controller::configure_routes(cfg, mask_group_use_case.clone())
+                        }
                     }),
             )
     })

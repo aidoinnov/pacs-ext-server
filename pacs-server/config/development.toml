@@ -36,3 +36,10 @@ format = "pretty"
 [signed_url]
 default_ttl = 600   # 10 minutes
 max_ttl = 3600      # 1 hour
+
+[dcm4chee]
+base_url = "http://localhost:8080"
+qido_path = "/dcm4chee-arc/aets/DCM4CHEE/rs"
+wado_path = "/dcm4chee-arc/aets/DCM4CHEE/wado"
+aet = "DCM4CHEE"
+timeout_ms = 5000

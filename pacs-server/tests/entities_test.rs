@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, Utc, TimeZone, NaiveDate};
 use pacs_server::domain::entities::*;
 use pacs_server::domain::entities::access_condition::ResourceLevel;
 use serde_json::json;
@@ -93,9 +93,13 @@ mod project_tests {
             id: 1,
             name: "Test Project".to_string(),
             description: Some("Test Description".to_string()),
+            sponsor: "Test Sponsor".to_string(),
+            start_date: NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            end_date: None,
+            auto_complete: false,
             is_active: true,
+            status: ProjectStatus::Active,
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(project.id, 1);
@@ -109,7 +113,10 @@ mod project_tests {
         let new_project = NewProject {
             name: "New Project".to_string(),
             description: None,
-            measurement_values: None,
+            sponsor: "Test Sponsor".to_string(),
+            start_date: NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            end_date: None,
+            auto_complete: false,
         };
 
         assert_eq!(new_project.name, "New Project");
@@ -141,7 +148,6 @@ mod role_tests {
             description: Some("Administrator role".to_string()),
             scope: "GLOBAL".to_string(),
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(role.name, "Admin");
@@ -186,7 +192,6 @@ mod access_condition_tests {
             value: Some("12345".to_string()),
             condition_type: ConditionType::Allow,
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(condition.resource_type, "DICOM");
@@ -226,7 +231,6 @@ mod logs_tests {
             session_id: Some("session123".to_string()),
             via_group_id: None,
             logged_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(log.user_id, 1);
@@ -250,7 +254,6 @@ mod logs_tests {
             ip_address: Some("10.0.0.1".to_string()),
             session_id: None,
             via_group_id: None,
-            measurement_values: None,
         };
 
         assert_eq!(new_log.resource_type, "SERIES");
@@ -282,7 +285,7 @@ mod annotation_tests {
             description: Some("Test annotation".to_string()),
             is_shared: true,
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            updated_at: Utc::timestamp_opt(1234567890, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
             measurement_values: None,
         };
 
@@ -326,7 +329,6 @@ mod relations_tests {
             user_id: 10,
             project_id: 20,
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(user_project.user_id, 10);
@@ -340,7 +342,6 @@ mod relations_tests {
             project_id: 5,
             role_id: 3,
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(project_role.project_id, 5);
@@ -355,7 +356,6 @@ mod relations_tests {
             permission_id: 2,
             scope: Some("PROJECT".to_string()),
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(role_permission.scope, Some("PROJECT".to_string()));
@@ -370,7 +370,6 @@ mod relations_tests {
             scope: None,
             inherits_from_role_permission: true,
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert!(project_permission.inherits_from_role_permission);
@@ -390,7 +389,6 @@ mod viewer_tests {
             name: "Chest CT Protocol".to_string(),
             is_default: true,
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(protocol.name, "Chest CT Protocol");
@@ -405,7 +403,6 @@ mod viewer_tests {
             rows: 2,
             cols: 3,
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(layout.rows, 2);
@@ -422,7 +419,6 @@ mod viewer_tests {
             selection_rule: Some("FIRST_SERIES".to_string()),
             sort_order: Some("ASC".to_string()),
             created_at: Utc.timestamp_opt(1234567890, 0).unwrap(),
-            measurement_values: None,
         };
 
         assert_eq!(viewport.position_row, 0);

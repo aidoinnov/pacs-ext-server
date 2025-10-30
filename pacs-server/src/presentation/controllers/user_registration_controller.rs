@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::application::dto::user_registration_dto::*;
 use crate::application::use_cases::UserRegistrationUseCase;
 use crate::domain::ServiceError;
-use crate::infrastructure::services::UserRegistrationServiceImpl;
+use crate::domain::services::UserRegistrationService;
 
 /// 회원가입 API 엔드포인트
 /// 
@@ -28,9 +28,9 @@ use crate::infrastructure::services::UserRegistrationServiceImpl;
     ),
     tag = "auth"
 )]
-pub async fn signup(
+pub async fn signup<S: UserRegistrationService>(
     req: web::Json<SignupRequest>,
-    use_case: web::Data<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+    use_case: web::Data<Arc<UserRegistrationUseCase<S>>>,
 ) -> Result<HttpResponse, ServiceError> {
     let response = use_case.signup(req.into_inner()).await?;
     Ok(HttpResponse::Created().json(response))
@@ -60,9 +60,9 @@ pub async fn signup(
     ),
     tag = "auth"
 )]
-pub async fn verify_email(
+pub async fn verify_email<S: UserRegistrationService>(
     req: web::Json<VerifyEmailRequest>,
-    use_case: web::Data<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+    use_case: web::Data<Arc<UserRegistrationUseCase<S>>>,
 ) -> Result<HttpResponse, ServiceError> {
     let response = use_case.verify_email(req.user_id).await?;
     Ok(HttpResponse::Ok().json(response))
@@ -93,9 +93,9 @@ pub async fn verify_email(
     tag = "admin",
     security(("bearer_auth" = []))
 )]
-pub async fn approve_user(
+pub async fn approve_user<S: UserRegistrationService>(
     req: web::Json<ApproveUserRequest>,
-    use_case: web::Data<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+    use_case: web::Data<Arc<UserRegistrationUseCase<S>>>,
     // TODO: Extract admin_id from JWT token in middleware
 ) -> Result<HttpResponse, ServiceError> {
     let admin_id = 1; // TODO: Get from auth middleware
@@ -130,9 +130,9 @@ pub async fn approve_user(
     tag = "users",
     security(("bearer_auth" = []))
 )]
-pub async fn delete_account(
+pub async fn delete_account<S: UserRegistrationService>(
     path: web::Path<i32>,
-    use_case: web::Data<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+    use_case: web::Data<Arc<UserRegistrationUseCase<S>>>,
     // TODO: Extract actor_id from JWT token in middleware
 ) -> Result<HttpResponse, ServiceError> {
     let user_id = path.into_inner();
@@ -166,9 +166,9 @@ pub async fn delete_account(
     ),
     tag = "users"
 )]
-pub async fn get_user_status(
+pub async fn get_user_status<S: UserRegistrationService>(
     path: web::Path<i32>,
-    use_case: web::Data<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+    use_case: web::Data<Arc<UserRegistrationUseCase<S>>>,
 ) -> Result<HttpResponse, ServiceError> {
     let user_id = path.into_inner();
     
@@ -194,12 +194,12 @@ pub async fn get_user_status(
 /// 
 /// # Arguments
 /// * `cfg` - Actix-web 서비스 설정
-pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>) {
+pub fn configure_routes<S: UserRegistrationService + 'static>(cfg: &mut web::ServiceConfig, use_case: Arc<UserRegistrationUseCase<S>>) {
     cfg
         .app_data(web::Data::new(use_case))
-        .route("/auth/signup", web::post().to(signup))
-        .route("/auth/verify-email", web::post().to(verify_email))
-        .route("/admin/users/approve", web::post().to(approve_user))
-        .route("/users/{user_id}", web::delete().to(delete_account))
-        .route("/users/{user_id}/status", web::get().to(get_user_status));
+        .route("/auth/signup", web::post().to(signup::<S>))
+        .route("/auth/verify-email", web::post().to(verify_email::<S>))
+        .route("/admin/users/approve", web::post().to(approve_user::<S>))
+        .route("/users/{user_id}", web::delete().to(delete_account::<S>))
+        .route("/users/{user_id}/status", web::get().to(get_user_status::<S>));
 }

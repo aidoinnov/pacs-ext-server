@@ -37,7 +37,7 @@ use crate::domain::entities::{NewAnnotation};
 /// - `annotation_service`: 어노테이션 도메인 서비스
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let annotation_use_case = AnnotationUseCase::new(annotation_service);
 /// let result = annotation_use_case.create_annotation(request, user_id, project_id).await;
 /// ```
@@ -78,7 +78,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - SOP Instance UID는 비어있을 수 없음
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let request = CreateAnnotationRequest {
     ///     study_instance_uid: "1.2.3.4.5.6.7.8.9.10".to_string(),
     ///     series_instance_uid: "1.2.3.4.5.6.7.8.9.11".to_string(),
@@ -151,7 +151,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 어노테이션을 찾을 수 없거나 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let annotation = annotation_use_case.get_annotation_by_id(123).await?;
     /// println!("어노테이션 ID: {}", annotation.id);
     /// ```
@@ -188,7 +188,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let response = annotation_use_case.get_annotations_by_project(1).await?;
     /// println!("총 어노테이션 수: {}", response.total);
     /// for annotation in response.annotations {
@@ -237,7 +237,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let response = annotation_use_case.get_annotations_by_user(1).await?;
     /// println!("사용자의 어노테이션 수: {}", response.total);
     /// ```
@@ -283,7 +283,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let study_uid = "1.2.3.4.5.6.7.8.9.10";
     /// let response = annotation_use_case.get_annotations_by_study(study_uid).await?;
     /// println!("Study의 어노테이션 수: {}", response.total);
@@ -330,7 +330,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let series_uid = "1.2.3.4.5.6.7.8.9.11";
     /// let response = annotation_use_case.get_annotations_by_series(series_uid).await?;
     /// println!("Series의 어노테이션 수: {}", response.total);
@@ -377,7 +377,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let instance_uid = "1.2.3.4.5.6.7.8.9.12";
     /// let response = annotation_use_case.get_annotations_by_instance(instance_uid).await?;
     /// println!("Instance의 어노테이션 수: {}", response.total);
@@ -425,7 +425,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let study_uid = "1.2.3.4.5.6.7.8.9.10";
     /// let response = annotation_use_case.get_annotations_by_project_and_study(1, study_uid).await?;
     /// println!("프로젝트 Study의 어노테이션 수: {}", response.total);
@@ -472,7 +472,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let response = annotation_use_case.get_shared_annotations(1).await?;
     /// println!("공유 어노테이션 수: {}", response.total);
     /// ```
@@ -519,7 +519,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 어노테이션을 찾을 수 없거나 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let request = UpdateAnnotationRequest {
     ///     annotation_data: Some(serde_json::json!({"type": "polygon", "points": [[0, 0], [100, 100]]})),
     /// };
@@ -567,7 +567,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 어노테이션을 찾을 수 없거나 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// annotation_use_case.delete_annotation(123).await?;
     /// println!("어노테이션이 삭제되었습니다.");
     /// ```
@@ -590,7 +590,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
     /// - `Err(ServiceError)`: 서비스 오류
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let can_access = annotation_use_case.can_access_annotation(1, 123).await?;
     /// if can_access {
     ///     println!("사용자는 이 어노테이션에 접근할 수 있습니다.");

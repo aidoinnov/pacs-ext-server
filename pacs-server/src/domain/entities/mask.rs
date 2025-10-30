@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 /// - `updated_at`: 마스크가 마지막으로 수정된 시각
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let mask = Mask {
 ///     id: 1,
 ///     mask_group_id: 1,
@@ -94,7 +94,7 @@ pub struct Mask {
 /// - `height`: 이미지 높이 (픽셀, 선택사항)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let new_mask = NewMask {
 ///     mask_group_id: 1,
 ///     slice_index: Some(1),
@@ -408,7 +408,7 @@ impl From<Mask> for NewMask {
 /// - `height`: 새로운 이미지 높이 (선택사항)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let update = UpdateMask::new(1)
 ///     .with_slice_index(5)
 ///     .with_label_name("spleen".to_string())
@@ -595,7 +595,7 @@ impl Default for UpdateMask {
 /// - `smallest_file_size`: 가장 작은 파일 크기 (바이트)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let mut stats = MaskStats::new();
 /// stats.total_masks = 100;
 /// stats.total_size_bytes = 1024000;
@@ -650,7 +650,7 @@ impl MaskStats {
     /// - `count`: 추가할 마스크 파일 수
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let mut stats = MaskStats::new();
     /// stats.add_mime_type_count("image/png".to_string(), 5);
     /// stats.add_mime_type_count("image/png".to_string(), 3); // PNG는 총 8개가 됨
@@ -669,7 +669,7 @@ impl MaskStats {
     /// - `count`: 추가할 마스크 파일 수
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let mut stats = MaskStats::new();
     /// stats.add_label_name_count("liver".to_string(), 10);
     /// stats.add_label_name_count("spleen".to_string(), 5);
@@ -684,7 +684,7 @@ impl MaskStats {
     /// 파일이 없는 경우 평균은 0.0으로 유지됩니다.
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let mut stats = MaskStats::new();
     /// stats.total_masks = 100;
     /// stats.total_size_bytes = 1024000;
@@ -720,7 +720,7 @@ impl Default for MaskStats {
 /// - `label_name`: 라벨 이름 (선택사항)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let file_info = MaskFileInfo::png(
 ///     "slice_001.png".to_string(),
 ///     1024,

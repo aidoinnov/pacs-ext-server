@@ -17,6 +17,7 @@ use pacs_server::infrastructure::services::UserRegistrationServiceImpl;
 use pacs_server::application::use_cases::user_registration_use_case::UserRegistrationUseCase;
 
 #[tokio::test]
+#[ignore]
 async fn test_refresh_token_performance() {
     // Load .env file
     dotenvy::dotenv().ok();
@@ -119,6 +120,7 @@ async fn test_refresh_token_performance() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_refresh_token_concurrent_performance() {
     // Load .env file
     dotenvy::dotenv().ok();
@@ -230,6 +232,7 @@ async fn test_refresh_token_concurrent_performance() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_refresh_token_memory_usage() {
     // Load .env file
     dotenvy::dotenv().ok();

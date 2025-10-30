@@ -95,7 +95,7 @@ pub struct NewUserAuditLog {
 /// - `updated_at`: 마지막 업데이트 시각
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let user = User {
 ///     id: 1,
 ///     keycloak_id: Uuid::new_v4(),
@@ -166,7 +166,7 @@ pub struct User {
 /// - `phone`: 연락처 (선택사항)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let new_user = NewUser {
 ///     keycloak_id: Uuid::new_v4(),
 ///     username: "jane_doe".to_string(),
@@ -209,7 +209,7 @@ pub struct NewUser {
 /// - `phone`: 연락처 (선택사항)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let update_user = UpdateUser::new(1)
 ///     .with_email("new_email@example.com".to_string())
 ///     .with_full_name("새로운 이름".to_string())

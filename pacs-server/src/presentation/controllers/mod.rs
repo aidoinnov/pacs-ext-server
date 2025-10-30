@@ -13,3 +13,5 @@ pub mod user_project_matrix_controller;
 pub mod role_permission_matrix_controller;
 pub mod project_data_access_controller;
 pub mod user_registration_controller;
+pub mod dicom_gateway_controller;
+pub mod sync_controller;

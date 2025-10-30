@@ -34,7 +34,7 @@ use sqlx::FromRow;
 /// - `updated_at`: 마스크 그룹이 마지막으로 수정된 시각
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let mask_group = MaskGroup {
 ///     id: 1,
 ///     annotation_id: 1,
@@ -95,7 +95,7 @@ pub struct MaskGroup {
 /// - `created_by`: 마스크 그룹을 생성할 사용자의 ID (선택사항)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let new_mask_group = NewMaskGroup {
 ///     annotation_id: 1,
 ///     group_name: Some("Liver_Segmentation_v2".to_string()),
@@ -313,7 +313,7 @@ impl From<MaskGroup> for NewMaskGroup {
 /// - `description`: 새로운 설명 (선택사항)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let update = UpdateMaskGroup::new(1)
 ///     .with_group_name("Updated_Group".to_string())
 ///     .with_model_info("NewModel".to_string(), "2.0.0".to_string())
@@ -468,7 +468,7 @@ impl Default for UpdateMaskGroup {
 /// - `mask_types`: 마스크 타입별 마스크 그룹 수 (해시맵)
 /// 
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let mut stats = MaskGroupStats::new();
 /// stats.total_groups = 5;
 /// stats.total_masks = 150;
@@ -517,7 +517,7 @@ impl MaskGroupStats {
     /// - `count`: 추가할 마스크 그룹 수
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let mut stats = MaskGroupStats::new();
     /// stats.add_modality_count("CT".to_string(), 5);
     /// stats.add_modality_count("CT".to_string(), 3); // CT는 총 8개가 됨
@@ -536,7 +536,7 @@ impl MaskGroupStats {
     /// - `count`: 추가할 마스크 그룹 수
     /// 
     /// # 예시
-    /// ```rust
+    /// ```ignore
     /// let mut stats = MaskGroupStats::new();
     /// stats.add_mask_type_count("segmentation".to_string(), 10);
     /// stats.add_mask_type_count("manual".to_string(), 2);

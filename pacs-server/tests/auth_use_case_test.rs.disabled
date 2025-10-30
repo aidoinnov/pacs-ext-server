@@ -2,7 +2,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{NaiveDateTime, Utc};
 
-use pacs_server::application::dto::auth_dto::{LoginRequest, LoginResponse, VerifyTokenResponse, RefreshTokenResponse};
+use pacs_server::application::dto::auth_dto::{LoginRequest, LoginResponse, VerifyTokenResponse, RefreshTokenRequest, RefreshTokenResponse};
 use pacs_server::application::use_cases::AuthUseCase;
 use pacs_server::domain::entities::User;
 use pacs_server::domain::services::AuthService;
@@ -181,7 +181,7 @@ async fn test_auth_use_case_refresh_token_success() {
     
     let auth_use_case = AuthUseCase::new(mock_auth_service);
 
-    let result = auth_use_case.refresh_token(token).await;
+    let result = auth_use_case.refresh_token(RefreshTokenRequest { refresh_token: token.to_string() }).await;
     assert!(result.is_ok());
 
     let refresh_response = result.unwrap();
@@ -196,7 +196,7 @@ async fn test_auth_use_case_refresh_token_invalid() {
     let mock_auth_service = MockAuthService::new();
     let auth_use_case = AuthUseCase::new(mock_auth_service);
 
-    let result = auth_use_case.refresh_token("invalid_token").await;
+    let result = auth_use_case.refresh_token(RefreshTokenRequest { refresh_token: "invalid_token".to_string() }).await;
     assert!(result.is_err());
 }
 
@@ -263,7 +263,7 @@ async fn test_refresh_token_response_structure() {
     
     let auth_use_case = AuthUseCase::new(mock_auth_service);
 
-    let refresh_response = auth_use_case.refresh_token(token).await.unwrap();
+    let refresh_response = auth_use_case.refresh_token(RefreshTokenRequest { refresh_token: token.to_string() }).await.unwrap();
     
     // Verify all required fields are present
     assert!(!refresh_response.token.is_empty());

@@ -19,8 +19,14 @@ mod tests {
             admin_password: "admin".to_string(),
         });
 
-        // Mock PgPool - 실제로는 연결하지 않음
-        let pool = PgPool::connect("postgresql://user:password@localhost:5432/testdb").await.unwrap();
+        // Lazy PgPool - 실제 연결하지 않음
+        let opts = sqlx::postgres::PgConnectOptions::new()
+            .host("localhost")
+            .port(5432)
+            .database("testdb")
+            .username("user")
+            .password("password");
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy_with(opts);
         let service = UserRegistrationServiceImpl::new(pool, keycloak_client);
 
         // When
@@ -51,7 +57,13 @@ mod tests {
             admin_password: "admin".to_string(),
         });
 
-        let pool = PgPool::connect("postgresql://user:password@localhost:5432/testdb").await.unwrap();
+        let opts = sqlx::postgres::PgConnectOptions::new()
+            .host("localhost")
+            .port(5432)
+            .database("testdb")
+            .username("user")
+            .password("password");
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy_with(opts);
         let service = UserRegistrationServiceImpl::new(pool, keycloak_client);
 
         // When
@@ -74,7 +86,13 @@ mod tests {
             admin_password: "admin".to_string(),
         });
 
-        let pool = PgPool::connect("postgresql://user:password@localhost:5432/testdb").await.unwrap();
+        let opts = sqlx::postgres::PgConnectOptions::new()
+            .host("localhost")
+            .port(5432)
+            .database("testdb")
+            .username("user")
+            .password("password");
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy_with(opts);
         let service = UserRegistrationServiceImpl::new(pool, keycloak_client);
 
         // When
@@ -97,7 +115,13 @@ mod tests {
             admin_password: "admin".to_string(),
         });
 
-        let pool = PgPool::connect("postgresql://user:password@localhost:5432/testdb").await.unwrap();
+        let opts = sqlx::postgres::PgConnectOptions::new()
+            .host("localhost")
+            .port(5432)
+            .database("testdb")
+            .username("user")
+            .password("password");
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy_with(opts);
         let service = UserRegistrationServiceImpl::new(pool, keycloak_client);
 
         // When

@@ -9,6 +9,8 @@ pub mod mask_group_service;
 pub mod mask_service;
 pub mod project_data_service;
 pub mod user_registration_service;
+pub mod dicom_rbac_evaluator;
+pub mod sync_service;
 
 pub use user_service::{UserService, UserServiceImpl};
 pub use project_service::{ProjectService, ProjectServiceImpl};
@@ -21,3 +23,5 @@ pub use mask_group_service::{MaskGroupService, MaskGroupServiceImpl};
 pub use mask_service::{MaskService, MaskServiceImpl};
 pub use project_data_service::*;
 pub use user_registration_service::*;
+pub use dicom_rbac_evaluator::*;
+pub use sync_service::*;

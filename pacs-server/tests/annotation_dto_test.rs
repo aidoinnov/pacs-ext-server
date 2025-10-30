@@ -4,13 +4,13 @@ mod annotation_dto_tests {
         CreateAnnotationRequest, UpdateAnnotationRequest, AnnotationResponse
     };
     use serde_json::json;
-    use chrono::{DateTime, Utc, TimeZone};
+    use chrono::{Utc, TimeZone};
 
     #[test]
     fn test_create_annotation_request_serialization() {
         let request = CreateAnnotationRequest {
-            project_id: 1,
-            user_id: 1,
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -48,8 +48,8 @@ mod annotation_dto_tests {
     #[test]
     fn test_create_annotation_request_with_none_fields() {
         let request = CreateAnnotationRequest {
-            project_id: 1,
-            user_id: 1,
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -115,7 +115,6 @@ mod annotation_dto_tests {
     fn test_annotation_response_serialization() {
         let response = AnnotationResponse {
             id: 123,
-            project_id: 1,
             user_id: 456,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
@@ -158,7 +157,6 @@ mod annotation_dto_tests {
     fn test_annotation_response_with_none_fields() {
         let response = AnnotationResponse {
             id: 789,
-            project_id: 1,
             user_id: 101,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
@@ -204,8 +202,8 @@ mod annotation_dto_tests {
         });
 
         let circle_request = CreateAnnotationRequest {
-            project_id: 1,
-            user_id: 1,
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -233,8 +231,8 @@ mod annotation_dto_tests {
         });
 
         let rectangle_request = CreateAnnotationRequest {
-            project_id: 1,
-            user_id: 1,
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -261,8 +259,8 @@ mod annotation_dto_tests {
         });
 
         let point_request = CreateAnnotationRequest {
-            project_id: 1,
-            user_id: 1,
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),

@@ -12,6 +12,8 @@ pub struct Settings {
     pub cors: CorsConfig,
     pub object_storage: ObjectStorageConfig,
     pub signed_url: SignedUrlConfig,
+    pub dcm4chee: Dcm4cheeConfig,
+    pub sync: Option<SyncConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -19,7 +21,19 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub workers: usize,
+    #[serde(default = "default_server_mode")] 
+    pub mode: ServerMode,
 }
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ServerMode {
+    #[serde(rename = "full")] Full,
+    #[serde(rename = "api-only")] ApiOnly,
+    #[serde(rename = "sync-only")] SyncOnly,
+}
+
+fn default_server_mode() -> ServerMode { ServerMode::Full }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
@@ -82,6 +96,40 @@ pub struct SignedUrlConfig {
     pub max_ttl: u64,      // Maximum TTL in seconds
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct Dcm4cheeConfig {
+    pub base_url: String,
+    pub qido_path: String,      // e.g., /dcm4chee-arc/aets/DCM4CHEE/rs
+    pub wado_path: String,      // e.g., /dcm4chee-arc/aets/DCM4CHEE/wado
+    pub aet: String,            // AE Title
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub timeout_ms: u64,
+    #[serde(default)]
+    pub db: Option<Dcm4cheeDbConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct SyncConfig {
+    #[serde(default = "default_sync_enabled")] 
+    pub enabled: bool,
+    #[serde(default = "default_sync_interval")] 
+    pub interval_sec: u64,
+    pub default_project_id: Option<i32>,
+}
+
+fn default_sync_enabled() -> bool { true }
+fn default_sync_interval() -> u64 { 30 }
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Dcm4cheeDbConfig {
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub username: String,
+    pub password: String,
+}
+
 impl Settings {
     /// Load settings with environment variable priority
     /// Priority (highest to lowest):
@@ -137,6 +185,11 @@ impl Settings {
                     .unwrap_or_else(|_| "4".to_string())
                     .parse()
                     .unwrap_or(4),
+                mode: match env::var("APP_SERVER__MODE").or_else(|_| env::var("SERVER_MODE")).unwrap_or_else(|_| "full".to_string()).to_lowercase().as_str() {
+                    "api-only" => ServerMode::ApiOnly,
+                    "sync-only" => ServerMode::SyncOnly,
+                    _ => ServerMode::Full,
+                },
             },
             database: DatabaseConfig {
                 host: env::var("APP_DATABASE__HOST")
@@ -297,6 +350,48 @@ impl Settings {
                     .parse()
                     .unwrap_or(3600),
             },
+            dcm4chee: Dcm4cheeConfig {
+                base_url: env::var("APP_DCM4CHEE__BASE_URL")
+                    .or_else(|_| env::var("DCM4CHEE_BASE_URL"))
+                    .unwrap_or_else(|_| "http://localhost:8080".to_string()),
+                qido_path: env::var("APP_DCM4CHEE__QIDO_PATH")
+                    .or_else(|_| env::var("DCM4CHEE_QIDO_PATH"))
+                    .unwrap_or_else(|_| "/dcm4chee-arc/aets/DCM4CHEE/rs".to_string()),
+                wado_path: env::var("APP_DCM4CHEE__WADO_PATH")
+                    .or_else(|_| env::var("DCM4CHEE_WADO_PATH"))
+                    .unwrap_or_else(|_| "/dcm4chee-arc/aets/DCM4CHEE/wado".to_string()),
+                aet: env::var("APP_DCM4CHEE__AET").or_else(|_| env::var("DCM4CHEE_AET")).unwrap_or_else(|_| "DCM4CHEE".to_string()),
+                username: env::var("APP_DCM4CHEE__USERNAME").ok().or_else(| | env::var("DCM4CHEE_USERNAME").ok()),
+                password: env::var("APP_DCM4CHEE__PASSWORD").ok().or_else(| | env::var("DCM4CHEE_PASSWORD").ok()),
+                timeout_ms: env::var("APP_DCM4CHEE__TIMEOUT_MS")
+                    .or_else(|_| env::var("DCM4CHEE_TIMEOUT_MS"))
+                    .unwrap_or_else(|_| "5000".to_string())
+                    .parse()
+                    .unwrap_or(5000),
+                db: {
+                    // Optional nested DB config for DCM4CHEE
+                    let host = env::var("APP_DCM4CHEE__DB__HOST").or_else(|_| env::var("DCM4CHEE_DB_HOST")).ok();
+                    let port = env::var("APP_DCM4CHEE__DB__PORT").or_else(|_| env::var("DCM4CHEE_DB_PORT")).ok();
+                    let database = env::var("APP_DCM4CHEE__DB__DATABASE").or_else(|_| env::var("DCM4CHEE_DB_DATABASE")).ok();
+                    let username = env::var("APP_DCM4CHEE__DB__USERNAME").or_else(|_| env::var("DCM4CHEE_DB_USERNAME")).ok();
+                    let password = env::var("APP_DCM4CHEE__DB__PASSWORD").or_else(|_| env::var("DCM4CHEE_DB_PASSWORD")).ok();
+
+                    if let (Some(host), Some(port), Some(database), Some(username), Some(password)) = (host, port, database, username, password) {
+                        Some(Dcm4cheeDbConfig {
+                            host,
+                            port: port.parse().unwrap_or(5432),
+                            database,
+                            username,
+                            password,
+                        })
+                    } else { None }
+                },
+            },
+            sync: Some(SyncConfig {
+                enabled: env::var("APP_SYNC__ENABLED").or_else(|_| env::var("SYNC_ENABLED")).unwrap_or_else(|_| "true".to_string()).parse().unwrap_or(true),
+                interval_sec: env::var("APP_SYNC__INTERVAL_SEC").or_else(|_| env::var("SYNC_INTERVAL_SEC")).unwrap_or_else(|_| "30".to_string()).parse().unwrap_or(30),
+                default_project_id: env::var("APP_SYNC__DEFAULT_PROJECT_ID").or_else(|_| env::var("SYNC_DEFAULT_PROJECT_ID")).ok().and_then(|s| s.parse::<i32>().ok()),
+            }),
         };
 
         Ok(settings)
@@ -324,7 +419,10 @@ impl Settings {
 mod tests {
     use super::*;
 
+    use serial_test::serial;
+
     #[test]
+    #[serial]
     fn test_database_url_from_config() {
         // Clear env var to ensure we test config-based URL
         env::remove_var("DATABASE_URL");
@@ -334,6 +432,7 @@ mod tests {
                 host: "0.0.0.0".to_string(),
                 port: 8080,
                 workers: 4,
+                mode: ServerMode::Full,
             },
             database: DatabaseConfig {
                 host: "localhost".to_string(),
@@ -380,6 +479,17 @@ mod tests {
                 default_ttl: 600,
                 max_ttl: 3600,
             },
+            dcm4chee: Dcm4cheeConfig {
+                base_url: "http://localhost:8080".to_string(),
+                qido_path: "/dcm4chee-arc/aets/DCM4CHEE/rs".to_string(),
+                wado_path: "/dcm4chee-arc/aets/DCM4CHEE/wado".to_string(),
+                aet: "DCM4CHEE".to_string(),
+                username: Some("admin".to_string()),
+                password: Some("adminPassword123!".to_string()),
+                timeout_ms: 5000,
+                db: None,
+            },
+            sync: Some(SyncConfig { enabled: true, interval_sec: 30, default_project_id: Some(1) }),
         };
 
         let url = settings.database_url();
@@ -387,7 +497,10 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_database_url_from_env() {
+        // Ensure APP-specific override is cleared for this test
+        env::remove_var("APP_DATABASE_URL");
         env::set_var("DATABASE_URL", "postgres://user:pass@host:5432/db");
 
         let settings = Settings {
@@ -395,6 +508,7 @@ mod tests {
                 host: "0.0.0.0".to_string(),
                 port: 8080,
                 workers: 4,
+                mode: ServerMode::Full,
             },
             database: DatabaseConfig {
                 host: "localhost".to_string(),
@@ -441,11 +555,23 @@ mod tests {
                 default_ttl: 600,
                 max_ttl: 3600,
             },
+            dcm4chee: Dcm4cheeConfig {
+                base_url: "http://localhost:8080".to_string(),
+                qido_path: "/dcm4chee-arc/aets/DCM4CHEE/rs".to_string(),
+                wado_path: "/dcm4chee-arc/aets/DCM4CHEE/wado".to_string(),
+                aet: "DCM4CHEE".to_string(),
+                username: Some("admin".to_string()),
+                password: Some("adminPassword123!".to_string()),
+                timeout_ms: 5000,
+                db: None,
+            },
+            sync: Some(SyncConfig { enabled: true, interval_sec: 30, default_project_id: Some(1) }),
         };
 
         let url = settings.database_url();
         assert_eq!(url, "postgres://user:pass@host:5432/db");
 
         env::remove_var("DATABASE_URL");
+        env::remove_var("APP_DATABASE_URL");
     }
 }

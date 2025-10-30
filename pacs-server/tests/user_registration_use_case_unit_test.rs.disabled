@@ -1,13 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
     use mockall::mock;
     use std::sync::Arc;
     use tokio;
-    use crate::application::dto::user_registration_dto::*;
-    use crate::application::use_cases::UserRegistrationUseCase;
-    use crate::domain::ServiceError;
-    use crate::domain::services::UserRegistrationService;
+    use async_trait::async_trait;
+    use pacs_server::application::dto::user_registration_dto::{SignupRequest, UserStatusResponse};
+    use pacs_server::application::use_cases::UserRegistrationUseCase;
+    use pacs_server::domain::ServiceError;
+    use pacs_server::domain::entities::user::UserAccountStatus;
+    use pacs_server::domain::services::UserRegistrationService;
 
     // Mock UserRegistrationService
     mock! {

@@ -16,6 +16,14 @@ mod annotation_use_case_tests {
     use uuid::Uuid;
     use serde_json::json;
 
+    fn build_use_case(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) -> AnnotationUseCase<AnnotationServiceImpl<AnnotationRepositoryImpl, UserRepositoryImpl, ProjectRepositoryImpl>> {
+        let annotation_repo = AnnotationRepositoryImpl::new(pool.as_ref().clone());
+        let user_repo = UserRepositoryImpl::new(pool.as_ref().clone());
+        let project_repo = ProjectRepositoryImpl::new(pool.as_ref().clone());
+        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo, project_repo);
+        AnnotationUseCase::new(annotation_service)
+    }
+
     async fn setup_test_app() -> (
         impl actix_web::dev::Service<
             actix_http::Request,
@@ -612,8 +620,8 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
     #[tokio::test]
     async fn test_get_annotations_by_user_with_viewer_filter() {
-        let (app, pool) = setup_test_app().await;
-        let annotation_use_case = test_get_annotation_use_case(&pool).await;
+        let (_app, pool) = setup_test_app().await;
+        let annotation_use_case = build_use_case(&pool);
         
         let user_id = 336;
         let project_id = 299;
@@ -689,8 +697,8 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
     #[tokio::test]
     async fn test_get_annotations_by_project_with_viewer_filter() {
-        let (app, pool) = setup_test_app().await;
-        let annotation_use_case = test_get_annotation_use_case(&pool).await;
+        let (_app, pool) = setup_test_app().await;
+        let annotation_use_case = build_use_case(&pool);
         
         let user_id = 336;
         let project_id = 299;
@@ -747,8 +755,8 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
 
     #[tokio::test]
     async fn test_get_annotations_by_study_with_viewer_filter() {
-        let (app, pool) = setup_test_app().await;
-        let annotation_use_case = test_get_annotation_use_case(&pool).await;
+        let (_app, pool) = setup_test_app().await;
+        let annotation_use_case = build_use_case(&pool);
         
         let user_id = 336;
         let project_id = 299;
@@ -879,7 +887,7 @@ async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) {
         assert_eq!(body["measurement_values"][1]["id"], "m2");
         assert_eq!(body["measurement_values"][1]["type"], "mean");
 
-        cleanup_test_data(&pool, user_id, project_id).await;
+        cleanup_test_data(&pool).await;
     }
 
     #[tokio::test]

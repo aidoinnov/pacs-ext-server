@@ -33,3 +33,10 @@ client_secret = "CHANGE_ME"
 [logging]
 level = "warn"
 format = "json"
+
+[dcm4chee]
+base_url = "https://dcm4chee.production.local"
+qido_path = "/dcm4chee-arc/aets/DCM4CHEE/rs"
+wado_path = "/dcm4chee-arc/aets/DCM4CHEE/wado"
+aet = "DCM4CHEE"
+timeout_ms = 5000

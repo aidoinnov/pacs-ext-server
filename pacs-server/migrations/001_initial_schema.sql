@@ -7,9 +7,23 @@
 -- ENUMS
 -- ==========================
 
-CREATE TYPE condition_type_enum AS ENUM ('ALLOW', 'DENY', 'LIMIT');
-CREATE TYPE resource_level_enum AS ENUM ('STUDY', 'SERIES', 'INSTANCE');
-CREATE TYPE grant_action_enum AS ENUM ('GRANT', 'REVOKE');
+DO $$ BEGIN
+    CREATE TYPE condition_type_enum AS ENUM ('ALLOW', 'DENY', 'LIMIT');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE resource_level_enum AS ENUM ('STUDY', 'SERIES', 'INSTANCE');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE grant_action_enum AS ENUM ('GRANT', 'REVOKE');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ==========================
 -- SECURITY SCHEMA

@@ -427,3 +427,4 @@ async fn get_cached_rules(&self, role_id: i32) -> Result<Vec<AccessCondition>, S
 ---
 
 > ✅ 이 설계는 기존 PACS Extension Server 구조를 최대한 보존하면서도 다기관 RBAC DICOM Gateway의 모든 요구사항을 충족합니다.
+

@@ -59,7 +59,7 @@ mod tests {
         let request = SignupRequest {
             username: "testuser".to_string(),
             email: "test@example.com".to_string(),
-            password: "password123".to_string(),
+            password: "Password123".to_string(),
             full_name: Some("Test User".to_string()),
             organization: None,
             department: None,
@@ -74,7 +74,7 @@ mod tests {
         let response = result.unwrap();
         assert_eq!(response.username, "testuser");
         assert_eq!(response.email, "test@example.com");
-        assert_eq!(response.account_status, "PENDING_EMAIL");
+        assert_eq!(response.account_status, "PendingEmail");
     }
 
     #[tokio::test]

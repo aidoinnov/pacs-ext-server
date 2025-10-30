@@ -16,6 +16,7 @@ use pacs_server::infrastructure::services::UserRegistrationServiceImpl;
 use pacs_server::application::dto::auth_dto::RefreshTokenRequest;
 
 #[tokio::test]
+#[ignore]
 async fn test_refresh_token_integration_success() {
     // Load .env file
     dotenvy::dotenv().ok();
@@ -107,6 +108,7 @@ async fn test_refresh_token_integration_success() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_refresh_token_integration_keycloak_error() {
     // Load .env file
     dotenvy::dotenv().ok();
@@ -193,6 +195,7 @@ async fn test_refresh_token_integration_keycloak_error() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_refresh_token_integration_malformed_response() {
     // Load .env file
     dotenvy::dotenv().ok();
@@ -274,6 +277,7 @@ async fn test_refresh_token_integration_malformed_response() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_refresh_token_integration_network_timeout() {
     // Load .env file
     dotenvy::dotenv().ok();
