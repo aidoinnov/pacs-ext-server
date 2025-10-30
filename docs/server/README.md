@@ -27,8 +27,8 @@ PACS Extension Server의 모든 기술 문서와 가이드를 모아놓은 중�
 - [레이어별 코드 패턴](background/07_Layer-Specific_Code_Patterns.md)
 
 ### 도메인 vs 비즈니스 로직
-- [도메인과 비즈니스 로직 구분](DOMAIN_VS_BUSINESS_LOGIC.md)
-- [로직 구분 가이드](LOGIC_DIFFERENTIATION_GUIDE.md)
+- [도메인과 비즈니스 로직 구분](docs/misc/DOMAIN_VS_BUSINESS_LOGIC.md)
+- [로직 구분 가이드](docs/misc/LOGIC_DIFFERENTIATION_GUIDE.md)
 
 ## 🔧 기술 문서
 
@@ -55,7 +55,7 @@ PACS Extension Server의 모든 기술 문서와 가이드를 모아놓은 중�
 
 ### 성능 및 벤치마크
 - [성능 최적화 가이드](technical/PERFORMANCE_OPTIMIZATION_GUIDE.md) - **NEW** ✅
-- [성능 비교 분석](performance-comparison.md)
+- [성능 비교 분석](docs/misc/performance-comparison.md)
 - [캐시 성능 분석](benchmarks/results/CACHE_PERFORMANCE_ANALYSIS.md)
 - [Redis 결정 문서](benchmarks/results/REDIS_DECISION.md)
 
@@ -97,7 +97,7 @@ PACS Extension Server의 모든 기술 문서와 가이드를 모아놓은 중�
 
 ### 환경 설정
 - [Notion 설정 가이드](notion-setup-guide.md)
-- [GitHub MCP 설정 가이드](github-mcp-setup-guide.md)
+- [GitHub MCP 설정 가이드](docs/misc/github-mcp-setup-guide.md)
 
 ### Docker 및 인프라
 - [Docker Compose 설정](infra/docker-compose.yml)
