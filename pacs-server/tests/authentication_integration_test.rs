@@ -104,7 +104,7 @@ mod authentication_integration_tests {
     }
 
     // Mock SignedUrlService for testing
-    use pacs_server::application::services::{SignedUrlService, SignedUrlError, SignedUrlResponse};
+use pacs_server::application::services::signed_url_service::{SignedUrlService, SignedUrlError, SignedUrlRequest, SignedUrlResponse};
     use async_trait::async_trait;
 
     struct MockSignedUrlService;
@@ -119,7 +119,7 @@ mod authentication_integration_tests {
     impl SignedUrlService for MockSignedUrlService {
         async fn generate_upload_url(
             &self,
-            _request: pacs_server::application::services::SignedUrlRequest,
+            _request: SignedUrlRequest,
         ) -> Result<SignedUrlResponse, SignedUrlError> {
             Ok(SignedUrlResponse::new(
                 "https://mock-s3.amazonaws.com/upload".to_string(),
@@ -131,7 +131,7 @@ mod authentication_integration_tests {
 
         async fn generate_download_url(
             &self,
-            _request: pacs_server::application::services::SignedUrlRequest,
+            _request: SignedUrlRequest,
         ) -> Result<SignedUrlResponse, SignedUrlError> {
             Ok(SignedUrlResponse::new(
                 "https://mock-s3.amazonaws.com/download".to_string(),

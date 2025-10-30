@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use crate::domain::entities::{Capability, NewCapability, UpdateCapability, Permission, Role};
 use crate::domain::repositories::CapabilityRepository;
 

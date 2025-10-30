@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
-use crate::domain::entities::{Project, NewProject, UpdateProject, ProjectStatus};
+use crate::domain::entities::{Project, NewProject, UpdateProject};
 use crate::domain::repositories::ProjectRepository;
 use crate::application::dto::project_dto::ProjectListQuery;
 

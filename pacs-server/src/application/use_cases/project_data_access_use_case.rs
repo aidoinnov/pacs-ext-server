@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::domain::services::ProjectDataService;
 use crate::domain::ServiceError;
 use crate::application::dto::project_data_access_dto::*;
-use crate::domain::entities::project_data::{NewProjectData, UpdateProjectData, UpdateProjectDataAccess, DataAccessStatus, ProjectDataStudy, ProjectDataSeries};
+use crate::domain::entities::project_data::{NewProjectData, UpdateProjectDataAccess, DataAccessStatus, ProjectDataStudy, ProjectDataSeries};
 
 pub struct ProjectDataAccessUseCase {
     project_data_service: Arc<dyn ProjectDataService>,

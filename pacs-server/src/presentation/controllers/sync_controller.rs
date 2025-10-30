@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::domain::services::{SyncService, SyncStatus};
+use crate::domain::services::SyncService;
 use crate::infrastructure::services::sync_worker::SyncServiceImpl;
 use crate::infrastructure::services::sync_state::SyncState;
 

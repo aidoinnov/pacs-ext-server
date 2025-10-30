@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::dto::auth_dto::{LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse};
+use crate::application::dto::auth_dto::{LoginRequest, RefreshTokenRequest};
 use crate::application::dto::user_registration_dto::*;
 use crate::application::use_cases::auth_use_case::AuthUseCase;
 use crate::application::use_cases::user_registration_use_case::UserRegistrationUseCase;

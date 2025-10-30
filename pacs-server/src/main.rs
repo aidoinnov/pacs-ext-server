@@ -17,7 +17,6 @@
 //! - OpenAPI 문서화
 
 // 환경 변수 로딩
-use dotenvy::dotenv;
 
 // 웹 프레임워크 및 HTTP 관련 모듈
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
@@ -70,16 +69,15 @@ use infrastructure::auth::JwtService;
 // 서명된 URL 및 객체 저장소 서비스
 use application::services::{ObjectStorageServiceFactory, SignedUrlServiceImpl};
 // 설정 관련 구조체들
-use infrastructure::config::{JwtConfig, Settings};
+use infrastructure::config::Settings;
 // 미들웨어 (캐시 헤더, CORS)
 use infrastructure::middleware::{configure_cors, CacheHeaders};
 // 프레젠테이션 레이어 - 컨트롤러들
 use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
-    mask_group_controller, project_controller, role_controller,
-    project_data_access_controller, project_user_controller, project_user_matrix_controller,
+    mask_group_controller, project_controller, role_controller, project_user_controller, project_user_matrix_controller,
     user_project_matrix_controller,
-    role_permission_matrix_controller, user_controller, user_registration_controller,
+    role_permission_matrix_controller, user_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use serde_json::json;
 use crate::domain::entities::mask_group::MaskGroupStats;
 
 /// 마스크 그룹 생성 요청 DTO

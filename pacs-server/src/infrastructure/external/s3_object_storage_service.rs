@@ -1,11 +1,9 @@
 use async_trait::async_trait;
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::presigning::PresigningConfig;
 use std::time::Duration;
 use crate::application::services::object_storage_service::{ObjectStorageService, ObjectStorageError, UploadedFile, SignedUrlOptions};
-use crate::domain::ServiceError;
 
 /// AWS S3를 사용한 객체 스토리지 서비스 구현
 pub struct S3ObjectStorageService {

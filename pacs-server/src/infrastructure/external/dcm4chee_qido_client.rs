@@ -38,7 +38,7 @@ impl Dcm4cheeQidoClient {
         Ok(url)
     }
 
-    pub async fn qido_studies(&self, mut params: Vec<(String, String)>) -> Result<Value, ServiceError> {
+    pub async fn qido_studies(&self, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
         // Ensure standard response accept header
         let url = self.build_url(&self.qido_path.replace("/rs", "/rs/studies"), &[])?;
         let mut req = self.http_client
@@ -67,7 +67,7 @@ impl Dcm4cheeQidoClient {
         Ok(json)
     }
 
-    pub async fn qido_series(&self, study_uid: &str, mut params: Vec<(String, String)>) -> Result<Value, ServiceError> {
+    pub async fn qido_series(&self, study_uid: &str, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
         let series_path = format!("{}/studies/{}/series", self.qido_path.replace("/rs", "/rs"), study_uid);
         let url = self.build_url(&series_path, &[])?;
         let mut req = self.http_client
@@ -97,7 +97,7 @@ impl Dcm4cheeQidoClient {
     }
 
     // Bearer token relay variants (if Dcm4chee sits behind Keycloak)
-    pub async fn qido_studies_with_bearer(&self, bearer_token: Option<&str>, mut params: Vec<(String, String)>) -> Result<Value, ServiceError> {
+    pub async fn qido_studies_with_bearer(&self, bearer_token: Option<&str>, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
         let studies_path = if self.qido_path.ends_with("/rs") {
             format!("{}/studies", self.qido_path)
         } else {
@@ -138,7 +138,7 @@ impl Dcm4cheeQidoClient {
         Ok(json)
     }
 
-    pub async fn qido_series_with_bearer(&self, bearer_token: Option<&str>, study_uid: &str, mut params: Vec<(String, String)>) -> Result<Value, ServiceError> {
+    pub async fn qido_series_with_bearer(&self, bearer_token: Option<&str>, study_uid: &str, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
         let series_path = if self.qido_path.ends_with("/rs") {
             format!("{}/studies/{}/series", self.qido_path, study_uid)
         } else {
@@ -173,7 +173,7 @@ impl Dcm4cheeQidoClient {
         Ok(json)
     }
 
-    pub async fn qido_instances_with_bearer(&self, bearer_token: Option<&str>, study_uid: &str, series_uid: &str, mut params: Vec<(String, String)>) -> Result<Value, ServiceError> {
+    pub async fn qido_instances_with_bearer(&self, bearer_token: Option<&str>, study_uid: &str, series_uid: &str, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
         let inst_path = if self.qido_path.ends_with("/rs") {
             format!("{}/studies/{}/series/{}/instances", self.qido_path, study_uid, series_uid)
         } else {

@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
-use chrono::{DateTime, Utc};
 use crate::domain::entities::mask::{Mask, NewMask, UpdateMask, MaskStats};
 use crate::domain::repositories::MaskRepository;
 use crate::domain::ServiceError;

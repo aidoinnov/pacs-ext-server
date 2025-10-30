@@ -1,7 +1,6 @@
 use actix_web::{web, HttpResponse, Responder, Result};
 use serde_json::json;
 use std::sync::Arc;
-use utoipa::OpenApi;
 
 use crate::application::use_cases::{project_user_use_case::ProjectUserUseCase, ProjectDataAccessUseCase};
 use crate::application::dto::project_user_dto::{

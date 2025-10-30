@@ -1,5 +1,5 @@
 use crate::application::dto::{
-    CreateUserRequest, UpdateUserRequest, UserResponse, UserListResponse, AddProjectMemberRequest,
+    CreateUserRequest, UpdateUserRequest, UserResponse, AddProjectMemberRequest,
     ProjectSummary,
 };
 use crate::application::dto::user_dto::UserProjectsResponse;

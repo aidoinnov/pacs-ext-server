@@ -1,6 +1,6 @@
 use crate::domain::entities::project_data::{ProjectData, ProjectDataStudy, ProjectDataSeries, NewProjectData, UpdateProjectData};
 use crate::domain::repositories::ProjectDataRepository;
-use sqlx::{PgPool, FromRow};
+use sqlx::PgPool;
 
 pub struct ProjectDataRepositoryImpl {
     pool: PgPool,

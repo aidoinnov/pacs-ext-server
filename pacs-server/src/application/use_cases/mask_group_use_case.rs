@@ -7,7 +7,7 @@ use crate::application::dto::mask_group_dto::{
 use crate::domain::services::MaskGroupService;
 use crate::domain::ServiceError;
 use crate::application::services::SignedUrlService;
-use crate::domain::entities::{NewMaskGroup, UpdateMaskGroup, MaskGroup};
+use crate::domain::entities::{NewMaskGroup, UpdateMaskGroup};
 
 /// Mask Group 관리 유스케이스
 pub struct MaskGroupUseCase<MGS, SUS> 

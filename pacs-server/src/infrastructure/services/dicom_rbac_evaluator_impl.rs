@@ -1,7 +1,6 @@
 use crate::domain::services::dicom_rbac_evaluator::{DicomRbacEvaluator, RbacEvaluationResult};
 use crate::domain::entities::access_condition::{AccessCondition, ConditionType};
 use sqlx::PgPool;
-use chrono::NaiveDate;
 
 pub struct DicomRbacEvaluatorImpl {
     pub pool: PgPool,

@@ -1,6 +1,5 @@
 use actix_web::{web, HttpResponse, Result};
 use std::sync::Arc;
-use utoipa::OpenApi;
 
 use crate::application::use_cases::RolePermissionMatrixUseCase;
 use crate::application::dto::role_permission_matrix_dto::*;

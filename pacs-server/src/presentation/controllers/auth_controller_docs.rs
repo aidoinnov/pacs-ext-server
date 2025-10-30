@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports, unused_variables)]
 use actix_web::{web, Responder};
 use std::sync::Arc;
 

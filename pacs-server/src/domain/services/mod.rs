@@ -17,7 +17,7 @@ pub use project_service::{ProjectService, ProjectServiceImpl};
 pub use permission_service::{PermissionService, PermissionServiceImpl};
 pub use capability_service::CapabilityService;
 pub use access_control_service::{AccessControlService, AccessControlServiceImpl};
-pub use auth_service::{AuthService, AuthServiceImpl, AuthResponse};
+pub use auth_service::{AuthService, AuthServiceImpl};
 pub use annotation_service::{AnnotationService, AnnotationServiceImpl};
 pub use mask_group_service::{MaskGroupService, MaskGroupServiceImpl};
 pub use mask_service::{MaskService, MaskServiceImpl};

@@ -1,4 +1,8 @@
 use chrono::{DateTime, Utc, TimeZone, NaiveDate};
+// Fix missing symbols by importing from crate public API
+use pacs_server::domain::entities::access_condition::{AccessCondition, ConditionType};
+use pacs_server::domain::entities::relations::{UserProject, ProjectRole, RolePermission, ProjectPermission};
+use pacs_server::domain::entities::viewer::{HangingProtocol, HpLayout, HpViewport};
 use pacs_server::domain::entities::*;
 use pacs_server::domain::entities::access_condition::ResourceLevel;
 use serde_json::json;

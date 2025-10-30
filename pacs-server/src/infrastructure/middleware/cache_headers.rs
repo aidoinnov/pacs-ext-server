@@ -1,9 +1,8 @@
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    Error, HttpMessage,
+    Error,
 };
 use futures::future::{ok, LocalBoxFuture, Ready};
-use std::task::{Context, Poll};
 
 /// HTTP Cache Headers Middleware
 /// Adds Cache-Control headers based on configuration

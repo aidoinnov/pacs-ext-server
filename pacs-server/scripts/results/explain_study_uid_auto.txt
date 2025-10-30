@@ -1,15 +1,17 @@
--- EXPLAIN captured at 20251030-081304
+-- EXPLAIN captured at 20251030-095736
 -- SQL: SELECT id FROM project_data_study WHERE study_uid = '1.2.3.4.5' AND project_id = 1;
 
                                                     QUERY PLAN                                                     
 -------------------------------------------------------------------------------------------------------------------
- Seq Scan on public.project_data_study  (cost=0.00..0.00 rows=1 width=4) (actual time=0.007..0.007 rows=0 loops=1)
+ Seq Scan on public.project_data_study  (cost=0.00..1.04 rows=1 width=4) (actual time=0.013..0.013 rows=0 loops=1)
    Output: id
    Filter: ((project_data_study.study_uid = '1.2.3.4.5'::text) AND (project_data_study.project_id = 1))
+   Rows Removed by Filter: 1
+   Buffers: shared hit=1
  Query Identifier: -6803326901943074389
  Planning:
-   Buffers: shared hit=164
- Planning Time: 0.913 ms
- Execution Time: 0.055 ms
-(8 rows)
+   Buffers: shared hit=227
+ Planning Time: 0.595 ms
+ Execution Time: 0.048 ms
+(10 rows)
 

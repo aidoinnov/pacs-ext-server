@@ -12,7 +12,6 @@ mod project_data_access_repository_impl;
 mod access_condition_repository_impl;
 mod institution_repository_impl;
 pub use access_condition_repository_impl::*;
-pub use institution_repository_impl::*;
 
 pub use user_repository_impl::*;
 pub use project_repository_impl::*;

@@ -1,4 +1,4 @@
-use crate::domain::entities::project_data::{ProjectData, ProjectDataAccess, ProjectDataStudy, ProjectDataSeries, NewProjectData, UpdateProjectData, NewProjectDataAccess, UpdateProjectDataAccess, DataAccessStatus};
+use crate::domain::entities::project_data::{ProjectData, ProjectDataAccess, ProjectDataStudy, ProjectDataSeries, NewProjectData, UpdateProjectData, UpdateProjectDataAccess, DataAccessStatus};
 use crate::domain::ServiceError;
 
 #[async_trait::async_trait]

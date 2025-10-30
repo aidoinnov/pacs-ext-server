@@ -6,7 +6,7 @@ use base64::Engine;
 
 use crate::domain::services::DicomRbacEvaluator;
 use crate::infrastructure::external::Dcm4cheeQidoClient;
-use crate::infrastructure::auth::{Claims, JwtService};
+use crate::infrastructure::auth::JwtService;
 use crate::infrastructure::repositories::{AccessConditionRepositoryImpl, UserRepositoryImpl};
 use crate::domain::repositories::{AccessConditionRepository, UserRepository};
 use crate::domain::entities::access_condition::AccessCondition;

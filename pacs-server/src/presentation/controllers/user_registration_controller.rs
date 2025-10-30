@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports, unused_variables)]
 use actix_web::{web, HttpResponse};
 use std::sync::Arc;
 use crate::application::dto::user_registration_dto::*;
