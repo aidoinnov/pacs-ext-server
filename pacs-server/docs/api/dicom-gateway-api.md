@@ -80,3 +80,11 @@ Authorization: Bearer <JWT>
 - 200 OK + 빈 배열: 규칙/권한에 의해 모두 필터링된 경우
 
 
+## 시나리오 요약(테스트 기준)
+- 프로젝트 필터링: 비멤버 프로젝트 데이터는 제외, 멤버 프로젝트 내 데이터만 반환
+- 규칙 기반 필터링: QIDO 파라미터 병합으로 CT/PatientID/StudyDate RANGE 등 사전 제한
+- RBAC 명시 권한: 해당 레벨(Study/Series/Instance)에서 명시 권한이 있으면 우선 허용
+- 계층 상속: Study 접근 허용 시 하위 Series/Instance 접근도 일관되게 허용
+- 충돌 처리: DENY > LIMIT > ALLOW, LIMIT는 교집합으로 축소
+
+

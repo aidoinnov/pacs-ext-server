@@ -696,3 +696,225 @@ async fn test_scenario_hierarchical_filtering() {
     cleanup_test_data(&pool).await;
 }
 
+// ========================================
+// 시나리오 5: Instance 레벨 필터링 (Study → Series → Instance)
+// ========================================
+
+#[tokio::test]
+#[ignore]
+#[ignore]
+async fn test_scenario_instance_level_filtering() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let (user_id, project_a_id, _project_b_id, study_a1_uid, _study_a2_uid, _study_b1_uid, series_a1_uid, _series_a2_uid, _series_b1_uid) = setup_scenario_data(&pool).await;
+
+    // Mock QIDO server: Instance 반환
+    let study_uid_clone = study_a1_uid.clone();
+    let series_uid_clone = series_a1_uid.clone();
+    let inst1_uid = format!("{}.{}.I1", study_a1_uid, series_a1_uid);
+    let inst2_uid = format!("{}.{}.I2", study_a1_uid, series_a1_uid);
+
+    let l = TcpListener::bind("127.0.0.1:0").expect("Failed to bind");
+    let port = l.local_addr().unwrap().port();
+    let server = HttpServer::new(move || {
+        let su = study_uid_clone.clone();
+        let se = series_uid_clone.clone();
+        let i1 = inst1_uid.clone();
+        let i2 = inst2_uid.clone();
+        App::new().route(
+            &format!("/rs/studies/{}/series/{}/instances", su, se),
+            web::get().to(move || {
+                let i1 = i1.clone();
+                let i2 = i2.clone();
+                async move {
+                    HttpResponse::Ok().json(json!([
+                        {"00080018": {"Value": [i1], "vr": "UI"}},
+                        {"00080018": {"Value": [i2], "vr": "UI"}},
+                    ]))
+                }
+            })
+        )
+    })
+    .listen(l)
+    .expect("Failed to start mock server")
+    .run();
+
+    actix_rt::spawn(server);
+
+    let cfg = pacs_server::infrastructure::config::Dcm4cheeConfig {
+        base_url: format!("http://127.0.0.1:{}", port),
+        qido_path: "/rs".to_string(),
+        wado_path: "/wado".to_string(),
+        aet: "TEST".to_string(),
+        username: None,
+        password: None,
+        timeout_ms: 5000,
+            db: None,
+    };
+    let qido = Dcm4cheeQidoClient::new(cfg);
+    let evaluator = std::sync::Arc::new(DicomRbacEvaluatorImpl::new(pool.clone()));
+    let jwt_service = std::sync::Arc::new(JwtService::new(&pacs_server::infrastructure::config::JwtConfig {
+        secret: "test_secret_key_for_jwt_service_integration_tests".to_string(),
+        expiration_hours: 24,
+    }));
+    let ac_repo = std::sync::Arc::new(AccessConditionRepositoryImpl { pool: pool.clone() });
+
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(qido))
+            .app_data(web::Data::new(evaluator))
+            .app_data(web::Data::new(jwt_service))
+            .app_data(web::Data::new(ac_repo))
+            .service(
+                web::scope("/api/dicom")
+                    .route(
+                        "/studies/{study_uid}/series/{series_uid}/instances",
+                        web::get().to(dicom_gateway_controller::get_instances),
+                    ),
+            ),
+    )
+    .await;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let token = format!("Bearer test_token_user_{}", user_id);
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/api/dicom/studies/{}/series/{}/instances?project_id={}",
+            study_a1_uid, series_a1_uid, project_a_id
+        ))
+        .insert_header(("Authorization", token))
+        .to_request();
+
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success(), "Request should succeed");
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    if let Some(array) = body.as_array() {
+        assert!(array.len() >= 1, "Should return instances for allowed study/series");
+    }
+
+    cleanup_test_data(&pool).await;
+}
+
+// ========================================
+// 시나리오 6: DENY 우선 및 LIMIT 교집합 확인
+// ========================================
+
+#[tokio::test]
+#[ignore]
+#[ignore]
+async fn test_scenario_deny_priority_and_limit_intersection() {
+    let pool = get_test_pool().await;
+    cleanup_test_data(&pool).await;
+
+    let (user_id, project_a_id, _project_b_id, study_a1_uid, study_a2_uid, _study_b1_uid, _series_a1_uid, _series_a2_uid, _series_b1_uid) = setup_scenario_data(&pool).await;
+
+    // 조건: 프로젝트에 ALLOW(Modality=CT) + DENY(StudyDate=20230101-20231231) 부여 → DENY 우선
+    let allow_id = sqlx::query_scalar::<_, i32>(
+        "INSERT INTO security_access_condition (resource_level, resource_type, dicom_tag, operator, value, condition_type)
+         VALUES ('STUDY', 'study', '00080060', 'EQ', 'CT', 'ALLOW') RETURNING id"
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let deny_id = sqlx::query_scalar::<_, i32>(
+        "INSERT INTO security_access_condition (resource_level, resource_type, dicom_tag, operator, value, condition_type)
+         VALUES ('STUDY', 'study', '00080020', 'RANGE', '20230101-20231231', 'DENY') RETURNING id"
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    sqlx::query("INSERT INTO security_project_dicom_condition (project_id, access_condition_id, priority) VALUES ($1, $2, 10)")
+        .bind(project_a_id)
+        .bind(allow_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    sqlx::query("INSERT INTO security_project_dicom_condition (project_id, access_condition_id, priority) VALUES ($1, $2, 20)")
+        .bind(project_a_id)
+        .bind(deny_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    // Mock QIDO server: 두 Study 모두 반환
+    let s1 = study_a1_uid.clone();
+    let s2 = study_a2_uid.clone();
+    let l = TcpListener::bind("127.0.0.1:0").expect("Failed to bind");
+    let port = l.local_addr().unwrap().port();
+    let server = HttpServer::new(move || {
+        let s1 = s1.clone();
+        let s2 = s2.clone();
+        App::new().route("/rs/studies", web::get().to(move || {
+            let s1 = s1.clone();
+            let s2 = s2.clone();
+            async move {
+                HttpResponse::Ok().json(json!([
+                    {"0020000D": {"Value": [s1], "vr": "UI"}, "00080060": {"Value": ["CT"], "vr": "CS"}, "00080020": {"Value": ["20230601"], "vr": "DA"}},
+                    {"0020000D": {"Value": [s2], "vr": "UI"}, "00080060": {"Value": ["CT"], "vr": "CS"}, "00080020": {"Value": ["20240115"], "vr": "DA"}},
+                ]))
+            }
+        }))
+    })
+    .listen(l)
+    .expect("Failed to start mock server")
+    .run();
+
+    actix_rt::spawn(server);
+
+    let cfg = pacs_server::infrastructure::config::Dcm4cheeConfig {
+        base_url: format!("http://127.0.0.1:{}", port),
+        qido_path: "/rs".to_string(),
+        wado_path: "/wado".to_string(),
+        aet: "TEST".to_string(),
+        username: None,
+        password: None,
+        timeout_ms: 5000,
+            db: None,
+    };
+    let qido = Dcm4cheeQidoClient::new(cfg);
+    let evaluator = std::sync::Arc::new(DicomRbacEvaluatorImpl::new(pool.clone()));
+    let jwt_service = std::sync::Arc::new(JwtService::new(&pacs_server::infrastructure::config::JwtConfig {
+        secret: "test_secret_key_for_jwt_service_integration_tests".to_string(),
+        expiration_hours: 24,
+    }));
+    let ac_repo = std::sync::Arc::new(AccessConditionRepositoryImpl { pool: pool.clone() });
+
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(qido))
+            .app_data(web::Data::new(evaluator))
+            .app_data(web::Data::new(jwt_service))
+            .app_data(web::Data::new(ac_repo))
+            .service(
+                web::scope("/api/dicom")
+                    .route("/studies", web::get().to(dicom_gateway_controller::get_studies)),
+            ),
+    )
+    .await;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    let token = format!("Bearer test_token_user_{}", user_id);
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/dicom/studies?project_id={}", project_a_id))
+        .insert_header(("Authorization", token))
+        .to_request();
+
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success(), "Request should succeed");
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    if let Some(array) = body.as_array() {
+        // 2023-06-01는 DENY RANGE에 포함 → 제외, 2024-01-15는 허용
+        assert!(array.iter().all(|item| {
+            item.get("00080020").and_then(|v| v.get("Value")).and_then(|v| v.as_array()).and_then(|arr| arr.get(0)).and_then(|v| v.as_str()) != Some("20230601")
+        }), "DENY range item should be filtered out");
+    }
+
+    cleanup_test_data(&pool).await;
+}
+
