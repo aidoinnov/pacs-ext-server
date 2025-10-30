@@ -21,6 +21,11 @@
   - `docs/api/password-reset-api.md` 생성
   - 비밀번호 재설정 API 상세 가이드 제공
   - 사용자 인증 및 Keycloak 연동 방식 설명
+- DICOM Gateway RBAC 필터링 추가
+  - QIDO 파라미터 매핑: Modality(00080060), PatientID(00100020), StudyDate(00080020)
+  - evaluator 기반 JSON 사후 필터링 (studies/series)
+  - 문서 추가: `docs/api/dicom-gateway-api.md`
+  - `GET /api/dicom/studies/{study_uid}/instances` 엔드포인트 추가 (토큰 릴레이 + RBAC 필터)
 
 ### Changed
 - 회원가입 시 account_status를 PENDING_APPROVAL로 설정
@@ -98,14 +103,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 요청/응답 예시
   - UI 구현 가이드
 - **Migration Files**: `016_create_project_data_tables.sql` 생성 및 실행 완료 ✅
-
-**⏸️ 남은 작업**:
-- Controller Layer 구현 (쿼리 파라미터 확장, OpenAPI 문서화)
-- 테스트 작성 (단위 테스트, 통합 테스트, 성능 테스트)
-
-**참고 문서**:
-- `docs/project_data_access_matrix_status.md` - 구현 상태 상세 보고서
-- `docs/project_data_access_matrix_completion_summary.md` - 완료 요약
 
 ## [1.0.0-beta.10] - 2025-01-15
 
@@ -1392,6 +1389,17 @@ sqlx migrate run
 - AI-powered mask generation
 - Mobile API support
 - Performance monitoring dashboard
+
+### Documentation
+- 작업 계획/구현/기술 문서 추가: `docs/implementation/{dicom_gateway, rbac_evaluator, sync_engine, auth_and_signup, tests_refactor}/`
+- TODO 스냅샷 추가: `docs/todo/status-2025-10-30.md`
+
+### Sync Engine
+- 서버 모드 도입(`full|api-only|sync-only`), 스케줄러/상태 API(`/api/sync`) 추가
+- dcm4chee DB 스키마 반영한 델타 동기화 구현(run_once), 접속 실패 시 우아한 비활성화
+
+### Testing
+- DICOM GW/Evaluator 미니멀 테스트 안정화, 레거시 테스트 단계적 재활성화 계획 수립
 
 ---
 
