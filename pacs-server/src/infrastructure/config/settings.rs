@@ -21,19 +21,24 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub workers: usize,
-    #[serde(default = "default_server_mode")] 
+    #[serde(default = "default_server_mode")]
     pub mode: ServerMode,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub enum ServerMode {
-    #[serde(rename = "full")] Full,
-    #[serde(rename = "api-only")] ApiOnly,
-    #[serde(rename = "sync-only")] SyncOnly,
+    #[serde(rename = "full")]
+    Full,
+    #[serde(rename = "api-only")]
+    ApiOnly,
+    #[serde(rename = "sync-only")]
+    SyncOnly,
 }
 
-fn default_server_mode() -> ServerMode { ServerMode::Full }
+fn default_server_mode() -> ServerMode {
+    ServerMode::Full
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
@@ -80,10 +85,10 @@ pub struct CorsConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ObjectStorageConfig {
-    pub provider: String,  // "s3" or "minio"
+    pub provider: String, // "s3" or "minio"
     pub bucket_name: String,
     pub region: String,
-    pub endpoint: String,  // MinIO endpoint (empty for AWS S3)
+    pub endpoint: String, // MinIO endpoint (empty for AWS S3)
     #[serde(rename = "access_key_id")]
     pub access_key: String,
     #[serde(rename = "secret_access_key")]
@@ -92,16 +97,16 @@ pub struct ObjectStorageConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SignedUrlConfig {
-    pub default_ttl: u64,  // Default TTL in seconds
-    pub max_ttl: u64,      // Maximum TTL in seconds
+    pub default_ttl: u64, // Default TTL in seconds
+    pub max_ttl: u64,     // Maximum TTL in seconds
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Dcm4cheeConfig {
     pub base_url: String,
-    pub qido_path: String,      // e.g., /dcm4chee-arc/aets/DCM4CHEE/rs
-    pub wado_path: String,      // e.g., /dcm4chee-arc/aets/DCM4CHEE/wado
-    pub aet: String,            // AE Title
+    pub qido_path: String, // e.g., /dcm4chee-arc/aets/DCM4CHEE/rs
+    pub wado_path: String, // e.g., /dcm4chee-arc/aets/DCM4CHEE/wado
+    pub aet: String,       // AE Title
     pub username: Option<String>,
     pub password: Option<String>,
     pub timeout_ms: u64,
@@ -111,15 +116,19 @@ pub struct Dcm4cheeConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SyncConfig {
-    #[serde(default = "default_sync_enabled")] 
+    #[serde(default = "default_sync_enabled")]
     pub enabled: bool,
-    #[serde(default = "default_sync_interval")] 
+    #[serde(default = "default_sync_interval")]
     pub interval_sec: u64,
     pub default_project_id: Option<i32>,
 }
 
-fn default_sync_enabled() -> bool { true }
-fn default_sync_interval() -> u64 { 30 }
+fn default_sync_enabled() -> bool {
+    true
+}
+fn default_sync_interval() -> u64 {
+    30
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Dcm4cheeDbConfig {
@@ -142,14 +151,18 @@ impl Settings {
         // 1. Load .env file first (lowest priority)
         dotenvy::dotenv().ok();
 
-        // 2. Determine run environment (default: development)
-        let run_env = env::var("RUN_ENV").unwrap_or_else(|_| "development".to_string());
+        // 2. Determine run environment and config directory (default: development, config)
+        // Support both APP_ENV and RUN_ENV for convenience
+        let run_env = env::var("APP_ENV")
+            .or_else(|_| env::var("RUN_ENV"))
+            .unwrap_or_else(|_| "development".to_string());
+        let config_dir = env::var("APP_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
 
         let config = Config::builder()
             // Start with default config
-            .add_source(File::with_name("config/default").required(false))
+            .add_source(File::with_name(&format!("{}/default", config_dir)).required(false))
             // Add environment-specific config
-            .add_source(File::with_name(&format!("config/{}", run_env)).required(false))
+            .add_source(File::with_name(&format!("{}/{}", config_dir, run_env)).required(false))
             // Add environment variables with APP_ prefix (highest priority)
             // Example: APP_SERVER__PORT=8080 -> server.port = 8080
             .add_source(
@@ -185,7 +198,12 @@ impl Settings {
                     .unwrap_or_else(|_| "4".to_string())
                     .parse()
                     .unwrap_or(4),
-                mode: match env::var("APP_SERVER__MODE").or_else(|_| env::var("SERVER_MODE")).unwrap_or_else(|_| "full".to_string()).to_lowercase().as_str() {
+                mode: match env::var("APP_SERVER__MODE")
+                    .or_else(|_| env::var("SERVER_MODE"))
+                    .unwrap_or_else(|_| "full".to_string())
+                    .to_lowercase()
+                    .as_str()
+                {
                     "api-only" => ServerMode::ApiOnly,
                     "sync-only" => ServerMode::SyncOnly,
                     _ => ServerMode::Full,
@@ -319,13 +337,38 @@ impl Settings {
                 println!("   Provider: {}", provider);
                 println!("   Bucket: {}", bucket_name);
                 println!("   Region: {}", region);
-                println!("   Endpoint: {}", if endpoint.is_empty() { "None".to_string() } else { endpoint.clone() });
-                println!("   Access Key: {} (길이: {})", 
-                    if access_key.is_empty() { "EMPTY".to_string() } else { format!("{}...{}", &access_key[..access_key.len().min(8)], &access_key[access_key.len().saturating_sub(4)..]) },
+                println!(
+                    "   Endpoint: {}",
+                    if endpoint.is_empty() {
+                        "None".to_string()
+                    } else {
+                        endpoint.clone()
+                    }
+                );
+                println!(
+                    "   Access Key: {} (길이: {})",
+                    if access_key.is_empty() {
+                        "EMPTY".to_string()
+                    } else {
+                        format!(
+                            "{}...{}",
+                            &access_key[..access_key.len().min(8)],
+                            &access_key[access_key.len().saturating_sub(4)..]
+                        )
+                    },
                     access_key.len()
                 );
-                println!("   Secret Key: {} (길이: {})", 
-                    if secret_key.is_empty() { "EMPTY".to_string() } else { format!("{}...{}", &secret_key[..secret_key.len().min(8)], &secret_key[secret_key.len().saturating_sub(4)..]) },
+                println!(
+                    "   Secret Key: {} (길이: {})",
+                    if secret_key.is_empty() {
+                        "EMPTY".to_string()
+                    } else {
+                        format!(
+                            "{}...{}",
+                            &secret_key[..secret_key.len().min(8)],
+                            &secret_key[secret_key.len().saturating_sub(4)..]
+                        )
+                    },
                     secret_key.len()
                 );
 
@@ -360,9 +403,15 @@ impl Settings {
                 wado_path: env::var("APP_DCM4CHEE__WADO_PATH")
                     .or_else(|_| env::var("DCM4CHEE_WADO_PATH"))
                     .unwrap_or_else(|_| "/dcm4chee-arc/aets/DCM4CHEE/wado".to_string()),
-                aet: env::var("APP_DCM4CHEE__AET").or_else(|_| env::var("DCM4CHEE_AET")).unwrap_or_else(|_| "DCM4CHEE".to_string()),
-                username: env::var("APP_DCM4CHEE__USERNAME").ok().or_else(| | env::var("DCM4CHEE_USERNAME").ok()),
-                password: env::var("APP_DCM4CHEE__PASSWORD").ok().or_else(| | env::var("DCM4CHEE_PASSWORD").ok()),
+                aet: env::var("APP_DCM4CHEE__AET")
+                    .or_else(|_| env::var("DCM4CHEE_AET"))
+                    .unwrap_or_else(|_| "DCM4CHEE".to_string()),
+                username: env::var("APP_DCM4CHEE__USERNAME")
+                    .ok()
+                    .or_else(|| env::var("DCM4CHEE_USERNAME").ok()),
+                password: env::var("APP_DCM4CHEE__PASSWORD")
+                    .ok()
+                    .or_else(|| env::var("DCM4CHEE_PASSWORD").ok()),
                 timeout_ms: env::var("APP_DCM4CHEE__TIMEOUT_MS")
                     .or_else(|_| env::var("DCM4CHEE_TIMEOUT_MS"))
                     .unwrap_or_else(|_| "5000".to_string())
@@ -370,13 +419,30 @@ impl Settings {
                     .unwrap_or(5000),
                 db: {
                     // Optional nested DB config for DCM4CHEE
-                    let host = env::var("APP_DCM4CHEE__DB__HOST").or_else(|_| env::var("DCM4CHEE_DB_HOST")).ok();
-                    let port = env::var("APP_DCM4CHEE__DB__PORT").or_else(|_| env::var("DCM4CHEE_DB_PORT")).ok();
-                    let database = env::var("APP_DCM4CHEE__DB__DATABASE").or_else(|_| env::var("DCM4CHEE_DB_DATABASE")).ok();
-                    let username = env::var("APP_DCM4CHEE__DB__USERNAME").or_else(|_| env::var("DCM4CHEE_DB_USERNAME")).ok();
-                    let password = env::var("APP_DCM4CHEE__DB__PASSWORD").or_else(|_| env::var("DCM4CHEE_DB_PASSWORD")).ok();
+                    let host = env::var("APP_DCM4CHEE__DB__HOST")
+                        .or_else(|_| env::var("DCM4CHEE_DB_HOST"))
+                        .ok();
+                    let port = env::var("APP_DCM4CHEE__DB__PORT")
+                        .or_else(|_| env::var("DCM4CHEE_DB_PORT"))
+                        .ok();
+                    let database = env::var("APP_DCM4CHEE__DB__DATABASE")
+                        .or_else(|_| env::var("DCM4CHEE_DB_DATABASE"))
+                        .ok();
+                    let username = env::var("APP_DCM4CHEE__DB__USERNAME")
+                        .or_else(|_| env::var("DCM4CHEE_DB_USERNAME"))
+                        .ok();
+                    let password = env::var("APP_DCM4CHEE__DB__PASSWORD")
+                        .or_else(|_| env::var("DCM4CHEE_DB_PASSWORD"))
+                        .ok();
 
-                    if let (Some(host), Some(port), Some(database), Some(username), Some(password)) = (host, port, database, username, password) {
+                    if let (
+                        Some(host),
+                        Some(port),
+                        Some(database),
+                        Some(username),
+                        Some(password),
+                    ) = (host, port, database, username, password)
+                    {
                         Some(Dcm4cheeDbConfig {
                             host,
                             port: port.parse().unwrap_or(5432),
@@ -384,13 +450,26 @@ impl Settings {
                             username,
                             password,
                         })
-                    } else { None }
+                    } else {
+                        None
+                    }
                 },
             },
             sync: Some(SyncConfig {
-                enabled: env::var("APP_SYNC__ENABLED").or_else(|_| env::var("SYNC_ENABLED")).unwrap_or_else(|_| "true".to_string()).parse().unwrap_or(true),
-                interval_sec: env::var("APP_SYNC__INTERVAL_SEC").or_else(|_| env::var("SYNC_INTERVAL_SEC")).unwrap_or_else(|_| "30".to_string()).parse().unwrap_or(30),
-                default_project_id: env::var("APP_SYNC__DEFAULT_PROJECT_ID").or_else(|_| env::var("SYNC_DEFAULT_PROJECT_ID")).ok().and_then(|s| s.parse::<i32>().ok()),
+                enabled: env::var("APP_SYNC__ENABLED")
+                    .or_else(|_| env::var("SYNC_ENABLED"))
+                    .unwrap_or_else(|_| "true".to_string())
+                    .parse()
+                    .unwrap_or(true),
+                interval_sec: env::var("APP_SYNC__INTERVAL_SEC")
+                    .or_else(|_| env::var("SYNC_INTERVAL_SEC"))
+                    .unwrap_or_else(|_| "30".to_string())
+                    .parse()
+                    .unwrap_or(30),
+                default_project_id: env::var("APP_SYNC__DEFAULT_PROJECT_ID")
+                    .or_else(|_| env::var("SYNC_DEFAULT_PROJECT_ID"))
+                    .ok()
+                    .and_then(|s| s.parse::<i32>().ok()),
             }),
         };
 
@@ -489,7 +568,11 @@ mod tests {
                 timeout_ms: 5000,
                 db: None,
             },
-            sync: Some(SyncConfig { enabled: true, interval_sec: 30, default_project_id: Some(1) }),
+            sync: Some(SyncConfig {
+                enabled: true,
+                interval_sec: 30,
+                default_project_id: Some(1),
+            }),
         };
 
         let url = settings.database_url();
@@ -565,7 +648,11 @@ mod tests {
                 timeout_ms: 5000,
                 db: None,
             },
-            sync: Some(SyncConfig { enabled: true, interval_sec: 30, default_project_id: Some(1) }),
+            sync: Some(SyncConfig {
+                enabled: true,
+                interval_sec: 30,
+                default_project_id: Some(1),
+            }),
         };
 
         let url = settings.database_url();

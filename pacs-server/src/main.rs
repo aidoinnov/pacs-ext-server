@@ -29,8 +29,8 @@ use std::sync::Arc;
 // OpenAPI 문서 생성
 use utoipa::OpenApi;
 // Swagger UI 서비스
-use utoipa_swagger_ui::SwaggerUi;
 use crate::infrastructure::config::ServerMode;
+use utoipa_swagger_ui::SwaggerUi;
 
 // 애플리케이션 레이어 모듈 (Use Case, Service 등)
 mod application;
@@ -45,8 +45,8 @@ mod presentation;
 use application::use_cases::{
     AccessControlUseCase, AnnotationUseCase, AuthUseCase, MaskGroupUseCase, MaskUseCase,
     PermissionUseCase, ProjectDataAccessUseCase, ProjectUseCase, ProjectUserMatrixUseCase,
-    ProjectUserUseCase, RolePermissionMatrixUseCase, RoleCapabilityMatrixUseCase, UserRegistrationUseCase, UserUseCase,
-    UserProjectMatrixUseCase,
+    ProjectUserUseCase, RoleCapabilityMatrixUseCase, RolePermissionMatrixUseCase,
+    UserProjectMatrixUseCase, UserRegistrationUseCase, UserUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
@@ -56,13 +56,16 @@ use domain::services::{
 };
 
 // 인프라스트럭처 레이어 - 리포지토리 구현체들
-use infrastructure::external::{KeycloakClient, Dcm4cheeQidoClient};
+use infrastructure::external::{Dcm4cheeQidoClient, KeycloakClient};
 use infrastructure::repositories::{
-    AccessLogRepositoryImpl, AnnotationRepositoryImpl, CapabilityRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
-    PermissionRepositoryImpl, ProjectDataAccessRepositoryImpl, ProjectDataRepositoryImpl,
-    ProjectRepositoryImpl, RoleRepositoryImpl, UserRepositoryImpl,
+    AccessLogRepositoryImpl, AnnotationRepositoryImpl, CapabilityRepositoryImpl,
+    MaskGroupRepositoryImpl, MaskRepositoryImpl, PermissionRepositoryImpl,
+    ProjectDataAccessRepositoryImpl, ProjectDataRepositoryImpl, ProjectRepositoryImpl,
+    RoleRepositoryImpl, UserRepositoryImpl,
 };
-use infrastructure::services::{CapabilityServiceImpl, ProjectDataServiceImpl, UserRegistrationServiceImpl};
+use infrastructure::services::{
+    CapabilityServiceImpl, ProjectDataServiceImpl, UserRegistrationServiceImpl,
+};
 
 // JWT 인증 서비스
 use infrastructure::auth::JwtService;
@@ -75,9 +78,9 @@ use infrastructure::middleware::{configure_cors, CacheHeaders};
 // 프레젠테이션 레이어 - 컨트롤러들
 use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
-    mask_group_controller, project_controller, role_controller, project_user_controller, project_user_matrix_controller,
-    user_project_matrix_controller,
-    role_permission_matrix_controller, user_controller,
+    mask_group_controller, project_controller, project_user_controller,
+    project_user_matrix_controller, role_controller, role_permission_matrix_controller,
+    user_controller, user_project_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -144,6 +147,25 @@ async fn main() -> std::io::Result<()> {
 
     // 애플리케이션 설정 로드
     print!("⚙️  Loading configuration... ");
+    // Diagnostics for configuration discovery
+    let env_app_env = std::env::var("APP_ENV").unwrap_or_else(|_| "(unset)".to_string());
+    let env_run_env = std::env::var("RUN_ENV").unwrap_or_else(|_| "(unset)".to_string());
+    let env_config_dir = std::env::var("APP_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+    println!("");
+    println!("   APP_ENV: {}", env_app_env);
+    println!("   RUN_ENV: {}", env_run_env);
+    println!("   APP_CONFIG_DIR: {}", env_config_dir);
+    println!(
+        "   Expected config files (if present): {}/default.toml, {}/{}.toml",
+        env_config_dir,
+        env_config_dir,
+        if env_app_env != "(unset)" {
+            env_app_env.clone()
+        } else {
+            env_run_env.clone()
+        }
+    );
+    print!("   → Result: ");
     let settings = Settings::new()
         .or_else(|_| {
             println!("⚠️  Config files not found, using environment variable defaults");
@@ -222,11 +244,11 @@ async fn main() -> std::io::Result<()> {
     let project_data_repo = Arc::new(ProjectDataRepositoryImpl::new(pool.clone()));
     // 프로젝트 데이터 접근 권한 관련 데이터 접근을 위한 리포지토리
     let project_data_access_repo = Arc::new(ProjectDataAccessRepositoryImpl::new(pool.clone()));
-    
+
     // DICOM RBAC Evaluator
     use crate::infrastructure::services::DicomRbacEvaluatorImpl;
     let dicom_evaluator = Arc::new(DicomRbacEvaluatorImpl::new(pool.clone()));
-    
+
     println!("✅ Done");
 
     // JWT(JSON Web Token) 서비스 초기화
@@ -253,7 +275,7 @@ async fn main() -> std::io::Result<()> {
     let project_service =
         ProjectServiceImpl::new(project_repo.clone(), user_repo.clone(), role_repo.clone());
     // 권한 서비스: 권한 CRUD, 역할-권한 매핑 등
-    let permission_service: PermissionServiceImpl<PermissionRepositoryImpl, RoleRepositoryImpl> = 
+    let permission_service: PermissionServiceImpl<PermissionRepositoryImpl, RoleRepositoryImpl> =
         PermissionServiceImpl::new(permission_repo.clone(), role_repo.clone());
     // 접근 제어 서비스: 권한 검증, 접근 로그 기록 등
     let access_control_service = AccessControlServiceImpl::new(
@@ -345,12 +367,13 @@ async fn main() -> std::io::Result<()> {
     let role_permission_matrix_use_case = Arc::new(RolePermissionMatrixUseCase::new(Arc::new(
         permission_service.clone(),
     )));
-    
+
     // Capability 서비스 및 Use Case 초기화
     let capability_repository = Arc::new(CapabilityRepositoryImpl::new(pool.clone()));
     let capability_service = Arc::new(CapabilityServiceImpl::new(capability_repository));
-    let role_capability_matrix_use_case = Arc::new(RoleCapabilityMatrixUseCase::new(capability_service));
-    
+    let role_capability_matrix_use_case =
+        Arc::new(RoleCapabilityMatrixUseCase::new(capability_service));
+
     let project_data_access_use_case =
         Arc::new(ProjectDataAccessUseCase::new(project_data_service.clone()));
     let user_registration_use_case =
@@ -417,15 +440,20 @@ async fn main() -> std::io::Result<()> {
     };
 
     // Sync components (optional by mode)
-    use crate::infrastructure::services::{sync_state::SyncState, sync_worker::SyncServiceImpl, sync_scheduler::run_scheduler};
     use crate::domain::services::SyncService;
+    use crate::infrastructure::services::{
+        sync_scheduler::run_scheduler, sync_state::SyncState, sync_worker::SyncServiceImpl,
+    };
     let sync_interval = settings.sync.as_ref().map(|s| s.interval_sec).unwrap_or(30);
     let sync_state = SyncState::new(sync_interval);
-    let sync_service_result = SyncServiceImpl::new(&settings, pool.clone(), sync_state.clone()).await;
+    let sync_service_result =
+        SyncServiceImpl::new(&settings, pool.clone(), sync_state.clone()).await;
     let sync_service: Arc<SyncServiceImpl> = match sync_service_result {
         Ok(svc) => Arc::new(svc),
         Err(e) => {
-            if settings.server.mode == ServerMode::Full || settings.server.mode == ServerMode::SyncOnly {
+            if settings.server.mode == ServerMode::Full
+                || settings.server.mode == ServerMode::SyncOnly
+            {
                 eprintln!("⚠️  Warning: Failed to initialize sync service: {}", e);
                 eprintln!("⚠️  Sync features will be disabled");
             }
@@ -434,7 +462,11 @@ async fn main() -> std::io::Result<()> {
                 rbac_pool: pool.clone(),
                 dcm4chee_pool: pool.clone(),
                 state: sync_state.clone(),
-                default_project_id: settings.sync.as_ref().and_then(|s| s.default_project_id).unwrap_or(1),
+                default_project_id: settings
+                    .sync
+                    .as_ref()
+                    .and_then(|s| s.default_project_id)
+                    .unwrap_or(1),
             })
         }
     };
@@ -443,7 +475,9 @@ async fn main() -> std::io::Result<()> {
     if settings.server.mode == ServerMode::Full || settings.server.mode == ServerMode::SyncOnly {
         let st = sync_state.clone();
         let svc = sync_service.clone();
-        tokio::spawn(async move { run_scheduler(st, svc).await; });
+        tokio::spawn(async move {
+            run_scheduler(st, svc).await;
+        });
     }
 
     // Prepare trait-object handle for DI
@@ -462,7 +496,9 @@ async fn main() -> std::io::Result<()> {
             // Shared app data for DICOM gateway dependencies
             .app_data(web::Data::new(dicom_evaluator.clone()))
             .app_data(web::Data::new(Arc::new(JwtService::new(&settings.jwt))))
-            .app_data(web::Data::new(Arc::new(infrastructure::repositories::AccessConditionRepositoryImpl { pool: pool.clone() })))
+            .app_data(web::Data::new(Arc::new(
+                infrastructure::repositories::AccessConditionRepositoryImpl { pool: pool.clone() },
+            )))
             // Swagger UI (commented out for now)
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", openapi.clone()),
@@ -493,13 +529,19 @@ async fn main() -> std::io::Result<()> {
                             (*qido_client).clone(),
                             dicom_evaluator.clone(),
                             jwt_svc,
-                            Arc::new(infrastructure::repositories::AccessConditionRepositoryImpl { pool: pool.clone() }),
+                            Arc::new(
+                                infrastructure::repositories::AccessConditionRepositoryImpl {
+                                    pool: pool.clone(),
+                                },
+                            ),
                             Arc::new(user_repo.clone()),
                         )
                     })
                     // Sync API (only in Full/SyncOnly)
                     .configure(|cfg| {
-                        if settings.server.mode == ServerMode::Full || settings.server.mode == ServerMode::SyncOnly {
+                        if settings.server.mode == ServerMode::Full
+                            || settings.server.mode == ServerMode::SyncOnly
+                        {
                             presentation::controllers::sync_controller::configure_routes(
                                 cfg,
                                 sync_state.clone(),
@@ -582,7 +624,10 @@ async fn main() -> std::io::Result<()> {
                     // ========================================
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
-                            annotation_controller::configure_routes(cfg, annotation_use_case.clone())
+                            annotation_controller::configure_routes(
+                                cfg,
+                                annotation_use_case.clone(),
+                            )
                         }
                     })
                     .configure(|cfg| {
@@ -592,7 +637,10 @@ async fn main() -> std::io::Result<()> {
                     })
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
-                            mask_group_controller::configure_routes(cfg, mask_group_use_case.clone())
+                            mask_group_controller::configure_routes(
+                                cfg,
+                                mask_group_use_case.clone(),
+                            )
                         }
                     }),
             )
