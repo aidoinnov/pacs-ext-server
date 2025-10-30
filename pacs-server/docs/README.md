@@ -1,3 +1,13 @@
+# PACS Server Docs
+
+이 디렉토리는 서버 코드와 함께 존재하지만, 문서의 정식 위치는 리포지토리 루트의 `docs/` 입니다.
+
+- 문서 모음(정식): `../../docs/`
+- 서버 작업 문서(예: QIDO 필터/페이지네이션): `../../docs/work/qido-filters-pagination/`
+- API 레퍼런스: `../../docs/api/`
+
+이 디렉토리에는 추후 문서가 추가되지 않도록 유지합니다(참조 전용).
+
 # 📚 PACS Extension Server 문서
 
 ## 📋 개요
