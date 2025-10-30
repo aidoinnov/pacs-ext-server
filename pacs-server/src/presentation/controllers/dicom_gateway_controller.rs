@@ -455,12 +455,29 @@ fn build_qido_params_from_user_query(extra: &serde_json::Map<String, Value>) -> 
         params.insert("StudyDate".to_string(), sd.to_string());
     }
 
-    // 페이지네이션: page(1-base), page_size(default 50, max 200)
-    let page_size = extra.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50).clamp(1, 200) as i64;
-    let page = extra.get("page").and_then(|v| v.as_i64()).unwrap_or(1).max(1);
-    let offset = (page - 1) * page_size;
-    params.insert("limit".to_string(), page_size.to_string());
-    params.insert("offset".to_string(), offset.to_string());
+    // 페이지네이션: limit/offset이 명시되면 그대로 사용, 없을 때만 page/page_size를 limit/offset으로 변환
+    let has_limit = extra.get("limit").is_some();
+    let has_offset = extra.get("offset").is_some();
+    if !has_limit || !has_offset {
+        let page_size = extra.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50).clamp(1, 200) as i64;
+        let page = extra.get("page").and_then(|v| v.as_i64()).unwrap_or(1).max(1);
+        let offset = (page - 1) * page_size;
+        if !has_limit { params.insert("limit".to_string(), page_size.to_string()); }
+        if !has_offset { params.insert("offset".to_string(), offset.to_string()); }
+    }
+
+    // DICOMweb 네이티브 파라미터 패스스루: 알려진 필드 외 문자열/숫자/불리언은 그대로 전달
+    for (k, v) in extra.iter() {
+        // 내부 파라미터는 전달하지 않음
+        if matches!(k.as_str(), "project_id" | "page" | "page_size") { continue; }
+        // 소문자 사용자 별칭은 이미 위에서 변환 처리됨(modality/patient_id/study_date/accession_number/patient_name)
+        if matches!(k.as_str(), "modality" | "patient_id" | "study_date" | "accession_number" | "patient_name") { continue; }
+        if let Some(s) = v.as_str() {
+            params.insert(k.clone(), s.to_string());
+        } else if v.is_number() || v.is_boolean() {
+            params.insert(k.clone(), v.to_string());
+        }
+    }
 
     Ok(params.into_iter().collect())
 }
@@ -485,7 +502,7 @@ fn merge_qido_params(rule_params: Vec<(String, String)>, user_params: Vec<(Strin
 
 #[cfg(test)]
 mod tests {
-    use super::{build_qido_params_from_conditions, decode_keycloak_token_sub, extract_study_uid, extract_series_uid, extract_instance_uid};
+    use super::{build_qido_params_from_conditions, decode_keycloak_token_sub, extract_study_uid, extract_series_uid, extract_instance_uid, build_qido_params_from_user_query, is_valid_study_date, merge_qido_params};
     use crate::domain::entities::access_condition::{AccessCondition, ResourceLevel, ConditionType};
     use base64::Engine;
 
@@ -556,6 +573,101 @@ mod tests {
         assert!(params.contains(&("Modality".to_string(), "MR".to_string())));
         assert!(params.contains(&("PatientID".to_string(), "P-001".to_string())));
         assert!(params.contains(&("StudyDate".to_string(), "20231001-20231031".to_string())));
+    }
+
+    // ==========================
+    // 사용자 쿼리 파싱/검증 단위 테스트
+    // ==========================
+
+    #[test]
+    fn test_is_valid_study_date_formats() {
+        assert!(is_valid_study_date("20240101"));
+        assert!(is_valid_study_date("20240101-20241231"));
+        assert!(!is_valid_study_date("2024-0101"));
+        assert!(!is_valid_study_date("2024010X"));
+        assert!(!is_valid_study_date("20240101-2024-1231"));
+    }
+
+    #[test]
+    fn test_build_qido_params_from_user_query_basic_filters() {
+        let mut extra = serde_json::Map::new();
+        extra.insert("modality".to_string(), serde_json::Value::String("CT".to_string()));
+        extra.insert("patient_id".to_string(), serde_json::Value::String("PAT001".to_string()));
+        extra.insert("study_date".to_string(), serde_json::Value::String("20240101-20241231".to_string()));
+        let params = build_qido_params_from_user_query(&extra).unwrap();
+        assert!(params.contains(&("Modality".to_string(), "CT".to_string())));
+        assert!(params.contains(&("PatientID".to_string(), "PAT001".to_string())));
+        assert!(params.contains(&("StudyDate".to_string(), "20240101-20241231".to_string())));
+        // pagination defaults
+        assert!(params.iter().any(|(k, v)| k == "limit" && v == "50"));
+        assert!(params.iter().any(|(k, v)| k == "offset" && v == "0"));
+    }
+
+    #[test]
+    fn test_build_qido_params_user_query_pagination_clamp_and_offset() {
+        let mut extra = serde_json::Map::new();
+        extra.insert("page".to_string(), serde_json::json!(2));
+        extra.insert("page_size".to_string(), serde_json::json!(250)); // will clamp to 200
+        let params = build_qido_params_from_user_query(&extra).unwrap();
+        assert!(params.iter().any(|(k, v)| k == "limit" && v == "200"));
+        assert!(params.iter().any(|(k, v)| k == "offset" && v == "200"));
+    }
+
+    #[test]
+    fn test_build_qido_params_user_query_invalid_study_date() {
+        let mut extra = serde_json::Map::new();
+        extra.insert("study_date".to_string(), serde_json::Value::String("2024-0101".to_string()));
+        let err = build_qido_params_from_user_query(&extra).unwrap_err();
+        assert!(err.contains("Invalid study_date"));
+    }
+
+    #[test]
+    fn test_merge_qido_params_user_wins() {
+        let rule = vec![
+            ("Modality".to_string(), "MR".to_string()),
+            ("StudyDate".to_string(), "20230101-20231231".to_string()),
+        ];
+        let user = vec![
+            ("Modality".to_string(), "CT".to_string()),
+            ("PatientID".to_string(), "P-9".to_string()),
+        ];
+        let merged = merge_qido_params(rule, user);
+        // Modality should be CT (user overrides)
+        assert!(merged.contains(&("Modality".to_string(), "CT".to_string())));
+        // PatientID should exist from user
+        assert!(merged.contains(&("PatientID".to_string(), "P-9".to_string())));
+        // StudyDate should remain from rule (user did not set)
+        assert!(merged.contains(&("StudyDate".to_string(), "20230101-20231231".to_string())));
+    }
+
+    #[test]
+    fn test_rule_mapping_extended_tags() {
+        let conds = vec![
+            ac(Some("00080050"), "EQ", Some("ACC-1")),
+            ac(Some("00100010"), "CONTAINS", Some("KIM")),
+        ];
+        let params = build_qido_params_from_conditions(&conds);
+        assert!(params.contains(&("AccessionNumber".to_string(), "ACC-1".to_string())));
+        assert!(params.contains(&("PatientName".to_string(), "KIM".to_string())));
+    }
+
+    // ===============
+    // 통합 테스트 스텁 (가벼운 모킹) — 환경 의존 없이 설계만 검증하므로 기본 ignore
+    // ===============
+    #[tokio::test]
+    #[ignore]
+    async fn it_should_propagate_filters_and_pagination_to_qido() {
+        // 향후: 로컬 mock 서버 기동 → Dcm4cheeQidoClient.base_url 지정 →
+        // 게이트웨이 핸들러 호출 → mock에서 쿼리스트링(limit/offset/filters) 캡처 검증
+        assert!(true);
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn it_should_apply_post_filtering_with_evaluator_stub() {
+        // 향후: evaluator 스텁이 특정 UID만 허용하도록 구성 →
+        // mock QIDO가 여러 UID 반환 → 응답에서 허용된 UID만 남는지 확인
+        assert!(true);
     }
 }
 

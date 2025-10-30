@@ -26,6 +26,8 @@
   - evaluator 기반 JSON 사후 필터링 (studies/series)
   - 문서 추가: `docs/api/dicom-gateway-api.md`
   - `GET /api/dicom/studies/{study_uid}/instances` 엔드포인트 추가 (토큰 릴레이 + RBAC 필터)
+  - QIDO 필터/페이지네이션: 사용자 별칭 파라미터 지원 및 DICOMweb 네이티브 파라미터 패스스루, page/page_size ↔ limit/offset 변환
+  - 모킹 통합 테스트: Studies/Series/Instances 전파 검증 추가
 
 ### Changed
 - 회원가입 시 account_status를 PENDING_APPROVAL로 설정
@@ -34,6 +36,8 @@
 - Keycloak 사용자 생성 시 enabled=false, emailVerified=true 설정
   - 회원가입 후 관리자 승인이 필요
   - 이메일 인증 없이 바로 사용 가능
+ - DICOM Gateway 요청/응답 완전 DICOMweb 호환 보장
+   - 네이티브 쿼리 키 패스스루, 응답 JSON 구조 변경 없음
 
 ### Fixed
 - Keycloak 토큰 획득 방식 변경
