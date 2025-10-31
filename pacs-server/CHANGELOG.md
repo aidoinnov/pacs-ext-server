@@ -64,6 +64,8 @@
    - `docs/work/study-detach-project/plan.md`
    - `docs/work/study-detach-project/tech.md`
    - `docs/work/study-detach-project/log.md`
+ - db(migrations): `019_study_detach_project.sql` 스캐폴드 추가 (실행 보류)
+ - docs(tech): `docs/technical/db-schema/study-detach-project.md` 추가
 
 ## [Previous] - 2024-10-27
 
