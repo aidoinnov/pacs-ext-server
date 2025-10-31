@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed - 2025-10-31
+
+#### **Project Data Hierarchy Refactor** 🔄
+- **주요 변경사항**: `project_data_study` 테이블에서 `project_id` 제거 및 계층적 리소스 매핑 구조 구현
+- **목표**: Study를 전역 엔티티로 변경하여 여러 프로젝트에서 공유 가능하도록 개선
+- **데이터베이스 스키마 변경**:
+  - `project_data_study` 테이블에서 `project_id` 컬럼 제거
+  - `project_data` 테이블을 계층적 리소스 매핑 테이블로 재구성
+  - `resource_level` ENUM 타입 추가 (STUDY/SERIES/INSTANCE)
+  - `project_data_instance` 테이블 신규 생성
+  - 데이터 마이그레이션 로직 포함 (백업 테이블 생성)
+- **RBAC 로직 강화**:
+  - 명시적 DENIED 체크 추가 (최우선 순위)
+  - 명시적 APPROVED 체크 추가
+  - 기본 허용 로직 추가 (프로젝트 멤버는 기본적으로 모든 데이터 접근 가능)
+  - 계층적 권한 상속 구현 (Series → Study, Instance → Series)
+  - RBAC 우선순위: DENIED > APPROVED > 기관 기반 > 룰 기반 > 기본 허용
+- **코드 변경**:
+  - `pacs-server/src/domain/entities/project_data.rs` - `ProjectDataStudy`에서 `project_id` 제거
+  - `pacs-server/src/infrastructure/repositories/project_data_repository_impl.rs` - 모든 쿼리를 `project_data` 테이블과 JOIN하도록 수정
+  - `pacs-server/src/infrastructure/services/dicom_rbac_evaluator_impl.rs` - RBAC 로직 대폭 수정
+- **마이그레이션**:
+  - `pacs-server/migrations/020_refactor_project_data_hierarchy.sql` - 새로운 마이그레이션 파일 추가
+  - 하위 호환성 보장 (백업 테이블 및 뷰 제공)
+- **테스트**:
+  - 3가지 시나리오 테스트 완료 (기본 접근, 명시적 거부, 명시적 승인)
+  - 모든 테스트 통과 ✅
+- **장점**:
+  - Study는 전역 엔티티 (여러 프로젝트에서 공유 가능)
+  - 세밀한 접근 제어 (Study/Series/Instance 레벨)
+  - 데이터 중복 없음
+  - 확장성 향상
+- **문서**:
+  - `docs/work/project-data-hierarchy-refactor/work-plan.md` - 작업 계획
+  - `docs/work/project-data-hierarchy-refactor/work-completion.md` - 작업 완료 보고서
+  - `docs/work/project-data-hierarchy-refactor/technical-documentation.md` - 기술 문서
+
 ### Added - 2025-01-27
 
 #### **User List API** 👥

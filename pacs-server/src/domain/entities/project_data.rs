@@ -22,11 +22,11 @@ impl std::fmt::Display for ResourceLevel {
     }
 }
 
-/// 프로젝트 데이터 (DICOM Study)
+/// 프로젝트 데이터 (DICOM Study) - 전역 엔티티 (프로젝트 독립적)
+/// 프로젝트와의 연결은 project_data 테이블을 통해 이루어짐
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ProjectDataStudy {
     pub id: i32,
-    pub project_id: i32,
     pub study_uid: String,
     pub study_description: Option<String>,
     pub patient_id: Option<String>,

@@ -316,7 +316,47 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
             };
         }
 
-        // 1) 기관 기반 접근 (같은 기관 또는 기관 간 허용)
+        // 1) 명시적 거부 확인 (최우선 - DENIED가 있으면 즉시 거부)
+        let is_denied: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM project_data_access
+             WHERE user_id = $1 AND project_id = $2
+             AND status = 'DENIED' AND resource_level = 'STUDY' AND study_id = $3)",
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(study_id)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(false);
+
+        if is_denied {
+            return RbacEvaluationResult {
+                allowed: false,
+                reason: Some("explicit_study_denied".to_string()),
+            };
+        }
+
+        // 2) 명시적 승인 확인 (APPROVED가 있으면 허용)
+        let is_approved: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM project_data_access
+             WHERE user_id = $1 AND project_id = $2
+             AND status = 'APPROVED' AND resource_level = 'STUDY' AND study_id = $3)",
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(study_id)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(false);
+
+        if is_approved {
+            return RbacEvaluationResult {
+                allowed: true,
+                reason: Some("explicit_study_approved".to_string()),
+            };
+        }
+
+        // 3) 기관 기반 접근 (같은 기관 또는 기관 간 허용)
         let user_inst: Option<i32> =
             sqlx::query_scalar("SELECT institution_id FROM security_user WHERE id = $1")
                 .bind(user_id)
@@ -358,28 +398,25 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
             }
         }
 
-        // 2) 명시적 접근 권한 (study 레벨)
-        let has_explicit: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM project_data_access WHERE user_id = $1 AND project_id = $2 AND status = 'APPROVED' AND resource_level = 'STUDY' AND study_id = $3)",
-        )
-        .bind(user_id)
-        .bind(project_id)
-        .bind(study_id)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(false);
+        // 4) 룰 기반 조건 평가 (access_condition + role/project)
+        let dicom_values = self.get_study_dicom_values(study_id).await;
+        let rule_result = self.evaluate_rule_based_conditions(user_id, project_id, &dicom_values, "STUDY").await;
 
-        if has_explicit {
-            return RbacEvaluationResult {
-                allowed: true,
-                reason: Some("explicit_study_access".to_string()),
-            };
+        // 룰이 명시적으로 거부하면 거부
+        if !rule_result.allowed && rule_result.reason.as_deref() == Some("rule_denied") {
+            return rule_result;
         }
 
-        // 3) 룰 기반 조건 평가 (access_condition + role/project)
-        let dicom_values = self.get_study_dicom_values(study_id).await;
-        self.evaluate_rule_based_conditions(user_id, project_id, &dicom_values, "STUDY")
-            .await
+        // 룰이 허용하면 허용
+        if rule_result.allowed {
+            return rule_result;
+        }
+
+        // 5) 기본값: 프로젝트 멤버면 허용 (명시적 DENIED가 없고, 다른 제약도 없으면)
+        RbacEvaluationResult {
+            allowed: true,
+            reason: Some("project_member_default_access".to_string()),
+        }
     }
 
     async fn evaluate_series_access(
@@ -405,9 +442,11 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
             };
         }
 
-        // 1) series에 대한 명시적 권한
-        let has_explicit_series: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM project_data_access WHERE user_id = $1 AND project_id = $2 AND status = 'APPROVED' AND resource_level = 'SERIES' AND series_id = $3)",
+        // 1) 명시적 거부 확인 (최우선)
+        let is_denied: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM project_data_access
+             WHERE user_id = $1 AND project_id = $2
+             AND status = 'DENIED' AND resource_level = 'SERIES' AND series_id = $3)",
         )
         .bind(user_id)
         .bind(project_id)
@@ -416,14 +455,34 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         .await
         .unwrap_or(false);
 
-        if has_explicit_series {
+        if is_denied {
             return RbacEvaluationResult {
-                allowed: true,
-                reason: Some("explicit_series_access".to_string()),
+                allowed: false,
+                reason: Some("explicit_series_denied".to_string()),
             };
         }
 
-        // 2) series가 포함된 study에 대한 권한 상속
+        // 2) 명시적 승인 확인
+        let is_approved: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM project_data_access
+             WHERE user_id = $1 AND project_id = $2
+             AND status = 'APPROVED' AND resource_level = 'SERIES' AND series_id = $3)",
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(series_id)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(false);
+
+        if is_approved {
+            return RbacEvaluationResult {
+                allowed: true,
+                reason: Some("explicit_series_approved".to_string()),
+            };
+        }
+
+        // 3) series가 포함된 study에 대한 권한 상속
         let parent_study_id: Option<i32> =
             sqlx::query_scalar("SELECT study_id FROM project_data_series WHERE id = $1")
                 .bind(series_id)
@@ -436,32 +495,21 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
             let study_result = self
                 .evaluate_study_access(user_id, project_id, study_id)
                 .await;
-            if study_result.allowed {
-                return RbacEvaluationResult {
-                    allowed: true,
-                    reason: Some("inherited_from_study".to_string()),
-                };
+            // Study가 거부되면 Series도 거부
+            if !study_result.allowed {
+                return study_result;
             }
+            // Study가 허용되면 Series도 허용 (상속)
+            return RbacEvaluationResult {
+                allowed: true,
+                reason: Some("inherited_from_study".to_string()),
+            };
         }
 
-        // 3) 룰 기반 조건 평가 (series는 상위 study의 값으로 평가)
-        let parent_study_id: Option<i32> =
-            sqlx::query_scalar("SELECT study_id FROM project_data_series WHERE id = $1")
-                .bind(series_id)
-                .fetch_optional(&self.pool)
-                .await
-                .ok()
-                .flatten();
-
-        if let Some(sid) = parent_study_id {
-            let dicom_values = self.get_study_dicom_values(sid).await;
-            self.evaluate_rule_based_conditions(user_id, project_id, &dicom_values, "SERIES")
-                .await
-        } else {
-            RbacEvaluationResult {
-                allowed: false,
-                reason: Some("series_parent_study_not_found".to_string()),
-            }
+        // 4) 상위 Study를 찾을 수 없으면 거부
+        RbacEvaluationResult {
+            allowed: false,
+            reason: Some("series_parent_study_not_found".to_string()),
         }
     }
 
@@ -471,8 +519,13 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         project_id: i32,
         study_uid: &str,
     ) -> RbacEvaluationResult {
+        // JOIN with project_data to verify study belongs to project
         let study_id: Option<i32> = sqlx::query_scalar(
-            "SELECT id FROM project_data_study WHERE project_id = $1 AND study_uid = $2",
+            "SELECT pds.id
+             FROM project_data_study pds
+             INNER JOIN project_data pd ON pd.study_id = pds.id
+             WHERE pd.project_id = $1 AND pds.study_uid = $2
+             LIMIT 1",
         )
         .bind(project_id)
         .bind(study_uid)
@@ -486,7 +539,7 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         }
         RbacEvaluationResult {
             allowed: false,
-            reason: Some("study_not_found".to_string()),
+            reason: Some("study_not_found_in_project".to_string()),
         }
     }
 
@@ -496,11 +549,14 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         project_id: i32,
         series_uid: &str,
     ) -> RbacEvaluationResult {
-        // series_uid로 series 찾기 (project_id로 필터링하여 정확도 향상)
+        // series_uid로 series 찾기 (project_data를 통해 project_id로 필터링)
         let series_id: Option<i32> = sqlx::query_scalar(
-            "SELECT pds.id FROM project_data_series pds
-             JOIN project_data_study pdt ON pds.study_id = pdt.id
-             WHERE pds.series_uid = $1 AND pdt.project_id = $2",
+            "SELECT pds.id
+             FROM project_data_series pds
+             INNER JOIN project_data_study pdst ON pds.study_id = pdst.id
+             INNER JOIN project_data pd ON pd.study_id = pdst.id
+             WHERE pds.series_uid = $1 AND pd.project_id = $2
+             LIMIT 1",
         )
         .bind(series_uid)
         .bind(project_id)
@@ -516,7 +572,7 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         }
         RbacEvaluationResult {
             allowed: false,
-            reason: Some("series_not_found".to_string()),
+            reason: Some("series_not_found_in_project".to_string()),
         }
     }
 
@@ -543,9 +599,11 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
             };
         }
 
-        // 1) instance에 대한 명시적 권한
-        let has_explicit_instance: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM project_data_access WHERE user_id = $1 AND project_id = $2 AND status = 'APPROVED' AND resource_level = 'INSTANCE' AND instance_id = $3)",
+        // 1) 명시적 거부 확인 (최우선)
+        let is_denied: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM project_data_access
+             WHERE user_id = $1 AND project_id = $2
+             AND status = 'DENIED' AND resource_level = 'INSTANCE' AND instance_id = $3)",
         )
         .bind(user_id)
         .bind(project_id)
@@ -554,14 +612,34 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         .await
         .unwrap_or(false);
 
-        if has_explicit_instance {
+        if is_denied {
             return RbacEvaluationResult {
-                allowed: true,
-                reason: Some("explicit_instance_access".to_string()),
+                allowed: false,
+                reason: Some("explicit_instance_denied".to_string()),
             };
         }
 
-        // 2) instance가 포함된 series에 대한 권한 상속
+        // 2) 명시적 승인 확인
+        let is_approved: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM project_data_access
+             WHERE user_id = $1 AND project_id = $2
+             AND status = 'APPROVED' AND resource_level = 'INSTANCE' AND instance_id = $3)",
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .bind(instance_id)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(false);
+
+        if is_approved {
+            return RbacEvaluationResult {
+                allowed: true,
+                reason: Some("explicit_instance_approved".to_string()),
+            };
+        }
+
+        // 3) instance가 포함된 series에 대한 권한 상속
         let parent_series_id: Option<i32> =
             sqlx::query_scalar("SELECT series_id FROM project_data_instance WHERE id = $1")
                 .bind(instance_id)
@@ -574,33 +652,21 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
             let series_result = self
                 .evaluate_series_access(user_id, project_id, series_id)
                 .await;
-            if series_result.allowed {
-                return RbacEvaluationResult {
-                    allowed: true,
-                    reason: Some("inherited_from_series".to_string()),
-                };
+            // Series가 거부되면 Instance도 거부
+            if !series_result.allowed {
+                return series_result;
             }
-
-            // 3) 룰 기반 조건 평가 (instance는 상위 study의 값으로 평가)
-            let parent_study_id: Option<i32> =
-                sqlx::query_scalar("SELECT study_id FROM project_data_series WHERE id = $1")
-                    .bind(series_id)
-                    .fetch_optional(&self.pool)
-                    .await
-                    .ok()
-                    .flatten();
-
-            if let Some(sid) = parent_study_id {
-                let dicom_values = self.get_study_dicom_values(sid).await;
-                return self
-                    .evaluate_rule_based_conditions(user_id, project_id, &dicom_values, "INSTANCE")
-                    .await;
-            }
+            // Series가 허용되면 Instance도 허용 (상속)
+            return RbacEvaluationResult {
+                allowed: true,
+                reason: Some("inherited_from_series".to_string()),
+            };
         }
 
+        // 4) 상위 Series를 찾을 수 없으면 거부
         RbacEvaluationResult {
             allowed: false,
-            reason: Some("instance_parent_study_not_found".to_string()),
+            reason: Some("instance_parent_series_not_found".to_string()),
         }
     }
 
