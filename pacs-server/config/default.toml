@@ -53,3 +53,11 @@ max_age = 3600
 [signed_url]
 default_ttl = 600  # 10 minutes
 max_ttl = 3600     # 1 hour
+
+
+[dcm4chee.db]
+host = "localhost"
+port = 5457
+database = "postgres"
+username = "pacsadmin"
+password = "HhL}qb(tl}?zJ4}("

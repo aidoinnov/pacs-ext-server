@@ -1,24 +1,27 @@
-use utoipa::OpenApi;
-use crate::presentation::controllers::auth_controller_docs::*;
-use crate::presentation::controllers::annotation_controller::*;
-use crate::presentation::controllers::project_controller::*;
-use crate::presentation::controllers::mask_group_controller::*;
-use crate::presentation::controllers::project_user_matrix_controller::*;
-use crate::presentation::controllers::user_project_matrix_controller;
-use crate::presentation::controllers::role_permission_matrix_controller::*;
-use crate::presentation::controllers::project_data_access_controller::*;
-use crate::application::dto::auth_dto::*;
-use crate::application::dto::user_dto::*;
-use crate::application::dto::project_dto::*;
 use crate::application::dto::annotation_dto::*;
+use crate::application::dto::auth_dto::*;
 use crate::application::dto::mask_group_dto::*;
 use crate::application::dto::permission_dto::*;
-use crate::application::dto::project_user_dto::{UserWithRoleResponse, ProjectWithRoleResponse, AssignRoleRequest, BatchAssignRolesRequest, UserRoleAssignment, RoleAssignmentResponse, BatchRoleAssignmentResponse, FailedAssignment};
-use crate::application::dto::project_user_matrix_dto::*;
-use crate::application::dto::user_project_matrix_dto::*;
-use crate::application::dto::role_permission_matrix_dto::*;
 use crate::application::dto::project_data_access_dto::*;
+use crate::application::dto::project_dto::*;
+use crate::application::dto::project_user_dto::{
+    AssignRoleRequest, BatchAssignRolesRequest, BatchRoleAssignmentResponse, FailedAssignment,
+    ProjectWithRoleResponse, RoleAssignmentResponse, UserRoleAssignment, UserWithRoleResponse,
+};
+use crate::application::dto::project_user_matrix_dto::*;
+use crate::application::dto::role_permission_matrix_dto::*;
+use crate::application::dto::user_dto::*;
+use crate::application::dto::user_project_matrix_dto::*;
 use crate::application::dto::user_registration_dto::*;
+use crate::presentation::controllers::annotation_controller::*;
+use crate::presentation::controllers::auth_controller_docs::*;
+use crate::presentation::controllers::mask_group_controller::*;
+use crate::presentation::controllers::project_controller::*;
+use crate::presentation::controllers::project_data_access_controller::*;
+use crate::presentation::controllers::project_user_matrix_controller::*;
+use crate::presentation::controllers::role_permission_matrix_controller::*;
+use crate::presentation::controllers::user_project_matrix_controller;
+use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(

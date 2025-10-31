@@ -63,3 +63,4 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 ### 비고
 - Keycloak 토큰의 서명 검증은 게이트웨이 내 필수는 아니며, 현재 구현은 payload 기반 매핑을 수행합니다. 상위 레벨에서 검증이 필요하면 공개키 검증을 추가할 수 있습니다.
+

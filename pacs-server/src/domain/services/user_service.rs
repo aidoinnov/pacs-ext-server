@@ -1,16 +1,16 @@
+use crate::domain::entities::{NewUser, Project, UpdateUser, User};
+use crate::domain::repositories::{ProjectRepository, UserRepository};
 use async_trait::async_trait;
 use uuid::Uuid;
-use crate::domain::entities::{User, NewUser, UpdateUser, Project};
-use crate::domain::repositories::{UserRepository, ProjectRepository};
 
 /// 사용자 관리 도메인 서비스
 #[async_trait]
 pub trait UserService: Send + Sync {
     /// 사용자 생성
     async fn create_user(
-        &self, 
-        username: String, 
-        email: String, 
+        &self,
+        username: String,
+        email: String,
         keycloak_id: Uuid,
         full_name: Option<String>,
         organization: Option<String>,
@@ -42,7 +42,11 @@ pub trait UserService: Send + Sync {
     async fn add_user_to_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError>;
 
     /// 프로젝트에서 사용자 제거
-    async fn remove_user_from_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError>;
+    async fn remove_user_from_project(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<(), ServiceError>;
 
     /// 사용자가 속한 프로젝트 목록 조회
     async fn get_user_projects(&self, user_id: i32) -> Result<Vec<Project>, ServiceError>;
@@ -51,10 +55,19 @@ pub trait UserService: Send + Sync {
     async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError>;
 
     /// 사용자를 프로젝트에 역할과 함께 추가
-    async fn add_user_to_project_with_role(&self, user_id: i32, project_id: i32, role_id: Option<i32>) -> Result<(), ServiceError>;
+    async fn add_user_to_project_with_role(
+        &self,
+        user_id: i32,
+        project_id: i32,
+        role_id: Option<i32>,
+    ) -> Result<(), ServiceError>;
 
     /// 프로젝트 멤버십 정보 조회 (역할 정보 포함)
-    async fn get_project_membership(&self, user_id: i32, project_id: i32) -> Result<Option<crate::application::dto::project_user_dto::MembershipResponse>, ServiceError>;
+    async fn get_project_membership(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<Option<crate::application::dto::project_user_dto::MembershipResponse>, ServiceError>;
 
     // === 사용자-프로젝트 역할 관리 ===
 
@@ -64,7 +77,13 @@ pub trait UserService: Send + Sync {
         user_id: i32,
         page: i32,
         page_size: i32,
-    ) -> Result<(Vec<crate::application::dto::project_user_dto::ProjectWithRoleResponse>, i64), ServiceError>;
+    ) -> Result<
+        (
+            Vec<crate::application::dto::project_user_dto::ProjectWithRoleResponse>,
+            i64,
+        ),
+        ServiceError,
+    >;
 
     // === 매트릭스 API 지원 ===
 
@@ -91,8 +110,14 @@ pub trait UserService: Send + Sync {
     async fn get_memberships_batch(
         &self,
         user_ids: &[i32],
-        project_ids: &[i32]
-    ) -> Result<std::collections::HashMap<(i32, i32), crate::application::dto::user_project_matrix_dto::MembershipInfo>, ServiceError>;
+        project_ids: &[i32],
+    ) -> Result<
+        std::collections::HashMap<
+            (i32, i32),
+            crate::application::dto::user_project_matrix_dto::MembershipInfo,
+        >,
+        ServiceError,
+    >;
 }
 
 #[derive(Clone)]
@@ -125,9 +150,9 @@ where
     P: ProjectRepository,
 {
     async fn create_user(
-        &self, 
-        username: String, 
-        email: String, 
+        &self,
+        username: String,
+        email: String,
         keycloak_id: Uuid,
         full_name: Option<String>,
         organization: Option<String>,
@@ -135,8 +160,14 @@ where
         phone: Option<String>,
     ) -> Result<User, ServiceError> {
         // 중복 체크
-        if let Some(_) = self.user_repository.find_by_keycloak_id(keycloak_id).await? {
-            return Err(ServiceError::AlreadyExists("User with this keycloak_id already exists".into()));
+        if let Some(_) = self
+            .user_repository
+            .find_by_keycloak_id(keycloak_id)
+            .await?
+        {
+            return Err(ServiceError::AlreadyExists(
+                "User with this keycloak_id already exists".into(),
+            ));
         }
 
         if let Some(_) = self.user_repository.find_by_username(&username).await? {
@@ -212,7 +243,11 @@ where
     }
 
     async fn user_exists(&self, keycloak_id: Uuid) -> Result<bool, ServiceError> {
-        Ok(self.user_repository.find_by_keycloak_id(keycloak_id).await?.is_some())
+        Ok(self
+            .user_repository
+            .find_by_keycloak_id(keycloak_id)
+            .await?
+            .is_some())
     }
 
     // === 프로젝트 멤버십 관리 구현 ===
@@ -225,7 +260,7 @@ where
              WHERE EXISTS(SELECT 1 FROM security_user WHERE id = $1)
                AND EXISTS(SELECT 1 FROM security_project WHERE id = $2)
              ON CONFLICT (user_id, project_id) DO NOTHING
-             RETURNING user_id"
+             RETURNING user_id",
         )
         .bind(user_id)
         .bind(project_id)
@@ -239,27 +274,39 @@ where
                 if self.user_repository.find_by_id(user_id).await?.is_none() {
                     return Err(ServiceError::NotFound("User not found".into()));
                 }
-                if self.project_repository.find_by_id(project_id).await?.is_none() {
+                if self
+                    .project_repository
+                    .find_by_id(project_id)
+                    .await?
+                    .is_none()
+                {
                     return Err(ServiceError::NotFound("Project not found".into()));
                 }
-                Err(ServiceError::AlreadyExists("User is already a member of this project".into()))
+                Err(ServiceError::AlreadyExists(
+                    "User is already a member of this project".into(),
+                ))
             }
         }
     }
 
-    async fn remove_user_from_project(&self, user_id: i32, project_id: i32) -> Result<(), ServiceError> {
-        let result = sqlx::query(
-            "DELETE FROM security_user_project WHERE user_id = $1 AND project_id = $2"
-        )
-        .bind(user_id)
-        .bind(project_id)
-        .execute(self.user_repository.pool())
-        .await?;
+    async fn remove_user_from_project(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<(), ServiceError> {
+        let result =
+            sqlx::query("DELETE FROM security_user_project WHERE user_id = $1 AND project_id = $2")
+                .bind(user_id)
+                .bind(project_id)
+                .execute(self.user_repository.pool())
+                .await?;
 
         if result.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(ServiceError::NotFound("User is not a member of this project".into()))
+            Err(ServiceError::NotFound(
+                "User is not a member of this project".into(),
+            ))
         }
     }
 
@@ -274,7 +321,7 @@ where
              FROM security_project p
              INNER JOIN security_user_project up ON p.id = up.project_id
              WHERE up.user_id = $1
-             ORDER BY p.name"
+             ORDER BY p.name",
         )
         .bind(user_id)
         .fetch_all(self.user_repository.pool())
@@ -285,7 +332,7 @@ where
 
     async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError> {
         let result = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1 AND project_id = $2"
+            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1 AND project_id = $2",
         )
         .bind(user_id)
         .bind(project_id)
@@ -295,20 +342,32 @@ where
         Ok(result > 0)
     }
 
-    async fn add_user_to_project_with_role(&self, user_id: i32, project_id: i32, role_id: Option<i32>) -> Result<(), ServiceError> {
+    async fn add_user_to_project_with_role(
+        &self,
+        user_id: i32,
+        project_id: i32,
+        role_id: Option<i32>,
+    ) -> Result<(), ServiceError> {
         // 사용자 존재 확인
         if self.user_repository.find_by_id(user_id).await?.is_none() {
             return Err(ServiceError::NotFound("User not found".into()));
         }
 
         // 프로젝트 존재 확인
-        if self.project_repository.find_by_id(project_id).await?.is_none() {
+        if self
+            .project_repository
+            .find_by_id(project_id)
+            .await?
+            .is_none()
+        {
             return Err(ServiceError::NotFound("Project not found".into()));
         }
 
         // 이미 멤버인지 확인
         if self.is_project_member(user_id, project_id).await? {
-            return Err(ServiceError::AlreadyExists("User is already a member of this project".into()));
+            return Err(ServiceError::AlreadyExists(
+                "User is already a member of this project".into(),
+            ));
         }
 
         // 기본 역할 설정 (role_id가 None인 경우 Viewer 역할 사용)
@@ -316,7 +375,7 @@ where
             Some(id) => {
                 // 역할 존재 확인
                 let role_exists = sqlx::query_scalar::<_, bool>(
-                    "SELECT EXISTS(SELECT 1 FROM security_role WHERE id = $1)"
+                    "SELECT EXISTS(SELECT 1 FROM security_role WHERE id = $1)",
                 )
                 .bind(id)
                 .fetch_one(self.user_repository.pool())
@@ -326,7 +385,7 @@ where
                     return Err(ServiceError::NotFound("Role not found".into()));
                 }
                 id
-            },
+            }
             None => {
                 // 기본 Viewer 역할 ID 조회
                 sqlx::query_scalar::<_, i32>(
@@ -342,7 +401,7 @@ where
         let result = sqlx::query(
             "INSERT INTO security_user_project (user_id, project_id, role_id)
              VALUES ($1, $2, $3)
-             RETURNING user_id"
+             RETURNING user_id",
         )
         .bind(user_id)
         .bind(project_id)
@@ -352,16 +411,31 @@ where
 
         match result {
             Some(_) => Ok(()),
-            None => Err(ServiceError::DatabaseError("Failed to add user to project".into()))
+            None => Err(ServiceError::DatabaseError(
+                "Failed to add user to project".into(),
+            )),
         }
     }
 
-    async fn get_project_membership(&self, user_id: i32, project_id: i32) -> Result<Option<crate::application::dto::project_user_dto::MembershipResponse>, ServiceError> {
-        let result = sqlx::query_as::<_, (i32, Option<i32>, Option<String>, chrono::DateTime<chrono::Utc>)>(
+    async fn get_project_membership(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<Option<crate::application::dto::project_user_dto::MembershipResponse>, ServiceError>
+    {
+        let result = sqlx::query_as::<
+            _,
+            (
+                i32,
+                Option<i32>,
+                Option<String>,
+                chrono::DateTime<chrono::Utc>,
+            ),
+        >(
             "SELECT up.user_id, up.role_id, r.name as role_name, up.created_at
              FROM security_user_project up
              LEFT JOIN security_role r ON up.role_id = r.id
-             WHERE up.user_id = $1 AND up.project_id = $2"
+             WHERE up.user_id = $1 AND up.project_id = $2",
         )
         .bind(user_id)
         .bind(project_id)
@@ -369,22 +443,22 @@ where
         .await?;
 
         match result {
-            Some((_, role_id, role_name, joined_at)) => {
-                Ok(Some(crate::application::dto::project_user_dto::MembershipResponse {
+            Some((_, role_id, role_name, joined_at)) => Ok(Some(
+                crate::application::dto::project_user_dto::MembershipResponse {
                     is_member: true,
                     role_id,
                     role_name,
                     joined_at: Some(joined_at.to_rfc3339()),
-                }))
-            },
-            None => {
-                Ok(Some(crate::application::dto::project_user_dto::MembershipResponse {
+                },
+            )),
+            None => Ok(Some(
+                crate::application::dto::project_user_dto::MembershipResponse {
                     is_member: false,
                     role_id: None,
                     role_name: None,
                     joined_at: None,
-                }))
-            }
+                },
+            )),
         }
     }
 
@@ -395,7 +469,13 @@ where
         user_id: i32,
         page: i32,
         page_size: i32,
-    ) -> Result<(Vec<crate::application::dto::project_user_dto::ProjectWithRoleResponse>, i64), ServiceError> {
+    ) -> Result<
+        (
+            Vec<crate::application::dto::project_user_dto::ProjectWithRoleResponse>,
+            i64,
+        ),
+        ServiceError,
+    > {
         // 사용자 존재 확인
         if self.user_repository.find_by_id(user_id).await?.is_none() {
             return Err(ServiceError::NotFound("User not found".into()));
@@ -404,7 +484,20 @@ where
         let offset = (page - 1) * page_size;
 
         // 사용자의 프로젝트와 역할 정보를 함께 조회 (기한 정보 포함)
-        let projects_with_roles = sqlx::query_as::<_, (i32, String, Option<String>, bool, Option<String>, Option<String>, Option<i32>, Option<String>, Option<String>)>(
+        let projects_with_roles = sqlx::query_as::<
+            _,
+            (
+                i32,
+                String,
+                Option<String>,
+                bool,
+                Option<String>,
+                Option<String>,
+                Option<i32>,
+                Option<String>,
+                Option<String>,
+            ),
+        >(
             "SELECT 
                 p.id as project_id, 
                 p.name as project_name, 
@@ -420,7 +513,7 @@ where
              LEFT JOIN security_role r ON up.role_id = r.id
              WHERE up.user_id = $1
              ORDER BY p.name
-             LIMIT $2 OFFSET $3"
+             LIMIT $2 OFFSET $3",
         )
         .bind(user_id)
         .bind(page_size)
@@ -430,29 +523,42 @@ where
 
         // 총 개수 조회
         let total_count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1"
+            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1",
         )
         .bind(user_id)
         .fetch_one(self.user_repository.pool())
         .await?;
 
         // DTO로 변환
-        let projects: Vec<crate::application::dto::project_user_dto::ProjectWithRoleResponse> = projects_with_roles
-            .into_iter()
-            .map(|(project_id, project_name, description, is_active, start_date, end_date, role_id, role_name, role_scope)| {
-                crate::application::dto::project_user_dto::ProjectWithRoleResponse {
-                    project_id,
-                    project_name,
-                    description,
-                    is_active,
-                    start_date,
-                    end_date,
-                    role_id,
-                    role_name,
-                    role_scope,
-                }
-            })
-            .collect();
+        let projects: Vec<crate::application::dto::project_user_dto::ProjectWithRoleResponse> =
+            projects_with_roles
+                .into_iter()
+                .map(
+                    |(
+                        project_id,
+                        project_name,
+                        description,
+                        is_active,
+                        start_date,
+                        end_date,
+                        role_id,
+                        role_name,
+                        role_scope,
+                    )| {
+                        crate::application::dto::project_user_dto::ProjectWithRoleResponse {
+                            project_id,
+                            project_name,
+                            description,
+                            is_active,
+                            start_date,
+                            end_date,
+                            role_id,
+                            role_name,
+                            role_scope,
+                        }
+                    },
+                )
+                .collect();
 
         Ok((projects, total_count))
     }
@@ -477,7 +583,7 @@ where
              WHERE ($1::int[] IS NULL OR id = ANY($1))
                AND account_status != 'DELETED'
              ORDER BY username
-             LIMIT $2 OFFSET $3"
+             LIMIT $2 OFFSET $3",
         )
         .bind(&user_ids)
         .bind(page_size)
@@ -490,7 +596,7 @@ where
             "SELECT COUNT(*)
              FROM security_user
              WHERE ($1::int[] IS NULL OR id = ANY($1))
-               AND account_status != 'DELETED'"
+               AND account_status != 'DELETED'",
         )
         .bind(&user_ids)
         .fetch_one(self.user_repository.pool())
@@ -513,7 +619,7 @@ where
         // 정렬 필드 검증 및 ORDER BY 절 구성
         let order_by = match sort_by {
             "username" => "username",
-            "email" => "email", 
+            "email" => "email",
             "created_at" => "created_at",
             _ => "username", // 기본값
         };
@@ -525,7 +631,10 @@ where
 
         // 검색 조건 구성
         let search_condition = if let Some(search_term) = search {
-            format!("AND (username ILIKE '%{}%' OR email ILIKE '%{}%')", search_term, search_term)
+            format!(
+                "AND (username ILIKE '%{}%' OR email ILIKE '%{}%')",
+                search_term, search_term
+            )
         } else {
             String::new()
         };
@@ -573,8 +682,14 @@ where
     async fn get_memberships_batch(
         &self,
         user_ids: &[i32],
-        project_ids: &[i32]
-    ) -> Result<std::collections::HashMap<(i32, i32), crate::application::dto::user_project_matrix_dto::MembershipInfo>, ServiceError> {
+        project_ids: &[i32],
+    ) -> Result<
+        std::collections::HashMap<
+            (i32, i32),
+            crate::application::dto::user_project_matrix_dto::MembershipInfo,
+        >,
+        ServiceError,
+    > {
         use crate::application::dto::user_project_matrix_dto::MembershipInfo;
 
         // 단일 쿼리로 모든 멤버십 정보 조회 (joined_at 제거로 성능 최적화)
@@ -582,7 +697,7 @@ where
             "SELECT up.user_id, up.project_id, up.role_id, r.name as role_name
              FROM security_user_project up
              LEFT JOIN security_role r ON up.role_id = r.id
-             WHERE up.user_id = ANY($1) AND up.project_id = ANY($2)"
+             WHERE up.user_id = ANY($1) AND up.project_id = ANY($2)",
         )
         .bind(&user_ids)
         .bind(&project_ids)
@@ -592,15 +707,9 @@ where
         // HashMap으로 변환하여 O(1) 조회 가능 (사전 용량 할당으로 재할당 방지)
         let estimated_capacity = user_ids.len().saturating_mul(project_ids.len());
         let mut membership_map = std::collections::HashMap::with_capacity(estimated_capacity);
-        
+
         for (user_id, project_id, role_id, role_name) in memberships {
-            membership_map.insert(
-                (user_id, project_id),
-                MembershipInfo {
-                    role_id,
-                    role_name,
-                }
-            );
+            membership_map.insert((user_id, project_id), MembershipInfo { role_id, role_name });
         }
 
         Ok(membership_map)
@@ -615,4 +724,3 @@ impl From<crate::application::services::SignedUrlError> for ServiceError {
         ServiceError::DatabaseError(err.to_string())
     }
 }
-

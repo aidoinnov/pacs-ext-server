@@ -20,8 +20,8 @@ pub struct ProjectWithRoleResponse {
     pub project_name: String,
     pub description: Option<String>,
     pub is_active: bool,
-    pub start_date: Option<String>,  // 프로젝트 시작일
-    pub end_date: Option<String>,    // 프로젝트 종료일
+    pub start_date: Option<String>, // 프로젝트 시작일
+    pub end_date: Option<String>,   // 프로젝트 종료일
     pub role_id: Option<i32>,
     pub role_name: Option<String>,
     pub role_scope: Option<String>,

@@ -3,10 +3,12 @@ use actix_web::{web, HttpResponse, Responder, Result};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::dto::permission_dto::{CreateRoleRequest, UpdateRoleRequest, PaginationQuery};
+use crate::application::dto::permission_dto::{
+    CreateRoleRequest, PaginationQuery, UpdateRoleRequest,
+};
+use crate::application::dto::role_capability_matrix_dto::*;
 use crate::application::use_cases::permission_use_case::PermissionUseCase;
 use crate::application::use_cases::RoleCapabilityMatrixUseCase;
-use crate::application::dto::role_capability_matrix_dto::*;
 use crate::domain::services::permission_service::PermissionService;
 use crate::domain::ServiceError;
 
@@ -52,7 +54,10 @@ impl<P: PermissionService> RoleController<P> {
         role_id: web::Path<i32>,
         req: web::Json<UpdateRoleRequest>,
     ) -> impl Responder {
-        match permission_use_case.update_role(*role_id, req.into_inner()).await {
+        match permission_use_case
+            .update_role(*role_id, req.into_inner())
+            .await
+        {
             Ok(role) => HttpResponse::Ok().json(role),
             Err(e) => HttpResponse::BadRequest().json(json!({
                 "error": format!("Failed to update role: {}", e)
@@ -122,13 +127,11 @@ impl<P: PermissionService> RoleController<P> {
         // 파라미터 검증 및 기본값 설정
         let page = query.page.unwrap_or(1).max(1);
         let size = query.size.unwrap_or(10).min(100).max(1);
-        
-        match use_case.get_global_matrix_paginated(
-            page,
-            size,
-            query.search.clone(),
-            query.scope.clone(),
-        ).await {
+
+        match use_case
+            .get_global_matrix_paginated(page, size, query.search.clone(), query.scope.clone())
+            .await
+        {
             Ok(matrix) => Ok(HttpResponse::Ok().json(matrix)),
             Err(ServiceError::DatabaseError(msg)) => {
                 tracing::error!("Database error in get_global_matrix_paginated: {}", msg);
@@ -201,8 +204,11 @@ impl<P: PermissionService> RoleController<P> {
         use_case: web::Data<Arc<RoleCapabilityMatrixUseCase>>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let (role_id, capability_id) = path.into_inner();
-        
-        match use_case.update_capability_assignment(role_id, capability_id, req.assign).await {
+
+        match use_case
+            .update_capability_assignment(role_id, capability_id, req.assign)
+            .await
+        {
             Ok(_) => {
                 let message = if req.assign {
                     "Capability assigned successfully"
@@ -331,23 +337,53 @@ pub fn configure_routes<P: PermissionService + 'static>(
             web::scope("/roles")
                 // Role Management
                 .route("", web::post().to(RoleController::<P>::create_role))
-                .route("/global", web::get().to(RoleController::<P>::get_global_roles))
-                .route("/global/with-permissions", web::get().to(RoleController::<P>::get_global_roles_with_permissions))
-                .route("/project", web::get().to(RoleController::<P>::get_project_roles))
+                .route(
+                    "/global",
+                    web::get().to(RoleController::<P>::get_global_roles),
+                )
+                .route(
+                    "/global/with-permissions",
+                    web::get().to(RoleController::<P>::get_global_roles_with_permissions),
+                )
+                .route(
+                    "/project",
+                    web::get().to(RoleController::<P>::get_project_roles),
+                )
                 // Role-Capability Matrix (specific routes first)
-                .route("/global/capabilities/matrix", web::get().to(RoleController::<P>::get_global_matrix_paginated))
-                .route("/global/capabilities/matrix/all", web::get().to(RoleController::<P>::get_global_matrix))
-                .route("/projects/{project_id}/capabilities/matrix", web::get().to(RoleController::<P>::get_project_matrix))
-                .route("/{role_id}/capabilities/{capability_id}", web::put().to(RoleController::<P>::update_capability_assignment))
+                .route(
+                    "/global/capabilities/matrix",
+                    web::get().to(RoleController::<P>::get_global_matrix_paginated),
+                )
+                .route(
+                    "/global/capabilities/matrix/all",
+                    web::get().to(RoleController::<P>::get_global_matrix),
+                )
+                .route(
+                    "/projects/{project_id}/capabilities/matrix",
+                    web::get().to(RoleController::<P>::get_project_matrix),
+                )
+                .route(
+                    "/{role_id}/capabilities/{capability_id}",
+                    web::put().to(RoleController::<P>::update_capability_assignment),
+                )
                 // Generic role routes (must be last)
                 .route("/{role_id}", web::get().to(RoleController::<P>::get_role))
-                .route("/{role_id}", web::put().to(RoleController::<P>::update_role))
-                .route("/{role_id}", web::delete().to(RoleController::<P>::delete_role))
+                .route(
+                    "/{role_id}",
+                    web::put().to(RoleController::<P>::update_role),
+                )
+                .route(
+                    "/{role_id}",
+                    web::delete().to(RoleController::<P>::delete_role),
+                ),
         )
         .service(
             web::scope("/capabilities")
                 .route("", web::get().to(get_all_capabilities))
                 .route("/{capability_id}", web::get().to(get_capability_detail))
-                .route("/category/{category}", web::get().to(get_capabilities_by_category))
+                .route(
+                    "/category/{category}",
+                    web::get().to(get_capabilities_by_category),
+                ),
         );
 }

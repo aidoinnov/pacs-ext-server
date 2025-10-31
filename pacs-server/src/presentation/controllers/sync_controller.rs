@@ -3,10 +3,14 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::domain::services::SyncService;
-use crate::infrastructure::services::sync_worker::SyncServiceImpl;
 use crate::infrastructure::services::sync_state::SyncState;
+use crate::infrastructure::services::sync_worker::SyncServiceImpl;
 
-pub fn configure_routes(cfg: &mut web::ServiceConfig, state: Arc<RwLock<SyncState>>, svc: Arc<SyncServiceImpl>) {
+pub fn configure_routes(
+    cfg: &mut web::ServiceConfig,
+    state: Arc<RwLock<SyncState>>,
+    svc: Arc<SyncServiceImpl>,
+) {
     cfg.app_data(web::Data::from(state))
         .app_data(web::Data::from(svc))
         .service(
@@ -21,7 +25,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, state: Arc<RwLock<SyncStat
         );
 }
 
-async fn get_status(state: web::Data<Arc<RwLock<SyncState>>>, svc: web::Data<SyncServiceImpl>) -> HttpResponse {
+async fn get_status(
+    state: web::Data<Arc<RwLock<SyncState>>>,
+    svc: web::Data<SyncServiceImpl>,
+) -> HttpResponse {
     let st = svc.get_status().await;
     HttpResponse::Ok().json(serde_json::json!({
         "is_running": st.is_running,
@@ -57,16 +64,23 @@ async fn get_schedule(svc: web::Data<SyncServiceImpl>) -> HttpResponse {
 }
 
 #[derive(serde::Deserialize)]
-struct UpdateSchedule { interval_sec: u64 }
+struct UpdateSchedule {
+    interval_sec: u64,
+}
 
-async fn update_schedule(svc: web::Data<SyncServiceImpl>, body: web::Json<UpdateSchedule>) -> HttpResponse {
+async fn update_schedule(
+    svc: web::Data<SyncServiceImpl>,
+    body: web::Json<UpdateSchedule>,
+) -> HttpResponse {
     svc.update_interval(body.interval_sec).await;
     HttpResponse::Ok().finish()
 }
 
 async fn deps_check(req: actix_web::HttpRequest) -> HttpResponse {
     // Detect presence under multiple plausible type registrations
-    let has_state_arc = req.app_data::<web::Data<Arc<RwLock<SyncState>>>>().is_some();
+    let has_state_arc = req
+        .app_data::<web::Data<Arc<RwLock<SyncState>>>>()
+        .is_some();
     let has_state_lock = req.app_data::<web::Data<RwLock<SyncState>>>().is_some();
     let has_state = has_state_arc || has_state_lock;
 
@@ -74,5 +88,3 @@ async fn deps_check(req: actix_web::HttpRequest) -> HttpResponse {
 
     HttpResponse::Ok().json(serde_json::json!({"state": has_state, "svc": has_svc}))
 }
-
-

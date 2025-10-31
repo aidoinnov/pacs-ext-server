@@ -91,7 +91,10 @@ pub struct ProjectData {
 
 /// 데이터 접근 상태
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "data_access_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "data_access_status_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum DataAccessStatus {
     Approved,
     Denied,

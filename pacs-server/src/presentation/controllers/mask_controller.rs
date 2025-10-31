@@ -1,15 +1,15 @@
 #![allow(dead_code, unused_imports, unused_variables)]
-use actix_web::{web, HttpResponse, Responder, HttpRequest};
-use serde_json::json;
-use std::sync::Arc;
 use crate::application::dto::mask_dto::{
-    CreateMaskRequest, UpdateMaskRequest, MaskResponse,
-    MaskListResponse, DownloadUrlRequest, DownloadUrlResponse, MaskStatsResponse
+    CreateMaskRequest, DownloadUrlRequest, DownloadUrlResponse, MaskListResponse, MaskResponse,
+    MaskStatsResponse, UpdateMaskRequest,
 };
 use crate::application::use_cases::MaskUseCase;
 use crate::domain::ServiceError;
+use actix_web::{web, HttpRequest, HttpResponse, Responder};
+use serde_json::json;
+use std::sync::Arc;
 
-pub struct MaskController<MS, MGS, SUS> 
+pub struct MaskController<MS, MGS, SUS>
 where
     MS: crate::domain::services::MaskService + Send + Sync,
     MGS: crate::domain::services::MaskGroupService + Send + Sync,
@@ -61,7 +61,7 @@ where
     let (annotation_id, group_id) = path.into_inner();
     let mut request = req.into_inner();
     request.mask_group_id = group_id;
-    
+
     // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
     let user_id = http_req
         .headers()
@@ -127,7 +127,7 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id, mask_id) = path.into_inner();
-    
+
     // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
     let user_id = http_req
         .headers()
@@ -186,8 +186,11 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id) = path.into_inner();
-    println!("DEBUG: list_masks called with annotation_id={}, group_id={}", annotation_id, group_id);
-    
+    println!(
+        "DEBUG: list_masks called with annotation_id={}, group_id={}",
+        annotation_id, group_id
+    );
+
     // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
     let user_id = http_req
         .headers()
@@ -197,10 +200,17 @@ where
         .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     // Query parameters 추출
-    let offset = query.get("offset").and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
-    let limit = query.get("limit").and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
+    let offset = query
+        .get("offset")
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
+    let limit = query
+        .get("limit")
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
 
-    match use_case.list_masks(Some(group_id), user_id, offset, limit).await {
+    match use_case
+        .list_masks(Some(group_id), user_id, offset, limit)
+        .await
+    {
         Ok(masks) => HttpResponse::Ok().json(masks),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
@@ -252,7 +262,7 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id, mask_id) = path.into_inner();
-    
+
     // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
     let user_id = http_req
         .headers()
@@ -261,7 +271,10 @@ where
         .and_then(|s| s.parse::<i32>().ok())
         .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
-    match use_case.update_mask(mask_id, req.into_inner(), user_id).await {
+    match use_case
+        .update_mask(mask_id, req.into_inner(), user_id)
+        .await
+    {
         Ok(mask) => HttpResponse::Ok().json(mask),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
@@ -318,7 +331,7 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id, mask_id) = path.into_inner();
-    
+
     // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
     let user_id = http_req
         .headers()
@@ -381,7 +394,7 @@ where
     let (annotation_id, group_id, mask_id) = path.into_inner();
     let mut request = req.into_inner();
     request.mask_id = mask_id;
-    
+
     // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
     let user_id = http_req
         .headers()
@@ -446,8 +459,11 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id) = path.into_inner();
-    println!("DEBUG: get_mask_stats called with annotation_id={}, group_id={}", annotation_id, group_id);
-    
+    println!(
+        "DEBUG: get_mask_stats called with annotation_id={}, group_id={}",
+        annotation_id, group_id
+    );
+
     // 테스트에서 X-User-ID 헤더로 사용자 ID를 전달받음
     let user_id = http_req
         .headers()
@@ -455,7 +471,7 @@ where
         .and_then(|h| h.to_str().ok())
         .and_then(|s| s.parse::<i32>().ok())
         .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
-    
+
     println!("DEBUG: get_mask_stats - user_id from header = {}", user_id);
 
     match use_case.get_mask_stats(Some(group_id), user_id).await {
@@ -483,21 +499,22 @@ where
 pub fn configure_routes<MS, MGS, SUS>(
     cfg: &mut web::ServiceConfig,
     use_case: Arc<MaskUseCase<MS, MGS, SUS>>,
-)
-where
+) where
     MS: crate::domain::services::MaskService + Send + Sync + 'static,
     MGS: crate::domain::services::MaskGroupService + Send + Sync + 'static,
     SUS: crate::application::services::SignedUrlService + Send + Sync + 'static,
 {
-    cfg.app_data(web::Data::new(use_case))
-        .service(
-            web::scope("/annotations/{annotation_id}/mask-groups/{group_id}/masks")
-                .route("", web::post().to(create_mask::<MS, MGS, SUS>))
-                .route("", web::get().to(list_masks::<MS, MGS, SUS>))
-                .route("/stats", web::get().to(get_mask_stats::<MS, MGS, SUS>))
-                .route("/{mask_id}", web::get().to(get_mask::<MS, MGS, SUS>))
-                .route("/{mask_id}", web::put().to(update_mask::<MS, MGS, SUS>))
-                .route("/{mask_id}", web::delete().to(delete_mask::<MS, MGS, SUS>))
-                .route("/{mask_id}/download-url", web::post().to(generate_download_url::<MS, MGS, SUS>))
-        );
+    cfg.app_data(web::Data::new(use_case)).service(
+        web::scope("/annotations/{annotation_id}/mask-groups/{group_id}/masks")
+            .route("", web::post().to(create_mask::<MS, MGS, SUS>))
+            .route("", web::get().to(list_masks::<MS, MGS, SUS>))
+            .route("/stats", web::get().to(get_mask_stats::<MS, MGS, SUS>))
+            .route("/{mask_id}", web::get().to(get_mask::<MS, MGS, SUS>))
+            .route("/{mask_id}", web::put().to(update_mask::<MS, MGS, SUS>))
+            .route("/{mask_id}", web::delete().to(delete_mask::<MS, MGS, SUS>))
+            .route(
+                "/{mask_id}/download-url",
+                web::post().to(generate_download_url::<MS, MGS, SUS>),
+            ),
+    );
 }

@@ -11,7 +11,9 @@ use uuid::Uuid;
 #[ignore]
 async fn get_me_returns_profile_with_valid_token() {
     dotenvy::dotenv().ok();
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set for test");
+    let database_url = std::env::var("DATABASE_URL")
+        .or_else(|_| std::env::var("APP_DATABASE_URL"))
+        .expect("DATABASE_URL or APP_DATABASE_URL not set for test");
 
     let pool = PgPoolOptions::new()
         .max_connections(1)

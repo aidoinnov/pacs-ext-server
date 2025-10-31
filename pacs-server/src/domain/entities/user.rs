@@ -1,5 +1,5 @@
 //! # 사용자 엔티티 모듈
-//! 
+//!
 //! 이 모듈은 시스템의 사용자 정보를 나타내는 엔티티들을 정의합니다.
 //! 사용자는 PACS 시스템에 접근할 수 있는 개인 또는 시스템 계정을 의미합니다.
 
@@ -14,11 +14,14 @@ use sqlx::FromRow;
 use uuid::Uuid;
 
 /// 사용자 계정 상태를 나타내는 열거형
-/// 
+///
 /// 사용자의 계정이 현재 어떤 상태인지를 나타냅니다.
 /// 회원가입부터 활성화까지의 전체 프로세스를 추적합니다.
 #[derive(Debug, Clone, sqlx::Type, Serialize, Deserialize, PartialEq)]
-#[sqlx(type_name = "user_account_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "user_account_status_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum UserAccountStatus {
     /// 이메일 인증 대기 상태
     PendingEmail,
@@ -33,7 +36,7 @@ pub enum UserAccountStatus {
 }
 
 /// 사용자 계정 감사 로그 엔티티
-/// 
+///
 /// 사용자의 모든 계정 관련 활동을 추적하는 로그입니다.
 /// 사용자가 삭제된 후에도 로그는 영구 보관됩니다.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
@@ -78,10 +81,10 @@ pub struct NewUserAuditLog {
 }
 
 /// 시스템 사용자를 나타내는 엔티티
-/// 
+///
 /// 이 구조체는 데이터베이스의 `security_user` 테이블과 매핑되며,
 /// 시스템에 등록된 사용자의 기본 정보를 저장합니다.
-/// 
+///
 /// # 필드
 /// - `id`: 데이터베이스에서 자동 생성되는 고유 식별자
 /// - `keycloak_id`: Keycloak 인증 시스템에서 사용하는 사용자 식별자
@@ -93,7 +96,7 @@ pub struct NewUserAuditLog {
 /// - `phone`: 연락처
 /// - `created_at`: 사용자 계정이 생성된 시각
 /// - `updated_at`: 마지막 업데이트 시각
-/// 
+///
 /// # 예시
 /// ```ignore
 /// let user = User {
@@ -152,10 +155,10 @@ pub struct User {
 }
 
 /// 새로운 사용자 생성을 위한 DTO(Data Transfer Object)
-/// 
+///
 /// 이 구조체는 사용자 생성 요청 시 전달되는 데이터를 나타냅니다.
 /// 데이터베이스에 저장되기 전의 사용자 정보를 담고 있습니다.
-/// 
+///
 /// # 필드
 /// - `keycloak_id`: Keycloak에서 발급받은 사용자 식별자
 /// - `username`: 생성할 사용자명 (중복되지 않아야 함)
@@ -164,7 +167,7 @@ pub struct User {
 /// - `organization`: 소속 기관 (선택사항)
 /// - `department`: 소속 부서/그룹 (선택사항)
 /// - `phone`: 연락처 (선택사항)
-/// 
+///
 /// # 예시
 /// ```ignore
 /// let new_user = NewUser {
@@ -196,10 +199,10 @@ pub struct NewUser {
 }
 
 /// 사용자 정보 업데이트를 위한 엔티티 (Builder 패턴)
-/// 
+///
 /// 이 구조체는 사용자 정보 업데이트 시 사용되며, 제공된 필드만 업데이트합니다.
 /// Builder 패턴을 사용하여 유연한 업데이트를 지원합니다.
-/// 
+///
 /// # 필드
 /// - `id`: 업데이트할 사용자 ID
 /// - `email`: 이메일 주소 (선택사항)
@@ -207,7 +210,7 @@ pub struct NewUser {
 /// - `organization`: 소속 기관 (선택사항)
 /// - `department`: 소속 부서/그룹 (선택사항)
 /// - `phone`: 연락처 (선택사항)
-/// 
+///
 /// # 예시
 /// ```ignore
 /// let update_user = UpdateUser::new(1)
@@ -233,10 +236,10 @@ pub struct UpdateUser {
 
 impl UpdateUser {
     /// 새로운 UpdateUser 인스턴스를 생성합니다.
-    /// 
+    ///
     /// # Arguments
     /// * `id` - 업데이트할 사용자 ID
-    /// 
+    ///
     /// # Returns
     /// * `UpdateUser` - 빈 업데이트 객체
     pub fn new(id: i32) -> Self {

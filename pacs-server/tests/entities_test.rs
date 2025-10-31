@@ -1,10 +1,12 @@
-use chrono::{DateTime, Utc, TimeZone, NaiveDate};
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 // Fix missing symbols by importing from crate public API
+use pacs_server::domain::entities::access_condition::ResourceLevel;
 use pacs_server::domain::entities::access_condition::{AccessCondition, ConditionType};
-use pacs_server::domain::entities::relations::{UserProject, ProjectRole, RolePermission, ProjectPermission};
+use pacs_server::domain::entities::relations::{
+    ProjectPermission, ProjectRole, RolePermission, UserProject,
+};
 use pacs_server::domain::entities::viewer::{HangingProtocol, HpLayout, HpViewport};
 use pacs_server::domain::entities::*;
-use pacs_server::domain::entities::access_condition::ResourceLevel;
 use serde_json::json;
 use uuid::Uuid;
 

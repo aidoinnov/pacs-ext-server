@@ -2,14 +2,16 @@ use actix_web::{web, HttpResponse, Responder, Result};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::use_cases::{project_user_use_case::ProjectUserUseCase, ProjectDataAccessUseCase};
-use crate::application::dto::project_user_dto::{
-    AssignRoleRequest, BatchAssignRolesRequest, RoleAssignmentResponse, BatchRoleAssignmentResponse,
-    AddMemberRequest
-};
 use crate::application::dto::permission_dto::PaginationQuery;
 use crate::application::dto::project_data_access_dto::*;
-use crate::domain::services::{ProjectService, UserService, ProjectDataService};
+use crate::application::dto::project_user_dto::{
+    AddMemberRequest, AssignRoleRequest, BatchAssignRolesRequest, BatchRoleAssignmentResponse,
+    RoleAssignmentResponse,
+};
+use crate::application::use_cases::{
+    project_user_use_case::ProjectUserUseCase, ProjectDataAccessUseCase,
+};
+use crate::domain::services::{ProjectDataService, ProjectService, UserService};
 use crate::domain::ServiceError;
 
 /// ServiceError를 HttpResponse로 변환하는 헬퍼 함수
@@ -69,7 +71,7 @@ where
     D: ProjectDataService,
 {
     let project_id = path.into_inner();
-    
+
     match use_case
         .get_project_members_with_roles(project_id, query.page, query.page_size)
         .await
@@ -108,7 +110,7 @@ where
     D: ProjectDataService,
 {
     let user_id = path.into_inner();
-    
+
     match use_case
         .get_user_projects_with_roles(user_id, query.page, query.page_size)
         .await
@@ -147,7 +149,7 @@ where
     D: ProjectDataService,
 {
     let (project_id, user_id) = path.into_inner();
-    
+
     match use_case
         .assign_role_to_user(project_id, user_id, req.role_id)
         .await
@@ -185,17 +187,15 @@ where
     D: ProjectDataService,
 {
     let project_id = path.into_inner();
-    
+
     // DTO를 (user_id, role_id) 튜플로 변환
-    let assignments: Vec<(i32, i32)> = req.assignments
+    let assignments: Vec<(i32, i32)> = req
+        .assignments
         .iter()
         .map(|assignment| (assignment.user_id, assignment.role_id))
         .collect();
-    
-    match use_case
-        .batch_assign_roles(project_id, assignments)
-        .await
-    {
+
+    match use_case.batch_assign_roles(project_id, assignments).await {
         Ok(response) => HttpResponse::Ok().json(response),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": format!("Failed to batch assign roles: {}", e)
@@ -228,11 +228,8 @@ where
     D: ProjectDataService,
 {
     let (project_id, user_id) = path.into_inner();
-    
-    match use_case
-        .remove_user_role(project_id, user_id)
-        .await
-    {
+
+    match use_case.remove_user_role(project_id, user_id).await {
         Ok(response) => HttpResponse::Ok().json(response),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": format!("Failed to remove user role: {}", e)
@@ -268,7 +265,7 @@ where
     D: ProjectDataService,
 {
     let project_id = path.into_inner();
-    
+
     match use_case
         .add_member_to_project(project_id, request.into_inner())
         .await
@@ -312,7 +309,7 @@ where
     D: ProjectDataService,
 {
     let (project_id, user_id) = path.into_inner();
-    
+
     match use_case
         .remove_member_from_project(project_id, user_id)
         .await
@@ -355,11 +352,8 @@ where
     D: ProjectDataService,
 {
     let (project_id, user_id) = path.into_inner();
-    
-    match use_case
-        .check_project_membership(project_id, user_id)
-        .await
-    {
+
+    match use_case.check_project_membership(project_id, user_id).await {
         Ok(response) => HttpResponse::Ok().json(response),
         Err(e) => {
             let status = match e.to_string().as_str() {
@@ -404,14 +398,10 @@ pub async fn get_project_data_access_matrix(
     let status = query.status.clone();
     let user_id = query.user_id;
 
-    match use_case.get_project_data_access_matrix(
-        project_id,
-        page,
-        page_size,
-        search,
-        status,
-        user_id,
-    ).await {
+    match use_case
+        .get_project_data_access_matrix(project_id, page, page_size, search, status, user_id)
+        .await
+    {
         Ok(matrix) => Ok(HttpResponse::Ok().json(matrix)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -440,7 +430,10 @@ pub async fn create_project_data(
 ) -> Result<HttpResponse, actix_web::Error> {
     let project_id = path.into_inner();
 
-    match use_case.create_project_data(project_id, request.into_inner()).await {
+    match use_case
+        .create_project_data(project_id, request.into_inner())
+        .await
+    {
         Ok(response) => Ok(HttpResponse::Created().json(response)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -471,7 +464,10 @@ pub async fn update_data_access(
 ) -> Result<HttpResponse, actix_web::Error> {
     let (project_id, data_id, user_id) = path.into_inner();
 
-    match use_case.update_data_access(data_id, user_id, request.into_inner()).await {
+    match use_case
+        .update_data_access(data_id, user_id, request.into_inner())
+        .await
+    {
         Ok(response) => Ok(HttpResponse::Ok().json(response)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -501,7 +497,10 @@ pub async fn batch_update_data_access(
 ) -> Result<HttpResponse, actix_web::Error> {
     let (project_id, data_id) = path.into_inner();
 
-    match use_case.batch_update_data_access(data_id, request.into_inner()).await {
+    match use_case
+        .batch_update_data_access(data_id, request.into_inner())
+        .await
+    {
         Ok(response) => Ok(HttpResponse::Ok().json(response)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -551,19 +550,55 @@ pub fn configure_routes<P, U, D>(
         .app_data(web::Data::new(project_data_access_use_case))
         .service(
             web::scope("/projects")
-                .route("/{project_id}/users", web::get().to(get_project_members::<P, U, D>))
-                .route("/{project_id}/users/{user_id}/role", web::put().to(assign_user_role::<P, U, D>))
-                .route("/{project_id}/users/{user_id}/role", web::delete().to(remove_user_role::<P, U, D>))
-                .route("/{project_id}/users/roles", web::post().to(batch_assign_roles::<P, U, D>))
-                .route("/{project_id}/members", web::post().to(add_project_member::<P, U, D>))
-                .route("/{project_id}/members/{user_id}", web::delete().to(remove_project_member::<P, U, D>))
-                .route("/{project_id}/members/{user_id}/membership", web::get().to(check_project_membership::<P, U, D>))
+                .route(
+                    "/{project_id}/users",
+                    web::get().to(get_project_members::<P, U, D>),
+                )
+                .route(
+                    "/{project_id}/users/{user_id}/role",
+                    web::put().to(assign_user_role::<P, U, D>),
+                )
+                .route(
+                    "/{project_id}/users/{user_id}/role",
+                    web::delete().to(remove_user_role::<P, U, D>),
+                )
+                .route(
+                    "/{project_id}/users/roles",
+                    web::post().to(batch_assign_roles::<P, U, D>),
+                )
+                .route(
+                    "/{project_id}/members",
+                    web::post().to(add_project_member::<P, U, D>),
+                )
+                .route(
+                    "/{project_id}/members/{user_id}",
+                    web::delete().to(remove_project_member::<P, U, D>),
+                )
+                .route(
+                    "/{project_id}/members/{user_id}/membership",
+                    web::get().to(check_project_membership::<P, U, D>),
+                )
                 // Data access routes
-                .route("/{project_id}/data-access/matrix", web::get().to(get_project_data_access_matrix))
+                .route(
+                    "/{project_id}/data-access/matrix",
+                    web::get().to(get_project_data_access_matrix),
+                )
                 .route("/{project_id}/data", web::post().to(create_project_data))
-                .route("/{project_id}/data/{data_id}/access/{user_id}", web::put().to(update_data_access))
-                .route("/{project_id}/data/{data_id}/access/batch", web::put().to(batch_update_data_access))
-                .route("/{project_id}/data/{data_id}/access/request", web::post().to(request_data_access))
+                .route(
+                    "/{project_id}/data/{data_id}/access/{user_id}",
+                    web::put().to(update_data_access),
+                )
+                .route(
+                    "/{project_id}/data/{data_id}/access/batch",
+                    web::put().to(batch_update_data_access),
+                )
+                .route(
+                    "/{project_id}/data/{data_id}/access/request",
+                    web::post().to(request_data_access),
+                ),
         )
-        .route("/users/{user_id}/projects", web::get().to(get_user_projects::<P, U, D>));
+        .route(
+            "/users/{user_id}/projects",
+            web::get().to(get_user_projects::<P, U, D>),
+        );
 }

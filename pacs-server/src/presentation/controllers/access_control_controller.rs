@@ -3,9 +3,7 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::dto::access_control_dto::{
-    CheckPermissionRequest, LogDicomAccessRequest,
-};
+use crate::application::dto::access_control_dto::{CheckPermissionRequest, LogDicomAccessRequest};
 use crate::application::use_cases::access_control_use_case::AccessControlUseCase;
 use crate::domain::services::access_control_service::AccessControlService;
 
@@ -24,7 +22,10 @@ impl<A: AccessControlService> AccessControlController<A> {
         access_control_use_case: web::Data<Arc<AccessControlUseCase<A>>>,
         req: web::Json<LogDicomAccessRequest>,
     ) -> impl Responder {
-        match access_control_use_case.log_dicom_access(req.into_inner()).await {
+        match access_control_use_case
+            .log_dicom_access(req.into_inner())
+            .await
+        {
             Ok(log) => HttpResponse::Created().json(log),
             Err(e) => HttpResponse::BadRequest().json(json!({
                 "error": format!("Failed to log access: {}", e)
@@ -43,7 +44,10 @@ impl<A: AccessControlService> AccessControlController<A> {
             .and_then(|l| l.parse::<i64>().ok())
             .unwrap_or(100);
 
-        match access_control_use_case.get_user_access_logs(user_id, limit).await {
+        match access_control_use_case
+            .get_user_access_logs(user_id, limit)
+            .await
+        {
             Ok(logs) => HttpResponse::Ok().json(logs),
             Err(e) => HttpResponse::InternalServerError().json(json!({
                 "error": format!("Failed to get access logs: {}", e)
@@ -99,7 +103,10 @@ impl<A: AccessControlService> AccessControlController<A> {
         access_control_use_case: web::Data<Arc<AccessControlUseCase<A>>>,
         req: web::Json<CheckPermissionRequest>,
     ) -> impl Responder {
-        match access_control_use_case.check_permission(req.into_inner()).await {
+        match access_control_use_case
+            .check_permission(req.into_inner())
+            .await
+        {
             Ok(response) => HttpResponse::Ok().json(response),
             Err(e) => HttpResponse::Forbidden().json(json!({
                 "error": format!("Permission check failed: {}", e)
@@ -149,7 +156,10 @@ pub fn configure_routes<A: AccessControlService + 'static>(
     cfg.app_data(web::Data::new(access_control_use_case))
         .service(
             web::scope("/access-control")
-                .route("/logs", web::post().to(AccessControlController::<A>::log_dicom_access))
+                .route(
+                    "/logs",
+                    web::post().to(AccessControlController::<A>::log_dicom_access),
+                )
                 .route(
                     "/logs/user/{user_id}",
                     web::get().to(AccessControlController::<A>::get_user_access_logs),

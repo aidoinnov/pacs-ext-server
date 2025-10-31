@@ -1,7 +1,7 @@
+use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration, Instant};
-use chrono::Utc;
 
 use crate::domain::services::SyncService;
 use crate::infrastructure::services::sync_state::SyncState;
@@ -17,7 +17,9 @@ pub async fn run_scheduler(state: Arc<RwLock<SyncState>>, sync_service: Arc<dyn 
         sleep(Duration::from_secs(interval)).await;
 
         let paused = { state.read().await.paused };
-        if paused { continue; }
+        if paused {
+            continue;
+        }
 
         {
             let mut s = state.write().await;
@@ -37,5 +39,3 @@ pub async fn run_scheduler(state: Arc<RwLock<SyncState>>, sync_service: Arc<dyn 
         let _ = (result, duration_ms);
     }
 }
-
-

@@ -1,8 +1,8 @@
+use crate::domain::ServiceError;
+use crate::infrastructure::config::KeycloakConfig;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use crate::domain::ServiceError;
-use crate::infrastructure::config::KeycloakConfig;
 
 #[derive(Clone)]
 pub struct KeycloakClient {
@@ -87,39 +87,53 @@ impl KeycloakClient {
     /// 1. Admin 토큰 획득
     async fn get_admin_token(&self) -> Result<String, ServiceError> {
         // Service account로 client credentials 방식 사용
-        let url = format!("{}/realms/{}/protocol/openid-connect/token", self.base_url, self.realm);
-        
+        let url = format!(
+            "{}/realms/{}/protocol/openid-connect/token",
+            self.base_url, self.realm
+        );
+
         let params = [
             ("grant_type", "client_credentials"),
             ("client_id", &self.client_id),
             ("client_secret", &self.client_secret),
         ];
-        
+
         eprintln!("DEBUG: Requesting Keycloak token from: {}", url);
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .post(&url)
             .form(&params)
             .send()
             .await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("Keycloak token request failed: {}", e)))?;
-        
-        eprintln!("DEBUG: Token request response status: {}", response.status());
-        
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Keycloak token request failed: {}", e))
+            })?;
+
+        eprintln!(
+            "DEBUG: Token request response status: {}",
+            response.status()
+        );
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            eprintln!("DEBUG: Token request failed: status={}, body={}", status, body);
-            return Err(ServiceError::ExternalServiceError(
-                format!("Keycloak token failed ({}): {}", status, body)
-            ));
+            eprintln!(
+                "DEBUG: Token request failed: status={}, body={}",
+                status, body
+            );
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Keycloak token failed ({}): {}",
+                status, body
+            )));
         }
-        
+
         eprintln!("DEBUG: Token request successful");
-        
-        let token_response: TokenResponse = response.json().await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("Failed to parse token: {}", e)))?;
-        
+
+        let token_response: TokenResponse = response.json().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("Failed to parse token: {}", e))
+        })?;
+
         Ok(token_response.access_token)
     }
 
@@ -132,170 +146,220 @@ impl KeycloakClient {
     ) -> Result<String, ServiceError> {
         let token = self.get_admin_token().await?;
         let url = format!("{}/admin/realms/{}/users", self.base_url, self.realm);
-        
+
         let create_request = CreateUserRequest {
             username: username.to_string(),
             email: email.to_string(),
-            enabled: false,  // 사용자는 비활성화 상태로 생성 (관리자 승인 필요)
-            email_verified: true,  // 이메일은 이미 인증된 것으로 간주
+            enabled: false,       // 사용자는 비활성화 상태로 생성 (관리자 승인 필요)
+            email_verified: true, // 이메일은 이미 인증된 것으로 간주
             credentials: vec![Credential {
                 credential_type: "password".to_string(),
                 value: password.to_string(),
                 temporary: false,
             }],
-            required_actions: vec![],  // 이메일 인증 필요 없음
+            required_actions: vec![], // 이메일 인증 필요 없음
         };
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .json(&create_request)
             .send()
             .await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("Keycloak create user failed: {}", e)))?;
-        
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Keycloak create user failed: {}", e))
+            })?;
+
         if response.status() == StatusCode::CONFLICT {
-            return Err(ServiceError::AlreadyExists("User already exists in Keycloak".into()));
+            return Err(ServiceError::AlreadyExists(
+                "User already exists in Keycloak".into(),
+            ));
         }
-        
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(ServiceError::ExternalServiceError(
-                format!("Keycloak create user failed ({}): {}", status, body)
-            ));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Keycloak create user failed ({}): {}",
+                status, body
+            )));
         }
-        
+
         // Location 헤더에서 사용자 ID 추출
-        let location = response.headers()
+        let location = response
+            .headers()
             .get("Location")
             .and_then(|v| v.to_str().ok())
             .ok_or_else(|| ServiceError::ExternalServiceError("No Location header".into()))?;
-        
-        let user_id = location.split('/').last()
+
+        let user_id = location
+            .split('/')
+            .last()
             .ok_or_else(|| ServiceError::ExternalServiceError("Invalid Location header".into()))?
             .to_string();
-        
+
         // user 역할 할당
         let _ = self.assign_realm_role(&token, &user_id, "user").await;
-        
+
         // 이메일 인증 메일 발송하지 않음 (관리자 승인 방식 사용)
-        
+
         Ok(user_id)
     }
 
     /// 3. 사용자 삭제
     pub async fn delete_user(&self, keycloak_user_id: &str) -> Result<(), ServiceError> {
         let token = self.get_admin_token().await?;
-        let url = format!("{}/admin/realms/{}/users/{}", self.base_url, self.realm, keycloak_user_id);
-        
-        
-        let response = self.http_client
+        let url = format!(
+            "{}/admin/realms/{}/users/{}",
+            self.base_url, self.realm, keycloak_user_id
+        );
+
+        let response = self
+            .http_client
             .delete(&url)
             .bearer_auth(&token)
             .send()
             .await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("Keycloak delete user failed: {}", e)))?;
-        
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Keycloak delete user failed: {}", e))
+            })?;
+
         if response.status() == StatusCode::NOT_FOUND {
             // 이미 삭제됨 - 성공으로 간주
             return Ok(());
         }
-        
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(ServiceError::ExternalServiceError(
-                format!("Keycloak delete user failed ({}): {}", status, body)
-            ));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Keycloak delete user failed ({}): {}",
+                status, body
+            )));
         }
-        
+
         Ok(())
     }
 
     /// 4. 이메일 인증 메일 발송
-    async fn send_verification_email(&self, token: &str, keycloak_user_id: &str) -> Result<(), ServiceError> {
+    async fn send_verification_email(
+        &self,
+        token: &str,
+        keycloak_user_id: &str,
+    ) -> Result<(), ServiceError> {
         let url = format!(
             "{}/admin/realms/{}/users/{}/send-verify-email",
             self.base_url, self.realm, keycloak_user_id
         );
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .put(&url)
             .bearer_auth(token)
             .send()
             .await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("Send verification email failed: {}", e)))?;
-        
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Send verification email failed: {}", e))
+            })?;
+
         if !response.status().is_success() {
             tracing::warn!("Failed to send verification email: {}", response.status());
         }
-        
+
         Ok(())
     }
 
     /// 5. Realm 역할 할당
-    async fn assign_realm_role(&self, token: &str, keycloak_user_id: &str, role_name: &str) -> Result<(), ServiceError> {
+    async fn assign_realm_role(
+        &self,
+        token: &str,
+        keycloak_user_id: &str,
+        role_name: &str,
+    ) -> Result<(), ServiceError> {
         // 1. 역할 조회
-        let role_url = format!("{}/admin/realms/{}/roles/{}", self.base_url, self.realm, role_name);
-        let role_response = self.http_client
+        let role_url = format!(
+            "{}/admin/realms/{}/roles/{}",
+            self.base_url, self.realm, role_name
+        );
+        let role_response = self
+            .http_client
             .get(&role_url)
             .bearer_auth(token)
             .send()
             .await?;
-        
+
         if !role_response.status().is_success() {
-            return Err(ServiceError::ExternalServiceError(format!("Role '{}' not found", role_name)));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Role '{}' not found",
+                role_name
+            )));
         }
-        
+
         let role: serde_json::Value = role_response.json().await?;
-        
+
         // 2. 역할 할당
         let assign_url = format!(
             "{}/admin/realms/{}/users/{}/role-mappings/realm",
             self.base_url, self.realm, keycloak_user_id
         );
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .post(&assign_url)
             .bearer_auth(token)
             .json(&vec![role])
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
-            tracing::warn!("Failed to assign role '{}': {}", role_name, response.status());
+            tracing::warn!(
+                "Failed to assign role '{}': {}",
+                role_name,
+                response.status()
+            );
         }
-        
+
         Ok(())
     }
 
     /// 6. 사용자 활성화/비활성화
-    pub async fn update_user_enabled(&self, keycloak_user_id: &str, enabled: bool) -> Result<(), ServiceError> {
+    pub async fn update_user_enabled(
+        &self,
+        keycloak_user_id: &str,
+        enabled: bool,
+    ) -> Result<(), ServiceError> {
         let token = self.get_admin_token().await?;
-        let url = format!("{}/admin/realms/{}/users/{}", self.base_url, self.realm, keycloak_user_id);
-        
+        let url = format!(
+            "{}/admin/realms/{}/users/{}",
+            self.base_url, self.realm, keycloak_user_id
+        );
+
         let update_request = UpdateUserRequest {
             enabled,
             email_verified: enabled, // 활성화 시 이메일 인증됨으로 표시
         };
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .put(&url)
             .bearer_auth(&token)
             .json(&update_request)
             .send()
             .await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("Update user failed: {}", e)))?;
-        
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Update user failed: {}", e))
+            })?;
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(ServiceError::ExternalServiceError(
-                format!("Update user failed ({}): {}", status, body)
-            ));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Update user failed ({}): {}",
+                status, body
+            )));
         }
-        
+
         Ok(())
     }
 
@@ -306,64 +370,80 @@ impl KeycloakClient {
         new_password: &str,
     ) -> Result<(), ServiceError> {
         let token = self.get_admin_token().await?;
-        
+
         let url = format!(
             "{}/admin/realms/{}/users/{}/reset-password",
             self.base_url, self.realm, keycloak_user_id
         );
-        
+
         let credential = json!({
             "type": "password",
             "value": new_password,
             "temporary": false
         });
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .put(&url)
             .bearer_auth(&token)
             .json(&credential)
             .send()
             .await?;
-        
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(ServiceError::ExternalServiceError(
-                format!("비밀번호 재설정 실패 ({}): {}", status, body)
-            ));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "비밀번호 재설정 실패 ({}): {}",
+                status, body
+            )));
         }
-        
+
         Ok(())
     }
 
     /// Refresh access token using Keycloak's refresh token endpoint
-    pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<KeycloakTokenResponse, ServiceError> {
-        let url = format!("{}/realms/{}/protocol/openid-connect/token", self.base_url, self.realm);
-        
+    pub async fn refresh_access_token(
+        &self,
+        refresh_token: &str,
+    ) -> Result<KeycloakTokenResponse, ServiceError> {
+        let url = format!(
+            "{}/realms/{}/protocol/openid-connect/token",
+            self.base_url, self.realm
+        );
+
         let request = RefreshTokenRequest {
             grant_type: "refresh_token".to_string(),
             refresh_token: refresh_token.to_string(),
             client_id: self.client_id.clone(),
         };
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .post(&url)
             .form(&request)
             .send()
             .await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("Refresh token request failed: {}", e)))?;
-        
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Refresh token request failed: {}", e))
+            })?;
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(ServiceError::ExternalServiceError(
-                format!("Refresh token failed ({}): {}", status, body)
-            ));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Refresh token failed ({}): {}",
+                status, body
+            )));
         }
-        
-        let token_response: KeycloakTokenResponse = response.json().await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("Failed to parse refresh token response: {}", e)))?;
-        
+
+        let token_response: KeycloakTokenResponse = response.json().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!(
+                "Failed to parse refresh token response: {}",
+                e
+            ))
+        })?;
+
         Ok(token_response)
     }
 }

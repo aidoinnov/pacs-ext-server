@@ -1,5 +1,5 @@
 //! # 유저-프로젝트 매트릭스 컨트롤러 모듈
-//! 
+//!
 //! 이 모듈은 유저 중심 매트릭스 API 엔드포인트를 제공합니다.
 //! 매트릭스는 관리 UI에서 테이블 형태로 보여주기 위한 것으로,
 //! 행은 유저 목록, 열은 프로젝트 목록이며, 각 셀에는 해당 유저의 프로젝트 역할이 표시됩니다.
@@ -8,15 +8,17 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
+use crate::application::dto::user_project_matrix_dto::{
+    UserProjectMatrixQueryParams, UserProjectMatrixResponse,
+};
 use crate::application::use_cases::user_project_matrix_use_case::UserProjectMatrixUseCase;
-use crate::application::dto::user_project_matrix_dto::{UserProjectMatrixQueryParams, UserProjectMatrixResponse};
 use crate::domain::services::{ProjectService, UserService};
 
 /// 유저-프로젝트 역할 매트릭스 조회
-/// 
+///
 /// 유저와 프로젝트의 역할 관계를 매트릭스 형태로 조회합니다.
 /// 이중 페이지네이션(유저/프로젝트)과 다양한 필터링 옵션을 지원합니다.
-/// 
+///
 /// # Parameters
 /// - `user_page`: 유저 페이지 번호 (기본값: 1)
 /// - `user_page_size`: 유저 페이지 크기 (기본값: 10, 최대: 50)
@@ -28,7 +30,7 @@ use crate::domain::services::{ProjectService, UserService};
 /// - `role_id`: 역할 ID 필터
 /// - `project_ids`: 특정 프로젝트 ID 목록
 /// - `user_ids`: 특정 유저 ID 목록
-/// 
+///
 /// # Returns
 /// - `200`: 매트릭스 데이터와 페이지네이션 정보
 /// - `500`: 내부 서버 오류
@@ -70,7 +72,7 @@ where
 }
 
 /// 라우팅 설정
-/// 
+///
 /// 매트릭스 API 엔드포인트를 설정합니다.
 pub fn configure_routes<U, P>(
     cfg: &mut web::ServiceConfig,

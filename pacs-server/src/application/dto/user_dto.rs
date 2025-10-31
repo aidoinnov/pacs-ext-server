@@ -101,30 +101,34 @@ pub struct UserListQuery {
     #[serde(default = "default_page")]
     #[schema(example = 1)]
     pub page: Option<i32>,
-    
+
     /// 페이지 크기 (기본값: 20, 최대: 100)
     #[serde(default = "default_page_size")]
     #[schema(example = 20)]
     pub page_size: Option<i32>,
-    
+
     /// 정렬 기준 (username, email, created_at)
     #[serde(default)]
     #[schema(example = "username")]
     pub sort_by: Option<String>,
-    
+
     /// 정렬 순서 (asc, desc)
     #[serde(default)]
     #[schema(example = "asc")]
     pub sort_order: Option<String>,
-    
+
     /// 검색어 (username, email 검색)
     #[serde(default)]
     #[schema(example = "john")]
     pub search: Option<String>,
 }
 
-fn default_page() -> Option<i32> { Some(1) }
-fn default_page_size() -> Option<i32> { Some(20) }
+fn default_page() -> Option<i32> {
+    Some(1)
+}
+fn default_page_size() -> Option<i32> {
+    Some(20)
+}
 
 /// 사용자 목록 응답 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]

@@ -1,8 +1,5 @@
 use crate::domain::entities::institution::{
-    NewProjectDataInstitution,
-    NewSecurityInstitution,
-    ProjectDataInstitution,
-    SecurityInstitution,
+    NewProjectDataInstitution, NewSecurityInstitution, ProjectDataInstitution, SecurityInstitution,
 };
 use crate::domain::repositories::InstitutionRepository;
 use sqlx::PgPool;
@@ -19,7 +16,10 @@ impl InstitutionRepositoryImpl {
 
 #[async_trait::async_trait]
 impl InstitutionRepository for InstitutionRepositoryImpl {
-    async fn create_security_institution(&self, new_inst: &NewSecurityInstitution) -> Result<SecurityInstitution, sqlx::Error> {
+    async fn create_security_institution(
+        &self,
+        new_inst: &NewSecurityInstitution,
+    ) -> Result<SecurityInstitution, sqlx::Error> {
         let rec = sqlx::query_as::<_, SecurityInstitution>(
             "INSERT INTO security_institution \
              (institution_code, institution_name, institution_type, address, phone, email) \
@@ -37,7 +37,10 @@ impl InstitutionRepository for InstitutionRepositoryImpl {
         Ok(rec)
     }
 
-    async fn find_security_institution_by_id(&self, id: i32) -> Result<Option<SecurityInstitution>, sqlx::Error> {
+    async fn find_security_institution_by_id(
+        &self,
+        id: i32,
+    ) -> Result<Option<SecurityInstitution>, sqlx::Error> {
         let rec = sqlx::query_as::<_, SecurityInstitution>(
             "SELECT id, institution_code, institution_name, institution_type, address, phone, email, is_active, created_at, updated_at \
              FROM security_institution WHERE id = $1",
@@ -48,7 +51,10 @@ impl InstitutionRepository for InstitutionRepositoryImpl {
         Ok(rec)
     }
 
-    async fn find_security_institution_by_code(&self, code: &str) -> Result<Option<SecurityInstitution>, sqlx::Error> {
+    async fn find_security_institution_by_code(
+        &self,
+        code: &str,
+    ) -> Result<Option<SecurityInstitution>, sqlx::Error> {
         let rec = sqlx::query_as::<_, SecurityInstitution>(
             "SELECT id, institution_code, institution_name, institution_type, address, phone, email, is_active, created_at, updated_at \
              FROM security_institution WHERE institution_code = $1",
@@ -59,7 +65,10 @@ impl InstitutionRepository for InstitutionRepositoryImpl {
         Ok(rec)
     }
 
-    async fn create_data_institution(&self, new_inst: &NewProjectDataInstitution) -> Result<ProjectDataInstitution, sqlx::Error> {
+    async fn create_data_institution(
+        &self,
+        new_inst: &NewProjectDataInstitution,
+    ) -> Result<ProjectDataInstitution, sqlx::Error> {
         let rec = sqlx::query_as::<_, ProjectDataInstitution>(
             "INSERT INTO project_data_institution \
              (institution_code, institution_name, institution_type, address, phone, email) \
@@ -77,7 +86,10 @@ impl InstitutionRepository for InstitutionRepositoryImpl {
         Ok(rec)
     }
 
-    async fn find_data_institution_by_id(&self, id: i32) -> Result<Option<ProjectDataInstitution>, sqlx::Error> {
+    async fn find_data_institution_by_id(
+        &self,
+        id: i32,
+    ) -> Result<Option<ProjectDataInstitution>, sqlx::Error> {
         let rec = sqlx::query_as::<_, ProjectDataInstitution>(
             "SELECT id, institution_code, institution_name, institution_type, address, phone, email, is_active, created_at, updated_at \
              FROM project_data_institution WHERE id = $1",
@@ -88,7 +100,10 @@ impl InstitutionRepository for InstitutionRepositoryImpl {
         Ok(rec)
     }
 
-    async fn find_data_institution_by_code(&self, code: &str) -> Result<Option<ProjectDataInstitution>, sqlx::Error> {
+    async fn find_data_institution_by_code(
+        &self,
+        code: &str,
+    ) -> Result<Option<ProjectDataInstitution>, sqlx::Error> {
         let rec = sqlx::query_as::<_, ProjectDataInstitution>(
             "SELECT id, institution_code, institution_name, institution_type, address, phone, email, is_active, created_at, updated_at \
              FROM project_data_institution WHERE institution_code = $1",
@@ -99,5 +114,3 @@ impl InstitutionRepository for InstitutionRepositoryImpl {
         Ok(rec)
     }
 }
-
-

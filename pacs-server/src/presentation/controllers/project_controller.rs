@@ -3,7 +3,10 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::application::dto::project_dto::{CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse, ProjectListQuery};
+use crate::application::dto::project_dto::{
+    CreateProjectRequest, ProjectListQuery, ProjectListResponse, ProjectResponse,
+    UpdateProjectRequest,
+};
 use crate::application::use_cases::project_use_case::ProjectUseCase;
 use crate::domain::services::project_service::ProjectService;
 
@@ -117,8 +120,11 @@ pub async fn get_active_projects<P: ProjectService>(
     let page_size = q.page_size.unwrap_or(20);
     let sort_by = q.sort_by.as_deref().unwrap_or("created_at");
     let sort_order = q.sort_order.as_deref().unwrap_or("desc");
-    
-    match project_use_case.get_active_projects(page, page_size, sort_by, sort_order).await {
+
+    match project_use_case
+        .get_active_projects(page, page_size, sort_by, sort_order)
+        .await
+    {
         Ok(response) => HttpResponse::Ok().json(response),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": format!("Failed to get active projects: {}", e)
@@ -145,7 +151,10 @@ pub async fn update_project<P: ProjectService>(
     project_id: web::Path<i32>,
     req: web::Json<UpdateProjectRequest>,
 ) -> impl Responder {
-    match project_use_case.update_project(*project_id, req.into_inner()).await {
+    match project_use_case
+        .update_project(*project_id, req.into_inner())
+        .await
+    {
         Ok(project) => HttpResponse::Ok().json(project),
         Err(e) => HttpResponse::BadRequest().json(json!({
             "error": format!("Failed to update project: {}", e)
@@ -188,5 +197,8 @@ pub fn configure_routes<P: ProjectService + 'static>(
         .route("/projects/active", web::get().to(get_active_projects::<P>))
         .route("/projects/{project_id}", web::get().to(get_project::<P>))
         .route("/projects/{project_id}", web::put().to(update_project::<P>))
-        .route("/projects/{project_id}", web::delete().to(delete_project::<P>));
+        .route(
+            "/projects/{project_id}",
+            web::delete().to(delete_project::<P>),
+        );
 }

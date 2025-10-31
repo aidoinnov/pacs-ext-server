@@ -21,3 +21,4 @@
 - 빌드/테스트 통과 (`users_me_test`는 ignored, 필요 시 DB 세팅 후 수동 실행)
 - 게이트웨이 컨트롤러가 공용 유틸을 사용
 - Swagger/OpenAPI에 `/api/users/me` 노출(간단 주석 포함)
+

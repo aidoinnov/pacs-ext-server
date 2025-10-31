@@ -1,7 +1,7 @@
-use reqwest::{Client, Url};
-use serde_json::Value;
 use crate::domain::ServiceError;
 use crate::infrastructure::config::Dcm4cheeConfig;
+use reqwest::{Client, Url};
+use serde_json::Value;
 use tracing;
 
 #[derive(Clone)]
@@ -41,7 +41,8 @@ impl Dcm4cheeQidoClient {
     pub async fn qido_studies(&self, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
         // Ensure standard response accept header
         let url = self.build_url(&self.qido_path.replace("/rs", "/rs/studies"), &[])?;
-        let mut req = self.http_client
+        let mut req = self
+            .http_client
             .get(url)
             .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .header("Accept", "application/json");
@@ -51,26 +52,43 @@ impl Dcm4cheeQidoClient {
         }
 
         if !params.is_empty() {
-            let qp: Vec<(&str, &str)> = params.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+            let qp: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
             req = req.query(&qp);
         }
 
-        let resp = req.send().await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /studies failed: {}", e)))?;
+        let resp = req.send().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /studies failed: {}", e))
+        })?;
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(ServiceError::ExternalServiceError(format!("QIDO /studies failed ({}): {}", status, body)));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "QIDO /studies failed ({}): {}",
+                status, body
+            )));
         }
-        let json: Value = serde_json::from_str(&body)
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /studies parse error: {}", e)))?;
+        let json: Value = serde_json::from_str(&body).map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /studies parse error: {}", e))
+        })?;
         Ok(json)
     }
 
-    pub async fn qido_series(&self, study_uid: &str, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
-        let series_path = format!("{}/studies/{}/series", self.qido_path.replace("/rs", "/rs"), study_uid);
+    pub async fn qido_series(
+        &self,
+        study_uid: &str,
+        params: Vec<(String, String)>,
+    ) -> Result<Value, ServiceError> {
+        let series_path = format!(
+            "{}/studies/{}/series",
+            self.qido_path.replace("/rs", "/rs"),
+            study_uid
+        );
         let url = self.build_url(&series_path, &[])?;
-        let mut req = self.http_client
+        let mut req = self
+            .http_client
             .get(url)
             .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .header("Accept", "application/json");
@@ -80,40 +98,59 @@ impl Dcm4cheeQidoClient {
         }
 
         if !params.is_empty() {
-            let qp: Vec<(&str, &str)> = params.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+            let qp: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
             req = req.query(&qp);
         }
 
-        let resp = req.send().await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /series failed: {}", e)))?;
+        let resp = req.send().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /series failed: {}", e))
+        })?;
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(ServiceError::ExternalServiceError(format!("QIDO /series failed ({}): {}", status, body)));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "QIDO /series failed ({}): {}",
+                status, body
+            )));
         }
-        let json: Value = serde_json::from_str(&body)
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /series parse error: {}", e)))?;
+        let json: Value = serde_json::from_str(&body).map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /series parse error: {}", e))
+        })?;
         Ok(json)
     }
 
     // Bearer token relay variants (if Dcm4chee sits behind Keycloak)
-    pub async fn qido_studies_with_bearer(&self, bearer_token: Option<&str>, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
+    pub async fn qido_studies_with_bearer(
+        &self,
+        bearer_token: Option<&str>,
+        params: Vec<(String, String)>,
+    ) -> Result<Value, ServiceError> {
         let studies_path = if self.qido_path.ends_with("/rs") {
             format!("{}/studies", self.qido_path)
         } else {
             format!("{}/rs/studies", self.qido_path)
         };
         let url = self.build_url(&studies_path, &[])?;
-        let mut req = self.http_client
+        let mut req = self
+            .http_client
             .get(url.clone())
             .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .header("Accept", "application/json");
 
         if let Some(token) = bearer_token {
             req = req.bearer_auth(token);
-            tracing::debug!("QIDO /studies: Using Bearer token (length: {})", token.len());
+            tracing::debug!(
+                "QIDO /studies: Using Bearer token (length: {})",
+                token.len()
+            );
             tracing::debug!("QIDO /studies: URL: {}", url);
-            tracing::debug!("QIDO /studies: Bearer token preview: {}...", &token[..std::cmp::min(50, token.len())]);
+            tracing::debug!(
+                "QIDO /studies: Bearer token preview: {}...",
+                &token[..std::cmp::min(50, token.len())]
+            );
         } else if let (Some(u), Some(p)) = (&self.username, &self.password) {
             req = req.basic_auth(u, Some(p));
             tracing::debug!("QIDO /studies: Using Basic Auth");
@@ -122,30 +159,44 @@ impl Dcm4cheeQidoClient {
         }
 
         if !params.is_empty() {
-            let qp: Vec<(&str, &str)> = params.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+            let qp: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
             req = req.query(&qp);
         }
 
-        let resp = req.send().await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /studies failed: {}", e)))?;
+        let resp = req.send().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /studies failed: {}", e))
+        })?;
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(ServiceError::ExternalServiceError(format!("QIDO /studies failed ({}): {}", status, body)));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "QIDO /studies failed ({}): {}",
+                status, body
+            )));
         }
-        let json: Value = serde_json::from_str(&body)
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /studies parse error: {}", e)))?;
+        let json: Value = serde_json::from_str(&body).map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /studies parse error: {}", e))
+        })?;
         Ok(json)
     }
 
-    pub async fn qido_series_with_bearer(&self, bearer_token: Option<&str>, study_uid: &str, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
+    pub async fn qido_series_with_bearer(
+        &self,
+        bearer_token: Option<&str>,
+        study_uid: &str,
+        params: Vec<(String, String)>,
+    ) -> Result<Value, ServiceError> {
         let series_path = if self.qido_path.ends_with("/rs") {
             format!("{}/studies/{}/series", self.qido_path, study_uid)
         } else {
             format!("{}/rs/studies/{}/series", self.qido_path, study_uid)
         };
         let url = self.build_url(&series_path, &[])?;
-        let mut req = self.http_client
+        let mut req = self
+            .http_client
             .get(url)
             .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .header("Accept", "application/json");
@@ -157,30 +208,51 @@ impl Dcm4cheeQidoClient {
         }
 
         if !params.is_empty() {
-            let qp: Vec<(&str, &str)> = params.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+            let qp: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
             req = req.query(&qp);
         }
 
-        let resp = req.send().await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /series failed: {}", e)))?;
+        let resp = req.send().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /series failed: {}", e))
+        })?;
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(ServiceError::ExternalServiceError(format!("QIDO /series failed ({}): {}", status, body)));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "QIDO /series failed ({}): {}",
+                status, body
+            )));
         }
-        let json: Value = serde_json::from_str(&body)
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /series parse error: {}", e)))?;
+        let json: Value = serde_json::from_str(&body).map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /series parse error: {}", e))
+        })?;
         Ok(json)
     }
 
-    pub async fn qido_instances_with_bearer(&self, bearer_token: Option<&str>, study_uid: &str, series_uid: &str, params: Vec<(String, String)>) -> Result<Value, ServiceError> {
+    pub async fn qido_instances_with_bearer(
+        &self,
+        bearer_token: Option<&str>,
+        study_uid: &str,
+        series_uid: &str,
+        params: Vec<(String, String)>,
+    ) -> Result<Value, ServiceError> {
         let inst_path = if self.qido_path.ends_with("/rs") {
-            format!("{}/studies/{}/series/{}/instances", self.qido_path, study_uid, series_uid)
+            format!(
+                "{}/studies/{}/series/{}/instances",
+                self.qido_path, study_uid, series_uid
+            )
         } else {
-            format!("{}/rs/studies/{}/series/{}/instances", self.qido_path, study_uid, series_uid)
+            format!(
+                "{}/rs/studies/{}/series/{}/instances",
+                self.qido_path, study_uid, series_uid
+            )
         };
         let url = self.build_url(&inst_path, &[])?;
-        let mut req = self.http_client
+        let mut req = self
+            .http_client
             .get(url)
             .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .header("Accept", "application/json");
@@ -192,21 +264,27 @@ impl Dcm4cheeQidoClient {
         }
 
         if !params.is_empty() {
-            let qp: Vec<(&str, &str)> = params.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+            let qp: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
             req = req.query(&qp);
         }
 
-        let resp = req.send().await
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /instances failed: {}", e)))?;
+        let resp = req.send().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /instances failed: {}", e))
+        })?;
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if !status.is_success() {
-            return Err(ServiceError::ExternalServiceError(format!("QIDO /instances failed ({}): {}", status, body)));
+            return Err(ServiceError::ExternalServiceError(format!(
+                "QIDO /instances failed ({}): {}",
+                status, body
+            )));
         }
-        let json: Value = serde_json::from_str(&body)
-            .map_err(|e| ServiceError::ExternalServiceError(format!("QIDO /instances parse error: {}", e)))?;
+        let json: Value = serde_json::from_str(&body).map_err(|e| {
+            ServiceError::ExternalServiceError(format!("QIDO /instances parse error: {}", e))
+        })?;
         Ok(json)
     }
 }
-
-

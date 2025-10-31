@@ -1,10 +1,10 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 use actix_web::{web, HttpResponse, Result};
-use std::sync::Arc;
 use serde_json::json;
+use std::sync::Arc;
 
-use crate::application::use_cases::ProjectDataAccessUseCase;
 use crate::application::dto::project_data_access_dto::*;
+use crate::application::use_cases::ProjectDataAccessUseCase;
 use crate::domain::ServiceError;
 
 /// ServiceError를 HttpResponse로 변환하는 헬퍼 함수
@@ -68,14 +68,10 @@ pub async fn get_project_data_access_matrix(
     let status = query.status.clone();
     let user_id = query.user_id;
 
-    match use_case.get_project_data_access_matrix(
-        project_id,
-        page,
-        page_size,
-        search,
-        status,
-        user_id,
-    ).await {
+    match use_case
+        .get_project_data_access_matrix(project_id, page, page_size, search, status, user_id)
+        .await
+    {
         Ok(matrix) => Ok(HttpResponse::Ok().json(matrix)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -104,7 +100,10 @@ pub async fn create_project_data(
 ) -> Result<HttpResponse, actix_web::Error> {
     let project_id = path.into_inner();
 
-    match use_case.create_project_data(project_id, request.into_inner()).await {
+    match use_case
+        .create_project_data(project_id, request.into_inner())
+        .await
+    {
         Ok(response) => Ok(HttpResponse::Created().json(response)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -135,7 +134,10 @@ pub async fn update_data_access(
 ) -> Result<HttpResponse, actix_web::Error> {
     let (project_id, data_id, user_id) = path.into_inner();
 
-    match use_case.update_data_access(data_id, user_id, request.into_inner()).await {
+    match use_case
+        .update_data_access(data_id, user_id, request.into_inner())
+        .await
+    {
         Ok(response) => Ok(HttpResponse::Ok().json(response)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -165,7 +167,10 @@ pub async fn batch_update_data_access(
 ) -> Result<HttpResponse, actix_web::Error> {
     let (project_id, data_id) = path.into_inner();
 
-    match use_case.batch_update_data_access(data_id, request.into_inner()).await {
+    match use_case
+        .batch_update_data_access(data_id, request.into_inner())
+        .await
+    {
         Ok(response) => Ok(HttpResponse::Ok().json(response)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -258,7 +263,10 @@ pub async fn get_user_access_list(
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(20);
 
-    match use_case.get_user_access_list(user_id, page, page_size).await {
+    match use_case
+        .get_user_access_list(user_id, page, page_size)
+        .await
+    {
         Ok(access_list) => Ok(HttpResponse::Ok().json(access_list)),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -270,18 +278,30 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataA
         .service(
             // 별도 scope 사용하여 경로 충돌 방지
             web::scope("/project-data")
-                .route("/{project_id}/data-access/matrix", web::get().to(get_project_data_access_matrix))
+                .route(
+                    "/{project_id}/data-access/matrix",
+                    web::get().to(get_project_data_access_matrix),
+                )
                 .route("/{project_id}/data", web::post().to(create_project_data))
-                .route("/{project_id}/data/{data_id}/access/{user_id}", web::put().to(update_data_access))
-                .route("/{project_id}/data/{data_id}/access/batch", web::put().to(batch_update_data_access))
-                .route("/{project_id}/data/{data_id}/access/request", web::post().to(request_data_access))
+                .route(
+                    "/{project_id}/data/{data_id}/access/{user_id}",
+                    web::put().to(update_data_access),
+                )
+                .route(
+                    "/{project_id}/data/{data_id}/access/batch",
+                    web::put().to(batch_update_data_access),
+                )
+                .route(
+                    "/{project_id}/data/{data_id}/access/request",
+                    web::post().to(request_data_access),
+                ),
         )
         .service(
             web::scope("/data-access")
-                .route("/status/{status}", web::get().to(get_access_by_status))
+                .route("/status/{status}", web::get().to(get_access_by_status)),
         )
         .service(
             web::scope("/users/{user_id}")
-                .route("/data-access", web::get().to(get_user_access_list))
+                .route("/data-access", web::get().to(get_user_access_list)),
         );
 }

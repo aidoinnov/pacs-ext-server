@@ -14,7 +14,10 @@ impl AccessConditionRepositoryImpl {
 
 #[async_trait::async_trait]
 impl AccessConditionRepository for AccessConditionRepositoryImpl {
-    async fn create(&self, new_condition: &NewAccessCondition) -> Result<AccessCondition, sqlx::Error> {
+    async fn create(
+        &self,
+        new_condition: &NewAccessCondition,
+    ) -> Result<AccessCondition, sqlx::Error> {
         let rec = sqlx::query_as::<_, AccessCondition>(
             "INSERT INTO security_access_condition \
              (resource_type, resource_level, dicom_tag, operator, value, condition_type) \
@@ -71,5 +74,3 @@ impl AccessConditionRepository for AccessConditionRepositoryImpl {
         Ok(rows)
     }
 }
-
-

@@ -1,13 +1,13 @@
+use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone)]
 pub struct SyncState {
     pub is_running: bool,
     pub paused: bool,
-    pub last_run: Option<DateTime<Utc>>, 
-    pub next_run: Option<DateTime<Utc>>, 
+    pub last_run: Option<DateTime<Utc>>,
+    pub next_run: Option<DateTime<Utc>>,
     pub interval_sec: u64,
 }
 
@@ -22,5 +22,3 @@ impl SyncState {
         }))
     }
 }
-
-

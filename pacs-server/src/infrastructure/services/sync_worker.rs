@@ -1,9 +1,12 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use sqlx::{postgres::{PgPoolOptions, PgConnectOptions}, PgPool, Row};
-use crate::domain::services::{SyncService, SyncResult, SyncStatus};
-use crate::infrastructure::config::{Settings, Dcm4cheeDbConfig};
+use crate::domain::services::{SyncResult, SyncService, SyncStatus};
+use crate::infrastructure::config::{Dcm4cheeDbConfig, Settings};
 use crate::infrastructure::services::sync_state::SyncState;
+use async_trait::async_trait;
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    PgPool, Row,
+};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub struct SyncServiceImpl {
@@ -14,8 +17,16 @@ pub struct SyncServiceImpl {
 }
 
 impl SyncServiceImpl {
-    pub async fn new(settings: &Settings, rbac_pool: PgPool, state: Arc<RwLock<SyncState>>) -> Result<Self, String> {
-        let db_cfg: &Dcm4cheeDbConfig = settings.dcm4chee.db.as_ref().ok_or_else(|| "DCM4CHEE DB config missing".to_string())?;
+    pub async fn new(
+        settings: &Settings,
+        rbac_pool: PgPool,
+        state: Arc<RwLock<SyncState>>,
+    ) -> Result<Self, String> {
+        let db_cfg: &Dcm4cheeDbConfig = settings
+            .dcm4chee
+            .db
+            .as_ref()
+            .ok_or_else(|| "DCM4CHEE DB config missing".to_string())?;
         let mut opts = PgConnectOptions::new();
         opts = opts.host(&db_cfg.host);
         opts = opts.port(db_cfg.port);
@@ -32,18 +43,26 @@ impl SyncServiceImpl {
             .as_ref()
             .and_then(|s| s.default_project_id)
             .unwrap_or(1);
-        Ok(Self { rbac_pool: rbac_pool, dcm4chee_pool: dcm_pool, state, default_project_id })
+        Ok(Self {
+            rbac_pool: rbac_pool,
+            dcm4chee_pool: dcm_pool,
+            state,
+            default_project_id,
+        })
     }
 
-    async fn sync_studies(&self, last_run: Option<chrono::DateTime<chrono::Utc>>) -> Result<usize, String> {
+    async fn sync_studies(
+        &self,
+        last_run: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<usize, String> {
         // 실제 스키마 반영: patient_fk 통해 patient.patient_id 조인, study_date는 varchar(YYYYMMDD)
         let rows = if let Some(ts) = last_run {
             sqlx::query(
                 r#"SELECT st.study_iuid, st.study_desc, NULL::text AS patient_id, st.study_date, st.updated_time
                    FROM study st
                    LEFT JOIN patient pt ON st.patient_fk = pt.pk
-                   WHERE updated_time > $1
-                   ORDER BY updated_time ASC
+                   WHERE st.updated_time > $1
+                   ORDER BY st.updated_time ASC
                    LIMIT 500"#,
             )
             .bind(ts)
@@ -55,7 +74,7 @@ impl SyncServiceImpl {
                 r#"SELECT st.study_iuid, st.study_desc, NULL::text AS patient_id, st.study_date, st.updated_time
                    FROM study st
                    LEFT JOIN patient pt ON st.patient_fk = pt.pk
-                   ORDER BY updated_time DESC
+                   ORDER BY st.updated_time DESC
                    LIMIT 500"#
             )
             .fetch_all(&self.dcm4chee_pool)
@@ -92,7 +111,10 @@ impl SyncServiceImpl {
         Ok(processed)
     }
 
-    async fn sync_series(&self, last_run: Option<chrono::DateTime<chrono::Utc>>) -> Result<usize, String> {
+    async fn sync_series(
+        &self,
+        last_run: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<usize, String> {
         // 실제 스키마 반영: series.study_fk → study.pk, series.modality varchar
         let rows = if let Some(ts) = last_run {
             sqlx::query(
@@ -158,7 +180,10 @@ impl SyncServiceImpl {
         Ok(processed)
     }
 
-    async fn sync_instances(&self, last_run: Option<chrono::DateTime<chrono::Utc>>) -> Result<usize, String> {
+    async fn sync_instances(
+        &self,
+        last_run: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<usize, String> {
         // 실제 스키마 반영: instance(series_fk→series.pk), content_date/time varchar
         let rows = if let Some(ts) = last_run {
             sqlx::query(
@@ -243,18 +268,44 @@ impl SyncService for SyncServiceImpl {
 
         match self.sync_studies(last_run_opt).await {
             Ok(n) => total_processed += n,
-            Err(e) => return SyncResult { success: false, processed: total_processed, duration_ms: 0, error: Some(format!("studies sync failed: {}", e)) },
+            Err(e) => {
+                return SyncResult {
+                    success: false,
+                    processed: total_processed,
+                    duration_ms: 0,
+                    error: Some(format!("studies sync failed: {}", e)),
+                }
+            }
         }
         match self.sync_series(last_run_opt).await {
             Ok(n) => total_processed += n,
-            Err(e) => return SyncResult { success: false, processed: total_processed, duration_ms: 0, error: Some(format!("series sync failed: {}", e)) },
+            Err(e) => {
+                return SyncResult {
+                    success: false,
+                    processed: total_processed,
+                    duration_ms: 0,
+                    error: Some(format!("series sync failed: {}", e)),
+                }
+            }
         }
         match self.sync_instances(last_run_opt).await {
             Ok(n) => total_processed += n,
-            Err(e) => return SyncResult { success: false, processed: total_processed, duration_ms: 0, error: Some(format!("instances sync failed: {}", e)) },
+            Err(e) => {
+                return SyncResult {
+                    success: false,
+                    processed: total_processed,
+                    duration_ms: 0,
+                    error: Some(format!("instances sync failed: {}", e)),
+                }
+            }
         }
 
-        SyncResult { success: true, processed: total_processed, duration_ms: 0, error: None }
+        SyncResult {
+            success: true,
+            processed: total_processed,
+            duration_ms: 0,
+            error: None,
+        }
     }
 
     async fn get_status(&self) -> SyncStatus {
@@ -282,5 +333,3 @@ impl SyncService for SyncServiceImpl {
         s.interval_sec = interval_sec;
     }
 }
-
-

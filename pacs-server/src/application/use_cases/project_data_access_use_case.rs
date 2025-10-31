@@ -1,9 +1,11 @@
-use std::sync::Arc;
-use std::str::FromStr;
+use crate::application::dto::project_data_access_dto::*;
+use crate::domain::entities::project_data::{
+    DataAccessStatus, NewProjectData, ProjectDataSeries, ProjectDataStudy, UpdateProjectDataAccess,
+};
 use crate::domain::services::ProjectDataService;
 use crate::domain::ServiceError;
-use crate::application::dto::project_data_access_dto::*;
-use crate::domain::entities::project_data::{NewProjectData, UpdateProjectDataAccess, DataAccessStatus, ProjectDataStudy, ProjectDataSeries};
+use std::str::FromStr;
+use std::sync::Arc;
 
 pub struct ProjectDataAccessUseCase {
     project_data_service: Arc<dyn ProjectDataService>,
@@ -11,7 +13,9 @@ pub struct ProjectDataAccessUseCase {
 
 impl ProjectDataAccessUseCase {
     pub fn new(project_data_service: Arc<dyn ProjectDataService>) -> Self {
-        Self { project_data_service }
+        Self {
+            project_data_service,
+        }
     }
 
     /// 프로젝트 데이터 접근 매트릭스 조회
@@ -36,7 +40,8 @@ impl ProjectDataAccessUseCase {
         };
 
         // Get access matrix
-        let (_, access_list) = self.project_data_service
+        let (_, access_list) = self
+            .project_data_service
             .get_project_data_access_matrix(project_id, page, page_size)
             .await?;
 
@@ -61,7 +66,7 @@ impl ProjectDataAccessUseCase {
             .collect::<std::collections::HashSet<i32>>()
             .into_iter()
             .collect();
-        
+
         // Sort user_ids by ID for consistent ordering
         let mut sorted_user_ids = user_ids;
         sorted_user_ids.sort();
@@ -92,7 +97,8 @@ impl ProjectDataAccessUseCase {
             .collect();
 
         // Calculate pagination
-        let total_items = self.project_data_service
+        let total_items = self
+            .project_data_service
             .get_project_data_list(project_id, 1, 1000) // Get total count
             .await?
             .len() as i64;
@@ -134,7 +140,10 @@ impl ProjectDataAccessUseCase {
             }
         }
 
-        let project_data = self.project_data_service.create_project_data(new_data).await?;
+        let project_data = self
+            .project_data_service
+            .create_project_data(new_data)
+            .await?;
 
         Ok(CreateProjectDataResponse {
             success: true,
@@ -188,7 +197,8 @@ impl ProjectDataAccessUseCase {
             ..Default::default()
         };
 
-        let results = self.project_data_service
+        let results = self
+            .project_data_service
             .batch_update_data_access(project_data_id, request.user_ids, update_access)
             .await?;
 
@@ -235,10 +245,11 @@ impl ProjectDataAccessUseCase {
         page: i32,
         page_size: i32,
     ) -> Result<Vec<DataAccessInfo>, ServiceError> {
-        let data_access_status = DataAccessStatus::from_str(&status)
-            .map_err(|e| ServiceError::ValidationError(e))?;
+        let data_access_status =
+            DataAccessStatus::from_str(&status).map_err(|e| ServiceError::ValidationError(e))?;
 
-        let access_list = self.project_data_service
+        let access_list = self
+            .project_data_service
             .get_access_by_status(data_access_status, page, page_size)
             .await?;
 
@@ -263,7 +274,8 @@ impl ProjectDataAccessUseCase {
         page: i32,
         page_size: i32,
     ) -> Result<Vec<DataAccessInfo>, ServiceError> {
-        let access_list = self.project_data_service
+        let access_list = self
+            .project_data_service
             .get_user_access_list(user_id, page, page_size)
             .await?;
 
@@ -280,23 +292,25 @@ impl ProjectDataAccessUseCase {
 
         Ok(access_matrix)
     }
-    
+
     // ========== 새로운 계층 구조 메서드 ==========
-    
+
     /// Study 조회 (by ID)
     pub async fn get_study(&self, study_id: i32) -> Result<ProjectDataStudy, ServiceError> {
-        self.project_data_service
-            .get_study_by_id(study_id)
-            .await
+        self.project_data_service.get_study_by_id(study_id).await
     }
-    
+
     /// Study 조회 (by project_id and study_uid)
-    pub async fn get_study_by_uid(&self, project_id: i32, study_uid: String) -> Result<ProjectDataStudy, ServiceError> {
+    pub async fn get_study_by_uid(
+        &self,
+        project_id: i32,
+        study_uid: String,
+    ) -> Result<ProjectDataStudy, ServiceError> {
         self.project_data_service
             .get_study_by_uid(project_id, &study_uid)
             .await
     }
-    
+
     /// 프로젝트별 Study 목록 조회 (페이지네이션)
     pub async fn get_studies(
         &self,
@@ -308,16 +322,17 @@ impl ProjectDataAccessUseCase {
             .get_studies_by_project(project_id, page, page_size)
             .await
     }
-    
+
     /// Series 조회 (by ID)
     pub async fn get_series(&self, series_id: i32) -> Result<ProjectDataSeries, ServiceError> {
-        self.project_data_service
-            .get_series_by_id(series_id)
-            .await
+        self.project_data_service.get_series_by_id(series_id).await
     }
-    
+
     /// Study별 Series 목록 조회
-    pub async fn get_series_by_study(&self, study_id: i32) -> Result<Vec<ProjectDataSeries>, ServiceError> {
+    pub async fn get_series_by_study(
+        &self,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, ServiceError> {
         self.project_data_service
             .get_series_by_study(study_id)
             .await

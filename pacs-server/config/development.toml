@@ -43,3 +43,10 @@ qido_path = "/dcm4chee-arc/aets/DCM4CHEE/rs"
 wado_path = "/dcm4chee-arc/aets/DCM4CHEE/wado"
 aet = "DCM4CHEE"
 timeout_ms = 5000
+
+[dcm4chee.db]
+host = "localhost"
+port = 5457
+database = "postgres"
+username = "pacsadmin"
+password = "HhL}qb(tl}?zJ4}("

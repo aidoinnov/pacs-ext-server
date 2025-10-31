@@ -1,7 +1,7 @@
 pub mod entities;
+pub mod errors;
 pub mod repositories;
 pub mod services;
-pub mod errors;
 
 // ServiceError를 직접 정의
 #[derive(Debug, Clone)]
@@ -44,18 +44,26 @@ impl From<sqlx::Error> for ServiceError {
 impl actix_web::ResponseError for ServiceError {
     fn error_response(&self) -> actix_web::HttpResponse {
         match self {
-            ServiceError::NotFound(_) => actix_web::HttpResponse::NotFound().json(serde_json::json!({
-                "error": self.to_string()
-            })),
-            ServiceError::AlreadyExists(_) => actix_web::HttpResponse::Conflict().json(serde_json::json!({
-                "error": self.to_string()
-            })),
-            ServiceError::ValidationError(_) => actix_web::HttpResponse::BadRequest().json(serde_json::json!({
-                "error": self.to_string()
-            })),
-            ServiceError::Unauthorized(_) => actix_web::HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": self.to_string()
-            })),
+            ServiceError::NotFound(_) => {
+                actix_web::HttpResponse::NotFound().json(serde_json::json!({
+                    "error": self.to_string()
+                }))
+            }
+            ServiceError::AlreadyExists(_) => {
+                actix_web::HttpResponse::Conflict().json(serde_json::json!({
+                    "error": self.to_string()
+                }))
+            }
+            ServiceError::ValidationError(_) => {
+                actix_web::HttpResponse::BadRequest().json(serde_json::json!({
+                    "error": self.to_string()
+                }))
+            }
+            ServiceError::Unauthorized(_) => {
+                actix_web::HttpResponse::Unauthorized().json(serde_json::json!({
+                    "error": self.to_string()
+                }))
+            }
             _ => actix_web::HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": self.to_string()
             })),

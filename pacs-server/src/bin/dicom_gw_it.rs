@@ -1,4 +1,4 @@
-use actix_web::{App, HttpResponse, web, HttpServer};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use std::net::TcpListener;
 
 #[actix_rt::main]
@@ -7,14 +7,17 @@ async fn main() {
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind stub");
     let port = listener.local_addr().unwrap().port();
     let server = HttpServer::new(|| {
-        App::new().route("/rs/studies", web::get().to(|| async {
-            HttpResponse::Ok().json(serde_json::json!([
-                {
-                    "0020000D": {"Value": ["1.2.3.4"], "vr": "UI"},
-                    "00080060": {"Value": ["CT"], "vr": "CS"}
-                }
-            ]))
-        }))
+        App::new().route(
+            "/rs/studies",
+            web::get().to(|| async {
+                HttpResponse::Ok().json(serde_json::json!([
+                    {
+                        "0020000D": {"Value": ["1.2.3.4"], "vr": "UI"},
+                        "00080060": {"Value": ["CT"], "vr": "CS"}
+                    }
+                ]))
+            }),
+        )
     })
     .listen(listener)
     .expect("listen")
@@ -57,11 +60,12 @@ async fn main() {
 
     let body: serde_json::Value = actix_web::test::read_body_json(resp).await;
     if !body.is_array() || body.as_array().unwrap().is_empty() {
-        eprintln!("Integration check failed: body not array or empty: {}", body);
+        eprintln!(
+            "Integration check failed: body not array or empty: {}",
+            body
+        );
         std::process::exit(2);
     }
 
     println!("dicom_gw_it OK: {} item(s)", body.as_array().unwrap().len());
 }
-
-

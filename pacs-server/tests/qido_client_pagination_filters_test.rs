@@ -1,6 +1,6 @@
-use pacs_server::infrastructure::external::Dcm4cheeQidoClient;
-use pacs_server::infrastructure::config::Dcm4cheeConfig;
 use mockito::{Mock, Server};
+use pacs_server::infrastructure::config::Dcm4cheeConfig;
+use pacs_server::infrastructure::external::Dcm4cheeQidoClient;
 
 #[tokio::test]
 async fn qido_studies_propagates_filters_and_pagination() {
@@ -8,7 +8,8 @@ async fn qido_studies_propagates_filters_and_pagination() {
     let mut server = Server::new_async().await;
 
     // Expect GET /dcm4chee-arc/aets/DCM4CHEE/rs/studies with query params
-    let _m: Mock = server.mock("GET", "/dcm4chee-arc/aets/DCM4CHEE/rs/studies")
+    let _m: Mock = server
+        .mock("GET", "/dcm4chee-arc/aets/DCM4CHEE/rs/studies")
         .match_query(mockito::Matcher::AllOf(vec![
             mockito::Matcher::UrlEncoded("Modality".into(), "CT".into()),
             mockito::Matcher::UrlEncoded("StudyDate".into(), "20240101-20241231".into()),
@@ -48,8 +49,12 @@ async fn qido_series_propagates_filters_and_pagination() {
     let mut server = Server::new_async().await;
 
     let study_uid = "1.2.3.4";
-    let path = format!("/dcm4chee-arc/aets/DCM4CHEE/rs/studies/{}/series", study_uid);
-    let _m: Mock = server.mock("GET", path.as_str())
+    let path = format!(
+        "/dcm4chee-arc/aets/DCM4CHEE/rs/studies/{}/series",
+        study_uid
+    );
+    let _m: Mock = server
+        .mock("GET", path.as_str())
         .match_query(mockito::Matcher::AllOf(vec![
             mockito::Matcher::UrlEncoded("Modality".into(), "MR".into()),
             mockito::Matcher::UrlEncoded("limit".into(), "5".into()),
@@ -78,7 +83,9 @@ async fn qido_series_propagates_filters_and_pagination() {
         ("offset".to_string(), "0".to_string()),
     ];
 
-    let res = client.qido_series_with_bearer(None, study_uid, params).await;
+    let res = client
+        .qido_series_with_bearer(None, study_uid, params)
+        .await;
     assert!(res.is_ok());
 }
 
@@ -92,7 +99,8 @@ async fn qido_instances_propagates_filters_and_pagination() {
         "/dcm4chee-arc/aets/DCM4CHEE/rs/studies/{}/series/{}/instances",
         study_uid, series_uid
     );
-    let _m: Mock = server.mock("GET", path.as_str())
+    let _m: Mock = server
+        .mock("GET", path.as_str())
         .match_query(mockito::Matcher::AllOf(vec![
             mockito::Matcher::UrlEncoded("AccessionNumber".into(), "ACC-123".into()),
             mockito::Matcher::UrlEncoded("limit".into(), "1".into()),
@@ -121,8 +129,8 @@ async fn qido_instances_propagates_filters_and_pagination() {
         ("offset".to_string(), "0".to_string()),
     ];
 
-    let res = client.qido_instances_with_bearer(None, study_uid, series_uid, params).await;
+    let res = client
+        .qido_instances_with_bearer(None, study_uid, series_uid, params)
+        .await;
     assert!(res.is_ok());
 }
-
-

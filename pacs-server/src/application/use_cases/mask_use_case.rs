@@ -1,15 +1,15 @@
-use std::sync::Arc;
 use crate::application::dto::mask_dto::{
-    CreateMaskRequest, UpdateMaskRequest, MaskResponse, MaskListResponse, 
-    DownloadUrlRequest, DownloadUrlResponse, MaskStatsResponse
+    CreateMaskRequest, DownloadUrlRequest, DownloadUrlResponse, MaskListResponse, MaskResponse,
+    MaskStatsResponse, UpdateMaskRequest,
 };
-use crate::domain::services::{MaskService, MaskGroupService};
-use crate::domain::ServiceError;
 use crate::application::services::SignedUrlService;
 use crate::domain::entities::{NewMask, UpdateMask};
+use crate::domain::services::{MaskGroupService, MaskService};
+use crate::domain::ServiceError;
+use std::sync::Arc;
 
 /// Mask 관리 유스케이스
-pub struct MaskUseCase<MS, MGS, SUS> 
+pub struct MaskUseCase<MS, MGS, SUS>
 where
     MS: MaskService + Send + Sync,
     MGS: MaskGroupService + Send + Sync,
@@ -77,8 +77,10 @@ where
             width: mask.width,
             height: mask.height,
             created_at: mask.created_at.to_string(),
-            updated_at: mask.updated_at.map(|dt| dt.to_string())
-                                        .unwrap_or("".to_string()),
+            updated_at: mask
+                .updated_at
+                .map(|dt| dt.to_string())
+                .unwrap_or("".to_string()),
         })
     }
 
@@ -87,7 +89,8 @@ where
         // 권한 확인
         self.mask_service.can_access_mask(user_id, id).await?;
 
-        let mask = self.mask_service
+        let mask = self
+            .mask_service
             .get_mask_by_id(id)
             .await?
             .ok_or_else(|| ServiceError::NotFound(format!("Mask with ID {} not found", id)))?;
@@ -105,8 +108,10 @@ where
             width: mask.width,
             height: mask.height,
             created_at: mask.created_at.to_string(),
-            updated_at: mask.updated_at.map(|dt| dt.to_string())
-            .unwrap_or("".to_string()),
+            updated_at: mask
+                .updated_at
+                .map(|dt| dt.to_string())
+                .unwrap_or("".to_string()),
         })
     }
 
@@ -125,7 +130,8 @@ where
                 .await?;
         }
 
-        let masks = self.mask_service
+        let masks = self
+            .mask_service
             .list_masks(
                 mask_group_id,
                 None, // sop_instance_uid 필터
@@ -136,7 +142,8 @@ where
             )
             .await?;
 
-        let total_count = self.mask_service
+        let total_count = self
+            .mask_service
             .count_masks(mask_group_id, None, None, None)
             .await?;
 
@@ -155,9 +162,10 @@ where
                 width: mask.width,
                 height: mask.height,
                 created_at: mask.created_at.to_string(),
-                updated_at: mask.updated_at
-                .map(|dt| dt.to_string())
-                .unwrap_or("".to_string()),
+                updated_at: mask
+                    .updated_at
+                    .map(|dt| dt.to_string())
+                    .unwrap_or("".to_string()),
             })
             .collect();
 
@@ -187,7 +195,7 @@ where
         self.mask_service.can_access_mask(user_id, id).await?;
 
         let mut update_mask = UpdateMask::new(id);
-        
+
         if let Some(slice_index) = request.slice_index {
             update_mask = update_mask.with_slice_index(slice_index);
         }
@@ -225,8 +233,10 @@ where
             width: mask.width,
             height: mask.height,
             created_at: mask.created_at.to_string(),
-            updated_at: mask.updated_at.map(|dt| dt.to_string())
-            .unwrap_or("".to_string()),
+            updated_at: mask
+                .updated_at
+                .map(|dt| dt.to_string())
+                .unwrap_or("".to_string()),
         })
     }
 
@@ -246,13 +256,13 @@ where
         user_id: i32,
     ) -> Result<DownloadUrlResponse, ServiceError> {
         // 권한 확인
-        self.mask_service.can_access_mask(user_id, request.mask_id).await?;
+        self.mask_service
+            .can_access_mask(user_id, request.mask_id)
+            .await?;
 
-        let signed_url = self.signed_url_service
-            .generate_mask_download_url(
-                request.file_path,
-                request.expires_in,
-            )
+        let signed_url = self
+            .signed_url_service
+            .generate_mask_download_url(request.file_path, request.expires_in)
             .await?;
 
         Ok(DownloadUrlResponse {

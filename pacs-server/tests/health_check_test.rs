@@ -11,10 +11,8 @@ mod health_check_tests {
 
     #[actix_web::test]
     async fn test_health_check() {
-        let app = test::init_service(
-            App::new().route("/health", web::get().to(health_check)),
-        )
-        .await;
+        let app =
+            test::init_service(App::new().route("/health", web::get().to(health_check))).await;
 
         let req = test::TestRequest::get().uri("/health").to_request();
         let resp = test::call_service(&app, req).await;
@@ -22,4 +20,3 @@ mod health_check_tests {
         assert_eq!(resp.status(), 200);
     }
 }
-

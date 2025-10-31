@@ -1,4 +1,6 @@
-use crate::domain::entities::project_data::{ProjectData, ProjectDataStudy, ProjectDataSeries, NewProjectData, UpdateProjectData};
+use crate::domain::entities::project_data::{
+    NewProjectData, ProjectData, ProjectDataSeries, ProjectDataStudy, UpdateProjectData,
+};
 use crate::domain::repositories::ProjectDataRepository;
 use sqlx::PgPool;
 
@@ -46,13 +48,13 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
     }
 
     async fn find_by_project_id(
-        &self, 
-        project_id: i32, 
-        page: i32, 
-        page_size: i32
+        &self,
+        project_id: i32,
+        page: i32,
+        page_size: i32,
     ) -> Result<Vec<ProjectData>, sqlx::Error> {
         let offset = (page - 1) * page_size;
-        
+
         let results = sqlx::query_as::<_, ProjectData>(
             "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at
              FROM project_data 
@@ -70,20 +72,19 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
     }
 
     async fn count_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error> {
-        let count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM project_data WHERE project_id = $1"
-        )
-        .bind(project_id)
-        .fetch_one(&self.pool)
-        .await?;
+        let count =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM project_data WHERE project_id = $1")
+                .bind(project_id)
+                .fetch_one(&self.pool)
+                .await?;
 
         Ok(count)
     }
 
     async fn find_by_study_uid(
-        &self, 
-        project_id: i32, 
-        study_uid: &str
+        &self,
+        project_id: i32,
+        study_uid: &str,
     ) -> Result<Option<ProjectData>, sqlx::Error> {
         let result = sqlx::query_as::<_, ProjectData>(
             "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at
@@ -103,11 +104,11 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         project_id: i32,
         search_term: &str,
         page: i32,
-        page_size: i32
+        page_size: i32,
     ) -> Result<Vec<ProjectData>, sqlx::Error> {
         let offset = (page - 1) * page_size;
         let search_pattern = format!("%{}%", search_term);
-        
+
         let results = sqlx::query_as::<_, ProjectData>(
             "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at
              FROM project_data 
@@ -129,14 +130,14 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
     async fn count_search_results(
         &self,
         project_id: i32,
-        search_term: &str
+        search_term: &str,
     ) -> Result<i64, sqlx::Error> {
         let search_pattern = format!("%{}%", search_term);
-        
+
         let count = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM project_data 
              WHERE project_id = $1 
-             AND (study_uid ILIKE $2 OR patient_id ILIKE $2 OR patient_name ILIKE $2)"
+             AND (study_uid ILIKE $2 OR patient_id ILIKE $2 OR patient_name ILIKE $2)",
         )
         .bind(project_id)
         .bind(&search_pattern)
@@ -146,7 +147,11 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         Ok(count)
     }
 
-    async fn update(&self, id: i32, update_data: &UpdateProjectData) -> Result<Option<ProjectData>, sqlx::Error> {
+    async fn update(
+        &self,
+        id: i32,
+        update_data: &UpdateProjectData,
+    ) -> Result<Option<ProjectData>, sqlx::Error> {
         let mut query = String::from("UPDATE project_data SET ");
         let mut params: Vec<Box<dyn sqlx::Encode<'_, sqlx::Postgres> + Send + Sync>> = Vec::new();
         let mut param_count = 1;
@@ -194,7 +199,7 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         params.push(Box::new(id));
 
         // Execute the query
-          let result = sqlx::query_as::<_, ProjectData>(&query)
+        let result = sqlx::query_as::<_, ProjectData>(&query)
             .bind(id)
             .fetch_optional(&self.pool)
             .await?;
@@ -214,9 +219,9 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
     fn pool(&self) -> &PgPool {
         &self.pool
     }
-    
+
     // ========== 새로운 계층 구조 메서드 구현 ==========
-    
+
     async fn find_study_by_id(&self, id: i32) -> Result<Option<ProjectDataStudy>, sqlx::Error> {
         let result = sqlx::query_as::<_, ProjectDataStudy>(
             "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, patient_birth_date, study_date, created_at, updated_at
@@ -225,11 +230,15 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .bind(id)
         .fetch_optional(&self.pool)
         .await?;
-        
+
         Ok(result)
     }
-    
-    async fn find_study_by_uid(&self, project_id: i32, study_uid: &str) -> Result<Option<ProjectDataStudy>, sqlx::Error> {
+
+    async fn find_study_by_uid(
+        &self,
+        project_id: i32,
+        study_uid: &str,
+    ) -> Result<Option<ProjectDataStudy>, sqlx::Error> {
         let result = sqlx::query_as::<_, ProjectDataStudy>(
             "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, patient_birth_date, study_date, created_at, updated_at
              FROM project_data_study WHERE project_id = $1 AND study_uid = $2"
@@ -238,18 +247,18 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .bind(study_uid)
         .fetch_optional(&self.pool)
         .await?;
-        
+
         Ok(result)
     }
-    
+
     async fn find_studies_by_project_id(
         &self,
         project_id: i32,
         page: i32,
-        page_size: i32
+        page_size: i32,
     ) -> Result<Vec<ProjectDataStudy>, sqlx::Error> {
         let offset = (page - 1) * page_size;
-        
+
         let results = sqlx::query_as::<_, ProjectDataStudy>(
             "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, patient_birth_date, study_date, created_at, updated_at
              FROM project_data_study 
@@ -262,21 +271,21 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .bind(offset)
         .fetch_all(&self.pool)
         .await?;
-        
+
         Ok(results)
     }
-    
+
     async fn count_studies_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error> {
         let count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM project_data_study WHERE project_id = $1"
+            "SELECT COUNT(*) FROM project_data_study WHERE project_id = $1",
         )
         .bind(project_id)
         .fetch_one(&self.pool)
         .await?;
-        
+
         Ok(count)
     }
-    
+
     async fn find_series_by_id(&self, id: i32) -> Result<Option<ProjectDataSeries>, sqlx::Error> {
         let result = sqlx::query_as::<_, ProjectDataSeries>(
             "SELECT id, study_id, series_uid, series_description, modality, series_number, created_at
@@ -285,11 +294,14 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .bind(id)
         .fetch_optional(&self.pool)
         .await?;
-        
+
         Ok(result)
     }
-    
-    async fn find_series_by_study_id(&self, study_id: i32) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
+
+    async fn find_series_by_study_id(
+        &self,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
         let results = sqlx::query_as::<_, ProjectDataSeries>(
             "SELECT id, study_id, series_uid, series_description, modality, series_number, created_at
              FROM project_data_series 
@@ -299,18 +311,18 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .bind(study_id)
         .fetch_all(&self.pool)
         .await?;
-        
+
         Ok(results)
     }
-    
+
     async fn count_series_by_study_id(&self, study_id: i32) -> Result<i64, sqlx::Error> {
         let count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM project_data_series WHERE study_id = $1"
+            "SELECT COUNT(*) FROM project_data_series WHERE study_id = $1",
         )
         .bind(study_id)
         .fetch_one(&self.pool)
         .await?;
-        
+
         Ok(count)
     }
 }

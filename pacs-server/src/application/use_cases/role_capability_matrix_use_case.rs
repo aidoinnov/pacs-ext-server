@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::application::dto::role_capability_matrix_dto::*;
 use crate::domain::services::CapabilityService;
 use crate::domain::ServiceError;
-use crate::application::dto::role_capability_matrix_dto::*;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub struct RoleCapabilityMatrixUseCase {
     capability_service: Arc<dyn CapabilityService>,
@@ -10,9 +10,7 @@ pub struct RoleCapabilityMatrixUseCase {
 
 impl RoleCapabilityMatrixUseCase {
     pub fn new(capability_service: Arc<dyn CapabilityService>) -> Self {
-        Self {
-            capability_service,
-        }
+        Self { capability_service }
     }
 
     /// 전역 Role-Capability 매트릭스 조회 (페이지네이션 및 검색 포함)
@@ -23,8 +21,14 @@ impl RoleCapabilityMatrixUseCase {
         search: Option<String>,
         scope: Option<String>,
     ) -> Result<RoleCapabilityMatrixResponse, ServiceError> {
-        let (roles, capabilities, assignments, total_count) = self.capability_service
-            .get_global_role_capability_matrix_paginated(page, size, search.as_deref(), scope.as_deref())
+        let (roles, capabilities, assignments, total_count) = self
+            .capability_service
+            .get_global_role_capability_matrix_paginated(
+                page,
+                size,
+                search.as_deref(),
+                scope.as_deref(),
+            )
             .await?;
 
         // 페이지네이션 정보 계산
@@ -63,7 +67,7 @@ impl RoleCapabilityMatrixUseCase {
                 category_label: capability.category_label.clone(),
                 permission_count: 0, // 임시로 0으로 고정
             };
-            
+
             capabilities_by_category
                 .entry(capability.category)
                 .or_insert_with(Vec::new)
@@ -76,7 +80,8 @@ impl RoleCapabilityMatrixUseCase {
         }
 
         // 할당 정보 변환
-        let assignment_set: std::collections::HashSet<(i32, i32)> = assignments.into_iter().collect();
+        let assignment_set: std::collections::HashSet<(i32, i32)> =
+            assignments.into_iter().collect();
         let assignments: Vec<RoleCapabilityAssignment> = role_infos
             .iter()
             .flat_map(|role| {
@@ -102,7 +107,8 @@ impl RoleCapabilityMatrixUseCase {
 
     /// 전역 Role-Capability 매트릭스 조회 (기존 - 하위 호환성)
     pub async fn get_global_matrix(&self) -> Result<RoleCapabilityMatrixResponse, ServiceError> {
-        let (roles, capabilities, assignments) = self.capability_service
+        let (roles, capabilities, assignments) = self
+            .capability_service
             .get_global_role_capability_matrix()
             .await?;
 
@@ -131,7 +137,7 @@ impl RoleCapabilityMatrixUseCase {
                 category_label: capability.category_label.clone(),
                 permission_count: 0, // 임시로 0으로 고정
             };
-            
+
             capabilities_by_category
                 .entry(capability.category)
                 .or_insert_with(Vec::new)
@@ -144,7 +150,8 @@ impl RoleCapabilityMatrixUseCase {
         }
 
         // 할당 정보 변환
-        let assignment_set: std::collections::HashSet<(i32, i32)> = assignments.into_iter().collect();
+        let assignment_set: std::collections::HashSet<(i32, i32)> =
+            assignments.into_iter().collect();
         let assignments: Vec<RoleCapabilityAssignment> = role_infos
             .iter()
             .flat_map(|role| {
@@ -179,8 +186,12 @@ impl RoleCapabilityMatrixUseCase {
     }
 
     /// 프로젝트별 Role-Capability 매트릭스 조회
-    pub async fn get_project_matrix(&self, project_id: i32) -> Result<RoleCapabilityMatrixResponse, ServiceError> {
-        let (roles, capabilities, assignments) = self.capability_service
+    pub async fn get_project_matrix(
+        &self,
+        project_id: i32,
+    ) -> Result<RoleCapabilityMatrixResponse, ServiceError> {
+        let (roles, capabilities, assignments) = self
+            .capability_service
             .get_project_role_capability_matrix(project_id)
             .await?;
 
@@ -209,7 +220,7 @@ impl RoleCapabilityMatrixUseCase {
                 category_label: capability.category_label.clone(),
                 permission_count: 0, // 임시로 0으로 고정
             };
-            
+
             capabilities_by_category
                 .entry(capability.category)
                 .or_insert_with(Vec::new)
@@ -222,7 +233,8 @@ impl RoleCapabilityMatrixUseCase {
         }
 
         // 할당 정보 변환
-        let assignment_set: std::collections::HashSet<(i32, i32)> = assignments.into_iter().collect();
+        let assignment_set: std::collections::HashSet<(i32, i32)> =
+            assignments.into_iter().collect();
         let assignments: Vec<RoleCapabilityAssignment> = role_infos
             .iter()
             .flat_map(|role| {
@@ -257,8 +269,12 @@ impl RoleCapabilityMatrixUseCase {
     }
 
     /// Capability 상세 조회 (매핑된 Permission 포함)
-    pub async fn get_capability_detail(&self, capability_id: i32) -> Result<CapabilityDetailResponse, ServiceError> {
-        let (capability, permissions) = self.capability_service
+    pub async fn get_capability_detail(
+        &self,
+        capability_id: i32,
+    ) -> Result<CapabilityDetailResponse, ServiceError> {
+        let (capability, permissions) = self
+            .capability_service
             .get_capability_with_permissions(capability_id)
             .await?;
 
@@ -309,13 +325,12 @@ impl RoleCapabilityMatrixUseCase {
 
     /// 모든 Capability 목록 조회
     pub async fn get_all_capabilities(&self) -> Result<Vec<CapabilityInfo>, ServiceError> {
-        let capabilities = self.capability_service
-            .get_all_capabilities()
-            .await?;
+        let capabilities = self.capability_service.get_all_capabilities().await?;
 
         let mut capability_infos = Vec::new();
         for capability in capabilities {
-            let permissions = self.capability_service
+            let permissions = self
+                .capability_service
                 .get_capability_with_permissions(capability.id)
                 .await?
                 .1;
@@ -338,14 +353,19 @@ impl RoleCapabilityMatrixUseCase {
     }
 
     /// 카테고리별 Capability 목록 조회
-    pub async fn get_capabilities_by_category(&self, category: &str) -> Result<Vec<CapabilityInfo>, ServiceError> {
-        let capabilities = self.capability_service
+    pub async fn get_capabilities_by_category(
+        &self,
+        category: &str,
+    ) -> Result<Vec<CapabilityInfo>, ServiceError> {
+        let capabilities = self
+            .capability_service
             .get_capabilities_by_category(category)
             .await?;
 
         let mut capability_infos = Vec::new();
         for capability in capabilities {
-            let permissions = self.capability_service
+            let permissions = self
+                .capability_service
                 .get_capability_with_permissions(capability.id)
                 .await?
                 .1;

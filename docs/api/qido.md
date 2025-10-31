@@ -129,3 +129,4 @@ Response (요약 예시):
 - 단위 테스트: 파라미터 파싱, 날짜 형식, 병합 우선순위 확인
 - 모킹 통합 테스트: mock upstream로 `limit`/`offset` 및 필터 전달 확인
 - 실서버 연동: Keycloak 토큰 릴레이로 dcm4chee 보호 자원 접근 확인
+

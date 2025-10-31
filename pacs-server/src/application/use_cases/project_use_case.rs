@@ -1,10 +1,15 @@
-use crate::application::dto::{
-    CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse, 
-    ProjectAssignRoleRequest, MemberInfo, ProjectRolesResponse,
+use crate::application::dto::project_dto::{
+    PaginationInfo, ProjectListQuery, ProjectMembersResponse, RoleInfo,
 };
-use crate::application::dto::project_dto::{RoleInfo, ProjectMembersResponse, ProjectListQuery, PaginationInfo};
+use crate::application::dto::{
+    CreateProjectRequest, MemberInfo, ProjectAssignRoleRequest, ProjectListResponse,
+    ProjectResponse, ProjectRolesResponse, UpdateProjectRequest,
+};
 use crate::domain::services::ProjectService;
-use crate::domain::{ServiceError, entities::project::{NewProject, UpdateProject, ProjectStatus}};
+use crate::domain::{
+    entities::project::{NewProject, ProjectStatus, UpdateProject},
+    ServiceError,
+};
 
 /// 프로젝트 관리 유스케이스
 pub struct ProjectUseCase<P: ProjectService> {
@@ -17,7 +22,10 @@ impl<P: ProjectService> ProjectUseCase<P> {
     }
 
     /// 프로젝트 생성
-    pub async fn create_project(&self, request: CreateProjectRequest) -> Result<ProjectResponse, ServiceError> {
+    pub async fn create_project(
+        &self,
+        request: CreateProjectRequest,
+    ) -> Result<ProjectResponse, ServiceError> {
         let new_project = NewProject {
             name: request.name,
             description: request.description,
@@ -38,38 +46,50 @@ impl<P: ProjectService> ProjectUseCase<P> {
     }
 
     /// 모든 프로젝트 조회 (페이지네이션 및 필터링 지원)
-    pub async fn get_all_projects(&self, query: ProjectListQuery) -> Result<ProjectListResponse, ServiceError> {
+    pub async fn get_all_projects(
+        &self,
+        query: ProjectListQuery,
+    ) -> Result<ProjectListResponse, ServiceError> {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(20);
         let sort_by = query.sort_by.as_deref().unwrap_or("created_at");
         let sort_order = query.sort_order.as_deref().unwrap_or("desc");
-        
+
         // 필터가 있는지 확인 (status, sponsor, 날짜 범위 중 하나라도 있으면 필터 사용)
-        let has_filters = query.status.is_some() || 
-                          query.sponsor.is_some() || 
-                          query.start_date_from.is_some() || 
-                          query.start_date_to.is_some() ||
-                          query.end_date_from.is_some() ||
-                          query.end_date_to.is_some();
-        
+        let has_filters = query.status.is_some()
+            || query.sponsor.is_some()
+            || query.start_date_from.is_some()
+            || query.start_date_to.is_some()
+            || query.end_date_from.is_some()
+            || query.end_date_to.is_some();
+
         let (projects, total) = if has_filters {
             // 필터링 사용
-            let projects = self.project_service.get_projects_with_filter(&query).await?;
-            let total = self.project_service.count_projects_with_filter(&query).await?;
+            let projects = self
+                .project_service
+                .get_projects_with_filter(&query)
+                .await?;
+            let total = self
+                .project_service
+                .count_projects_with_filter(&query)
+                .await?;
             (projects, total)
         } else {
             // 단순 페이지네이션
-            let projects = self.project_service.get_projects_paginated(page, page_size, sort_by, sort_order).await?;
+            let projects = self
+                .project_service
+                .get_projects_paginated(page, page_size, sort_by, sort_order)
+                .await?;
             let total = self.project_service.count_all_projects().await?;
             (projects, total)
         };
-        
+
         let total_pages = if total > 0 {
             ((total as f64) / (page_size as f64)).ceil() as i32
         } else {
             0
         };
-        
+
         Ok(ProjectListResponse {
             projects: projects.into_iter().map(|p| p.into()).collect(),
             pagination: PaginationInfo {
@@ -89,15 +109,18 @@ impl<P: ProjectService> ProjectUseCase<P> {
         sort_by: &str,
         sort_order: &str,
     ) -> Result<ProjectListResponse, ServiceError> {
-        let projects = self.project_service.get_active_projects_paginated(page, page_size, sort_by, sort_order).await?;
+        let projects = self
+            .project_service
+            .get_active_projects_paginated(page, page_size, sort_by, sort_order)
+            .await?;
         let total = self.project_service.count_active_projects().await?;
-        
+
         let total_pages = if total > 0 {
             ((total as f64) / (page_size as f64)).ceil() as i32
         } else {
             0
         };
-        
+
         Ok(ProjectListResponse {
             projects: projects.into_iter().map(|p| p.into()).collect(),
             pagination: PaginationInfo {
@@ -110,7 +133,11 @@ impl<P: ProjectService> ProjectUseCase<P> {
     }
 
     /// 프로젝트 수정
-    pub async fn update_project(&self, project_id: i32, request: UpdateProjectRequest) -> Result<ProjectResponse, ServiceError> {
+    pub async fn update_project(
+        &self,
+        project_id: i32,
+        request: UpdateProjectRequest,
+    ) -> Result<ProjectResponse, ServiceError> {
         let mut update = UpdateProject {
             name: request.name,
             description: request.description,
@@ -130,13 +157,18 @@ impl<P: ProjectService> ProjectUseCase<P> {
                 "Completed" | "COMPLETED" => Some(ProjectStatus::Completed),
                 "Suspended" | "SUSPENDED" => Some(ProjectStatus::Suspended),
                 "Cancelled" | "CANCELLED" => Some(ProjectStatus::Cancelled),
-                "PendingCompletion" | "PENDING_COMPLETION" => Some(ProjectStatus::PendingCompletion),
+                "PendingCompletion" | "PENDING_COMPLETION" => {
+                    Some(ProjectStatus::PendingCompletion)
+                }
                 "OverPlanning" | "OVER_PLANNING" => Some(ProjectStatus::OverPlanning),
                 _ => None,
             };
         }
 
-        let project = self.project_service.update_project(project_id, update).await?;
+        let project = self
+            .project_service
+            .update_project(project_id, update)
+            .await?;
         Ok(project.into())
     }
 
@@ -147,7 +179,10 @@ impl<P: ProjectService> ProjectUseCase<P> {
     }
 
     /// 프로젝트 비활성화
-    pub async fn deactivate_project(&self, project_id: i32) -> Result<ProjectResponse, ServiceError> {
+    pub async fn deactivate_project(
+        &self,
+        project_id: i32,
+    ) -> Result<ProjectResponse, ServiceError> {
         let project = self.project_service.deactivate_project(project_id).await?;
         Ok(project.into())
     }
@@ -158,9 +193,15 @@ impl<P: ProjectService> ProjectUseCase<P> {
     }
 
     /// 프로젝트 멤버 목록 조회
-    pub async fn get_project_members(&self, project_id: i32) -> Result<ProjectMembersResponse, ServiceError> {
+    pub async fn get_project_members(
+        &self,
+        project_id: i32,
+    ) -> Result<ProjectMembersResponse, ServiceError> {
         let members = self.project_service.get_project_members(project_id).await?;
-        let count = self.project_service.count_project_members(project_id).await?;
+        let count = self
+            .project_service
+            .count_project_members(project_id)
+            .await?;
 
         let member_infos = members
             .into_iter()
@@ -180,7 +221,11 @@ impl<P: ProjectService> ProjectUseCase<P> {
     }
 
     /// 프로젝트에 역할 할당
-    pub async fn assign_role(&self, project_id: i32, request: ProjectAssignRoleRequest) -> Result<(), ServiceError> {
+    pub async fn assign_role(
+        &self,
+        project_id: i32,
+        request: ProjectAssignRoleRequest,
+    ) -> Result<(), ServiceError> {
         self.project_service
             .assign_role_to_project(project_id, request.role_id)
             .await
@@ -194,7 +239,10 @@ impl<P: ProjectService> ProjectUseCase<P> {
     }
 
     /// 프로젝트 역할 목록 조회
-    pub async fn get_project_roles(&self, project_id: i32) -> Result<ProjectRolesResponse, ServiceError> {
+    pub async fn get_project_roles(
+        &self,
+        project_id: i32,
+    ) -> Result<ProjectRolesResponse, ServiceError> {
         let roles = self.project_service.get_project_roles(project_id).await?;
 
         let role_infos = roles

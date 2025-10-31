@@ -1,6 +1,6 @@
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation, Algorithm};
 use super::claims::Claims;
 use crate::infrastructure::config::JwtConfig;
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 
 #[derive(Debug)]
 pub enum JwtError {
@@ -56,8 +56,8 @@ impl JwtService {
 
     /// JWT 토큰 검증 및 Claims 추출
     pub fn validate_token(&self, token: &str) -> Result<Claims, JwtError> {
-        let token_data = decode::<Claims>(token, &self.decoding_key, &self.validation)
-            .map_err(|e| {
+        let token_data =
+            decode::<Claims>(token, &self.decoding_key, &self.validation).map_err(|e| {
                 if e.to_string().contains("ExpiredSignature") {
                     JwtError::ExpiredToken
                 } else {

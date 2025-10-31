@@ -1,8 +1,8 @@
+use crate::domain::entities::{NewUser, UpdateUser, User};
+use crate::domain::repositories::UserRepository;
 use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::domain::entities::{User, NewUser, UpdateUser};
-use crate::domain::repositories::UserRepository;
 
 #[derive(Clone)]
 pub struct UserRepositoryImpl {
@@ -24,7 +24,7 @@ impl UserRepository for UserRepositoryImpl {
                     email_verification_token, email_verification_expires_at,
                     approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
-             WHERE id = $1"
+             WHERE id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -38,7 +38,7 @@ impl UserRepository for UserRepositoryImpl {
                     email_verification_token, email_verification_expires_at,
                     approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
-             WHERE keycloak_id = $1"
+             WHERE keycloak_id = $1",
         )
         .bind(keycloak_id)
         .fetch_optional(&self.pool)
@@ -52,7 +52,7 @@ impl UserRepository for UserRepositoryImpl {
                     email_verification_token, email_verification_expires_at,
                     approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
-             WHERE username = $1"
+             WHERE username = $1",
         )
         .bind(username)
         .fetch_optional(&self.pool)
@@ -66,7 +66,7 @@ impl UserRepository for UserRepositoryImpl {
                     email_verification_token, email_verification_expires_at,
                     approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
-             WHERE email = $1"
+             WHERE email = $1",
         )
         .bind(email)
         .fetch_optional(&self.pool)
@@ -80,7 +80,7 @@ impl UserRepository for UserRepositoryImpl {
                     email_verification_token, email_verification_expires_at,
                     approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
-             ORDER BY created_at DESC"
+             ORDER BY created_at DESC",
         )
         .fetch_all(&self.pool)
         .await

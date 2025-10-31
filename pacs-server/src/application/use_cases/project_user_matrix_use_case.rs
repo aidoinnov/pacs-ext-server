@@ -1,17 +1,17 @@
 //! # 프로젝트-사용자 매트릭스 Use Case 모듈
-//! 
+//!
 //! 이 모듈은 프로젝트-사용자 역할 매트릭스 조회를 위한 Use Case를 정의합니다.
 //! 매트릭스는 관리 UI에서 테이블 형태로 보여주기 위한 것으로,
 //! 열은 사용자 목록, 행은 프로젝트 목록이며, 각 셀에는 해당 프로젝트에서 사용자의 역할이 표시됩니다.
 
-use std::sync::Arc;
-use crate::domain::ServiceError;
-use crate::domain::services::{ProjectService, UserService};
-use crate::domain::entities::ProjectStatus;
 use crate::application::dto::project_user_matrix_dto::*;
+use crate::domain::entities::ProjectStatus;
+use crate::domain::services::{ProjectService, UserService};
+use crate::domain::ServiceError;
+use std::sync::Arc;
 
 /// 프로젝트-사용자 매트릭스 Use Case
-/// 
+///
 /// 프로젝트와 사용자 데이터를 조합하여 매트릭스 형태의 데이터를 생성합니다.
 pub struct ProjectUserMatrixUseCase<P, U>
 where
@@ -36,10 +36,10 @@ where
     }
 
     /// 프로젝트-사용자 역할 매트릭스 조회
-    /// 
+    ///
     /// # Parameters
     /// - `params`: 매트릭스 조회 파라미터 (페이지네이션, 필터 등)
-    /// 
+    ///
     /// # Returns
     /// - `ProjectUserMatrixResponse`: 매트릭스 데이터와 페이지네이션 정보
     pub async fn get_matrix(
@@ -83,11 +83,7 @@ where
         // 필터된 사용자 조회 (페이지네이션)
         let (users, user_total_count) = self
             .user_service
-            .get_users_with_filter(
-                params.user_ids.clone(),
-                user_page,
-                user_page_size,
-            )
+            .get_users_with_filter(params.user_ids.clone(), user_page, user_page_size)
             .await?;
 
         // 프로젝트나 사용자가 비어있으면 빈 매트릭스 반환
@@ -161,8 +157,8 @@ where
             .collect();
 
         // 페이지네이션 계산
-        let project_total_pages =
-            ((project_total_count + project_page_size as i64 - 1) / project_page_size as i64) as i32;
+        let project_total_pages = ((project_total_count + project_page_size as i64 - 1)
+            / project_page_size as i64) as i32;
         let user_total_pages =
             ((user_total_count + user_page_size as i64 - 1) / user_page_size as i64) as i32;
 

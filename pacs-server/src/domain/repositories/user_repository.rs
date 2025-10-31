@@ -1,7 +1,7 @@
+use crate::domain::entities::{NewUser, UpdateUser, User};
 use async_trait::async_trait;
-use uuid::Uuid;
 use sqlx::PgPool;
-use crate::domain::entities::{User, NewUser, UpdateUser};
+use uuid::Uuid;
 
 #[async_trait]
 pub trait UserRepository: Send + Sync {

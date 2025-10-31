@@ -4,8 +4,8 @@ use chrono::{DateTime, Utc};
 #[derive(Debug, Clone)]
 pub struct SyncStatus {
     pub is_running: bool,
-    pub last_run: Option<DateTime<Utc>>, 
-    pub next_run: Option<DateTime<Utc>>, 
+    pub last_run: Option<DateTime<Utc>>,
+    pub next_run: Option<DateTime<Utc>>,
     pub interval_sec: u64,
 }
 
@@ -25,5 +25,3 @@ pub trait SyncService: Send + Sync {
     async fn resume(&self);
     async fn update_interval(&self, interval_sec: u64);
 }
-
-

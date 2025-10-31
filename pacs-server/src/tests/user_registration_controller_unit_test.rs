@@ -1,15 +1,15 @@
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
-    use actix_web::{test, web, App};
-    use std::sync::Arc;
-    use serde_json::json;
-    use tokio;
     use crate::application::dto::user_registration_dto::*;
     use crate::application::use_cases::UserRegistrationUseCase;
-    use crate::domain::ServiceError;
+    use crate::domain::entities::{NewUserAuditLog, User, UserAccountStatus};
     use crate::domain::services::UserRegistrationService;
-    use crate::domain::entities::{User, UserAccountStatus, NewUserAuditLog};
+    use crate::domain::ServiceError;
+    use actix_web::{test, web, App};
+    use async_trait::async_trait;
+    use serde_json::json;
+    use std::sync::Arc;
+    use tokio;
 
     // Mock UserRegistrationService for controller tests
     use mockall::mock;
@@ -58,11 +58,13 @@ mod tests {
             .returning(move |_, _, _, _, _, _, _| Ok(expected_user.clone()));
 
         let use_case = Arc::new(UserRegistrationUseCase::new(mock_service));
-        let app = test::init_service(
-            App::new().service(web::scope("/api").configure(|cfg| {
-                crate::presentation::controllers::user_registration_controller::configure_routes(cfg, use_case.clone())
-            }))
-        ).await;
+        let app = test::init_service(App::new().service(web::scope("/api").configure(|cfg| {
+            crate::presentation::controllers::user_registration_controller::configure_routes(
+                cfg,
+                use_case.clone(),
+            )
+        })))
+        .await;
 
         let request_body = json!({
             "username": "testuser",
@@ -96,11 +98,13 @@ mod tests {
             .returning(|_| Ok(()));
 
         let use_case = Arc::new(UserRegistrationUseCase::new(mock_service));
-        let app = test::init_service(
-            App::new().service(web::scope("/api").configure(|cfg| {
-                crate::presentation::controllers::user_registration_controller::configure_routes(cfg, use_case.clone())
-            }))
-        ).await;
+        let app = test::init_service(App::new().service(web::scope("/api").configure(|cfg| {
+            crate::presentation::controllers::user_registration_controller::configure_routes(
+                cfg,
+                use_case.clone(),
+            )
+        })))
+        .await;
 
         let request_body = json!({
             "user_id": 1,
@@ -129,11 +133,13 @@ mod tests {
             .returning(|_, _| Ok(()));
 
         let use_case = Arc::new(UserRegistrationUseCase::new(mock_service));
-        let app = test::init_service(
-            App::new().service(web::scope("/api").configure(|cfg| {
-                crate::presentation::controllers::user_registration_controller::configure_routes(cfg, use_case.clone())
-            }))
-        ).await;
+        let app = test::init_service(App::new().service(web::scope("/api").configure(|cfg| {
+            crate::presentation::controllers::user_registration_controller::configure_routes(
+                cfg,
+                use_case.clone(),
+            )
+        })))
+        .await;
 
         let request_body = json!({
             "user_id": 1
@@ -161,16 +167,16 @@ mod tests {
             .returning(|_, _| Ok(()));
 
         let use_case = Arc::new(UserRegistrationUseCase::new(mock_service));
-        let app = test::init_service(
-            App::new().service(web::scope("/api").configure(|cfg| {
-                crate::presentation::controllers::user_registration_controller::configure_routes(cfg, use_case.clone())
-            }))
-        ).await;
+        let app = test::init_service(App::new().service(web::scope("/api").configure(|cfg| {
+            crate::presentation::controllers::user_registration_controller::configure_routes(
+                cfg,
+                use_case.clone(),
+            )
+        })))
+        .await;
 
         // When
-        let req = test::TestRequest::delete()
-            .uri("/api/users/1")
-            .to_request();
+        let req = test::TestRequest::delete().uri("/api/users/1").to_request();
 
         let resp = test::call_service(&app, req).await;
 

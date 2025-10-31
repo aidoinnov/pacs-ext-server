@@ -10,10 +10,11 @@ async fn scenario_db_ct_and_date_range_perfproj() {
     let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
 
     // PerfProj 프로젝트 id
-    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
-        .fetch_one(&pool)
-        .await
-        .expect("PerfProj exists");
+    let project_id: i32 =
+        sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+            .fetch_one(&pool)
+            .await
+            .expect("PerfProj exists");
 
     // CT + 날짜 범위(2024-01-01 ~ 2024-12-31)에 해당하는 study 존재 확인
     let cnt: i64 = sqlx::query_scalar(
@@ -26,9 +27,11 @@ async fn scenario_db_ct_and_date_range_perfproj() {
     .await
     .expect("count studies");
 
-    assert!(cnt >= 1, "expected at least one CT study in 2024 for PerfProj");
+    assert!(
+        cnt >= 1,
+        "expected at least one CT study in 2024 for PerfProj"
+    );
 }
-
 
 #[tokio::test]
 async fn scenario_db_series_under_seeded_study_perfproj() {
@@ -86,7 +89,10 @@ async fn scenario_db_instance_under_seeded_series_perfproj() {
     .await
     .expect("count instances");
 
-    assert!(inst_cnt >= 1, "expected seeded instance under seeded series");
+    assert!(
+        inst_cnt >= 1,
+        "expected seeded instance under seeded series"
+    );
 }
 
 // ========================================
@@ -107,10 +113,11 @@ async fn scenario_db_deny_patient_id_effect() {
 
     let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
 
-    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
-        .fetch_one(&pool)
-        .await
-        .expect("PerfProj exists");
+    let project_id: i32 =
+        sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+            .fetch_one(&pool)
+            .await
+            .expect("PerfProj exists");
 
     // 시드 데이터 자체는 존재해야 함
     let base_cnt: i64 = sqlx::query_scalar(
@@ -133,7 +140,10 @@ async fn scenario_db_deny_patient_id_effect() {
     .fetch_one(&pool)
     .await
     .expect("deny count");
-    assert_eq!(denied_cnt, 0, "deny on PatientID should exclude the seeded row");
+    assert_eq!(
+        denied_cnt, 0,
+        "deny on PatientID should exclude the seeded row"
+    );
 }
 
 #[tokio::test]
@@ -147,10 +157,11 @@ async fn scenario_db_limit_date_range_intersection_empty() {
 
     let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
 
-    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
-        .fetch_one(&pool)
-        .await
-        .expect("PerfProj exists");
+    let project_id: i32 =
+        sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+            .fetch_one(&pool)
+            .await
+            .expect("PerfProj exists");
 
     // 시드 스터디는 2024-06-15 → 2023 범위를 LIMIT 하면 교집합은 비어야 함
     let cnt: i64 = sqlx::query_scalar(
@@ -162,7 +173,10 @@ async fn scenario_db_limit_date_range_intersection_empty() {
     .fetch_one(&pool)
     .await
     .expect("limit date range count");
-    assert_eq!(cnt, 0, "limit with non-overlapping date range should yield empty set");
+    assert_eq!(
+        cnt, 0,
+        "limit with non-overlapping date range should yield empty set"
+    );
 }
 
 #[tokio::test]
@@ -176,10 +190,11 @@ async fn scenario_db_deny_over_allow_simulation() {
 
     let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
 
-    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
-        .fetch_one(&pool)
-        .await
-        .expect("PerfProj exists");
+    let project_id: i32 =
+        sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+            .fetch_one(&pool)
+            .await
+            .expect("PerfProj exists");
 
     // 시드: Modality='CT', PatientID='PAT-EXPLAIN-001', StudyDate='2024-06-15'
     // ALLOW(Modality=CT)와 동시에 DENY(PatientID=PAT-EXPLAIN-001)가 있으면 최종 제외되어야 함
@@ -204,7 +219,10 @@ async fn scenario_db_deny_over_allow_simulation() {
     .fetch_one(&pool)
     .await
     .expect("final count after deny");
-    assert_eq!(final_cnt, 0, "DENY must override ALLOW resulting in exclusion");
+    assert_eq!(
+        final_cnt, 0,
+        "DENY must override ALLOW resulting in exclusion"
+    );
 }
 
 #[tokio::test]
@@ -218,10 +236,11 @@ async fn scenario_db_allow_ct_and_limit_june_positive() {
 
     let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
 
-    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
-        .fetch_one(&pool)
-        .await
-        .expect("PerfProj exists");
+    let project_id: i32 =
+        sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+            .fetch_one(&pool)
+            .await
+            .expect("PerfProj exists");
 
     // ALLOW(Modality=CT) ∩ LIMIT(2024-06-01..2024-06-30) → 시드 1건 유지 기대
     let cnt: i64 = sqlx::query_scalar(
@@ -249,10 +268,11 @@ async fn scenario_db_non_member_denied() {
 
     let pool = sqlx::PgPool::connect(&db_url).await.expect("connect DB");
 
-    let project_id: i32 = sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
-        .fetch_one(&pool)
-        .await
-        .expect("PerfProj exists");
+    let project_id: i32 =
+        sqlx::query_scalar("SELECT id FROM security_project WHERE name='PerfProj'")
+            .fetch_one(&pool)
+            .await
+            .expect("PerfProj exists");
 
     // 존재하지 않는 사용자 또는 비멤버 사용자를 가정: membership 조인 불일치
     let non_member_user_id: i32 = 999_999;
@@ -293,7 +313,7 @@ async fn scenario_db_explicit_study_access_overrides_rule() {
     .await
     .expect("project/user exists");
 
-    // 규칙: CT만 허용 + 2024-06 범위 제한이 있다고 가정. 
+    // 규칙: CT만 허용 + 2024-06 범위 제한이 있다고 가정.
     // 명시 권한으로 특정 Study UID를 부여하면 규칙 조건과 무관하게 접근 가능해야 함을 DB WHERE로 모사.
     let study_uid: String = sqlx::query_scalar(
         "SELECT study_uid FROM project_data_study WHERE project_id=$1 ORDER BY id LIMIT 1",
@@ -399,5 +419,3 @@ async fn scenario_db_explicit_study_access_overrides_rule() {
 
     assert_eq!(cnt, 1);
 }
-
-

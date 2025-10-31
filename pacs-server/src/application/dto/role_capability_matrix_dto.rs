@@ -200,18 +200,17 @@ mod tests {
 
     #[test]
     fn test_role_capability_matrix_response_serialization() {
-        let roles = vec![
-            RoleInfo {
-                id: 1,
-                name: "SUPER_ADMIN".to_string(),
-                description: Some("시스템 전체 관리자".to_string()),
-                scope: "GLOBAL".to_string(),
-            },
-        ];
+        let roles = vec![RoleInfo {
+            id: 1,
+            name: "SUPER_ADMIN".to_string(),
+            description: Some("시스템 전체 관리자".to_string()),
+            scope: "GLOBAL".to_string(),
+        }];
 
         let mut capabilities_by_category = HashMap::new();
-        capabilities_by_category.insert("관리".to_string(), vec![
-            CapabilityInfo {
+        capabilities_by_category.insert(
+            "관리".to_string(),
+            vec![CapabilityInfo {
                 id: 1,
                 name: "MANAGE_USERS".to_string(),
                 display_name: "사용자 관리".to_string(),
@@ -220,16 +219,14 @@ mod tests {
                 category: "관리".to_string(),
                 category_label: "MANAGE".to_string(),
                 permission_count: 5,
-            },
-        ]);
+            }],
+        );
 
-        let assignments = vec![
-            RoleCapabilityAssignment {
-                role_id: 1,
-                capability_id: 1,
-                assigned: true,
-            },
-        ];
+        let assignments = vec![RoleCapabilityAssignment {
+            role_id: 1,
+            capability_id: 1,
+            assigned: true,
+        }];
 
         let pagination = PaginationInfo {
             current_page: 1,

@@ -1,12 +1,12 @@
-use crate::application::dto::{
-    CreateRoleRequest, UpdateRoleRequest, RoleResponse, PermissionResponse,
-    RolePermissionsResponse, ProjectPermissionsResponse, ResourcePermissionsResponse,
-    RoleWithPermissionsResponse, RolesWithPermissionsListResponse,
-};
 use crate::application::dto::permission_dto::AssignPermissionRequest;
+use crate::application::dto::{
+    CreateRoleRequest, PermissionResponse, ProjectPermissionsResponse, ResourcePermissionsResponse,
+    RolePermissionsResponse, RoleResponse, RoleWithPermissionsResponse,
+    RolesWithPermissionsListResponse, UpdateRoleRequest,
+};
+use crate::domain::entities::RoleScope;
 use crate::domain::services::PermissionService;
 use crate::domain::ServiceError;
-use crate::domain::entities::RoleScope;
 
 /// 권한 관리 유스케이스
 pub struct PermissionUseCase<P: PermissionService> {
@@ -19,11 +19,18 @@ impl<P: PermissionService> PermissionUseCase<P> {
     }
 
     /// 역할 생성
-    pub async fn create_role(&self, request: CreateRoleRequest) -> Result<RoleResponse, ServiceError> {
+    pub async fn create_role(
+        &self,
+        request: CreateRoleRequest,
+    ) -> Result<RoleResponse, ServiceError> {
         let scope = match request.scope.as_str() {
             "GLOBAL" => RoleScope::Global,
             "PROJECT" => RoleScope::Project,
-            _ => return Err(ServiceError::ValidationError("Invalid scope. Must be GLOBAL or PROJECT".into())),
+            _ => {
+                return Err(ServiceError::ValidationError(
+                    "Invalid scope. Must be GLOBAL or PROJECT".into(),
+                ))
+            }
         };
 
         let role = self
@@ -52,8 +59,15 @@ impl<P: PermissionService> PermissionUseCase<P> {
     }
 
     /// 역할 업데이트
-    pub async fn update_role(&self, role_id: i32, request: UpdateRoleRequest) -> Result<RoleResponse, ServiceError> {
-        let role = self.permission_service.update_role(role_id, request.name, request.description).await?;
+    pub async fn update_role(
+        &self,
+        role_id: i32,
+        request: UpdateRoleRequest,
+    ) -> Result<RoleResponse, ServiceError> {
+        let role = self
+            .permission_service
+            .update_role(role_id, request.name, request.description)
+            .await?;
 
         Ok(RoleResponse {
             id: role.id,
@@ -121,9 +135,15 @@ impl<P: PermissionService> PermissionUseCase<P> {
     }
 
     /// 역할 권한 목록 조회
-    pub async fn get_role_permissions(&self, role_id: i32) -> Result<RolePermissionsResponse, ServiceError> {
+    pub async fn get_role_permissions(
+        &self,
+        role_id: i32,
+    ) -> Result<RolePermissionsResponse, ServiceError> {
         let role = self.permission_service.get_role(role_id).await?;
-        let permissions = self.permission_service.get_role_permissions(role_id).await?;
+        let permissions = self
+            .permission_service
+            .get_role_permissions(role_id)
+            .await?;
 
         let permission_responses = permissions
             .into_iter()
@@ -164,7 +184,10 @@ impl<P: PermissionService> PermissionUseCase<P> {
     }
 
     /// 프로젝트 권한 목록 조회
-    pub async fn get_project_permissions(&self, project_id: i32) -> Result<ProjectPermissionsResponse, ServiceError> {
+    pub async fn get_project_permissions(
+        &self,
+        project_id: i32,
+    ) -> Result<ProjectPermissionsResponse, ServiceError> {
         let permissions = self
             .permission_service
             .get_project_permissions(project_id)
@@ -186,7 +209,10 @@ impl<P: PermissionService> PermissionUseCase<P> {
     }
 
     /// 리소스별 권한 조회
-    pub async fn get_permissions_for_resource(&self, resource_type: &str) -> Result<ResourcePermissionsResponse, ServiceError> {
+    pub async fn get_permissions_for_resource(
+        &self,
+        resource_type: &str,
+    ) -> Result<ResourcePermissionsResponse, ServiceError> {
         let permissions = self
             .permission_service
             .get_permissions_for_resource(resource_type)
@@ -216,25 +242,26 @@ impl<P: PermissionService> PermissionUseCase<P> {
         let page = page.unwrap_or(1).max(1);
         let page_size = page_size.unwrap_or(20).clamp(1, 100);
         let offset = (page - 1) * page_size;
-        
+
         // 전체 Global 역할 조회
         let all_roles = self.permission_service.get_global_roles().await?;
         let total_count = all_roles.len() as i64;
-        
+
         // 페이지네이션 적용
         let paginated_roles: Vec<_> = all_roles
             .into_iter()
             .skip(offset as usize)
             .take(page_size as usize)
             .collect();
-        
+
         // 각 역할의 권한 조회
         let mut roles_with_permissions = Vec::new();
         for role in paginated_roles {
-            let permissions = self.permission_service
+            let permissions = self
+                .permission_service
                 .get_role_permissions(role.id)
                 .await?;
-            
+
             roles_with_permissions.push(RoleWithPermissionsResponse {
                 id: role.id,
                 name: role.name,
@@ -250,9 +277,9 @@ impl<P: PermissionService> PermissionUseCase<P> {
                     .collect(),
             });
         }
-        
+
         let total_pages = ((total_count + page_size as i64 - 1) / page_size as i64) as i32;
-        
+
         Ok(RolesWithPermissionsListResponse {
             roles: roles_with_permissions,
             total_count,

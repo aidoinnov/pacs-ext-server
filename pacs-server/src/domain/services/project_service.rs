@@ -1,7 +1,7 @@
-use crate::domain::entities::{NewProject, Project, ProjectStatus, Role, User, UpdateProject};
+use crate::application::dto::project_dto::ProjectListQuery;
+use crate::domain::entities::{NewProject, Project, ProjectStatus, Role, UpdateProject, User};
 use crate::domain::repositories::{ProjectRepository, RoleRepository, UserRepository};
 use crate::domain::ServiceError;
-use crate::application::dto::project_dto::ProjectListQuery;
 use async_trait::async_trait;
 
 /// 프로젝트 관리 도메인 서비스
@@ -18,7 +18,7 @@ pub trait ProjectService: Send + Sync {
 
     /// 모든 프로젝트 조회
     async fn get_all_projects(&self) -> Result<Vec<Project>, ServiceError>;
-    
+
     /// 페이지네이션된 프로젝트 조회
     async fn get_projects_paginated(
         &self,
@@ -27,7 +27,7 @@ pub trait ProjectService: Send + Sync {
         sort_by: &str,
         sort_order: &str,
     ) -> Result<Vec<Project>, ServiceError>;
-    
+
     /// 필터링된 프로젝트 조회
     async fn get_projects_with_filter(
         &self,
@@ -36,7 +36,7 @@ pub trait ProjectService: Send + Sync {
 
     /// 활성화된 프로젝트만 조회
     async fn get_active_projects(&self) -> Result<Vec<Project>, ServiceError>;
-    
+
     /// 페이지네이션된 활성 프로젝트 조회
     async fn get_active_projects_paginated(
         &self,
@@ -45,13 +45,13 @@ pub trait ProjectService: Send + Sync {
         sort_by: &str,
         sort_order: &str,
     ) -> Result<Vec<Project>, ServiceError>;
-    
+
     /// 전체 프로젝트 개수 조회
     async fn count_all_projects(&self) -> Result<i64, ServiceError>;
-    
+
     /// 활성 프로젝트 개수 조회
     async fn count_active_projects(&self) -> Result<i64, ServiceError>;
-    
+
     /// 필터링된 프로젝트 개수 조회
     async fn count_projects_with_filter(
         &self,
@@ -65,7 +65,8 @@ pub trait ProjectService: Send + Sync {
     async fn deactivate_project(&self, id: i32) -> Result<Project, ServiceError>;
 
     /// 프로젝트 수정
-    async fn update_project(&self, id: i32, update: UpdateProject) -> Result<Project, ServiceError>;
+    async fn update_project(&self, id: i32, update: UpdateProject)
+        -> Result<Project, ServiceError>;
 
     /// 프로젝트 삭제
     async fn delete_project(&self, id: i32) -> Result<(), ServiceError>;
@@ -185,7 +186,11 @@ where
 {
     async fn create_project(&self, new_project: NewProject) -> Result<Project, ServiceError> {
         // 프로젝트 이름 중복 체크
-        if let Some(_) = self.project_repository.find_by_name(&new_project.name).await? {
+        if let Some(_) = self
+            .project_repository
+            .find_by_name(&new_project.name)
+            .await?
+        {
             return Err(ServiceError::AlreadyExists(
                 "Project name already exists".into(),
             ));
@@ -224,7 +229,7 @@ where
     async fn get_all_projects(&self) -> Result<Vec<Project>, ServiceError> {
         Ok(self.project_repository.find_all().await?)
     }
-    
+
     async fn get_projects_paginated(
         &self,
         page: i32,
@@ -232,9 +237,12 @@ where
         sort_by: &str,
         sort_order: &str,
     ) -> Result<Vec<Project>, ServiceError> {
-        Ok(self.project_repository.find_with_pagination(page, page_size, sort_by, sort_order).await?)
+        Ok(self
+            .project_repository
+            .find_with_pagination(page, page_size, sort_by, sort_order)
+            .await?)
     }
-    
+
     async fn get_projects_with_filter(
         &self,
         query: &ProjectListQuery,
@@ -245,7 +253,7 @@ where
     async fn get_active_projects(&self) -> Result<Vec<Project>, ServiceError> {
         Ok(self.project_repository.find_active().await?)
     }
-    
+
     async fn get_active_projects_paginated(
         &self,
         page: i32,
@@ -253,17 +261,20 @@ where
         sort_by: &str,
         sort_order: &str,
     ) -> Result<Vec<Project>, ServiceError> {
-        Ok(self.project_repository.find_active_with_pagination(page, page_size, sort_by, sort_order).await?)
+        Ok(self
+            .project_repository
+            .find_active_with_pagination(page, page_size, sort_by, sort_order)
+            .await?)
     }
-    
+
     async fn count_all_projects(&self) -> Result<i64, ServiceError> {
         Ok(self.project_repository.count_all().await?)
     }
-    
+
     async fn count_active_projects(&self) -> Result<i64, ServiceError> {
         Ok(self.project_repository.count_active().await?)
     }
-    
+
     async fn count_projects_with_filter(
         &self,
         query: &ProjectListQuery,
@@ -303,7 +314,11 @@ where
         Ok(project)
     }
 
-    async fn update_project(&self, id: i32, update: UpdateProject) -> Result<Project, ServiceError> {
+    async fn update_project(
+        &self,
+        id: i32,
+        update: UpdateProject,
+    ) -> Result<Project, ServiceError> {
         self.project_repository
             .update(id, &update)
             .await?
@@ -576,7 +591,7 @@ where
         .bind(project_id)
         .fetch_one(self.project_repository.pool())
         .await?;
-    println!("222");
+        println!("222");
         if !is_member {
             return Err(ServiceError::NotFound(
                 "User is not a member of this project".into(),
@@ -596,7 +611,6 @@ where
         .await?;
         println!("444");
         if result.rows_affected() > 0 {
-            
             Ok(())
         } else {
             Err(ServiceError::NotFound(

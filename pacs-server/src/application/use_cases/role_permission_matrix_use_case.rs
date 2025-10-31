@@ -1,17 +1,17 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::application::dto::role_permission_matrix_dto::*;
 use crate::domain::services::PermissionService;
 use crate::domain::ServiceError;
-use crate::application::dto::role_permission_matrix_dto::*;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::entities::{Permission, Role, RoleScope};
+    use crate::domain::ServiceError;
+    use mockall::mock;
     use std::collections::HashMap;
     use std::sync::Arc;
-    use mockall::mock;
-    use crate::domain::entities::{Role, Permission, RoleScope};
-    use crate::domain::ServiceError;
 
     // Mock PermissionService
     mock! {
@@ -107,16 +107,21 @@ mod tests {
 
         assert!(result.is_ok());
         let matrix = result.unwrap();
-        
+
         // Check roles
         assert_eq!(matrix.roles.len(), 2);
         assert_eq!(matrix.roles[0].name, "Admin");
         assert_eq!(matrix.roles[1].name, "User");
 
         // Check permissions by category
-        assert!(matrix.permissions_by_category.contains_key("사용자 및 권한 관리"));
+        assert!(matrix
+            .permissions_by_category
+            .contains_key("사용자 및 권한 관리"));
         assert!(matrix.permissions_by_category.contains_key("프로젝트 관리"));
-        assert_eq!(matrix.permissions_by_category["사용자 및 권한 관리"].len(), 2);
+        assert_eq!(
+            matrix.permissions_by_category["사용자 및 권한 관리"].len(),
+            2
+        );
         assert_eq!(matrix.permissions_by_category["프로젝트 관리"].len(), 1);
 
         // Check assignments
@@ -126,11 +131,15 @@ mod tests {
     #[tokio::test]
     async fn test_get_global_matrix_service_error() {
         let mut mock_service = MockPermissionService::new();
-        
+
         mock_service
             .expect_get_global_role_permission_matrix()
             .times(1)
-            .returning(|| Err(ServiceError::DatabaseError("Database connection failed".into())));
+            .returning(|| {
+                Err(ServiceError::DatabaseError(
+                    "Database connection failed".into(),
+                ))
+            });
 
         let use_case = RolePermissionMatrixUseCase::new(Arc::new(mock_service));
         let result = use_case.get_global_matrix().await;
@@ -159,7 +168,7 @@ mod tests {
 
         assert!(result.is_ok());
         let matrix = result.unwrap();
-        
+
         assert_eq!(matrix.roles.len(), 2);
         assert_eq!(matrix.assignments.len(), 6);
     }
@@ -167,7 +176,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_project_matrix_not_found() {
         let mut mock_service = MockPermissionService::new();
-        
+
         mock_service
             .expect_get_project_role_permission_matrix()
             .times(1)
@@ -186,7 +195,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_permission_assignment_assign() {
         let mut mock_service = MockPermissionService::new();
-        
+
         mock_service
             .expect_assign_permission_to_role()
             .times(1)
@@ -202,7 +211,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_permission_assignment_remove() {
         let mut mock_service = MockPermissionService::new();
-        
+
         mock_service
             .expect_remove_permission_from_role()
             .times(1)
@@ -218,11 +227,15 @@ mod tests {
     #[tokio::test]
     async fn test_update_permission_assignment_error() {
         let mut mock_service = MockPermissionService::new();
-        
+
         mock_service
             .expect_assign_permission_to_role()
             .times(1)
-            .returning(|_, _| Err(ServiceError::ValidationError("Invalid role or permission".into())));
+            .returning(|_, _| {
+                Err(ServiceError::ValidationError(
+                    "Invalid role or permission".into(),
+                ))
+            });
 
         let use_case = RolePermissionMatrixUseCase::new(Arc::new(mock_service));
         let result = use_case.update_permission_assignment(1, 2, true).await;
@@ -242,14 +255,13 @@ pub struct RolePermissionMatrixUseCase {
 
 impl RolePermissionMatrixUseCase {
     pub fn new(permission_service: Arc<dyn PermissionService>) -> Self {
-        Self {
-            permission_service,
-        }
+        Self { permission_service }
     }
 
     /// 글로벌 역할-권한 매트릭스 조회
     pub async fn get_global_matrix(&self) -> Result<RolePermissionMatrixResponse, ServiceError> {
-        let (roles, permissions, assignments) = self.permission_service
+        let (roles, permissions, assignments) = self
+            .permission_service
             .get_global_role_permission_matrix()
             .await?;
 
@@ -273,7 +285,7 @@ impl RolePermissionMatrixUseCase {
                 resource_type: permission.resource_type.clone(),
                 action: permission.action,
             };
-            
+
             permissions_by_category
                 .entry(permission.category)
                 .or_insert_with(Vec::new)
@@ -283,13 +295,15 @@ impl RolePermissionMatrixUseCase {
         // 각 카테고리 내에서 권한 정렬 (resource_type, action 순)
         for permissions in permissions_by_category.values_mut() {
             permissions.sort_by(|a, b| {
-                a.resource_type.cmp(&b.resource_type)
+                a.resource_type
+                    .cmp(&b.resource_type)
                     .then_with(|| a.action.cmp(&b.action))
             });
         }
 
         // 할당 정보 변환
-        let assignment_set: std::collections::HashSet<(i32, i32)> = assignments.into_iter().collect();
+        let assignment_set: std::collections::HashSet<(i32, i32)> =
+            assignments.into_iter().collect();
         let assignments: Vec<RolePermissionAssignment> = role_infos
             .iter()
             .flat_map(|role| {
@@ -313,8 +327,12 @@ impl RolePermissionMatrixUseCase {
     }
 
     /// 프로젝트별 역할-권한 매트릭스 조회
-    pub async fn get_project_matrix(&self, project_id: i32) -> Result<RolePermissionMatrixResponse, ServiceError> {
-        let (roles, permissions, assignments) = self.permission_service
+    pub async fn get_project_matrix(
+        &self,
+        project_id: i32,
+    ) -> Result<RolePermissionMatrixResponse, ServiceError> {
+        let (roles, permissions, assignments) = self
+            .permission_service
             .get_project_role_permission_matrix(project_id)
             .await?;
 
@@ -338,7 +356,7 @@ impl RolePermissionMatrixUseCase {
                 resource_type: permission.resource_type.clone(),
                 action: permission.action,
             };
-            
+
             permissions_by_category
                 .entry(permission.category)
                 .or_insert_with(Vec::new)
@@ -348,13 +366,15 @@ impl RolePermissionMatrixUseCase {
         // 각 카테고리 내에서 권한 정렬 (resource_type, action 순)
         for permissions in permissions_by_category.values_mut() {
             permissions.sort_by(|a, b| {
-                a.resource_type.cmp(&b.resource_type)
+                a.resource_type
+                    .cmp(&b.resource_type)
                     .then_with(|| a.action.cmp(&b.action))
             });
         }
 
         // 할당 정보 변환
-        let assignment_set: std::collections::HashSet<(i32, i32)> = assignments.into_iter().collect();
+        let assignment_set: std::collections::HashSet<(i32, i32)> =
+            assignments.into_iter().collect();
         let assignments: Vec<RolePermissionAssignment> = role_infos
             .iter()
             .flat_map(|role| {

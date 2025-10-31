@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests {
+    use crate::application::dto::user_registration_dto::*;
+    use crate::application::use_cases::UserRegistrationUseCase;
+    use crate::domain::entities::{NewUserAuditLog, User, UserAccountStatus};
+    use crate::domain::services::UserRegistrationService;
+    use crate::domain::ServiceError;
     use async_trait::async_trait;
     use mockall::mock;
     use tokio;
-    use crate::application::dto::user_registration_dto::*;
-    use crate::application::use_cases::UserRegistrationUseCase;
-    use crate::domain::ServiceError;
-    use crate::domain::services::UserRegistrationService;
-    use crate::domain::entities::{User, UserAccountStatus, NewUserAuditLog};
 
     // Mock UserRegistrationService
     mock! {

@@ -1,8 +1,8 @@
-use crate::application::dto::{
-    LogDicomAccessRequest, AccessLogResponse, AccessLogListResponse, CheckPermissionRequest,
-    CheckPermissionResponse, UserPermissionsResponse, ProjectAccessResponse,
-};
 use crate::application::dto::access_control_dto::PermissionInfo;
+use crate::application::dto::{
+    AccessLogListResponse, AccessLogResponse, CheckPermissionRequest, CheckPermissionResponse,
+    LogDicomAccessRequest, ProjectAccessResponse, UserPermissionsResponse,
+};
 use crate::domain::services::AccessControlService;
 use crate::domain::ServiceError;
 
@@ -19,7 +19,10 @@ impl<A: AccessControlService> AccessControlUseCase<A> {
     }
 
     /// DICOM 접근 로그 기록
-    pub async fn log_dicom_access(&self, request: LogDicomAccessRequest) -> Result<AccessLogResponse, ServiceError> {
+    pub async fn log_dicom_access(
+        &self,
+        request: LogDicomAccessRequest,
+    ) -> Result<AccessLogResponse, ServiceError> {
         let log = self
             .access_control_service
             .log_dicom_access(
@@ -156,7 +159,10 @@ impl<A: AccessControlService> AccessControlUseCase<A> {
     }
 
     /// 권한 검증
-    pub async fn check_permission(&self, request: CheckPermissionRequest) -> Result<CheckPermissionResponse, ServiceError> {
+    pub async fn check_permission(
+        &self,
+        request: CheckPermissionRequest,
+    ) -> Result<CheckPermissionResponse, ServiceError> {
         let has_permission = self
             .access_control_service
             .check_permission(
@@ -204,7 +210,11 @@ impl<A: AccessControlService> AccessControlUseCase<A> {
     }
 
     /// 프로젝트 접근 가능 여부 확인
-    pub async fn can_access_project(&self, user_id: i32, project_id: i32) -> Result<ProjectAccessResponse, ServiceError> {
+    pub async fn can_access_project(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<ProjectAccessResponse, ServiceError> {
         let can_access = self
             .access_control_service
             .can_access_project(user_id, project_id)

@@ -1,18 +1,18 @@
 //! # 유저-프로젝트 매트릭스 Use Case 모듈
-//! 
+//!
 //! 이 모듈은 유저 중심 매트릭스 API를 위한 비즈니스 로직을 제공합니다.
 //! 유저를 행으로, 프로젝트를 열로 표시하는 매트릭스 데이터를 생성합니다.
 
-use std::sync::Arc;
 use crate::application::dto::user_project_matrix_dto::{
-    UserProjectMatrixResponse, UserProjectMatrixRow, ProjectRoleCell, ProjectInfo,
-    UserProjectMatrixPagination, UserProjectMatrixQueryParams
+    ProjectInfo, ProjectRoleCell, UserProjectMatrixPagination, UserProjectMatrixQueryParams,
+    UserProjectMatrixResponse, UserProjectMatrixRow,
 };
-use crate::domain::services::{UserService, ProjectService};
+use crate::domain::services::{ProjectService, UserService};
 use crate::domain::ServiceError;
+use std::sync::Arc;
 
 /// 유저-프로젝트 매트릭스 Use Case
-/// 
+///
 /// 유저 중심 매트릭스 데이터를 생성하는 비즈니스 로직을 담당합니다.
 #[derive(Clone)]
 pub struct UserProjectMatrixUseCase<U, P>
@@ -38,7 +38,7 @@ where
     }
 
     /// 유저-프로젝트 매트릭스 조회
-    /// 
+    ///
     /// 유저를 행으로, 프로젝트를 열로 표시하는 매트릭스 데이터를 생성합니다.
     /// 이중 페이지네이션(유저/프로젝트)과 다양한 필터링 옵션을 지원합니다.
     pub async fn get_matrix(
@@ -50,7 +50,9 @@ where
         let user_page_size = params.user_page_size.unwrap_or(10).min(50);
         let project_page = params.project_page.unwrap_or(1);
         let project_page_size = params.project_page_size.unwrap_or(10).min(50);
-        let user_sort_by = params.user_sort_by.unwrap_or_else(|| "username".to_string());
+        let user_sort_by = params
+            .user_sort_by
+            .unwrap_or_else(|| "username".to_string());
         let user_sort_order = params.user_sort_order.unwrap_or_else(|| "asc".to_string());
 
         // 1. 유저 목록 및 프로젝트 목록 병렬 조회 (성능 최적화)
@@ -74,20 +76,21 @@ where
         // 3. 모든 유저-프로젝트 멤버십 일괄 조회 (N+1 쿼리 문제 해결)
         let user_ids: Vec<i32> = users.iter().map(|u| u.id).collect();
         let project_ids: Vec<i32> = projects.iter().map(|p| p.id).collect();
-        
-        let memberships = self.user_service
+
+        let memberships = self
+            .user_service
             .get_memberships_batch(&user_ids, &project_ids)
             .await?;
-        
+
         // 4. 매트릭스 구조 생성 (메모리에서 O(1) 조회)
         let mut matrix_rows = Vec::new();
-        
+
         for user in users {
             let project_roles: Vec<ProjectRoleCell> = projects
                 .iter()
                 .map(|project| {
                     let membership = memberships.get(&(user.id, project.id));
-                    
+
                     ProjectRoleCell {
                         project_id: project.id,
                         project_name: project.name.clone(),
@@ -96,7 +99,7 @@ where
                     }
                 })
                 .collect();
-            
+
             let matrix_row = UserProjectMatrixRow {
                 user_id: user.id,
                 username: user.username.clone(),
@@ -104,7 +107,7 @@ where
                 full_name: user.full_name.clone(),
                 project_roles,
             };
-            
+
             matrix_rows.push(matrix_row);
         }
 
@@ -121,7 +124,8 @@ where
 
         // 6. 페이지네이션 정보 계산
         let user_total_pages = ((user_total_count as f64) / (user_page_size as f64)).ceil() as i32;
-        let project_total_pages = ((project_total_count as f64) / (project_page_size as f64)).ceil() as i32;
+        let project_total_pages =
+            ((project_total_count as f64) / (project_page_size as f64)).ceil() as i32;
 
         let pagination = UserProjectMatrixPagination {
             user_page,

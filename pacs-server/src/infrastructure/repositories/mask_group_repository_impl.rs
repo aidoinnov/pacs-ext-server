@@ -1,8 +1,8 @@
-use async_trait::async_trait;
-use sqlx::{PgPool, Row};
-use crate::domain::entities::{MaskGroup, NewMaskGroup, UpdateMaskGroup, MaskGroupStats, Mask};
+use crate::domain::entities::{Mask, MaskGroup, MaskGroupStats, NewMaskGroup, UpdateMaskGroup};
 use crate::domain::repositories::MaskGroupRepository;
 use crate::domain::ServiceError;
+use async_trait::async_trait;
+use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -41,7 +41,10 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             Ok(mask_group) => Ok(mask_group),
             Err(e) => {
                 eprintln!("Failed to create mask group: {}", e);
-                Err(ServiceError::DatabaseError(format!("Failed to create mask group: {}", e)))
+                Err(ServiceError::DatabaseError(format!(
+                    "Failed to create mask group: {}",
+                    e
+                )))
             }
         }
     }
@@ -60,15 +63,22 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             Ok(mask_group) => Ok(mask_group),
             Err(e) => {
                 eprintln!("Failed to get mask group by id {}: {}", id, e);
-                Err(ServiceError::DatabaseError(format!("Failed to get mask group: {}", e)))
+                Err(ServiceError::DatabaseError(format!(
+                    "Failed to get mask group: {}",
+                    e
+                )))
             }
         }
     }
 
-    async fn update(&self, id: i32, update_mask_group: &UpdateMaskGroup) -> Result<MaskGroup, ServiceError> {
+    async fn update(
+        &self,
+        id: i32,
+        update_mask_group: &UpdateMaskGroup,
+    ) -> Result<MaskGroup, ServiceError> {
         // For now, implement a simple update that only updates non-None fields
         // This is a simplified version - in production, you'd want to build dynamic queries
-        
+
         let result = sqlx::query_as::<_, MaskGroup>(
             "UPDATE annotation_mask_group 
              SET group_name = COALESCE($2, group_name),
@@ -97,7 +107,10 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             Ok(mask_group) => Ok(mask_group),
             Err(e) => {
                 eprintln!("Failed to update mask group {}: {}", id, e);
-                Err(ServiceError::DatabaseError(format!("Failed to update mask group: {}", e)))
+                Err(ServiceError::DatabaseError(format!(
+                    "Failed to update mask group: {}",
+                    e
+                )))
             }
         }
     }
@@ -111,14 +124,20 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
         match result {
             Ok(result) => {
                 if result.rows_affected() == 0 {
-                    Err(ServiceError::NotFound(format!("Mask group with ID {} not found", id)))
+                    Err(ServiceError::NotFound(format!(
+                        "Mask group with ID {} not found",
+                        id
+                    )))
                 } else {
                     Ok(())
                 }
             }
             Err(e) => {
                 eprintln!("Failed to delete mask group {}: {}", id, e);
-                Err(ServiceError::DatabaseError(format!("Failed to delete mask group: {}", e)))
+                Err(ServiceError::DatabaseError(format!(
+                    "Failed to delete mask group: {}",
+                    e
+                )))
             }
         }
     }
@@ -155,7 +174,10 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             Ok(mask_groups) => Ok(mask_groups),
             Err(e) => {
                 eprintln!("Failed to list mask groups: {}", e);
-                Err(ServiceError::DatabaseError(format!("Failed to list mask groups: {}", e)))
+                Err(ServiceError::DatabaseError(format!(
+                    "Failed to list mask groups: {}",
+                    e
+                )))
             }
         }
     }
@@ -190,9 +212,7 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
                 .fetch_all(&self.pool)
                 .await
         } else {
-            sqlx::query(query)
-                .fetch_all(&self.pool)
-                .await
+            sqlx::query(query).fetch_all(&self.pool).await
         };
 
         match result {
@@ -223,7 +243,10 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             }
             Err(e) => {
                 eprintln!("Failed to get mask group stats: {}", e);
-                Err(ServiceError::DatabaseError(format!("Failed to get mask group stats: {}", e)))
+                Err(ServiceError::DatabaseError(format!(
+                    "Failed to get mask group stats: {}",
+                    e
+                )))
             }
         }
     }
@@ -241,7 +264,7 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
              WHERE ($1::int IS NULL OR annotation_id = $1)
                AND ($2::int IS NULL OR created_by = $2)
                AND ($3::text IS NULL OR modality = $3)
-               AND ($4::text IS NULL OR mask_type = $4)"
+               AND ($4::text IS NULL OR mask_type = $4)",
         )
         .bind(annotation_id)
         .bind(created_by)
@@ -254,7 +277,10 @@ impl MaskGroupRepository for MaskGroupRepositoryImpl {
             Ok(count) => Ok(count),
             Err(e) => {
                 eprintln!("Failed to count mask groups: {}", e);
-                Err(ServiceError::DatabaseError(format!("Failed to count mask groups: {}", e)))
+                Err(ServiceError::DatabaseError(format!(
+                    "Failed to count mask groups: {}",
+                    e
+                )))
             }
         }
     }

@@ -1,6 +1,6 @@
 use crate::application::dto::{
-    LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, VerifyTokenResponse,
-    FindUsernameResponse, ResetPasswordResponse, mask_email,
+    mask_email, FindUsernameResponse, LoginRequest, LoginResponse, RefreshTokenRequest,
+    RefreshTokenResponse, ResetPasswordResponse, VerifyTokenResponse,
 };
 use crate::domain::services::AuthService;
 use crate::domain::ServiceError;
@@ -47,9 +47,14 @@ impl<A: AuthService> AuthUseCase<A> {
     }
 
     /// 토큰 갱신 (Keycloak 사용)
-    pub async fn refresh_token(&self, request: RefreshTokenRequest) -> Result<RefreshTokenResponse, ServiceError> {
+    pub async fn refresh_token(
+        &self,
+        request: RefreshTokenRequest,
+    ) -> Result<RefreshTokenResponse, ServiceError> {
         // Keycloak의 refresh token endpoint를 통해 토큰 갱신
-        self.auth_service.refresh_token_with_keycloak(&request.refresh_token).await
+        self.auth_service
+            .refresh_token_with_keycloak(&request.refresh_token)
+            .await
     }
 
     /// 로그아웃
@@ -60,10 +65,10 @@ impl<A: AuthService> AuthUseCase<A> {
     /// 아이디 찾기
     pub async fn find_username(&self, email: &str) -> Result<FindUsernameResponse, ServiceError> {
         let user = self.auth_service.find_username_by_email(email).await?;
-        
+
         // 이메일 마스킹
         let masked_email = mask_email(&user.email);
-        
+
         Ok(FindUsernameResponse {
             username: user.username,
             masked_email,
@@ -81,7 +86,7 @@ impl<A: AuthService> AuthUseCase<A> {
         self.auth_service
             .reset_password_by_credentials(username, email, new_password)
             .await?;
-        
+
         Ok(ResetPasswordResponse {
             message: "비밀번호가 성공적으로 재설정되었습니다.".to_string(),
         })

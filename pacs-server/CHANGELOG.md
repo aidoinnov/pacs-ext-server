@@ -60,6 +60,10 @@
 - users: GET `/api/users/me` 엔드포인트 추가 (토큰 기반 프로필 조회)
 - tests: `/api/users/me` 통합 테스트 추가(ignored), DB URL 폴백(DATABASE_URL→APP_DATABASE_URL)
 - docs: QIDO API 스펙 및 auth 작업 문서(계획/로그/기술) 추가
+ - work: Study 정규화 리팩토링 계획/설계/로그 초안 추가
+   - `docs/work/study-detach-project/plan.md`
+   - `docs/work/study-detach-project/tech.md`
+   - `docs/work/study-detach-project/log.md`
 
 ## [Previous] - 2024-10-27
 

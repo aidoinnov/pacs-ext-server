@@ -1,5 +1,6 @@
 use pacs_server::application::dto::permission_dto::{
-    RoleWithPermissionsResponse, RolesWithPermissionsListResponse, PaginationQuery, PermissionResponse
+    PaginationQuery, PermissionResponse, RoleWithPermissionsResponse,
+    RolesWithPermissionsListResponse,
 };
 use serde_json;
 
@@ -72,15 +73,13 @@ fn test_role_with_permissions_response_deserialization() {
 fn test_roles_with_permissions_list_response_serialization() {
     // Given
     let response = RolesWithPermissionsListResponse {
-        roles: vec![
-            RoleWithPermissionsResponse {
-                id: 1,
-                name: "시스템 관리자".to_string(),
-                description: Some("전체 시스템 관리 권한".to_string()),
-                scope: "GLOBAL".to_string(),
-                permissions: vec![],
-            },
-        ],
+        roles: vec![RoleWithPermissionsResponse {
+            id: 1,
+            name: "시스템 관리자".to_string(),
+            description: Some("전체 시스템 관리 권한".to_string()),
+            scope: "GLOBAL".to_string(),
+            permissions: vec![],
+        }],
         total_count: 1,
         page: 1,
         page_size: 20,

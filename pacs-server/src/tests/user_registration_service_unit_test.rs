@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use tokio;
+    use crate::domain::services::UserRegistrationService;
     use crate::domain::ServiceError;
     use crate::infrastructure::external::KeycloakClient;
     use crate::infrastructure::services::UserRegistrationServiceImpl;
-    use crate::domain::services::UserRegistrationService;
     use sqlx::PgPool;
+    use tokio;
 
     #[tokio::test]
     async fn test_signup_without_keycloak() {
@@ -30,15 +30,17 @@ mod tests {
         let service = UserRegistrationServiceImpl::new(pool, keycloak_client);
 
         // When
-        let result = service.signup(
-            "testuser".to_string(),
-            "test@example.com".to_string(),
-            "password123".to_string(),
-            Some("Test User".to_string()),
-            Some("Test Org".to_string()),
-            Some("Test Dept".to_string()),
-            Some("010-1234-5678".to_string()),
-        ).await;
+        let result = service
+            .signup(
+                "testuser".to_string(),
+                "test@example.com".to_string(),
+                "password123".to_string(),
+                Some("Test User".to_string()),
+                Some("Test Org".to_string()),
+                Some("Test Dept".to_string()),
+                Some("010-1234-5678".to_string()),
+            )
+            .await;
 
         // Then
         // 실제 Keycloak 서버가 없으므로 에러가 발생할 것으로 예상됨

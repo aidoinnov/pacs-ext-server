@@ -1,8 +1,8 @@
+use crate::application::dto::project_dto::ProjectListQuery;
+use crate::domain::entities::{NewProject, Project, UpdateProject};
+use crate::domain::repositories::ProjectRepository;
 use async_trait::async_trait;
 use sqlx::PgPool;
-use crate::domain::entities::{Project, NewProject, UpdateProject};
-use crate::domain::repositories::ProjectRepository;
-use crate::application::dto::project_dto::ProjectListQuery;
 
 #[derive(Clone)]
 pub struct ProjectRepositoryImpl {
@@ -76,7 +76,11 @@ impl ProjectRepository for ProjectRepositoryImpl {
         .await
     }
 
-    async fn update(&self, id: i32, update: &UpdateProject) -> Result<Option<Project>, sqlx::Error> {
+    async fn update(
+        &self,
+        id: i32,
+        update: &UpdateProject,
+    ) -> Result<Option<Project>, sqlx::Error> {
         let mut query = String::from("UPDATE security_project SET ");
         let mut param_count = 1;
 
@@ -162,19 +166,17 @@ impl ProjectRepository for ProjectRepositoryImpl {
         }
 
         bind_query = bind_query.bind(id);
-        
+
         let result = bind_query.fetch_optional(&self.pool).await?;
         Ok(result)
     }
 
     async fn set_active(&self, id: i32, is_active: bool) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            "UPDATE security_project SET is_active = $2 WHERE id = $1"
-        )
-        .bind(id)
-        .bind(is_active)
-        .execute(&self.pool)
-        .await?;
+        let result = sqlx::query("UPDATE security_project SET is_active = $2 WHERE id = $1")
+            .bind(id)
+            .bind(is_active)
+            .execute(&self.pool)
+            .await?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -205,7 +207,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
             "asc" => "ASC",
             _ => "DESC",
         };
-        
+
         let query = format!(
             "SELECT id, name, description, sponsor, start_date, end_date, 
                     auto_complete, is_active, status, created_at
@@ -214,14 +216,14 @@ impl ProjectRepository for ProjectRepositoryImpl {
              LIMIT $1 OFFSET $2",
             order_column, order_direction
         );
-        
+
         sqlx::query_as::<_, Project>(&query)
             .bind(page_size)
             .bind(offset)
             .fetch_all(&self.pool)
             .await
     }
-    
+
     async fn find_active_with_pagination(
         &self,
         page: i32,
@@ -239,7 +241,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
             "asc" => "ASC",
             _ => "DESC",
         };
-        
+
         let query = format!(
             "SELECT id, name, description, sponsor, start_date, end_date, 
                     auto_complete, is_active, status, created_at
@@ -249,14 +251,14 @@ impl ProjectRepository for ProjectRepositoryImpl {
              LIMIT $1 OFFSET $2",
             order_column, order_direction
         );
-        
+
         sqlx::query_as::<_, Project>(&query)
             .bind(page_size)
             .bind(offset)
             .fetch_all(&self.pool)
             .await
     }
-    
+
     async fn find_with_filter(
         &self,
         query: &ProjectListQuery,
@@ -264,7 +266,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
         let page = query.page.unwrap_or(1);
         let page_size = query.page_size.unwrap_or(20);
         let offset = (page - 1) * page_size;
-        
+
         let sort_by = query.sort_by.as_deref().unwrap_or("created_at");
         let sort_order = query.sort_order.as_deref().unwrap_or("desc");
         let order_column = match sort_by {
@@ -276,10 +278,10 @@ impl ProjectRepository for ProjectRepositoryImpl {
             "asc" => "ASC",
             _ => "DESC",
         };
-        
+
         let mut where_clauses = Vec::new();
         let mut param_count = 1;
-        
+
         if let Some(status) = &query.status {
             where_clauses.push(format!("status = ${}::project_status", param_count));
             param_count += 1;
@@ -304,13 +306,13 @@ impl ProjectRepository for ProjectRepositoryImpl {
             where_clauses.push(format!("end_date <= ${}", param_count));
             param_count += 1;
         }
-        
+
         let where_clause = if where_clauses.is_empty() {
             String::new()
         } else {
             format!("WHERE {}", where_clauses.join(" AND "))
         };
-        
+
         let sql = format!(
             "SELECT id, name, description, sponsor, start_date, end_date, 
                     auto_complete, is_active, status, created_at
@@ -318,11 +320,15 @@ impl ProjectRepository for ProjectRepositoryImpl {
              {}
              ORDER BY {} {}
              LIMIT ${} OFFSET ${}",
-            where_clause, order_column, order_direction, param_count, param_count + 1
+            where_clause,
+            order_column,
+            order_direction,
+            param_count,
+            param_count + 1
         );
-        
+
         let mut query_builder = sqlx::query_as::<_, Project>(&sql);
-        
+
         param_count = 1;
         if let Some(status) = &query.status {
             query_builder = query_builder.bind(status);
@@ -348,39 +354,33 @@ impl ProjectRepository for ProjectRepositoryImpl {
             query_builder = query_builder.bind(end_date_to);
             param_count += 1;
         }
-        
+
         query_builder
             .bind(page_size)
             .bind(offset)
             .fetch_all(&self.pool)
             .await
     }
-    
+
     async fn count_all(&self) -> Result<i64, sqlx::Error> {
-        let result: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM security_project"
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let result: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM security_project")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(result.0)
     }
-    
+
     async fn count_active(&self) -> Result<i64, sqlx::Error> {
-        let result: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM security_project WHERE is_active = true"
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let result: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM security_project WHERE is_active = true")
+                .fetch_one(&self.pool)
+                .await?;
         Ok(result.0)
     }
-    
-    async fn count_with_filter(
-        &self,
-        query: &ProjectListQuery,
-    ) -> Result<i64, sqlx::Error> {
+
+    async fn count_with_filter(&self, query: &ProjectListQuery) -> Result<i64, sqlx::Error> {
         let mut where_clauses = Vec::new();
         let mut param_count = 1;
-        
+
         if let Some(status) = &query.status {
             where_clauses.push(format!("status = ${}::project_status", param_count));
             param_count += 1;
@@ -405,15 +405,18 @@ impl ProjectRepository for ProjectRepositoryImpl {
             where_clauses.push(format!("end_date <= ${}", param_count));
             param_count += 1;
         }
-        
+
         let where_clause = if where_clauses.is_empty() {
             String::from("SELECT COUNT(*) FROM security_project")
         } else {
-            format!("SELECT COUNT(*) FROM security_project WHERE {}", where_clauses.join(" AND "))
+            format!(
+                "SELECT COUNT(*) FROM security_project WHERE {}",
+                where_clauses.join(" AND ")
+            )
         };
-        
+
         let mut query_builder = sqlx::query_as::<_, (i64,)>(&where_clause);
-        
+
         param_count = 1;
         if let Some(status) = &query.status {
             query_builder = query_builder.bind(status);
@@ -439,11 +442,11 @@ impl ProjectRepository for ProjectRepositoryImpl {
             query_builder = query_builder.bind(end_date_to);
             param_count += 1;
         }
-        
+
         let result = query_builder.fetch_one(&self.pool).await?;
         Ok(result.0)
     }
-    
+
     fn pool(&self) -> &PgPool {
         &self.pool
     }

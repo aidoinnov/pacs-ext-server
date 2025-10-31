@@ -1,5 +1,5 @@
-mod cache_headers;
 mod cache;
+mod cache_headers;
 pub use cache::{CacheMiddleware, CachePolicy};
 pub mod cors_middleware;
 

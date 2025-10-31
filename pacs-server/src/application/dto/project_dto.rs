@@ -1,6 +1,6 @@
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use chrono::{DateTime, Utc, NaiveDate};
 
 /// 프로젝트 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -32,11 +32,9 @@ where
     match DateOrString::deserialize(deserializer)? {
         DateOrString::Date(d) => Ok(Some(d)),
         DateOrString::String(s) if s.is_empty() => Ok(None),
-        DateOrString::String(s) => {
-            NaiveDate::parse_from_str(&s, "%Y-%m-%d")
-                .map(Some)
-                .map_err(serde::de::Error::custom)
-        }
+        DateOrString::String(s) => NaiveDate::parse_from_str(&s, "%Y-%m-%d")
+            .map(Some)
+            .map_err(serde::de::Error::custom),
     }
 }
 

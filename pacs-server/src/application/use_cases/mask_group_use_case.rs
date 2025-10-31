@@ -1,16 +1,16 @@
-use std::sync::Arc;
 use crate::application::dto::mask_group_dto::{
-    CreateMaskGroupRequest, UpdateMaskGroupRequest, MaskGroupResponse, 
-    MaskGroupListResponse, MaskGroupDetailResponse, SignedUrlRequest, 
-    SignedUrlResponse, CompleteUploadRequest, CompleteUploadResponse
+    CompleteUploadRequest, CompleteUploadResponse, CreateMaskGroupRequest, MaskGroupDetailResponse,
+    MaskGroupListResponse, MaskGroupResponse, SignedUrlRequest, SignedUrlResponse,
+    UpdateMaskGroupRequest,
 };
-use crate::domain::services::MaskGroupService;
-use crate::domain::ServiceError;
 use crate::application::services::SignedUrlService;
 use crate::domain::entities::{NewMaskGroup, UpdateMaskGroup};
+use crate::domain::services::MaskGroupService;
+use crate::domain::ServiceError;
+use std::sync::Arc;
 
 /// Mask Group 관리 유스케이스
-pub struct MaskGroupUseCase<MGS, SUS> 
+pub struct MaskGroupUseCase<MGS, SUS>
 where
     MGS: MaskGroupService + Send + Sync,
     SUS: SignedUrlService + Send + Sync,
@@ -33,10 +33,10 @@ where
 
     /// Mask Group 생성
     pub async fn create_mask_group(
-        &self, 
+        &self,
         annotation_id: i32,
-        request: CreateMaskGroupRequest, 
-        user_id: i32
+        request: CreateMaskGroupRequest,
+        user_id: i32,
     ) -> Result<MaskGroupResponse, ServiceError> {
         // 권한 확인
         self.mask_group_service
@@ -55,7 +55,10 @@ where
             Some(user_id),
         );
 
-        let mask_group = self.mask_group_service.create_mask_group(&new_mask_group).await?;
+        let mask_group = self
+            .mask_group_service
+            .create_mask_group(&new_mask_group)
+            .await?;
 
         Ok(MaskGroupResponse {
             id: mask_group.id,
@@ -74,17 +77,27 @@ where
     }
 
     /// Mask Group 조회
-    pub async fn get_mask_group(&self, id: i32, user_id: i32) -> Result<MaskGroupDetailResponse, ServiceError> {
+    pub async fn get_mask_group(
+        &self,
+        id: i32,
+        user_id: i32,
+    ) -> Result<MaskGroupDetailResponse, ServiceError> {
         // 권한 확인
-        self.mask_group_service.can_access_mask_group(user_id, id).await?;
+        self.mask_group_service
+            .can_access_mask_group(user_id, id)
+            .await?;
 
-        let mask_group = self.mask_group_service
+        let mask_group = self
+            .mask_group_service
             .get_mask_group_by_id(id)
             .await?
-            .ok_or_else(|| ServiceError::NotFound(format!("Mask group with ID {} not found", id)))?;
+            .ok_or_else(|| {
+                ServiceError::NotFound(format!("Mask group with ID {} not found", id))
+            })?;
 
         // 통계 정보 조회
-        let stats = self.mask_group_service
+        let stats = self
+            .mask_group_service
             .get_mask_group_stats(Some(mask_group.annotation_id))
             .await?;
 
@@ -113,18 +126,20 @@ where
         offset: Option<i64>,
         limit: Option<i64>,
     ) -> Result<MaskGroupListResponse, ServiceError> {
-        let mask_groups = self.mask_group_service
+        let mask_groups = self
+            .mask_group_service
             .list_mask_groups(
                 annotation_id,
                 Some(user_id), // 사용자별 필터링
-                None, // modality 필터
-                None, // mask_type 필터
+                None,          // modality 필터
+                None,          // mask_type 필터
                 offset,
                 limit,
             )
             .await?;
 
-        let total_count = self.mask_group_service
+        let total_count = self
+            .mask_group_service
             .count_mask_groups(annotation_id, Some(user_id), None, None)
             .await?;
 
@@ -162,10 +177,12 @@ where
         user_id: i32,
     ) -> Result<MaskGroupResponse, ServiceError> {
         // 권한 확인
-        self.mask_group_service.can_access_mask_group(user_id, id).await?;
+        self.mask_group_service
+            .can_access_mask_group(user_id, id)
+            .await?;
 
         let mut update_mask_group = UpdateMaskGroup::new(id);
-        
+
         if let Some(group_name) = request.group_name {
             update_mask_group = update_mask_group.with_group_name(group_name);
         }
@@ -187,7 +204,8 @@ where
             update_mask_group = update_mask_group.with_description(description);
         }
 
-        let mask_group = self.mask_group_service
+        let mask_group = self
+            .mask_group_service
             .update_mask_group(id, &update_mask_group)
             .await?;
 
@@ -210,7 +228,9 @@ where
     /// Mask Group 삭제
     pub async fn delete_mask_group(&self, id: i32, user_id: i32) -> Result<(), ServiceError> {
         // 권한 확인
-        self.mask_group_service.can_access_mask_group(user_id, id).await?;
+        self.mask_group_service
+            .can_access_mask_group(user_id, id)
+            .await?;
 
         self.mask_group_service.delete_mask_group(id).await?;
         Ok(())
@@ -223,15 +243,24 @@ where
         user_id: i32,
     ) -> Result<SignedUrlResponse, ServiceError> {
         // 권한 확인
-        self.mask_group_service.can_access_mask_group(user_id, request.mask_group_id).await?;
+        self.mask_group_service
+            .can_access_mask_group(user_id, request.mask_group_id)
+            .await?;
 
         // 마스크 그룹에서 annotation_id 조회
-        let mask_group = self.mask_group_service
+        let mask_group = self
+            .mask_group_service
             .get_mask_group_by_id(request.mask_group_id)
             .await?
-            .ok_or_else(|| ServiceError::NotFound(format!("Mask group with ID {} not found", request.mask_group_id)))?;
+            .ok_or_else(|| {
+                ServiceError::NotFound(format!(
+                    "Mask group with ID {} not found",
+                    request.mask_group_id
+                ))
+            })?;
 
-        let signed_url = self.signed_url_service
+        let signed_url = self
+            .signed_url_service
             .generate_mask_upload_url(
                 mask_group.annotation_id, // 실제 annotation_id 사용
                 request.mask_group_id,
@@ -259,7 +288,9 @@ where
         user_id: i32,
     ) -> Result<CompleteUploadResponse, ServiceError> {
         // 권한 확인
-        self.mask_group_service.can_access_mask_group(user_id, request.mask_group_id).await?;
+        self.mask_group_service
+            .can_access_mask_group(user_id, request.mask_group_id)
+            .await?;
 
         // 여기서는 단순히 성공 응답을 반환
         // 실제로는 업로드된 파일의 메타데이터를 검증하고 데이터베이스에 기록하는 로직이 필요

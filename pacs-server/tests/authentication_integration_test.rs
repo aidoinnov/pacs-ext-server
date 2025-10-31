@@ -1,29 +1,28 @@
 #[cfg(test)]
 mod authentication_integration_tests {
     use actix_web::{test, web, App};
+    use chrono::{Duration, Utc};
     use pacs_server::application::dto::{
-        annotation_dto::CreateAnnotationRequest,
-        mask_group_dto::CreateMaskGroupRequest,
+        annotation_dto::CreateAnnotationRequest, mask_group_dto::CreateMaskGroupRequest,
     };
     use pacs_server::application::use_cases::{AnnotationUseCase, MaskGroupUseCase, MaskUseCase};
     use pacs_server::domain::services::{
-        AnnotationServiceImpl, MaskGroupServiceImpl, MaskServiceImpl
-    };
-    use pacs_server::infrastructure::repositories::{
-        AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
-        UserRepositoryImpl, ProjectRepositoryImpl
-    };
-    use pacs_server::presentation::controllers::{
-        annotation_controller::configure_routes as configure_annotation_routes,
-        mask_group_controller::configure_routes as configure_mask_group_routes,
-        mask_controller::configure_routes as configure_mask_routes,
+        AnnotationServiceImpl, MaskGroupServiceImpl, MaskServiceImpl,
     };
     use pacs_server::infrastructure::auth::JwtService;
     use pacs_server::infrastructure::config::JwtConfig;
+    use pacs_server::infrastructure::repositories::{
+        AnnotationRepositoryImpl, MaskGroupRepositoryImpl, MaskRepositoryImpl,
+        ProjectRepositoryImpl, UserRepositoryImpl,
+    };
+    use pacs_server::presentation::controllers::{
+        annotation_controller::configure_routes as configure_annotation_routes,
+        mask_controller::configure_routes as configure_mask_routes,
+        mask_group_controller::configure_routes as configure_mask_group_routes,
+    };
     use sqlx::postgres::PgPoolOptions;
     use std::sync::Arc;
     use uuid::Uuid;
-    use chrono::{Duration, Utc};
 
     async fn setup_test_app() -> (
         impl actix_web::dev::Service<
@@ -53,9 +52,10 @@ mod authentication_integration_tests {
         let project_repo = ProjectRepositoryImpl::new(pool.clone());
 
         let pool = Arc::new(pool);
-        
+
         // Initialize services
-        let annotation_service = AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
+        let annotation_service =
+            AnnotationServiceImpl::new(annotation_repo, user_repo.clone(), project_repo.clone());
         let mask_group_service = Arc::new(MaskGroupServiceImpl::new(
             Arc::new(mask_group_repo.clone()),
             Arc::new(AnnotationRepositoryImpl::new(pool.as_ref().clone())),
@@ -66,10 +66,10 @@ mod authentication_integration_tests {
             Arc::new(mask_group_repo.clone()),
             Arc::new(user_repo.clone()),
         ));
-        
+
         // Mock SignedUrlService for testing
         let signed_url_service = Arc::new(MockSignedUrlService::new());
-        
+
         // Initialize use cases
         let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
         let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
@@ -104,8 +104,10 @@ mod authentication_integration_tests {
     }
 
     // Mock SignedUrlService for testing
-use pacs_server::application::services::signed_url_service::{SignedUrlService, SignedUrlError, SignedUrlRequest, SignedUrlResponse};
     use async_trait::async_trait;
+    use pacs_server::application::services::signed_url_service::{
+        SignedUrlError, SignedUrlRequest, SignedUrlResponse, SignedUrlService,
+    };
 
     struct MockSignedUrlService;
 
@@ -203,11 +205,11 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
 
     async fn create_test_user(pool: &Arc<sqlx::Pool<sqlx::Postgres>>) -> (i32, String) {
         use sqlx::Row;
-        
+
         let keycloak_id = Uuid::new_v4();
         let username = format!("authtestuser_{}", Uuid::new_v4());
         let email = format!("authtest_{}@example.com", Uuid::new_v4());
-        
+
         let user_result = sqlx::query(
             "INSERT INTO security_user (keycloak_id, username, email) VALUES ($1, $2, $3) RETURNING id"
         )
@@ -224,9 +226,9 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
 
     async fn create_test_project(pool: &Arc<sqlx::Pool<sqlx::Postgres>>, user_id: i32) -> i32 {
         use sqlx::Row;
-        
+
         let project_result = sqlx::query(
-            "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id"
+            "INSERT INTO security_project (name, description) VALUES ($1, $2) RETURNING id",
         )
         .bind("Auth Test Project")
         .bind("Auth Test Description")
@@ -237,50 +239,52 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
         let project_id: i32 = project_result.get("id");
 
         // Add user to project
-        sqlx::query(
-            "INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)"
-        )
-        .bind(user_id)
-        .bind(project_id)
-        .execute(pool.as_ref())
-        .await
-        .expect("Failed to add user to project");
+        sqlx::query("INSERT INTO security_user_project (user_id, project_id) VALUES ($1, $2)")
+            .bind(user_id)
+            .bind(project_id)
+            .execute(pool.as_ref())
+            .await
+            .expect("Failed to add user to project");
 
         project_id
     }
 
-    async fn cleanup_test_data(pool: &Arc<sqlx::Pool<sqlx::Postgres>>, user_id: i32, project_id: i32) {
+    async fn cleanup_test_data(
+        pool: &Arc<sqlx::Pool<sqlx::Postgres>>,
+        user_id: i32,
+        project_id: i32,
+    ) {
         // Clean up in reverse order of dependencies
         sqlx::query("DELETE FROM annotation_mask WHERE mask_group_id IN (SELECT id FROM annotation_mask_group WHERE annotation_id IN (SELECT id FROM annotation_annotation WHERE user_id = $1))")
             .bind(user_id)
             .execute(pool.as_ref())
             .await
             .ok();
-        
+
         sqlx::query("DELETE FROM annotation_mask_group WHERE annotation_id IN (SELECT id FROM annotation_annotation WHERE user_id = $1)")
             .bind(user_id)
             .execute(pool.as_ref())
             .await
             .ok();
-        
+
         sqlx::query("DELETE FROM annotation_annotation WHERE user_id = $1")
             .bind(user_id)
             .execute(pool.as_ref())
             .await
             .ok();
-        
+
         sqlx::query("DELETE FROM security_user_project WHERE user_id = $1")
             .bind(user_id)
             .execute(pool.as_ref())
             .await
             .ok();
-        
+
         sqlx::query("DELETE FROM security_user WHERE id = $1")
             .bind(user_id)
             .execute(pool.as_ref())
             .await
             .ok();
-        
+
         sqlx::query("DELETE FROM security_project WHERE id = $1")
             .bind(project_id)
             .execute(pool.as_ref())
@@ -293,7 +297,7 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
     }
 
     #[actix_web::test]
-#[ignore]
+    #[ignore]
     async fn test_jwt_token_generation_and_validation() {
         let (_, pool, jwt_service) = setup_test_app().await;
         let (user_id, username) = create_test_user(&pool).await;
@@ -337,11 +341,17 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
 
         let expired_token = expired_token_result.unwrap();
         let expired_validation_result = jwt_service.validate_token(&expired_token);
-        assert!(expired_validation_result.is_err(), "Expired token should be invalid");
+        assert!(
+            expired_validation_result.is_err(),
+            "Expired token should be invalid"
+        );
 
         // Test 4: Validate malformed token
         let malformed_validation_result = jwt_service.validate_token("invalid.jwt.token");
-        assert!(malformed_validation_result.is_err(), "Malformed token should be invalid");
+        assert!(
+            malformed_validation_result.is_err(),
+            "Malformed token should be invalid"
+        );
 
         // Test 5: Validate token with wrong secret
         let wrong_secret_config = JwtConfig {
@@ -349,9 +359,12 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
             expiration_hours: 24,
         };
         let wrong_secret_jwt_service = JwtService::new(&wrong_secret_config);
-        
+
         let wrong_secret_validation_result = wrong_secret_jwt_service.validate_token(&token);
-        assert!(wrong_secret_validation_result.is_err(), "Token with wrong secret should be invalid");
+        assert!(
+            wrong_secret_validation_result.is_err(),
+            "Token with wrong secret should be invalid"
+        );
 
         // Cleanup
         sqlx::query("DELETE FROM security_user WHERE id = $1")
@@ -362,7 +375,7 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
     }
 
     #[actix_web::test]
-#[ignore]
+    #[ignore]
     async fn test_authentication_middleware_integration() {
         let (app, pool, jwt_service) = setup_test_app().await;
         let (user_id, username) = create_test_user(&pool).await;
@@ -419,7 +432,7 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
     }
 
     #[actix_web::test]
-#[ignore]
+    #[ignore]
     async fn test_user_authorization_scenarios() {
         let (app, pool, jwt_service) = setup_test_app().await;
         let (user_id, username) = create_test_user(&pool).await;
@@ -506,7 +519,7 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
     }
 
     #[actix_web::test]
-#[ignore]
+    #[ignore]
     async fn test_token_expiration_handling() {
         let (app, pool, jwt_service) = setup_test_app().await;
         let (user_id, username) = create_test_user(&pool).await;
@@ -532,7 +545,10 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
 
         // Token should now be invalid
         let expired_validation_result = jwt_service.validate_token(&token);
-        assert!(expired_validation_result.is_err(), "Expired token should be invalid");
+        assert!(
+            expired_validation_result.is_err(),
+            "Expired token should be invalid"
+        );
 
         // Test 2: Create token with very short expiration
         let short_claims = pacs_server::infrastructure::auth::Claims {
@@ -550,7 +566,10 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
         tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
         let short_expired_result = jwt_service.validate_token(&short_token);
-        assert!(short_expired_result.is_err(), "Short-lived expired token should be invalid");
+        assert!(
+            short_expired_result.is_err(),
+            "Short-lived expired token should be invalid"
+        );
 
         // Cleanup
         sqlx::query("DELETE FROM security_user WHERE id = $1")
@@ -561,7 +580,7 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
     }
 
     #[actix_web::test]
-#[ignore]
+    #[ignore]
     async fn test_multiple_user_authentication() {
         let (app, pool, jwt_service) = setup_test_app().await;
 
@@ -633,7 +652,7 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
     }
 
     #[actix_web::test]
-#[ignore]
+    #[ignore]
     async fn test_token_refresh_scenario() {
         let (_, pool, jwt_service) = setup_test_app().await;
         let (user_id, username) = create_test_user(&pool).await;
@@ -684,7 +703,7 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
     }
 
     #[actix_web::test]
-#[ignore]
+    #[ignore]
     async fn test_malformed_token_handling() {
         let (_, pool, jwt_service) = setup_test_app().await;
 
@@ -701,8 +720,11 @@ use pacs_server::application::services::signed_url_service::{SignedUrlService, S
 
         for malformed_token in malformed_tokens {
             let validation_result = jwt_service.validate_token(malformed_token);
-            assert!(validation_result.is_err(), 
-                "Malformed token '{}' should be invalid", malformed_token);
+            assert!(
+                validation_result.is_err(),
+                "Malformed token '{}' should be invalid",
+                malformed_token
+            );
         }
     }
 }

@@ -44,7 +44,9 @@ impl<A: AuthService> AuthController<A> {
     }
 
     pub async fn signup(
-        user_registration_use_case: web::Data<Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>>,
+        user_registration_use_case: web::Data<
+            Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+        >,
         req: web::Json<SignupRequest>,
     ) -> impl Responder {
         match user_registration_use_case.signup(req.into_inner()).await {
@@ -56,7 +58,9 @@ impl<A: AuthService> AuthController<A> {
     }
 
     pub async fn verify_email(
-        user_registration_use_case: web::Data<Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>>,
+        user_registration_use_case: web::Data<
+            Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+        >,
         req: web::Json<VerifyEmailRequest>,
     ) -> impl Responder {
         let user_id = req.user_id;
@@ -69,12 +73,17 @@ impl<A: AuthService> AuthController<A> {
     }
 
     pub async fn approve_user(
-        user_registration_use_case: web::Data<Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>>,
+        user_registration_use_case: web::Data<
+            Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+        >,
         req: web::Json<ApproveUserRequest>,
     ) -> impl Responder {
         let user_id = req.user_id;
         let admin_id = 1; // TODO: 실제 관리자 ID로 교체 필요
-        match user_registration_use_case.approve_user(user_id, admin_id).await {
+        match user_registration_use_case
+            .approve_user(user_id, admin_id)
+            .await
+        {
             Ok(response) => HttpResponse::Ok().json(response),
             Err(e) => HttpResponse::BadRequest().json(json!({
                 "error": format!("User approval failed: {}", e)
@@ -83,11 +92,16 @@ impl<A: AuthService> AuthController<A> {
     }
 
     pub async fn delete_account(
-        user_registration_use_case: web::Data<Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>>,
+        user_registration_use_case: web::Data<
+            Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+        >,
         path: web::Path<i32>,
     ) -> impl Responder {
         let user_id = path.into_inner();
-        match user_registration_use_case.delete_account(user_id, None).await {
+        match user_registration_use_case
+            .delete_account(user_id, None)
+            .await
+        {
             Ok(response) => HttpResponse::Ok().json(response),
             Err(e) => HttpResponse::BadRequest().json(json!({
                 "error": format!("Account deletion failed: {}", e)
@@ -133,7 +147,6 @@ impl<A: AuthService> AuthController<A> {
             })),
         }
     }
-
 }
 
 pub fn configure_routes<A: AuthService + 'static>(
@@ -150,13 +163,31 @@ pub fn configure_routes<A: AuthService + 'static>(
                     "/verify/{token}",
                     web::get().to(AuthController::<A>::verify_token),
                 )
-                .route("/refresh", web::post().to(AuthController::<A>::refresh_token))
+                .route(
+                    "/refresh",
+                    web::post().to(AuthController::<A>::refresh_token),
+                )
                 .route("/signup", web::post().to(AuthController::<A>::signup))
-                .route("/verify-email", web::post().to(AuthController::<A>::verify_email))
-                .route("/find-username", web::post().to(AuthController::<A>::find_username))
-                .route("/reset-password", web::post().to(AuthController::<A>::reset_password))
-                .route("/admin/users/approve", web::post().to(AuthController::<A>::approve_user)),
+                .route(
+                    "/verify-email",
+                    web::post().to(AuthController::<A>::verify_email),
+                )
+                .route(
+                    "/find-username",
+                    web::post().to(AuthController::<A>::find_username),
+                )
+                .route(
+                    "/reset-password",
+                    web::post().to(AuthController::<A>::reset_password),
+                )
+                .route(
+                    "/admin/users/approve",
+                    web::post().to(AuthController::<A>::approve_user),
+                ),
         )
         // Add user registration routes separately
-        .route("/users/{user_id}", web::delete().to(AuthController::<A>::delete_account));
+        .route(
+            "/users/{user_id}",
+            web::delete().to(AuthController::<A>::delete_account),
+        );
 }

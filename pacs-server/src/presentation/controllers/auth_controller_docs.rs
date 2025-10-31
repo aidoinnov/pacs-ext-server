@@ -2,7 +2,9 @@
 use actix_web::{web, Responder};
 use std::sync::Arc;
 
-use crate::application::dto::auth_dto::{LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, VerifyTokenResponse};
+use crate::application::dto::auth_dto::{
+    LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse, VerifyTokenResponse,
+};
 use crate::application::use_cases::auth_use_case::AuthUseCase;
 use crate::domain::services::AuthServiceImpl;
 use crate::infrastructure::repositories::UserRepositoryImpl;

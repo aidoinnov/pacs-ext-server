@@ -33,10 +33,13 @@ mod tests {
         }"#;
 
         let role_info: RoleInfo = serde_json::from_str(json).unwrap();
-        
+
         assert_eq!(role_info.id, 1);
         assert_eq!(role_info.name, "Admin");
-        assert_eq!(role_info.description, Some("Administrator role".to_string()));
+        assert_eq!(
+            role_info.description,
+            Some("Administrator role".to_string())
+        );
         assert_eq!(role_info.scope, "GLOBAL");
     }
 
@@ -81,7 +84,7 @@ mod tests {
         }"#;
 
         let permission_info: PermissionInfo = serde_json::from_str(json).unwrap();
-        
+
         assert_eq!(permission_info.id, 1);
         assert_eq!(permission_info.category, "사용자 및 권한 관리");
         assert_eq!(permission_info.resource_type, "USER");
@@ -111,7 +114,7 @@ mod tests {
         }"#;
 
         let assignment: RolePermissionAssignment = serde_json::from_str(json).unwrap();
-        
+
         assert_eq!(assignment.role_id, 1);
         assert_eq!(assignment.permission_id, 2);
         assert_eq!(assignment.assigned, true);
@@ -119,9 +122,7 @@ mod tests {
 
     #[test]
     fn test_assign_permission_request_serialization() {
-        let request = AssignPermissionRequest {
-            assign: true,
-        };
+        let request = AssignPermissionRequest { assign: true };
 
         let json = serde_json::to_string(&request).unwrap();
         let deserialized: AssignPermissionRequest = serde_json::from_str(&json).unwrap();
@@ -136,7 +137,7 @@ mod tests {
         }"#;
 
         let request: AssignPermissionRequest = serde_json::from_str(json).unwrap();
-        
+
         assert_eq!(request.assign, false);
     }
 
@@ -161,7 +162,7 @@ mod tests {
         }"#;
 
         let response: AssignPermissionResponse = serde_json::from_str(json).unwrap();
-        
+
         assert_eq!(response.success, false);
         assert_eq!(response.message, "Permission not found");
     }
@@ -184,28 +185,32 @@ mod tests {
         ];
 
         let mut permissions_by_category = HashMap::new();
-        permissions_by_category.insert("사용자 및 권한 관리".to_string(), vec![
-            PermissionInfo {
-                id: 1,
-                category: "사용자 및 권한 관리".to_string(),
-                resource_type: "USER".to_string(),
-                action: "READ".to_string(),
-            },
-            PermissionInfo {
-                id: 2,
-                category: "사용자 및 권한 관리".to_string(),
-                resource_type: "USER".to_string(),
-                action: "WRITE".to_string(),
-            },
-        ]);
-        permissions_by_category.insert("프로젝트 관리".to_string(), vec![
-            PermissionInfo {
+        permissions_by_category.insert(
+            "사용자 및 권한 관리".to_string(),
+            vec![
+                PermissionInfo {
+                    id: 1,
+                    category: "사용자 및 권한 관리".to_string(),
+                    resource_type: "USER".to_string(),
+                    action: "READ".to_string(),
+                },
+                PermissionInfo {
+                    id: 2,
+                    category: "사용자 및 권한 관리".to_string(),
+                    resource_type: "USER".to_string(),
+                    action: "WRITE".to_string(),
+                },
+            ],
+        );
+        permissions_by_category.insert(
+            "프로젝트 관리".to_string(),
+            vec![PermissionInfo {
                 id: 3,
                 category: "프로젝트 관리".to_string(),
                 resource_type: "PROJECT".to_string(),
                 action: "READ".to_string(),
-            },
-        ]);
+            }],
+        );
 
         let assignments = vec![
             RolePermissionAssignment {
@@ -250,7 +255,10 @@ mod tests {
         let deserialized: RolePermissionMatrixResponse = serde_json::from_str(&json).unwrap();
 
         assert_eq!(matrix.roles.len(), deserialized.roles.len());
-        assert_eq!(matrix.permissions_by_category.len(), deserialized.permissions_by_category.len());
+        assert_eq!(
+            matrix.permissions_by_category.len(),
+            deserialized.permissions_by_category.len()
+        );
         assert_eq!(matrix.assignments.len(), deserialized.assignments.len());
     }
 

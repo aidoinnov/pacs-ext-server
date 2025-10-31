@@ -125,10 +125,12 @@ async fn health_check() -> impl Responder {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // 서버 초기화 시작 메시지 출력
+    
     println!("\n{}", "=".repeat(80));
     println!("🚀 PACS Extension Server - Initialization");
     println!("{}\n", "=".repeat(80));
-
+    // 로깅 초기화
+    env_logger::init();
     // .env 파일에서 환경 변수 로드
     dotenvy::dotenv().ok();
 
@@ -498,6 +500,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(Arc::new(JwtService::new(&settings.jwt))))
             .app_data(web::Data::new(Arc::new(
                 infrastructure::repositories::AccessConditionRepositoryImpl { pool: pool.clone() },
+            )))
+            // Shared repos needed by lightweight handlers like /api/users/me
+            .app_data(web::Data::new(Arc::new(
+                infrastructure::repositories::UserRepositoryImpl::new(pool.clone()),
             )))
             // Swagger UI (commented out for now)
             .service(

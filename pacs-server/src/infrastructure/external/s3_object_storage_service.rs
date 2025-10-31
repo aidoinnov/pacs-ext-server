@@ -1,9 +1,11 @@
+use crate::application::services::object_storage_service::{
+    ObjectStorageError, ObjectStorageService, SignedUrlOptions, UploadedFile,
+};
 use async_trait::async_trait;
-use aws_sdk_s3::Client as S3Client;
 use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::Client as S3Client;
 use std::time::Duration;
-use crate::application::services::object_storage_service::{ObjectStorageService, ObjectStorageError, UploadedFile, SignedUrlOptions};
 
 /// AWS S3를 사용한 객체 스토리지 서비스 구현
 pub struct S3ObjectStorageService {
@@ -55,8 +57,9 @@ impl ObjectStorageService for S3ObjectStorageService {
         options: SignedUrlOptions,
     ) -> Result<String, ObjectStorageError> {
         let object_key = self.generate_object_key(file_path);
-        
-        let mut put_request = self.client
+
+        let mut put_request = self
+            .client
             .put_object()
             .bucket(&self.bucket_name)
             .key(&object_key);
@@ -66,8 +69,10 @@ impl ObjectStorageService for S3ObjectStorageService {
         }
 
         let presigned = put_request
-            .presigned(PresigningConfig::expires_in(Duration::from_secs(options.ttl_seconds))
-                .map_err(|e| ObjectStorageError::S3Error(e.to_string()))?)
+            .presigned(
+                PresigningConfig::expires_in(Duration::from_secs(options.ttl_seconds))
+                    .map_err(|e| ObjectStorageError::S3Error(e.to_string()))?,
+            )
             .await
             .map_err(|e| ObjectStorageError::S3Error(e.to_string()))?;
 
@@ -80,13 +85,16 @@ impl ObjectStorageService for S3ObjectStorageService {
         ttl_seconds: u64,
     ) -> Result<String, ObjectStorageError> {
         let object_key = self.generate_object_key(file_path);
-        
-        let presigned = self.client
+
+        let presigned = self
+            .client
             .get_object()
             .bucket(&self.bucket_name)
             .key(&object_key)
-            .presigned(PresigningConfig::expires_in(Duration::from_secs(ttl_seconds))
-                .map_err(|e| ObjectStorageError::S3Error(e.to_string()))?)
+            .presigned(
+                PresigningConfig::expires_in(Duration::from_secs(ttl_seconds))
+                    .map_err(|e| ObjectStorageError::S3Error(e.to_string()))?,
+            )
             .await
             .map_err(|e| ObjectStorageError::S3Error(e.to_string()))?;
 
@@ -95,7 +103,7 @@ impl ObjectStorageService for S3ObjectStorageService {
 
     async fn delete_file(&self, file_path: &str) -> Result<(), ObjectStorageError> {
         let object_key = self.generate_object_key(file_path);
-        
+
         self.client
             .delete_object()
             .bucket(&self.bucket_name)
@@ -109,8 +117,9 @@ impl ObjectStorageService for S3ObjectStorageService {
 
     async fn file_exists(&self, file_path: &str) -> Result<bool, ObjectStorageError> {
         let object_key = self.generate_object_key(file_path);
-        
-        match self.client
+
+        match self
+            .client
             .head_object()
             .bucket(&self.bucket_name)
             .key(&object_key)
@@ -130,8 +139,9 @@ impl ObjectStorageService for S3ObjectStorageService {
 
     async fn get_file_metadata(&self, file_path: &str) -> Result<UploadedFile, ObjectStorageError> {
         let object_key = self.generate_object_key(file_path);
-        
-        let result = self.client
+
+        let result = self
+            .client
             .head_object()
             .bucket(&self.bucket_name)
             .key(&object_key)
@@ -144,8 +154,7 @@ impl ObjectStorageService for S3ObjectStorageService {
             file_size: result.content_length().unwrap_or(0),
             checksum: result.e_tag().map(|s| s.to_string()),
             mime_type: result.content_type().map(|s| s.to_string()),
-            last_modified: result.last_modified()
-                .map(|dt| dt.to_string()),
+            last_modified: result.last_modified().map(|dt| dt.to_string()),
         })
     }
 
@@ -154,7 +163,8 @@ impl ObjectStorageService for S3ObjectStorageService {
         prefix: &str,
         max_keys: Option<i32>,
     ) -> Result<Vec<String>, ObjectStorageError> {
-        let mut list_request = self.client
+        let mut list_request = self
+            .client
             .list_objects_v2()
             .bucket(&self.bucket_name)
             .prefix(prefix);
@@ -169,13 +179,11 @@ impl ObjectStorageService for S3ObjectStorageService {
             .map_err(|e| ObjectStorageError::S3Error(e.to_string()))?;
 
         let mut files = Vec::new();
-        
+
         if let Some(contents) = result.contents {
             for object in contents {
                 if let Some(key) = object.key {
-                    let file_path = key.strip_prefix("pacs-masks/")
-                        .unwrap_or(&key)
-                        .to_string();
+                    let file_path = key.strip_prefix("pacs-masks/").unwrap_or(&key).to_string();
                     files.push(file_path);
                 }
             }
@@ -191,7 +199,7 @@ impl ObjectStorageService for S3ObjectStorageService {
     ) -> Result<(), ObjectStorageError> {
         let source_key = self.generate_object_key(source_path);
         let destination_key = self.generate_object_key(destination_path);
-        
+
         self.client
             .copy_object()
             .bucket(&self.bucket_name)

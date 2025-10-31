@@ -1,8 +1,8 @@
-use async_trait::async_trait;
-use sqlx::PgPool;
-use crate::domain::entities::mask::{Mask, NewMask, UpdateMask, MaskStats};
+use crate::domain::entities::mask::{Mask, MaskStats, NewMask, UpdateMask};
 use crate::domain::repositories::MaskRepository;
 use crate::domain::ServiceError;
+use async_trait::async_trait;
+use sqlx::PgPool;
 
 /// MaskRepository의 PostgreSQL 구현체
 #[derive(Debug, Clone)]
@@ -148,13 +148,10 @@ impl MaskRepository for MaskRepositoryImpl {
 
     /// 마스크 삭제
     async fn delete(&self, id: i32) -> Result<(), ServiceError> {
-        sqlx::query!(
-            "DELETE FROM annotation_mask WHERE id = $1",
-            id
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| ServiceError::DatabaseError(format!("Failed to delete mask: {}", e)))?;
+        sqlx::query!("DELETE FROM annotation_mask WHERE id = $1", id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(format!("Failed to delete mask: {}", e)))?;
 
         Ok(())
     }
@@ -193,21 +190,24 @@ impl MaskRepository for MaskRepositoryImpl {
         .await
         .map_err(|e| ServiceError::DatabaseError(format!("Failed to list masks: {}", e)))?;
 
-        Ok(results.into_iter().map(|row| Mask {
-            id: row.id,
-            mask_group_id: row.mask_group_id,
-            slice_index: row.slice_index,
-            sop_instance_uid: row.sop_instance_uid,
-            label_name: row.label_name,
-            file_path: row.file_path,
-            mime_type: row.mime_type,
-            file_size: row.file_size,
-            checksum: row.checksum,
-            width: row.width,
-            height: row.height,
-            created_at: row.created_at,
-            updated_at: Some(row.updated_at),
-        }).collect())
+        Ok(results
+            .into_iter()
+            .map(|row| Mask {
+                id: row.id,
+                mask_group_id: row.mask_group_id,
+                slice_index: row.slice_index,
+                sop_instance_uid: row.sop_instance_uid,
+                label_name: row.label_name,
+                file_path: row.file_path,
+                mime_type: row.mime_type,
+                file_size: row.file_size,
+                checksum: row.checksum,
+                width: row.width,
+                height: row.height,
+                created_at: row.created_at,
+                updated_at: Some(row.updated_at),
+            })
+            .collect())
     }
 
     /// 마스크 통계 조회
@@ -228,7 +228,9 @@ impl MaskRepository for MaskRepositoryImpl {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(format!("Failed to get basic mask stats: {}", e)))?;
+        .map_err(|e| {
+            ServiceError::DatabaseError(format!("Failed to get basic mask stats: {}", e))
+        })?;
 
         // MIME 타입 분포 조회
         let mime_types = sqlx::query!(
@@ -243,7 +245,9 @@ impl MaskRepository for MaskRepositoryImpl {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(format!("Failed to get mime type stats: {}", e)))?;
+        .map_err(|e| {
+            ServiceError::DatabaseError(format!("Failed to get mime type stats: {}", e))
+        })?;
 
         // 라벨 이름 분포 조회
         let label_names = sqlx::query!(
@@ -258,7 +262,9 @@ impl MaskRepository for MaskRepositoryImpl {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(format!("Failed to get label name stats: {}", e)))?;
+        .map_err(|e| {
+            ServiceError::DatabaseError(format!("Failed to get label name stats: {}", e))
+        })?;
 
         // HashMap으로 변환
         let mut mime_types_map = std::collections::HashMap::new();
@@ -277,12 +283,32 @@ impl MaskRepository for MaskRepositoryImpl {
 
         Ok(MaskStats {
             total_masks: basic_stats.total_masks.unwrap_or(0),
-            total_size_bytes: basic_stats.total_size_bytes.unwrap_or_default().to_string().parse::<i64>().unwrap_or(0),
+            total_size_bytes: basic_stats
+                .total_size_bytes
+                .unwrap_or_default()
+                .to_string()
+                .parse::<i64>()
+                .unwrap_or(0),
             mime_types: mime_types_map,
             label_names: label_names_map,
-            average_file_size: basic_stats.average_file_size.unwrap_or_default().to_string().parse::<f64>().unwrap_or(0.0),
-            largest_file_size: basic_stats.largest_file_size.unwrap_or_default().to_string().parse::<i64>().unwrap_or(0),
-            smallest_file_size: basic_stats.smallest_file_size.unwrap_or_default().to_string().parse::<i64>().unwrap_or(0),
+            average_file_size: basic_stats
+                .average_file_size
+                .unwrap_or_default()
+                .to_string()
+                .parse::<f64>()
+                .unwrap_or(0.0),
+            largest_file_size: basic_stats
+                .largest_file_size
+                .unwrap_or_default()
+                .to_string()
+                .parse::<i64>()
+                .unwrap_or(0),
+            smallest_file_size: basic_stats
+                .smallest_file_size
+                .unwrap_or_default()
+                .to_string()
+                .parse::<i64>()
+                .unwrap_or(0),
         })
     }
 

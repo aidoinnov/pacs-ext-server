@@ -1,8 +1,8 @@
 use actix_web::{web, HttpResponse, Result};
 use std::sync::Arc;
 
-use crate::application::use_cases::RolePermissionMatrixUseCase;
 use crate::application::dto::role_permission_matrix_dto::*;
+use crate::application::use_cases::RolePermissionMatrixUseCase;
 use crate::domain::ServiceError;
 
 /// ServiceError를 HttpResponse로 변환하는 헬퍼 함수
@@ -24,10 +24,12 @@ fn handle_service_error(error: ServiceError) -> HttpResponse {
             "error": "Already Exists",
             "message": msg
         })),
-        ServiceError::DatabaseError(msg) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": "Database Error",
-            "message": msg
-        })),
+        ServiceError::DatabaseError(msg) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Database Error",
+                "message": msg
+            }))
+        }
         _ => HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Internal Server Error",
             "message": "An unexpected error occurred"
@@ -103,7 +105,10 @@ pub async fn update_global_permission_assignment(
     let (role_id, permission_id) = path.into_inner();
     let assign = request.into_inner().assign;
 
-    match use_case.update_permission_assignment(role_id, permission_id, assign).await {
+    match use_case
+        .update_permission_assignment(role_id, permission_id, assign)
+        .await
+    {
         Ok(_) => {
             let response = AssignPermissionResponse {
                 success: true,
@@ -114,7 +119,7 @@ pub async fn update_global_permission_assignment(
                 },
             };
             Ok(HttpResponse::Ok().json(response))
-        },
+        }
         Err(e) => Ok(handle_service_error(e)),
     }
 }
@@ -146,7 +151,10 @@ pub async fn update_project_permission_assignment(
 
     // 프로젝트별 역할인지 확인 (추가 검증이 필요한 경우)
     // 현재는 단순히 권한 할당/제거만 수행
-    match use_case.update_permission_assignment(role_id, permission_id, assign).await {
+    match use_case
+        .update_permission_assignment(role_id, permission_id, assign)
+        .await
+    {
         Ok(_) => {
             let response = AssignPermissionResponse {
                 success: true,
@@ -157,7 +165,7 @@ pub async fn update_project_permission_assignment(
                 },
             };
             Ok(HttpResponse::Ok().json(response))
-        },
+        }
         Err(e) => Ok(handle_service_error(e)),
     }
 }
@@ -165,22 +173,21 @@ pub async fn update_project_permission_assignment(
 /// 라우트 설정
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<RolePermissionMatrixUseCase>) {
     let use_case = web::Data::new(use_case);
-    
+
     cfg.service(
-        web::resource("/roles/global/permissions/matrix")
-            .route(web::get().to(get_global_matrix))
+        web::resource("/roles/global/permissions/matrix").route(web::get().to(get_global_matrix)),
     )
     .service(
         web::resource("/projects/{project_id}/roles/permissions/matrix")
-            .route(web::get().to(get_project_matrix))
+            .route(web::get().to(get_project_matrix)),
     )
     .service(
         web::resource("/roles/{role_id}/permissions/{permission_id}")
-            .route(web::put().to(update_global_permission_assignment))
+            .route(web::put().to(update_global_permission_assignment)),
     )
     .service(
         web::resource("/projects/{project_id}/roles/{role_id}/permissions/{permission_id}")
-            .route(web::put().to(update_project_permission_assignment))
+            .route(web::put().to(update_project_permission_assignment)),
     )
     .app_data(use_case);
 }

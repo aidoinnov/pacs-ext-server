@@ -49,5 +49,3 @@ pub struct NewProjectDataInstitution {
     pub phone: Option<String>,
     pub email: Option<String>,
 }
-
-

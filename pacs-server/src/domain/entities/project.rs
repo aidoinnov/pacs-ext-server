@@ -1,20 +1,20 @@
 //! # 프로젝트 엔티티 모듈
-//! 
+//!
 //! 이 모듈은 시스템의 프로젝트 정보를 나타내는 엔티티들을 정의합니다.
 //! 프로젝트는 사용자들이 협업할 수 있는 작업 단위를 의미하며,
 //! 어노테이션과 마스크는 특정 프로젝트에 속하게 됩니다.
 
 // 날짜/시간 처리를 위한 chrono 라이브러리
-use chrono::{DateTime, Utc, NaiveDate};
+use chrono::{DateTime, NaiveDate, Utc};
 // JSON 직렬화/역직렬화를 위한 serde 라이브러리
 use serde::{Deserialize, Serialize};
 // SQLx를 통한 데이터베이스 행 매핑을 위한 트레이트
 use sqlx::{FromRow, Type};
 
 /// 프로젝트 상태를 나타내는 열거형
-/// 
+///
 /// 프로젝트의 생명주기 상태를 나타내며, 데이터베이스의 `project_status` ENUM과 매핑됩니다.
-/// 
+///
 /// # Variants
 /// - `Planning`: 기획중 - 프로젝트가 기획 단계
 /// - `Active`: 진행중 - 프로젝트가 활발히 진행 중
@@ -41,10 +41,10 @@ pub enum ProjectStatus {
 }
 
 /// 시스템 프로젝트를 나타내는 엔티티
-/// 
+///
 /// 이 구조체는 데이터베이스의 `security_project` 테이블과 매핑되며,
 /// 사용자들이 협업할 수 있는 작업 단위를 나타냅니다.
-/// 
+///
 /// # 필드
 /// - `id`: 데이터베이스에서 자동 생성되는 고유 식별자
 /// - `name`: 프로젝트의 고유한 이름
@@ -81,10 +81,10 @@ pub struct Project {
 }
 
 /// 새로운 프로젝트 생성을 위한 DTO(Data Transfer Object)
-/// 
+///
 /// 이 구조체는 프로젝트 생성 요청 시 전달되는 데이터를 나타냅니다.
 /// 데이터베이스에 저장되기 전의 프로젝트 정보를 담고 있습니다.
-/// 
+///
 /// # 필드
 /// - `name`: 생성할 프로젝트명 (중복되지 않아야 함)
 /// - `description`: 프로젝트에 대한 상세 설명 (선택사항)
@@ -92,7 +92,7 @@ pub struct Project {
 /// - `start_date`: 프로젝트 시작일
 /// - `end_date`: 프로젝트 종료일/목표일 (선택사항)
 /// - `auto_complete`: 자동 완료 여부
-/// 
+///
 /// # 예시
 /// ```ignore
 /// let new_project = NewProject {
@@ -121,10 +121,10 @@ pub struct NewProject {
 }
 
 /// 프로젝트 업데이트를 위한 DTO(Data Transfer Object)
-/// 
+///
 /// 이 구조체는 프로젝트 업데이트 요청 시 전달되는 데이터를 나타냅니다.
 /// 모든 필드는 선택사항이며, 제공된 필드만 업데이트됩니다.
-/// 
+///
 /// # 필드
 /// - `name`: 프로젝트명
 /// - `description`: 프로젝트에 대한 상세 설명
@@ -134,7 +134,7 @@ pub struct NewProject {
 /// - `status`: 프로젝트 상태
 /// - `auto_complete`: 자동 완료 여부
 /// - `is_active`: 프로젝트 활성화 상태
-/// 
+///
 /// # 예시
 /// ```ignore
 /// let update_project = UpdateProject {
