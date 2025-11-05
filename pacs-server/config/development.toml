@@ -38,11 +38,11 @@ default_ttl = 600   # 10 minutes
 max_ttl = 3600      # 1 hour
 
 [dcm4chee]
-base_url = "http://localhost:8080"
-qido_path = "/dcm4chee-arc/aets/DCM4CHEE/rs"
-wado_path = "/dcm4chee-arc/aets/DCM4CHEE/wado"
-aet = "DCM4CHEE"
-timeout_ms = 5000
+base_url = "https://archive.pacs.ai-do.kr"
+qido_path = "/iaid-pacs/aets/iAID_PACS/rs"
+wado_path = "/iaid-pacs/aets/iAID_PACS/wado"
+aet = "iAID_PACS"
+timeout_ms = 30000
 
 [dcm4chee.db]
 host = "localhost"

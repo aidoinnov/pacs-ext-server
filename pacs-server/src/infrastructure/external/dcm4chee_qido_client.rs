@@ -128,12 +128,19 @@ impl Dcm4cheeQidoClient {
         bearer_token: Option<&str>,
         params: Vec<(String, String)>,
     ) -> Result<Value, ServiceError> {
+        tracing::debug!("QIDO /studies: base_url={}, qido_path={}", self.base_url, self.qido_path);
+
         let studies_path = if self.qido_path.ends_with("/rs") {
             format!("{}/studies", self.qido_path)
         } else {
             format!("{}/rs/studies", self.qido_path)
         };
+
+        tracing::debug!("QIDO /studies: studies_path={}", studies_path);
+
         let url = self.build_url(&studies_path, &[])?;
+
+        tracing::debug!("QIDO /studies: Final URL (before params)={}", url);
         let mut req = self
             .http_client
             .get(url.clone())
@@ -163,15 +170,22 @@ impl Dcm4cheeQidoClient {
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
+            tracing::debug!("QIDO /studies: Query parameters: {:?}", qp);
             req = req.query(&qp);
+        } else {
+            tracing::debug!("QIDO /studies: No query parameters");
         }
 
+        tracing::debug!("QIDO /studies: Sending request...");
         let resp = req.send().await.map_err(|e| {
+            tracing::error!("QIDO /studies: Request failed: {}", e);
             ServiceError::ExternalServiceError(format!("QIDO /studies failed: {}", e))
         })?;
         let status = resp.status();
+        tracing::debug!("QIDO /studies: Response status: {}", status);
         let body = resp.text().await.unwrap_or_default();
         if !status.is_success() {
+            tracing::error!("QIDO /studies: Non-success status: {} - Body: {}", status, &body[..std::cmp::min(500, body.len())]);
             return Err(ServiceError::ExternalServiceError(format!(
                 "QIDO /studies failed ({}): {}",
                 status, body

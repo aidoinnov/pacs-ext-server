@@ -399,10 +399,10 @@ impl Settings {
                     .unwrap_or_else(|_| "http://localhost:8080".to_string()),
                 qido_path: env::var("APP_DCM4CHEE__QIDO_PATH")
                     .or_else(|_| env::var("DCM4CHEE_QIDO_PATH"))
-                    .unwrap_or_else(|_| "/dcm4chee-arc/aets/DCM4CHEE/rs".to_string()),
+                    .unwrap_or_else(|_| "/iaid-pacs/aets/iAID_PACS/rs".to_string()),
                 wado_path: env::var("APP_DCM4CHEE__WADO_PATH")
                     .or_else(|_| env::var("DCM4CHEE_WADO_PATH"))
-                    .unwrap_or_else(|_| "/dcm4chee-arc/aets/DCM4CHEE/wado".to_string()),
+                    .unwrap_or_else(|_| "/iaid-pacs/aets/iAID_PACS/wado".to_string()),
                 aet: env::var("APP_DCM4CHEE__AET")
                     .or_else(|_| env::var("DCM4CHEE_AET"))
                     .unwrap_or_else(|_| "DCM4CHEE".to_string()),
@@ -560,8 +560,8 @@ mod tests {
             },
             dcm4chee: Dcm4cheeConfig {
                 base_url: "http://localhost:8080".to_string(),
-                qido_path: "/dcm4chee-arc/aets/DCM4CHEE/rs".to_string(),
-                wado_path: "/dcm4chee-arc/aets/DCM4CHEE/wado".to_string(),
+                qido_path: "/iaid-pacs/aets/iAID_PACS/rs".to_string(),
+                wado_path: "/iaid-pacs/aets/iAID_PACS/wado".to_string(),
                 aet: "DCM4CHEE".to_string(),
                 username: Some("admin".to_string()),
                 password: Some("adminPassword123!".to_string()),
@@ -640,9 +640,9 @@ mod tests {
             },
             dcm4chee: Dcm4cheeConfig {
                 base_url: "http://localhost:8080".to_string(),
-                qido_path: "/dcm4chee-arc/aets/DCM4CHEE/rs".to_string(),
-                wado_path: "/dcm4chee-arc/aets/DCM4CHEE/wado".to_string(),
-                aet: "DCM4CHEE".to_string(),
+                qido_path: "/iaid-pacs/aets/iAID_PACS/rs".to_string(),
+                wado_path: "/iaid-pacs/aets/iAID_PACS/wado".to_string(),
+                aet: "iAID_PACS".to_string(),
                 username: Some("admin".to_string()),
                 password: Some("adminPassword123!".to_string()),
                 timeout_ms: 5000,

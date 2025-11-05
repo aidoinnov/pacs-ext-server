@@ -138,11 +138,19 @@ pub async fn get_studies(
             return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
         }
     };
+
+    tracing::debug!("Gateway: User params: {:?}", user_params);
+
     let qido_params =
         if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
+            tracing::debug!("Gateway: Found {} access conditions for project {}", conditions.len(), project_id);
             let rule_params = build_qido_params_from_conditions(&conditions);
-            merge_qido_params(rule_params, user_params) // 사용자 입력이 우선
+            tracing::debug!("Gateway: Rule params from conditions: {:?}", rule_params);
+            let merged = merge_qido_params(rule_params, user_params); // 사용자 입력이 우선
+            tracing::debug!("Gateway: Merged QIDO params: {:?}", merged);
+            merged
         } else {
+            tracing::debug!("Gateway: No access conditions found for project {}, using user params only", project_id);
             user_params
         };
 
