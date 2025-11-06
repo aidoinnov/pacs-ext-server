@@ -1,6 +1,7 @@
 use crate::domain::entities::project_data::{
     DataAccessStatus, NewProjectData, NewProjectDataAccess, ProjectData, ProjectDataAccess,
-    ProjectDataSeries, ProjectDataStudy, UpdateProjectData, UpdateProjectDataAccess,
+    ProjectDataInstance, ProjectDataSeries, ProjectDataStudy, UpdateProjectData,
+    UpdateProjectDataAccess,
 };
 use crate::domain::repositories::{ProjectDataAccessRepository, ProjectDataRepository};
 use crate::domain::services::ProjectDataService;
@@ -396,6 +397,24 @@ where
     ) -> Result<Vec<ProjectDataSeries>, ServiceError> {
         self.project_data_repository
             .find_series_by_study_id(study_id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))
+    }
+
+    async fn get_instance_by_id(&self, id: i32) -> Result<ProjectDataInstance, ServiceError> {
+        self.project_data_repository
+            .find_instance_by_id(id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| ServiceError::NotFound("Instance not found".to_string()))
+    }
+
+    async fn get_instances_by_series(
+        &self,
+        series_id: i32,
+    ) -> Result<Vec<ProjectDataInstance>, ServiceError> {
+        self.project_data_repository
+            .find_instances_by_series_id(series_id)
             .await
             .map_err(|e| ServiceError::DatabaseError(e.to_string()))
     }

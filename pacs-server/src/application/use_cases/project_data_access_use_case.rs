@@ -1,6 +1,7 @@
 use crate::application::dto::project_data_access_dto::*;
 use crate::domain::entities::project_data::{
-    DataAccessStatus, NewProjectData, ProjectDataSeries, ProjectDataStudy, UpdateProjectDataAccess,
+    DataAccessStatus, NewProjectData, ProjectDataInstance, ProjectDataSeries, ProjectDataStudy,
+    UpdateProjectDataAccess,
 };
 use crate::domain::services::{ProjectDataService, ProjectService};
 use crate::domain::ServiceError;
@@ -346,6 +347,26 @@ impl ProjectDataAccessUseCase {
     ) -> Result<Vec<ProjectDataSeries>, ServiceError> {
         self.project_data_service
             .get_series_by_study(study_id)
+            .await
+    }
+
+    /// Instance 조회 (by ID)
+    pub async fn get_instance(
+        &self,
+        instance_id: i32,
+    ) -> Result<ProjectDataInstance, ServiceError> {
+        self.project_data_service
+            .get_instance_by_id(instance_id)
+            .await
+    }
+
+    /// Series별 Instance 목록 조회
+    pub async fn get_instances_by_series(
+        &self,
+        series_id: i32,
+    ) -> Result<Vec<ProjectDataInstance>, ServiceError> {
+        self.project_data_service
+            .get_instances_by_series(series_id)
             .await
     }
 }

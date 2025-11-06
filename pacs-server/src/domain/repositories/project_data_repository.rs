@@ -1,5 +1,6 @@
 use crate::domain::entities::project_data::{
-    NewProjectData, ProjectData, ProjectDataSeries, ProjectDataStudy, UpdateProjectData,
+    NewProjectData, ProjectData, ProjectDataInstance, ProjectDataSeries, ProjectDataStudy,
+    UpdateProjectData,
 };
 use sqlx::PgPool;
 
@@ -92,4 +93,19 @@ pub trait ProjectDataRepository: Send + Sync {
 
     /// Study별 Series 총 개수
     async fn count_series_by_study_id(&self, study_id: i32) -> Result<i64, sqlx::Error>;
+
+    /// Instance 조회 (by ID)
+    async fn find_instance_by_id(
+        &self,
+        id: i32,
+    ) -> Result<Option<ProjectDataInstance>, sqlx::Error>;
+
+    /// Series별 Instance 목록 조회
+    async fn find_instances_by_series_id(
+        &self,
+        series_id: i32,
+    ) -> Result<Vec<ProjectDataInstance>, sqlx::Error>;
+
+    /// Series별 Instance 총 개수
+    async fn count_instances_by_series_id(&self, series_id: i32) -> Result<i64, sqlx::Error>;
 }

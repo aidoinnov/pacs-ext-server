@@ -49,6 +49,17 @@ pub struct ProjectDataSeries {
     pub created_at: DateTime<Utc>,
 }
 
+/// 프로젝트 데이터 (DICOM Instance)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ProjectDataInstance {
+    pub id: i32,
+    pub series_id: i32,
+    pub instance_uid: String,
+    pub sop_class_uid: Option<String>,
+    pub instance_number: Option<i32>,
+    pub created_at: DateTime<Utc>,
+}
+
 /// 프로젝트 데이터 접근 권한 (Study, Series, Instance 레벨)
 /// NOTE: project_data_id는 하위 호환성을 위한 임시 필드 (기존 project_data 테이블 참조)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

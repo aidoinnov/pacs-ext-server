@@ -1,5 +1,6 @@
 use crate::domain::entities::project_data::{
-    NewProjectData, ProjectData, ProjectDataSeries, ProjectDataStudy, UpdateProjectData,
+    NewProjectData, ProjectData, ProjectDataInstance, ProjectDataSeries, ProjectDataStudy,
+    UpdateProjectData,
 };
 use crate::domain::repositories::ProjectDataRepository;
 use sqlx::PgPool;
@@ -455,6 +456,50 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
             "SELECT COUNT(*) FROM project_data_series WHERE study_id = $1",
         )
         .bind(study_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(count)
+    }
+
+    async fn find_instance_by_id(
+        &self,
+        id: i32,
+    ) -> Result<Option<ProjectDataInstance>, sqlx::Error> {
+        let result = sqlx::query_as::<_, ProjectDataInstance>(
+            "SELECT id, series_id, instance_uid, sop_class_uid, instance_number, created_at
+             FROM project_data_instance
+             WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result)
+    }
+
+    async fn find_instances_by_series_id(
+        &self,
+        series_id: i32,
+    ) -> Result<Vec<ProjectDataInstance>, sqlx::Error> {
+        let results = sqlx::query_as::<_, ProjectDataInstance>(
+            "SELECT id, series_id, instance_uid, sop_class_uid, instance_number, created_at
+             FROM project_data_instance
+             WHERE series_id = $1
+             ORDER BY instance_number ASC NULLS LAST, created_at ASC",
+        )
+        .bind(series_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(results)
+    }
+
+    async fn count_instances_by_series_id(&self, series_id: i32) -> Result<i64, sqlx::Error> {
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM project_data_instance WHERE series_id = $1",
+        )
+        .bind(series_id)
         .fetch_one(&self.pool)
         .await?;
 

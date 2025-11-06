@@ -442,3 +442,40 @@ pub struct GetProjectSeriesResponse {
     /// 페이지네이션 정보
     pub pagination: PaginationInfo,
 }
+
+/// Instance 정보
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct InstanceInfo {
+    /// Instance ID
+    pub id: i32,
+    /// Instance UID (SOPInstanceUID)
+    pub instance_uid: String,
+    /// SOP Class UID
+    pub sop_class_uid: Option<String>,
+    /// Instance 번호
+    pub instance_number: Option<i32>,
+    /// 생성 시각
+    pub created_at: String,
+}
+
+/// Series와 Instance 정보를 함께 포함
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct InstanceWithSeriesInfo {
+    /// Series 정보
+    pub series: SeriesInfo,
+    /// Instance 정보
+    pub instance: InstanceInfo,
+    /// 프로젝트에 할당된 시각
+    pub assigned_at: String,
+}
+
+/// 프로젝트 Instance 목록 조회 응답
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GetProjectInstancesResponse {
+    /// 성공 여부
+    pub success: bool,
+    /// Instance 목록 (Series 정보 포함)
+    pub instances: Vec<InstanceWithSeriesInfo>,
+    /// 페이지네이션 정보
+    pub pagination: PaginationInfo,
+}

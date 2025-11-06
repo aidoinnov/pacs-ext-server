@@ -1,6 +1,6 @@
 use crate::domain::entities::project_data::{
-    DataAccessStatus, NewProjectData, ProjectData, ProjectDataAccess, ProjectDataSeries,
-    ProjectDataStudy, UpdateProjectData, UpdateProjectDataAccess,
+    DataAccessStatus, NewProjectData, ProjectData, ProjectDataAccess, ProjectDataInstance,
+    ProjectDataSeries, ProjectDataStudy, UpdateProjectData, UpdateProjectDataAccess,
 };
 use crate::domain::ServiceError;
 
@@ -146,4 +146,13 @@ pub trait ProjectDataService: Send + Sync {
         &self,
         study_id: i32,
     ) -> Result<Vec<ProjectDataSeries>, ServiceError>;
+
+    /// Instance 조회 (by ID)
+    async fn get_instance_by_id(&self, id: i32) -> Result<ProjectDataInstance, ServiceError>;
+
+    /// Series별 Instance 목록 조회
+    async fn get_instances_by_series(
+        &self,
+        series_id: i32,
+    ) -> Result<Vec<ProjectDataInstance>, ServiceError>;
 }

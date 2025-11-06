@@ -411,6 +411,77 @@ pub async fn get_study_series(
     }
 }
 
+/// 프로젝트 Instance 목록 조회 (Series별)
+#[utoipa::path(
+    get,
+    path = "/api/project-data/{project_id}/series/{series_id}/instances",
+    responses(
+        (status = 200, description = "Instance 목록 조회 성공", body = GetProjectInstancesResponse),
+        (status = 404, description = "Series를 찾을 수 없음"),
+        (status = 500, description = "서버 내부 오류")
+    ),
+    params(
+        ("project_id" = i32, Path, description = "프로젝트 ID"),
+        ("series_id" = i32, Path, description = "Series ID")
+    ),
+    tag = "project-data"
+)]
+pub async fn get_series_instances(
+    path: web::Path<(i32, i32)>,
+    use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let (project_id, series_id) = path.into_inner();
+
+    // Series 정보 조회
+    let series = match use_case.get_series(series_id).await {
+        Ok(s) => s,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
+
+    // Instance 목록 조회
+    match use_case.get_instances_by_series(series_id).await {
+        Ok(instance_list) => {
+            let instances_with_series: Vec<InstanceWithSeriesInfo> = instance_list
+                .into_iter()
+                .map(|i| InstanceWithSeriesInfo {
+                    series: SeriesInfo {
+                        id: series.id,
+                        series_uid: series.series_uid.clone(),
+                        series_description: series.series_description.clone(),
+                        modality: series.modality.clone(),
+                        series_number: series.series_number,
+                        created_at: series.created_at.to_rfc3339(),
+                    },
+                    instance: InstanceInfo {
+                        id: i.id,
+                        instance_uid: i.instance_uid,
+                        sop_class_uid: i.sop_class_uid,
+                        instance_number: i.instance_number,
+                        created_at: i.created_at.to_rfc3339(),
+                    },
+                    assigned_at: i.created_at.to_rfc3339(),
+                })
+                .collect();
+
+            let total_count = instances_with_series.len();
+
+            let response = GetProjectInstancesResponse {
+                success: true,
+                instances: instances_with_series,
+                pagination: PaginationInfo {
+                    page: 1,
+                    page_size: total_count as i32,
+                    total_items: total_count as i64,
+                    total_pages: 1,
+                },
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Err(e) => Ok(handle_service_error(e)),
+    }
+}
+
 /// 라우트 설정
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataAccessUseCase>) {
     cfg.app_data(web::Data::new(use_case))
@@ -434,11 +505,15 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataA
                     "/{project_id}/data/{data_id}/access/request",
                     web::post().to(request_data_access),
                 )
-                // Study/Series 목록 조회 엔드포인트
+                // Study/Series/Instance 목록 조회 엔드포인트
                 .route("/{project_id}/studies", web::get().to(get_project_studies))
                 .route(
                     "/{project_id}/studies/{study_id}/series",
                     web::get().to(get_study_series),
+                )
+                .route(
+                    "/{project_id}/series/{series_id}/instances",
+                    web::get().to(get_series_instances),
                 ),
         )
         .service(
