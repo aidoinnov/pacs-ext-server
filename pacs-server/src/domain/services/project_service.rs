@@ -348,7 +348,10 @@ where
         }
 
         let members = sqlx::query_as::<_, User>(
-            "SELECT u.id, u.keycloak_id, u.username, u.email, u.created_at
+            "SELECT u.id, u.keycloak_id, u.username, u.email, u.full_name, u.organization,
+                    u.department, u.phone, u.created_at, u.updated_at, u.account_status,
+                    u.email_verified, u.email_verification_token, u.email_verification_expires_at,
+                    u.approved_by, u.approved_at, u.suspended_at, u.suspended_reason, u.deleted_at
              FROM security_user u
              INNER JOIN security_user_project up ON u.id = up.user_id
              WHERE up.project_id = $1

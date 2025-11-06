@@ -314,15 +314,55 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
     ) -> Result<Vec<ProjectDataStudy>, sqlx::Error> {
         let offset = (page - 1) * page_size;
 
-        // JOIN with project_data to get studies belonging to the project
+        // UNION of directly assigned studies and rule-based matched studies
         let results = sqlx::query_as::<_, ProjectDataStudy>(
-            "SELECT pds.id, pds.study_uid, pds.study_description, pds.patient_id, pds.patient_name,
-                    pds.patient_birth_date, pds.study_date, pds.created_at, pds.updated_at
-             FROM project_data_study pds
-             INNER JOIN project_data pd ON pd.study_id = pds.id
-             WHERE pd.project_id = $1 AND pd.resource_level = 'STUDY'
-             ORDER BY pds.study_date DESC NULLS LAST, pds.created_at DESC
-             LIMIT $2 OFFSET $3"
+            "WITH directly_assigned AS (
+                -- 직접 할당된 Study
+                SELECT DISTINCT pds.id, pds.study_uid, pds.study_description, pds.patient_id, pds.patient_name,
+                       pds.patient_birth_date, pds.study_date, pds.created_at, pds.updated_at
+                FROM project_data_study pds
+                INNER JOIN project_data pd ON pd.study_id = pds.id
+                WHERE pd.project_id = $1 AND pd.resource_level = 'STUDY'
+            ),
+            rule_based AS (
+                -- 규칙 기반으로 매칭되는 Study
+                SELECT DISTINCT pds.id, pds.study_uid, pds.study_description, pds.patient_id, pds.patient_name,
+                       pds.patient_birth_date, pds.study_date, pds.created_at, pds.updated_at
+                FROM project_data_study pds
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM security_project_dicom_condition spdc
+                    INNER JOIN security_access_condition ac ON spdc.access_condition_id = ac.id
+                    WHERE spdc.project_id = $1
+                      AND ac.resource_level = 'STUDY'
+                      AND ac.condition_type = 'ALLOW'
+                      AND (
+                          -- Modality 조건
+                          (ac.dicom_tag IN ('00080060', 'Modality') AND ac.modality IS NOT NULL
+                           AND pds.modality = ac.modality)
+                          OR
+                          -- PatientID 조건
+                          (ac.dicom_tag IN ('00100020', 'PatientID') AND ac.patient_id IS NOT NULL
+                           AND pds.patient_id = ac.patient_id)
+                          OR
+                          -- StudyDate 범위 조건
+                          (ac.dicom_tag IN ('00080020', 'StudyDate')
+                           AND ac.date_range_start IS NOT NULL
+                           AND ac.date_range_end IS NOT NULL
+                           AND pds.study_date BETWEEN ac.date_range_start AND ac.date_range_end)
+                          OR
+                          -- 조건이 없으면 모든 Study 허용 (프로젝트 전체 접근)
+                          (ac.dicom_tag IS NULL AND ac.modality IS NULL AND ac.patient_id IS NULL)
+                      )
+                )
+            )
+            SELECT * FROM (
+                SELECT * FROM directly_assigned
+                UNION
+                SELECT * FROM rule_based
+            ) AS combined
+            ORDER BY study_date DESC NULLS LAST, created_at DESC
+            LIMIT $2 OFFSET $3"
         )
         .bind(project_id)
         .bind(page_size)
@@ -334,12 +374,45 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
     }
 
     async fn count_studies_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error> {
-        // COUNT with JOIN to project_data
+        // COUNT with UNION of directly assigned and rule-based matched studies
         let count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(DISTINCT pds.id)
-             FROM project_data_study pds
-             INNER JOIN project_data pd ON pd.study_id = pds.id
-             WHERE pd.project_id = $1 AND pd.resource_level = 'STUDY'",
+            "WITH directly_assigned AS (
+                SELECT DISTINCT pds.id
+                FROM project_data_study pds
+                INNER JOIN project_data pd ON pd.study_id = pds.id
+                WHERE pd.project_id = $1 AND pd.resource_level = 'STUDY'
+            ),
+            rule_based AS (
+                SELECT DISTINCT pds.id
+                FROM project_data_study pds
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM security_project_dicom_condition spdc
+                    INNER JOIN security_access_condition ac ON spdc.access_condition_id = ac.id
+                    WHERE spdc.project_id = $1
+                      AND ac.resource_level = 'STUDY'
+                      AND ac.condition_type = 'ALLOW'
+                      AND (
+                          (ac.dicom_tag IN ('00080060', 'Modality') AND ac.modality IS NOT NULL
+                           AND pds.modality = ac.modality)
+                          OR
+                          (ac.dicom_tag IN ('00100020', 'PatientID') AND ac.patient_id IS NOT NULL
+                           AND pds.patient_id = ac.patient_id)
+                          OR
+                          (ac.dicom_tag IN ('00080020', 'StudyDate')
+                           AND ac.date_range_start IS NOT NULL
+                           AND ac.date_range_end IS NOT NULL
+                           AND pds.study_date BETWEEN ac.date_range_start AND ac.date_range_end)
+                          OR
+                          (ac.dicom_tag IS NULL AND ac.modality IS NULL AND ac.patient_id IS NULL)
+                      )
+                )
+            )
+            SELECT COUNT(*) FROM (
+                SELECT id FROM directly_assigned
+                UNION
+                SELECT id FROM rule_based
+            ) AS combined",
         )
         .bind(project_id)
         .fetch_one(&self.pool)

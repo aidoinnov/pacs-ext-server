@@ -2,19 +2,24 @@ use crate::application::dto::project_data_access_dto::*;
 use crate::domain::entities::project_data::{
     DataAccessStatus, NewProjectData, ProjectDataSeries, ProjectDataStudy, UpdateProjectDataAccess,
 };
-use crate::domain::services::ProjectDataService;
+use crate::domain::services::{ProjectDataService, ProjectService};
 use crate::domain::ServiceError;
 use std::str::FromStr;
 use std::sync::Arc;
 
 pub struct ProjectDataAccessUseCase {
     project_data_service: Arc<dyn ProjectDataService>,
+    project_service: Arc<dyn ProjectService>,
 }
 
 impl ProjectDataAccessUseCase {
-    pub fn new(project_data_service: Arc<dyn ProjectDataService>) -> Self {
+    pub fn new(
+        project_data_service: Arc<dyn ProjectDataService>,
+        project_service: Arc<dyn ProjectService>,
+    ) -> Self {
         Self {
             project_data_service,
+            project_service,
         }
     }
 
@@ -59,30 +64,36 @@ impl ProjectDataAccessUseCase {
             })
             .collect();
 
-        // Get users from access list (preserve order by using Vec instead of HashSet)
-        let user_ids: Vec<i32> = access_list
-            .iter()
-            .map(|access| access.user_id)
-            .collect::<std::collections::HashSet<i32>>()
-            .into_iter()
-            .collect();
+        // Get project members (users who belong to the project)
+        println!("🔍 Fetching project members for project_id: {}", project_id);
+        let project_members = match self
+            .project_service
+            .get_project_members(project_id)
+            .await
+        {
+            Ok(members) => {
+                println!("✅ Found {} project members", members.len());
+                members
+            }
+            Err(e) => {
+                println!("❌ Error fetching project members: {:?}", e);
+                return Err(e);
+            }
+        };
 
-        // Sort user_ids by ID for consistent ordering
-        let mut sorted_user_ids = user_ids;
-        sorted_user_ids.sort();
-
-        // TODO: Get user information from UserService
-        // For now, create mock user info
-        let users: Vec<UserInfo> = sorted_user_ids
+        // Convert to UserInfo DTOs
+        let users: Vec<UserInfo> = project_members
             .into_iter()
-            .map(|id| UserInfo {
-                id,
-                username: format!("user{}", id),
-                email: format!("user{}@example.com", id),
-                full_name: Some(format!("사용자 {}", id)),
-                organization: Some("서울대학교병원".to_string()),
+            .map(|user| UserInfo {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                full_name: None, // User entity doesn't have full_name field
+                organization: None, // User entity doesn't have organization field
             })
             .collect();
+
+        println!("📋 Converted {} users to UserInfo DTOs", users.len());
 
         // Convert access list to DTOs
         let access_matrix: Vec<DataAccessInfo> = access_list

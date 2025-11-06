@@ -52,7 +52,7 @@ use application::use_cases::{
 // 도메인 레이어 - 서비스 구현체들
 use domain::services::{
     AccessControlServiceImpl, AnnotationServiceImpl, AuthServiceImpl, MaskGroupServiceImpl,
-    MaskServiceImpl, PermissionServiceImpl, ProjectServiceImpl, UserServiceImpl,
+    MaskServiceImpl, PermissionServiceImpl, ProjectService, ProjectServiceImpl, UserServiceImpl,
 };
 
 // 인프라스트럭처 레이어 - 리포지토리 구현체들
@@ -376,8 +376,10 @@ async fn main() -> std::io::Result<()> {
     let role_capability_matrix_use_case =
         Arc::new(RoleCapabilityMatrixUseCase::new(capability_service));
 
-    let project_data_access_use_case =
-        Arc::new(ProjectDataAccessUseCase::new(project_data_service.clone()));
+    let project_data_access_use_case = Arc::new(ProjectDataAccessUseCase::new(
+        project_data_service.clone(),
+        Arc::new(project_service.clone()),
+    ));
     let user_registration_use_case =
         Arc::new(UserRegistrationUseCase::new(user_registration_service));
     println!("✅ Done");
