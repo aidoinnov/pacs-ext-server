@@ -103,39 +103,25 @@ impl ObjectStorageService for S3ObjectStorageService {
         options: SignedUrlOptions,
     ) -> Result<String, ObjectStorageError> {
         let key = self.file_path_to_key(file_path);
-        
+
         let presigning_config = PresigningConfig::expires_in(Duration::from_secs(options.ttl_seconds))
             .map_err(|e| ObjectStorageError::S3Error(format!("Failed to create presigning config: {}", e)))?;
-        
+
         let mut put_object = self.client
             .put_object()
             .bucket(&self.bucket_name)
-            .key(&key)
-            .set_acl(Some(ObjectCannedAcl::Private))
-            .set_storage_class(Some(StorageClass::Standard));
-        
-        // Content-Type 설정
+            .key(&key);
+
+        // Content-Type만 설정 (클라이언트는 Content-Type만 보내야 함)
         if let Some(content_type) = options.content_type {
             put_object = put_object.content_type(content_type);
         }
-        
-        // Content-Disposition 설정
-        if let Some(content_disposition) = options.content_disposition {
-            put_object = put_object.content_disposition(content_disposition);
-        }
-        
-        // 메타데이터 설정
-        if let Some(metadata) = options.metadata {
-            for (key, value) in metadata {
-                put_object = put_object.metadata(key, value);
-            }
-        }
-        
+
         let request = put_object
             .presigned(presigning_config)
             .await
             .map_err(|e| self.map_s3_error(e.into()))?;
-        
+
         Ok(request.uri().to_string())
     }
     

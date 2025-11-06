@@ -644,18 +644,6 @@ async fn main() -> std::io::Result<()> {
                             annotation_controller::configure_routes(
                                 cfg,
                                 annotation_use_case.clone(),
-                            )
-                        }
-                    })
-                    .configure(|cfg| {
-                        if settings.server.mode != ServerMode::SyncOnly {
-                            mask_controller::configure_routes(cfg, mask_use_case.clone())
-                        }
-                    })
-                    .configure(|cfg| {
-                        if settings.server.mode != ServerMode::SyncOnly {
-                            mask_group_controller::configure_routes(
-                                cfg,
                                 mask_group_use_case.clone(),
                             )
                         }

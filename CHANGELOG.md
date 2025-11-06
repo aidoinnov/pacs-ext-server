@@ -6,6 +6,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed - 2025-11-06
+
+#### **S3 Presigned URL 업로드 및 Mask API 라우트 수정** 🔧
+- **브랜치**: `fix/mask-upload-and-route-issues`
+- **이슈**: S3 업로드 403 에러 및 Mask API 404 에러 수정
+- **주요 변경사항**:
+  1. **S3 Presigned URL 생성 로직 단순화**
+     - 불필요한 헤더 제거 (ACL, Storage Class, 메타데이터)
+     - Content-Type만 포함하도록 수정
+     - 클라이언트 측 헤더 전송 단순화 필요
+  2. **Mask API 라우트 통합**
+     - Mask 라우트를 `annotation_controller.rs`에 통합
+     - `main.rs`에서 중복 라우트 등록 제거
+     - 일관된 라우트 계층 구조 유지
+
+- **수정된 파일**:
+  - `pacs-server/src/infrastructure/external/s3_service.rs` - Presigned URL 생성 로직 수정
+  - `pacs-server/src/infrastructure/external/minio_service.rs` - MinIO 서비스 동일 수정
+  - `pacs-server/src/presentation/controllers/annotation_controller.rs` - Mask 라우트 통합
+  - `pacs-server/src/main.rs` - 중복 라우트 등록 제거
+
+- **Breaking Changes** ⚠️:
+  - **클라이언트 측 수정 필요**: S3 업로드 시 불필요한 헤더 제거
+    - ❌ 제거: `x-amz-acl`, `x-amz-storage-class`, `x-amz-meta-*` 헤더
+    - ✅ 유지: `Content-Type` 헤더만 전송
+
+- **마이그레이션 가이드**:
+  ```javascript
+  // ❌ 이전 방식
+  fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'image/png',
+      'x-amz-acl': 'private',
+      'x-amz-storage-class': 'STANDARD',
+      'x-amz-meta-annotation_id': '123',
+    },
+    body: fileBlob
+  });
+
+  // ✅ 새로운 방식
+  fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'image/png'  // Content-Type만!
+    },
+    body: fileBlob
+  });
+  ```
+
+- **문서**:
+  - `docs/issues/2025-11-06-s3-업로드-및-마스크-라우트-수정/작업계획.md` - 작업 계획
+  - `docs/issues/2025-11-06-s3-업로드-및-마스크-라우트-수정/작업내용.md` - 작업 내용 상세
+  - `docs/issues/2025-11-06-s3-업로드-및-마스크-라우트-수정/기술문서.md` - 기술 문서
+
+- **테스트 결과**:
+  - ✅ Cargo 빌드 성공
+  - ✅ 서버 정상 시작
+  - ✅ S3 업로드 성공 (클라이언트 수정 후)
+  - ✅ Mask API 엔드포인트 접근 가능
+
 ### Changed - 2025-10-31
 
 #### **Project Data Hierarchy Refactor** 🔄
