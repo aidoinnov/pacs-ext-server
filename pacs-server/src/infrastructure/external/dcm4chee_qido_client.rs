@@ -165,25 +165,65 @@ impl Dcm4cheeQidoClient {
             tracing::warn!("QIDO /studies: No authentication method available");
         }
 
+        // Build final URL with query parameters
+        let mut final_url = url.clone();
         if !params.is_empty() {
             let qp: Vec<(&str, &str)> = params
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
+
+            // Manually build query string
+            let query_string = qp.iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&");
+
+            final_url.set_query(Some(&query_string));
+
             tracing::debug!("QIDO /studies: Query parameters: {:?}", qp);
             req = req.query(&qp);
         } else {
             tracing::debug!("QIDO /studies: No query parameters");
         }
 
+        // Log request details
+        tracing::info!("========== QIDO /studies Request Details ==========");
+        tracing::info!("Method: GET");
+        tracing::info!("URL: {}", final_url);
+        tracing::info!("Headers:");
+        tracing::info!("  Accept: application/json");
+        tracing::info!("  Timeout: {}ms", self.timeout_ms);
+        if bearer_token.is_some() {
+            tracing::info!("  Authorization: Bearer <token present>");
+        } else if self.username.is_some() {
+            tracing::info!("  Authorization: Basic <credentials present>");
+        } else {
+            tracing::info!("  Authorization: None");
+        }
+        tracing::info!("===================================================");
+
         tracing::debug!("QIDO /studies: Sending request...");
         let resp = req.send().await.map_err(|e| {
             tracing::error!("QIDO /studies: Request failed: {}", e);
             ServiceError::ExternalServiceError(format!("QIDO /studies failed: {}", e))
         })?;
+
         let status = resp.status();
         tracing::debug!("QIDO /studies: Response status: {}", status);
+
         let body = resp.text().await.unwrap_or_default();
+
+        tracing::info!("========== QIDO /studies Response Details ==========");
+        tracing::info!("Status: {}", status);
+        tracing::info!("Body length: {} bytes", body.len());
+        if body.len() > 0 {
+            tracing::info!("Body preview (first 1000 chars): {}", &body[..std::cmp::min(1000, body.len())]);
+        } else {
+            tracing::info!("Body: <empty>");
+        }
+        tracing::info!("====================================================");
+
         if !status.is_success() {
             tracing::error!("QIDO /studies: Non-success status: {} - Body: {}", status, &body[..std::cmp::min(500, body.len())]);
             return Err(ServiceError::ExternalServiceError(format!(

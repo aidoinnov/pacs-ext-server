@@ -596,9 +596,5 @@ pub fn configure_routes<P, U, D>(
                     "/{project_id}/data/{data_id}/access/request",
                     web::post().to(request_data_access),
                 ),
-        )
-        .route(
-            "/users/{user_id}/projects",
-            web::get().to(get_user_projects::<P, U, D>),
         );
 }

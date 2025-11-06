@@ -272,6 +272,145 @@ pub async fn get_user_access_list(
     }
 }
 
+/// 프로젝트 Study 목록 조회
+#[utoipa::path(
+    get,
+    path = "/api/project-data/{project_id}/studies",
+    responses(
+        (status = 200, description = "Study 목록 조회 성공", body = GetProjectStudiesResponse),
+        (status = 404, description = "프로젝트를 찾을 수 없음"),
+        (status = 500, description = "서버 내부 오류")
+    ),
+    params(
+        ("project_id" = i32, Path, description = "프로젝트 ID"),
+        ("page" = Option<i32>, Query, description = "페이지 번호 (기본값: 1)"),
+        ("page_size" = Option<i32>, Query, description = "페이지 크기 (기본값: 20, 최대: 100)"),
+        ("patient_id" = Option<String>, Query, description = "환자 ID 필터"),
+        ("study_date_from" = Option<String>, Query, description = "Study 시작일 필터 (YYYY-MM-DD)"),
+        ("study_date_to" = Option<String>, Query, description = "Study 종료일 필터 (YYYY-MM-DD)")
+    ),
+    tag = "project-data"
+)]
+pub async fn get_project_studies(
+    path: web::Path<i32>,
+    query: web::Query<GetProjectStudiesRequest>,
+    use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let project_id = path.into_inner();
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(20).min(100); // 최대 100개
+
+    match use_case.get_studies(project_id, page, page_size).await {
+        Ok((studies, total)) => {
+            let total_pages = (total as f64 / page_size as f64).ceil() as i64;
+
+            let studies_info: Vec<StudyInfo> = studies
+                .into_iter()
+                .map(|s| StudyInfo {
+                    id: s.id,
+                    study_uid: s.study_uid,
+                    study_description: s.study_description,
+                    patient_id: s.patient_id,
+                    patient_name: s.patient_name,
+                    patient_birth_date: s.patient_birth_date.map(|d| d.to_string()),
+                    study_date: s.study_date.map(|d| d.to_string()),
+                    created_at: s.created_at.to_rfc3339(),
+                    updated_at: s.updated_at.to_rfc3339(),
+                })
+                .collect();
+
+            let response = GetProjectStudiesResponse {
+                success: true,
+                studies: studies_info,
+                pagination: PaginationInfo {
+                    page,
+                    page_size,
+                    total_items: total,
+                    total_pages,
+                },
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Err(e) => Ok(handle_service_error(e)),
+    }
+}
+
+/// 프로젝트 Series 목록 조회 (Study별)
+#[utoipa::path(
+    get,
+    path = "/api/project-data/{project_id}/studies/{study_id}/series",
+    responses(
+        (status = 200, description = "Series 목록 조회 성공", body = GetProjectSeriesResponse),
+        (status = 404, description = "Study를 찾을 수 없음"),
+        (status = 500, description = "서버 내부 오류")
+    ),
+    params(
+        ("project_id" = i32, Path, description = "프로젝트 ID"),
+        ("study_id" = i32, Path, description = "Study ID")
+    ),
+    tag = "project-data"
+)]
+pub async fn get_study_series(
+    path: web::Path<(i32, i32)>,
+    use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let (project_id, study_id) = path.into_inner();
+
+    // Study 정보 조회
+    let study = match use_case.get_study(study_id).await {
+        Ok(s) => s,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
+
+    // Series 목록 조회
+    match use_case.get_series_by_study(study_id).await {
+        Ok(series_list) => {
+            let series_with_study: Vec<SeriesWithStudyInfo> = series_list
+                .into_iter()
+                .map(|s| SeriesWithStudyInfo {
+                    study: StudyInfo {
+                        id: study.id,
+                        study_uid: study.study_uid.clone(),
+                        study_description: study.study_description.clone(),
+                        patient_id: study.patient_id.clone(),
+                        patient_name: study.patient_name.clone(),
+                        patient_birth_date: study.patient_birth_date.map(|d| d.to_string()),
+                        study_date: study.study_date.map(|d| d.to_string()),
+                        created_at: study.created_at.to_rfc3339(),
+                        updated_at: study.updated_at.to_rfc3339(),
+                    },
+                    series: SeriesInfo {
+                        id: s.id,
+                        series_uid: s.series_uid,
+                        series_description: s.series_description,
+                        modality: s.modality,
+                        series_number: s.series_number,
+                        created_at: s.created_at.to_rfc3339(),
+                    },
+                    assigned_at: s.created_at.to_rfc3339(),
+                })
+                .collect();
+
+            let total_count = series_with_study.len();
+
+            let response = GetProjectSeriesResponse {
+                success: true,
+                series: series_with_study,
+                pagination: PaginationInfo {
+                    page: 1,
+                    page_size: total_count as i32,
+                    total_items: total_count as i64,
+                    total_pages: 1,
+                },
+            };
+
+            Ok(HttpResponse::Ok().json(response))
+        }
+        Err(e) => Ok(handle_service_error(e)),
+    }
+}
+
 /// 라우트 설정
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataAccessUseCase>) {
     cfg.app_data(web::Data::new(use_case))
@@ -294,6 +433,12 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataA
                 .route(
                     "/{project_id}/data/{data_id}/access/request",
                     web::post().to(request_data_access),
+                )
+                // Study/Series 목록 조회 엔드포인트
+                .route("/{project_id}/studies", web::get().to(get_project_studies))
+                .route(
+                    "/{project_id}/studies/{study_id}/series",
+                    web::get().to(get_study_series),
                 ),
         )
         .service(

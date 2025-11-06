@@ -498,15 +498,15 @@ where
                 Option<String>,
             ),
         >(
-            "SELECT 
-                p.id as project_id, 
-                p.name as project_name, 
-                p.description, 
+            "SELECT
+                p.id as project_id,
+                p.name as project_name,
+                p.description,
                 p.is_active,
-                p.start_date,
-                p.end_date,
-                r.id as role_id, 
-                r.name as role_name, 
+                p.start_date::text,
+                p.end_date::text,
+                r.id as role_id,
+                r.name as role_name,
                 r.scope as role_scope
              FROM security_project p
              INNER JOIN security_user_project up ON p.id = up.project_id

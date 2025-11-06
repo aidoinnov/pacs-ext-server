@@ -339,3 +339,106 @@ mod tests {
         assert_eq!(request, deserialized);
     }
 }
+
+// ========== Study/Series 목록 조회 DTO ==========
+
+/// Study 정보 (계층 구조)
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct StudyInfo {
+    /// Study ID
+    pub id: i32,
+    /// Study UID
+    pub study_uid: String,
+    /// Study 설명
+    pub study_description: Option<String>,
+    /// 환자 ID
+    pub patient_id: Option<String>,
+    /// 환자 이름
+    pub patient_name: Option<String>,
+    /// 환자 생년월일
+    pub patient_birth_date: Option<String>,
+    /// Study 날짜
+    pub study_date: Option<String>,
+    /// 생성 시각
+    pub created_at: String,
+    /// 수정 시각
+    pub updated_at: String,
+}
+
+/// Series 정보 (계층 구조)
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SeriesInfo {
+    /// Series ID
+    pub id: i32,
+    /// Series UID
+    pub series_uid: String,
+    /// Series 설명
+    pub series_description: Option<String>,
+    /// 모달리티
+    pub modality: Option<String>,
+    /// Series 번호
+    pub series_number: Option<i32>,
+    /// 생성 시각
+    pub created_at: String,
+}
+
+/// 프로젝트 Study 목록 조회 요청
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GetProjectStudiesRequest {
+    /// 페이지 번호 (기본값: 1)
+    pub page: Option<i32>,
+    /// 페이지 크기 (기본값: 20, 최대: 100)
+    pub page_size: Option<i32>,
+    /// 환자 ID 필터
+    pub patient_id: Option<String>,
+    /// Study 시작일 필터 (YYYY-MM-DD)
+    pub study_date_from: Option<String>,
+    /// Study 종료일 필터 (YYYY-MM-DD)
+    pub study_date_to: Option<String>,
+}
+
+/// 프로젝트 Study 목록 조회 응답
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GetProjectStudiesResponse {
+    /// 성공 여부
+    pub success: bool,
+    /// Study 목록
+    pub studies: Vec<StudyInfo>,
+    /// 페이지네이션 정보
+    pub pagination: PaginationInfo,
+}
+
+/// 프로젝트 Series 목록 조회 요청
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GetProjectSeriesRequest {
+    /// 페이지 번호 (기본값: 1)
+    pub page: Option<i32>,
+    /// 페이지 크기 (기본값: 20, 최대: 100)
+    pub page_size: Option<i32>,
+    /// Study UID 필터 (특정 Study의 Series만 조회)
+    pub study_uid: Option<String>,
+    /// 모달리티 필터 (CT, MR 등)
+    pub modality: Option<String>,
+}
+
+/// Study와 Series 정보를 함께 포함
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SeriesWithStudyInfo {
+    /// Study 정보
+    pub study: StudyInfo,
+    /// Series 정보
+    pub series: SeriesInfo,
+    /// 프로젝트에 할당된 시각
+    pub assigned_at: String,
+}
+
+/// 프로젝트 Series 목록 조회 응답
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GetProjectSeriesResponse {
+    /// 성공 여부
+    pub success: bool,
+    /// Series 목록 (Study 정보 포함)
+    pub series: Vec<SeriesWithStudyInfo>,
+    /// 페이지네이션 정보
+    pub pagination: PaginationInfo,
+}

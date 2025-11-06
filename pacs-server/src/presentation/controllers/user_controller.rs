@@ -2,6 +2,7 @@ use actix_web::{web, HttpResponse, Responder, HttpRequest};
 use serde_json::json;
 use std::sync::Arc;
 
+use crate::application::dto::permission_dto::PaginationQuery;
 use crate::application::dto::user_dto::{
     CreateUserRequest, PaginationInfo, UpdateUserRequest, UserListQuery, UserListResponse,
     UserResponse,
@@ -163,20 +164,69 @@ pub async fn update_user<U: UserService + 'static>(
     }
 }
 
+/// 사용자가 속한 프로젝트 목록 조회 (역할 정보 포함)
+#[utoipa::path(
+    get,
+    path = "/api/users/{user_id}/projects",
+    params(
+        ("user_id" = i32, Path, description = "User ID"),
+        ("page" = Option<i32>, Query, description = "Page number (default: 1)"),
+        ("page_size" = Option<i32>, Query, description = "Page size (default: 20, max: 100)")
+    ),
+    responses(
+        (status = 200, description = "User projects retrieved successfully"),
+        (status = 404, description = "User not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+pub async fn get_user_projects<U: UserService>(
+    path: web::Path<i32>,
+    query: web::Query<PaginationQuery>,
+    user_service: web::Data<Arc<U>>,
+) -> impl Responder {
+    let user_id = path.into_inner();
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(20).min(100);
+
+    match user_service
+        .get_user_projects_with_roles(user_id, page, page_size)
+        .await
+    {
+        Ok((projects, total_count)) => {
+            let total_pages = (total_count as f64 / page_size as f64).ceil() as i32;
+            HttpResponse::Ok().json(json!({
+                "projects": projects,
+                "total_count": total_count,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages
+            }))
+        }
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to get user projects: {}", e)
+        })),
+    }
+}
+
 pub fn configure_routes<U: UserService + 'static>(
     cfg: &mut web::ServiceConfig,
     user_use_case: Arc<UserUseCase<U>>,
+    user_service: Arc<U>,
 ) {
-    cfg.app_data(web::Data::new(user_use_case)).service(
-        web::scope("/users")
-            .route("", web::get().to(UserController::<U>::list_users))
-            .route("", web::post().to(UserController::<U>::create_user))
-            .route("/me", web::get().to(get_me))
-            .route("/{user_id}", web::get().to(UserController::<U>::get_user))
-            .route("/{user_id}", web::put().to(update_user::<U>))
-            .route(
-                "/username/{username}",
-                web::get().to(UserController::<U>::get_user_by_username),
-            ),
-    );
+    cfg.app_data(web::Data::new(user_use_case))
+        .app_data(web::Data::new(user_service))
+        .service(
+            web::scope("/users")
+                .route("", web::get().to(UserController::<U>::list_users))
+                .route("", web::post().to(UserController::<U>::create_user))
+                .route("/me", web::get().to(get_me))
+                .route(
+                    "/username/{username}",
+                    web::get().to(UserController::<U>::get_user_by_username),
+                )
+                .route("/{user_id}", web::get().to(UserController::<U>::get_user))
+                .route("/{user_id}", web::put().to(update_user::<U>))
+                .route("/{user_id}/projects", web::get().to(get_user_projects::<U>)),
+        );
 }

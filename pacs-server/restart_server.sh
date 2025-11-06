@@ -13,7 +13,7 @@ echo "📁 현재 디렉토리: $(pwd)"
 # 1. 기존 서버 프로세스 강제 종료
 echo "🛑 기존 서버 프로세스 종료 중..."
 pkill -f "pacs-server" 2>/dev/null || true
-pkill -f "cargo run" 2>/dev/null || true
+pkill -f "cargo run --bin pacs_server" 2>/dev/null || true
 pkill -f "target/release/pacs-server" 2>/dev/null || true
 
 # 잠시 대기
@@ -46,7 +46,7 @@ echo "🚀 서버 시작 중..."
 echo "=========================================="
 
 # 백그라운드에서 서버 실행
-nohup cargo run > server.log 2>&1 &
+nohup cargo run --bin pacs_server > server.log 2>&1 &
 SERVER_PID=$!
 
 # 서버 시작 대기

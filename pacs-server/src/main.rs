@@ -78,9 +78,9 @@ use infrastructure::middleware::{configure_cors, CacheHeaders};
 // 프레젠테이션 레이어 - 컨트롤러들
 use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
-    mask_group_controller, project_controller, project_user_controller,
-    project_user_matrix_controller, role_controller, role_permission_matrix_controller,
-    user_controller, user_project_matrix_controller,
+    mask_group_controller, project_controller, project_data_access_controller,
+    project_user_controller, project_user_matrix_controller, role_controller,
+    role_permission_matrix_controller, user_controller, user_project_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -564,7 +564,15 @@ async fn main() -> std::io::Result<()> {
                         }
                     })
                     // ========================================
-                    // 📊 프로젝트-사용자 매트릭스 API (병합됨)
+                    // 👥 사용자 관리 API (구체적인 경로 우선 - /me, /username/{username})
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            user_controller::configure_routes(cfg, user_use_case.clone(), Arc::new(user_service.clone()))
+                        }
+                    })
+                    // ========================================
+                    // 📊 프로젝트-사용자 매트릭스 API
                     // ========================================
                     .configure(|cfg| {
                         project_user_controller::configure_routes(
@@ -574,12 +582,13 @@ async fn main() -> std::io::Result<()> {
                         )
                     })
                     // ========================================
-                    // 👥 사용자 관리 API
+                    // 📊 프로젝트 데이터 접근 관리 API
                     // ========================================
                     .configure(|cfg| {
-                        if settings.server.mode != ServerMode::SyncOnly {
-                            user_controller::configure_routes(cfg, user_use_case.clone())
-                        }
+                        project_data_access_controller::configure_routes(
+                            cfg,
+                            project_data_access_use_case.clone(),
+                        )
                     })
                     // ========================================
                     // 🔑 권한 관리 API (구체적인 경로 우선)

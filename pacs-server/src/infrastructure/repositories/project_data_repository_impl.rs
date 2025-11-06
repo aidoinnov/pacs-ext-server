@@ -37,8 +37,19 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
 
     async fn find_by_id(&self, id: i32) -> Result<Option<ProjectData>, sqlx::Error> {
         let result = sqlx::query_as::<_, ProjectData>(
-            "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at
-             FROM project_data WHERE id = $1"
+            "SELECT
+                pd.id,
+                pd.project_id,
+                pds.study_uid,
+                pds.study_description,
+                pds.patient_id,
+                pds.patient_name,
+                pds.study_date,
+                NULL::text as modality,
+                pd.created_at
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             WHERE pd.id = $1"
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -55,11 +66,22 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
     ) -> Result<Vec<ProjectData>, sqlx::Error> {
         let offset = (page - 1) * page_size;
 
+        // JOIN with project_data_study to get study information
         let results = sqlx::query_as::<_, ProjectData>(
-            "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at
-             FROM project_data 
-             WHERE project_id = $1
-             ORDER BY id ASC
+            "SELECT
+                pd.id,
+                pd.project_id,
+                pds.study_uid,
+                pds.study_description,
+                pds.patient_id,
+                pds.patient_name,
+                pds.study_date,
+                NULL::text as modality,
+                pd.created_at
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             WHERE pd.project_id = $1 AND pd.resource_level = 'STUDY'
+             ORDER BY pd.id ASC
              LIMIT $2 OFFSET $3"
         )
         .bind(project_id)
@@ -72,11 +94,15 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
     }
 
     async fn count_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error> {
-        let count =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM project_data WHERE project_id = $1")
-                .bind(project_id)
-                .fetch_one(&self.pool)
-                .await?;
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*)
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             WHERE pd.project_id = $1 AND pd.resource_level = 'STUDY'"
+        )
+        .bind(project_id)
+        .fetch_one(&self.pool)
+        .await?;
 
         Ok(count)
     }
@@ -87,9 +113,19 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         study_uid: &str,
     ) -> Result<Option<ProjectData>, sqlx::Error> {
         let result = sqlx::query_as::<_, ProjectData>(
-            "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at
-             FROM project_data 
-             WHERE project_id = $1 AND study_uid = $2"
+            "SELECT
+                pd.id,
+                pd.project_id,
+                pds.study_uid,
+                pds.study_description,
+                pds.patient_id,
+                pds.patient_name,
+                pds.study_date,
+                NULL::text as modality,
+                pd.created_at
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             WHERE pd.project_id = $1 AND pds.study_uid = $2 AND pd.resource_level = 'STUDY'"
         )
         .bind(project_id)
         .bind(study_uid)
@@ -110,11 +146,22 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         let search_pattern = format!("%{}%", search_term);
 
         let results = sqlx::query_as::<_, ProjectData>(
-            "SELECT id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at
-             FROM project_data 
-             WHERE project_id = $1 
-             AND (study_uid ILIKE $2 OR patient_id ILIKE $2 OR patient_name ILIKE $2)
-             ORDER BY id ASC
+            "SELECT
+                pd.id,
+                pd.project_id,
+                pds.study_uid,
+                pds.study_description,
+                pds.patient_id,
+                pds.patient_name,
+                pds.study_date,
+                NULL::text as modality,
+                pd.created_at
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             WHERE pd.project_id = $1
+             AND pd.resource_level = 'STUDY'
+             AND (pds.study_uid ILIKE $2 OR pds.patient_id ILIKE $2 OR pds.patient_name ILIKE $2)
+             ORDER BY pd.id ASC
              LIMIT $3 OFFSET $4"
         )
         .bind(project_id)
@@ -135,9 +182,12 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         let search_pattern = format!("%{}%", search_term);
 
         let count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM project_data 
-             WHERE project_id = $1 
-             AND (study_uid ILIKE $2 OR patient_id ILIKE $2 OR patient_name ILIKE $2)",
+            "SELECT COUNT(*)
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             WHERE pd.project_id = $1
+             AND pd.resource_level = 'STUDY'
+             AND (pds.study_uid ILIKE $2 OR pds.patient_id ILIKE $2 OR pds.patient_name ILIKE $2)",
         )
         .bind(project_id)
         .bind(&search_pattern)
