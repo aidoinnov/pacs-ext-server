@@ -104,7 +104,9 @@ pub async fn get_annotation(
     >,
 ) -> impl Responder {
     match use_case.get_annotation_by_id(*annotation_id).await {
-        Ok(annotation) => HttpResponse::Ok().json(annotation),
+        Ok(annotation) => HttpResponse::Ok()
+            .insert_header(("Cache-Control", "public, max-age=5"))
+            .json(annotation),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
             "message": msg
@@ -209,7 +211,9 @@ pub async fn list_annotations(
     };
 
     match result {
-        Ok(annotations) => HttpResponse::Ok().json(annotations),
+        Ok(annotations) => HttpResponse::Ok()
+            .insert_header(("Cache-Control", "public, max-age=5"))
+            .json(annotations),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": "Internal Server Error",
             "message": e.to_string()
