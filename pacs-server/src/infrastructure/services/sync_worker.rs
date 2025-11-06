@@ -89,23 +89,35 @@ impl SyncServiceImpl {
             let pid: Option<String> = r.try_get("patient_id").ok();
             let sdate_raw: Option<String> = r.try_get("study_date").ok();
 
-            // upsert into project_data_study
-            let _ = sqlx::query(
-                r#"INSERT INTO project_data_study (project_id, study_uid, study_description, patient_id, study_date)
-                    VALUES ($1, $2, $3, $4, to_date($5, 'YYYYMMDD'))
-                    ON CONFLICT (project_id, study_uid)
+            // upsert into project_data_study (no project_id column)
+            let study_id: i32 = sqlx::query_scalar(
+                r#"INSERT INTO project_data_study (study_uid, study_description, patient_id, study_date)
+                    VALUES ($1, $2, $3, to_date($4, 'YYYYMMDD'))
+                    ON CONFLICT (study_uid)
                     DO UPDATE SET study_description = EXCLUDED.study_description,
                                   patient_id = EXCLUDED.patient_id,
-                                  study_date = EXCLUDED.study_date"#,
+                                  study_date = EXCLUDED.study_date
+                    RETURNING id"#,
             )
-            .bind(self.default_project_id)
-            .bind(uid)
-            .bind(desc)
-            .bind(pid)
-            .bind(sdate_raw)
-            .execute(&self.rbac_pool)
+            .bind(&uid)
+            .bind(&desc)
+            .bind(&pid)
+            .bind(sdate_raw.unwrap_or_default())
+            .fetch_one(&self.rbac_pool)
             .await
             .map_err(|e| format!("rbac upsert study failed: {}", e))?;
+
+            // Link study to project via project_data table
+            let _ = sqlx::query(
+                r#"INSERT INTO project_data (project_id, study_id, resource_level)
+                    VALUES ($1, $2, 'STUDY')
+                    ON CONFLICT (project_id, study_id, series_id, instance_id) DO NOTHING"#,
+            )
+            .bind(self.default_project_id)
+            .bind(study_id)
+            .execute(&self.rbac_pool)
+            .await
+            .map_err(|e| format!("rbac link study to project failed: {}", e))?;
             processed += 1;
         }
         Ok(processed)
@@ -149,11 +161,10 @@ impl SyncServiceImpl {
             let series_desc: Option<String> = r.try_get("series_desc").ok();
             let modality: Option<String> = r.try_get("modality").ok();
 
-            // find study id
+            // find study id (no project_id in project_data_study)
             let study_id = sqlx::query_scalar::<_, i32>(
-                r#"SELECT id FROM project_data_study WHERE project_id = $1 AND study_uid = $2"#,
+                r#"SELECT id FROM project_data_study WHERE study_uid = $1"#,
             )
-            .bind(self.default_project_id)
             .bind(study_uid)
             .fetch_optional(&self.rbac_pool)
             .await
@@ -220,14 +231,10 @@ impl SyncServiceImpl {
             let content_date: Option<String> = r.try_get("content_date").ok();
             let content_time: Option<String> = r.try_get("content_time").ok();
 
-            // find series id
+            // find series id (no project_id in project_data_study)
             let series_id = sqlx::query_scalar::<_, i32>(
-                r#"SELECT pds.id
-                    FROM project_data_series pds
-                    JOIN project_data_study pdt ON pds.study_id = pdt.id
-                   WHERE pdt.project_id = $1 AND pds.series_uid = $2"#,
+                r#"SELECT id FROM project_data_series WHERE series_uid = $1"#,
             )
-            .bind(self.default_project_id)
             .bind(series_uid)
             .fetch_optional(&self.rbac_pool)
             .await

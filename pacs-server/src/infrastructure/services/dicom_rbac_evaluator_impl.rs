@@ -677,11 +677,13 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         instance_uid: &str,
     ) -> RbacEvaluationResult {
         // instance_uid로 instance 찾기 (project_id로 필터링하여 정확도 향상)
+        // project_data 테이블을 통해 project와 instance를 연결
         let instance_id: Option<i32> = sqlx::query_scalar(
             "SELECT pdi.id FROM project_data_instance pdi
              JOIN project_data_series pds ON pdi.series_id = pds.id
              JOIN project_data_study pdt ON pds.study_id = pdt.id
-             WHERE pdi.instance_uid = $1 AND pdt.project_id = $2",
+             JOIN project_data pd ON pd.study_id = pdt.id
+             WHERE pdi.instance_uid = $1 AND pd.project_id = $2 AND pd.resource_level = 'STUDY'",
         )
         .bind(instance_uid)
         .bind(project_id)

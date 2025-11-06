@@ -305,6 +305,19 @@ impl Dcm4cheeQidoClient {
             )
         };
         let url = self.build_url(&inst_path, &[])?;
+
+        // 🔍 로그: 토큰 및 파라미터 출력
+        tracing::info!("🔍 QIDO Instances Request:");
+        tracing::info!("  📍 URL: {}", url);
+        tracing::info!("  🔑 Bearer Token: {}", if bearer_token.is_some() {
+            format!("Present ({}...)", bearer_token.unwrap().chars().take(20).collect::<String>())
+        } else {
+            "None".to_string()
+        });
+        tracing::info!("  📋 Params: {:?}", params);
+        tracing::info!("  👤 Study UID: {}", study_uid);
+        tracing::info!("  📁 Series UID: {}", series_uid);
+
         let mut req = self
             .http_client
             .get(url)
@@ -313,8 +326,12 @@ impl Dcm4cheeQidoClient {
 
         if let Some(token) = bearer_token {
             req = req.bearer_auth(token);
+            tracing::info!("  ✅ Using Bearer token authentication");
         } else if let (Some(u), Some(p)) = (&self.username, &self.password) {
             req = req.basic_auth(u, Some(p));
+            tracing::info!("  ✅ Using Basic authentication (user: {})", u);
+        } else {
+            tracing::warn!("  ⚠️  No authentication provided!");
         }
 
         if !params.is_empty() {
@@ -323,22 +340,43 @@ impl Dcm4cheeQidoClient {
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
             req = req.query(&qp);
+            tracing::info!("  📊 Query params added: {:?}", qp);
         }
 
+        tracing::info!("  🚀 Sending request...");
         let resp = req.send().await.map_err(|e| {
+            tracing::error!("  ❌ QIDO /instances request failed: {}", e);
             ServiceError::ExternalServiceError(format!("QIDO /instances failed: {}", e))
         })?;
         let status = resp.status();
+        tracing::info!("  📥 Response status: {}", status);
+
         let body = resp.text().await.unwrap_or_default();
+        tracing::info!("  📄 Response body length: {} bytes", body.len());
+
+        if body.len() < 500 {
+            tracing::info!("  📄 Response body: {}", body);
+        } else {
+            tracing::info!("  📄 Response body (first 500 chars): {}", &body[..500]);
+        }
+
         if !status.is_success() {
+            tracing::error!("  ❌ QIDO request failed with status {}: {}", status, body);
             return Err(ServiceError::ExternalServiceError(format!(
                 "QIDO /instances failed ({}): {}",
                 status, body
             )));
         }
+
         let json: Value = serde_json::from_str(&body).map_err(|e| {
+            tracing::error!("  ❌ Failed to parse JSON: {}", e);
             ServiceError::ExternalServiceError(format!("QIDO /instances parse error: {}", e))
         })?;
+
+        if let Some(arr) = json.as_array() {
+            tracing::info!("  ✅ Parsed {} instances from QIDO response", arr.len());
+        }
+
         Ok(json)
     }
 }
