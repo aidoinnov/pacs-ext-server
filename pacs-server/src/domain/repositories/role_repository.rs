@@ -1,6 +1,6 @@
+use crate::domain::entities::{NewRole, Role};
 use async_trait::async_trait;
 use sqlx::PgPool;
-use crate::domain::entities::{Role, NewRole};
 
 #[async_trait]
 pub trait RoleRepository: Send + Sync {

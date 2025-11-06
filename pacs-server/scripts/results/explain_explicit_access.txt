@@ -1,0 +1,19 @@
+-- EXPLAIN captured at 20251030-081111
+-- SQL: SELECT 1 FROM project_data_access WHERE user_id = 10 AND project_id = 1 AND resource_level = 'STUDY' AND study_id = 123 AND status = 'APPROVED' LIMIT 1;
+
+                                                                                                                                      QUERY PLAN                                                                                                                                       
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.00..1.63 rows=1 width=4) (actual time=0.013..0.014 rows=0 loops=1)
+   Output: 1
+   Buffers: shared hit=1
+   ->  Seq Scan on public.project_data_access  (cost=0.00..1.63 rows=1 width=4) (actual time=0.009..0.010 rows=0 loops=1)
+         Output: 1
+         Filter: ((project_data_access.user_id = 10) AND (project_data_access.project_id = 1) AND (project_data_access.resource_level = 'STUDY'::resource_level_enum) AND (project_data_access.study_id = 123) AND (project_data_access.status = 'APPROVED'::data_access_status_enum))
+         Buffers: shared hit=1
+ Query Identifier: -3875988242647953365
+ Planning:
+   Buffers: shared hit=331
+ Planning Time: 0.914 ms
+ Execution Time: 0.036 ms
+(12 rows)
+

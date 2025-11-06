@@ -1,7 +1,9 @@
-use async_trait::async_trait;
 use crate::domain::entities::{AccessLog, NewAccessLog, Permission};
-use crate::domain::repositories::{AccessLogRepository, UserRepository, ProjectRepository, RoleRepository, PermissionRepository};
+use crate::domain::repositories::{
+    AccessLogRepository, PermissionRepository, ProjectRepository, RoleRepository, UserRepository,
+};
 use crate::domain::ServiceError;
+use async_trait::async_trait;
 
 /// 접근 제어 및 로깅 도메인 서비스
 /// DICOM 리소스 접근에 대한 로그를 관리합니다
@@ -23,19 +25,32 @@ pub trait AccessControlService: Send + Sync {
     ) -> Result<AccessLog, ServiceError>;
 
     /// 특정 사용자의 접근 로그 조회 (최근 N개)
-    async fn get_user_access_logs(&self, user_id: i32, limit: i64) -> Result<Vec<AccessLog>, ServiceError>;
+    async fn get_user_access_logs(
+        &self,
+        user_id: i32,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, ServiceError>;
 
     /// 특정 프로젝트의 접근 로그 조회 (최근 N개)
-    async fn get_project_access_logs(&self, project_id: i32, limit: i64) -> Result<Vec<AccessLog>, ServiceError>;
+    async fn get_project_access_logs(
+        &self,
+        project_id: i32,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, ServiceError>;
 
     /// 특정 Study의 접근 로그 조회
-    async fn get_study_access_logs(&self, study_uid: &str, limit: i64) -> Result<Vec<AccessLog>, ServiceError>;
+    async fn get_study_access_logs(
+        &self,
+        study_uid: &str,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, ServiceError>;
 
     /// 사용자의 접근 로그 개수 조회
     async fn count_user_access(&self, user_id: i32) -> Result<i64, ServiceError>;
 
     /// 사용자가 프로젝트에 접근 가능한지 확인
-    async fn can_access_project(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError>;
+    async fn can_access_project(&self, user_id: i32, project_id: i32)
+        -> Result<bool, ServiceError>;
 
     // === 권한 검증 ===
 
@@ -135,7 +150,9 @@ where
 
         // 리소스 타입 검증
         if resource_type.trim().is_empty() {
-            return Err(ServiceError::ValidationError("Resource type cannot be empty".into()));
+            return Err(ServiceError::ValidationError(
+                "Resource type cannot be empty".into(),
+            ));
         }
 
         let new_log = NewAccessLog {
@@ -157,40 +174,71 @@ where
         Ok(self.access_log_repository.create(new_log).await?)
     }
 
-    async fn get_user_access_logs(&self, user_id: i32, limit: i64) -> Result<Vec<AccessLog>, ServiceError> {
+    async fn get_user_access_logs(
+        &self,
+        user_id: i32,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, ServiceError> {
         // 사용자 존재 확인
         if self.user_repository.find_by_id(user_id).await?.is_none() {
             return Err(ServiceError::NotFound("User not found".into()));
         }
 
-        Ok(self.access_log_repository.find_by_user_id(user_id, limit).await?)
+        Ok(self
+            .access_log_repository
+            .find_by_user_id(user_id, limit)
+            .await?)
     }
 
-    async fn get_project_access_logs(&self, project_id: i32, limit: i64) -> Result<Vec<AccessLog>, ServiceError> {
+    async fn get_project_access_logs(
+        &self,
+        project_id: i32,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, ServiceError> {
         // 프로젝트 존재 확인
-        if self.project_repository.find_by_id(project_id).await?.is_none() {
+        if self
+            .project_repository
+            .find_by_id(project_id)
+            .await?
+            .is_none()
+        {
             return Err(ServiceError::NotFound("Project not found".into()));
         }
 
-        Ok(self.access_log_repository.find_by_project_id(project_id, limit).await?)
+        Ok(self
+            .access_log_repository
+            .find_by_project_id(project_id, limit)
+            .await?)
     }
 
-    async fn get_study_access_logs(&self, study_uid: &str, limit: i64) -> Result<Vec<AccessLog>, ServiceError> {
-        Ok(self.access_log_repository.find_by_study_uid(study_uid, limit).await?)
+    async fn get_study_access_logs(
+        &self,
+        study_uid: &str,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, ServiceError> {
+        Ok(self
+            .access_log_repository
+            .find_by_study_uid(study_uid, limit)
+            .await?)
     }
 
     async fn count_user_access(&self, user_id: i32) -> Result<i64, ServiceError> {
         Ok(self.access_log_repository.count_by_user_id(user_id).await?)
     }
 
-    async fn can_access_project(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError> {
+    async fn can_access_project(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<bool, ServiceError> {
         // 사용자 존재 확인
         if self.user_repository.find_by_id(user_id).await?.is_none() {
             return Err(ServiceError::NotFound("User not found".into()));
         }
 
         // 프로젝트 존재 확인
-        let project = self.project_repository
+        let project = self
+            .project_repository
             .find_by_id(project_id)
             .await?
             .ok_or(ServiceError::NotFound("Project not found".into()))?;
@@ -249,7 +297,7 @@ where
 
                     LIMIT 1
                 )
-            )"
+            )",
         )
         .bind(user_id)
         .bind(project_id)
@@ -272,13 +320,20 @@ where
         }
 
         // 프로젝트 존재 확인
-        if self.project_repository.find_by_id(project_id).await?.is_none() {
+        if self
+            .project_repository
+            .find_by_id(project_id)
+            .await?
+            .is_none()
+        {
             return Err(ServiceError::NotFound("Project not found".into()));
         }
 
         // 사용자가 프로젝트의 멤버인지 확인
         if !self.is_project_member(user_id, project_id).await? {
-            return Err(ServiceError::Unauthorized("User is not a member of this project".into()));
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
         }
 
         // 사용자가 프로젝트에서 가진 모든 권한 조회 (역할을 통한 권한 + 프로젝트 직접 권한)
@@ -297,7 +352,7 @@ where
                  INNER JOIN security_user_project up ON pp.project_id = up.project_id
                  WHERE up.user_id = $1 AND pp.project_id = $2
              )
-             ORDER BY p.resource_type, p.action"
+             ORDER BY p.resource_type, p.action",
         )
         .bind(user_id)
         .bind(project_id)
@@ -309,7 +364,7 @@ where
 
     async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError> {
         let count = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1 AND project_id = $2"
+            "SELECT COUNT(*) FROM security_user_project WHERE user_id = $1 AND project_id = $2",
         )
         .bind(user_id)
         .bind(project_id)

@@ -1,7 +1,7 @@
+use crate::domain::entities::{NewRole, Role, RoleScope};
+use crate::domain::repositories::RoleRepository;
 use async_trait::async_trait;
 use sqlx::PgPool;
-use crate::domain::entities::{Role, NewRole, RoleScope};
-use crate::domain::repositories::RoleRepository;
 
 #[derive(Clone)]
 pub struct RoleRepositoryImpl {
@@ -20,7 +20,7 @@ impl RoleRepository for RoleRepositoryImpl {
         sqlx::query_as::<_, Role>(
             "SELECT id, name, description, scope, created_at
              FROM security_role
-             WHERE id = $1"
+             WHERE id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -31,7 +31,7 @@ impl RoleRepository for RoleRepositoryImpl {
         sqlx::query_as::<_, Role>(
             "SELECT id, name, description, scope, created_at
              FROM security_role
-             WHERE name = $1"
+             WHERE name = $1",
         )
         .bind(name)
         .fetch_optional(&self.pool)
@@ -42,7 +42,7 @@ impl RoleRepository for RoleRepositoryImpl {
         sqlx::query_as::<_, Role>(
             "SELECT id, name, description, scope, created_at
              FROM security_role
-             ORDER BY created_at DESC"
+             ORDER BY created_at DESC",
         )
         .fetch_all(&self.pool)
         .await
@@ -53,7 +53,7 @@ impl RoleRepository for RoleRepositoryImpl {
             "SELECT id, name, description, scope, created_at
              FROM security_role
              WHERE scope = $1
-             ORDER BY created_at DESC"
+             ORDER BY created_at DESC",
         )
         .bind(scope)
         .fetch_all(&self.pool)
@@ -69,7 +69,7 @@ impl RoleRepository for RoleRepositoryImpl {
         sqlx::query_as::<_, Role>(
             "INSERT INTO security_role (name, description, scope)
              VALUES ($1, $2, $3)
-             RETURNING id, name, description, scope, created_at"
+             RETURNING id, name, description, scope, created_at",
         )
         .bind(new_role.name)
         .bind(new_role.description)
@@ -88,7 +88,7 @@ impl RoleRepository for RoleRepositoryImpl {
             "UPDATE security_role
              SET name = $2, description = $3, scope = $4
              WHERE id = $1
-             RETURNING id, name, description, scope, created_at"
+             RETURNING id, name, description, scope, created_at",
         )
         .bind(id)
         .bind(new_role.name)

@@ -1,15 +1,16 @@
-use actix_web::{web, HttpResponse, Responder, HttpRequest};
-use serde_json::json;
-use std::sync::Arc;
+#![allow(dead_code, unused_imports, unused_variables)]
 use crate::application::dto::mask_group_dto::{
-    CreateMaskGroupRequest, UpdateMaskGroupRequest, MaskGroupResponse,
-    MaskGroupListResponse, MaskGroupDetailResponse, SignedUrlRequest,
-    SignedUrlResponse, CompleteUploadRequest, CompleteUploadResponse
+    CompleteUploadRequest, CompleteUploadResponse, CreateMaskGroupRequest, MaskGroupDetailResponse,
+    MaskGroupListResponse, MaskGroupResponse, SignedUrlRequest, SignedUrlResponse,
+    UpdateMaskGroupRequest,
 };
 use crate::application::use_cases::MaskGroupUseCase;
 use crate::domain::ServiceError;
+use actix_web::{web, HttpRequest, HttpResponse, Responder};
+use serde_json::json;
+use std::sync::Arc;
 
-pub struct MaskGroupController<MGS, SUS> 
+pub struct MaskGroupController<MGS, SUS>
 where
     MGS: crate::domain::services::MaskGroupService + Send + Sync,
     SUS: crate::application::services::SignedUrlService + Send + Sync,
@@ -55,10 +56,12 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let annotation_id = path.into_inner();
-    let mut request = req.into_inner();
-    request.annotation_id = annotation_id;
+    let request = req.into_inner();
 
-    println!("🔍 [MaskGroupController] 마스크 그룹 생성 요청: annotation_id = {}", annotation_id);
+    println!(
+        "🔍 [MaskGroupController] 마스크 그룹 생성 요청: annotation_id = {}",
+        annotation_id
+    );
 
     // X-User-ID 헤더에서 user_id 추출
     let user_id = _http_req
@@ -70,7 +73,10 @@ where
 
     println!("🔍 [MaskGroupController] user_id = {}", user_id);
 
-    match use_case.create_mask_group(request, user_id).await {
+    match use_case
+        .create_mask_group(annotation_id, request, user_id)
+        .await
+    {
         Ok(mask_group) => HttpResponse::Created().json(mask_group),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
@@ -92,6 +98,12 @@ where
             "error": "Database Error",
             "message": msg
         })),
+        Err(ServiceError::ExternalServiceError(msg)) => {
+            HttpResponse::InternalServerError().json(json!({
+                "error": "External Service Error",
+                "message": msg
+            }))
+        }
     }
 }
 
@@ -121,7 +133,7 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id) = path.into_inner();
-    
+
     // X-User-ID 헤더에서 user_id 추출
     let user_id = _http_req
         .headers()
@@ -178,7 +190,7 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let annotation_id = path.into_inner();
-    
+
     // X-User-ID 헤더에서 user_id 추출
     let user_id = _http_req
         .headers()
@@ -188,10 +200,17 @@ where
         .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
     // Query parameters 추출
-    let offset = query.get("offset").and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
-    let limit = query.get("limit").and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
+    let offset = query
+        .get("offset")
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
+    let limit = query
+        .get("limit")
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<i64>().ok()));
 
-    match use_case.list_mask_groups(Some(annotation_id), user_id, offset, limit).await {
+    match use_case
+        .list_mask_groups(Some(annotation_id), user_id, offset, limit)
+        .await
+    {
         Ok(mask_groups) => HttpResponse::Ok().json(mask_groups),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
@@ -241,7 +260,7 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id) = path.into_inner();
-    
+
     // X-User-ID 헤더에서 user_id 추출
     let user_id = _http_req
         .headers()
@@ -250,7 +269,10 @@ where
         .and_then(|s| s.parse::<i32>().ok())
         .unwrap_or(1); // 기본값은 1 (기존 코드와 호환)
 
-    match use_case.update_mask_group(group_id, req.into_inner(), user_id).await {
+    match use_case
+        .update_mask_group(group_id, req.into_inner(), user_id)
+        .await
+    {
         Ok(mask_group) => HttpResponse::Ok().json(mask_group),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
@@ -305,7 +327,7 @@ where
     SUS: crate::application::services::SignedUrlService + Send + Sync,
 {
     let (annotation_id, group_id) = path.into_inner();
-    
+
     // X-User-ID 헤더에서 user_id 추출
     let user_id = _http_req
         .headers()
@@ -366,7 +388,7 @@ where
     let (annotation_id, group_id) = path.into_inner();
     let mut request = req.into_inner();
     request.mask_group_id = group_id;
-    
+
     // X-User-ID 헤더에서 user_id 추출
     let user_id = _http_req
         .headers()
@@ -435,7 +457,7 @@ where
     let (annotation_id, group_id) = path.into_inner();
     let mut request = req.into_inner();
     request.mask_group_id = group_id;
-    
+
     // X-User-ID 헤더에서 user_id 추출
     let user_id = _http_req
         .headers()
@@ -477,20 +499,27 @@ where
 pub fn configure_routes<MGS, SUS>(
     cfg: &mut web::ServiceConfig,
     use_case: Arc<MaskGroupUseCase<MGS, SUS>>,
-)
-where
+) where
     MGS: crate::domain::services::MaskGroupService + Send + Sync + 'static,
     SUS: crate::application::services::SignedUrlService + Send + Sync + 'static,
 {
-    cfg.app_data(web::Data::new(use_case))
-        .service(
-            web::scope("/api/annotations/{annotation_id}/mask-groups")
-                .route("", web::post().to(create_mask_group::<MGS, SUS>))
-                .route("", web::get().to(list_mask_groups::<MGS, SUS>))
-                .route("/{group_id}", web::get().to(get_mask_group::<MGS, SUS>))
-                .route("/{group_id}", web::put().to(update_mask_group::<MGS, SUS>))
-                .route("/{group_id}", web::delete().to(delete_mask_group::<MGS, SUS>))
-                .route("/{group_id}/upload-url", web::post().to(generate_upload_url::<MGS, SUS>))
-                .route("/{group_id}/complete-upload", web::post().to(complete_upload::<MGS, SUS>))
-        );
+    cfg.app_data(web::Data::new(use_case)).service(
+        web::scope("/annotations/{annotation_id}/mask-groups")
+            .route("", web::post().to(create_mask_group::<MGS, SUS>))
+            .route("", web::get().to(list_mask_groups::<MGS, SUS>))
+            .route("/{group_id}", web::get().to(get_mask_group::<MGS, SUS>))
+            .route("/{group_id}", web::put().to(update_mask_group::<MGS, SUS>))
+            .route(
+                "/{group_id}",
+                web::delete().to(delete_mask_group::<MGS, SUS>),
+            )
+            .route(
+                "/{group_id}/upload-url",
+                web::post().to(generate_upload_url::<MGS, SUS>),
+            )
+            .route(
+                "/{group_id}/complete-upload",
+                web::post().to(complete_upload::<MGS, SUS>),
+            ),
+    );
 }

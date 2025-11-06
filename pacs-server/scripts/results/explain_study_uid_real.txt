@@ -1,0 +1,22 @@
+-- EXPLAIN captured at 20251030-083341
+-- SQL: SELECT id FROM project_data_study WHERE study_uid = '1.2.840.10008.1.2.1.999.1' AND project_id = (SELECT id FROM security_project WHERE name='PerfProj');
+
+                                                       QUERY PLAN                                                        
+-------------------------------------------------------------------------------------------------------------------------
+ Seq Scan on public.project_data_study  (cost=2.01..3.06 rows=1 width=4) (actual time=0.040..0.041 rows=1 loops=1)
+   Output: project_data_study.id
+   Filter: ((project_data_study.study_uid = '1.2.840.10008.1.2.1.999.1'::text) AND (project_data_study.project_id = $0))
+   Buffers: shared hit=2
+   InitPlan 1 (returns $0)
+     ->  Seq Scan on public.security_project  (cost=0.00..2.01 rows=1 width=4) (actual time=0.023..0.024 rows=1 loops=1)
+           Output: security_project.id
+           Filter: (security_project.name = 'PerfProj'::text)
+           Rows Removed by Filter: 1
+           Buffers: shared hit=1
+ Query Identifier: 9104416903317984062
+ Planning:
+   Buffers: shared hit=358
+ Planning Time: 2.132 ms
+ Execution Time: 0.094 ms
+(15 rows)
+

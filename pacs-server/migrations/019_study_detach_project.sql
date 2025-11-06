@@ -1,0 +1,43 @@
+-- Migration 019: Study detach from project (scaffold)
+-- WARNING: This is a scaffold for the upcoming refactor to normalize Study.
+-- Do NOT run in production without completing and validating the steps.
+
+-- BEGIN;
+--
+-- -- 1) Create new global study table
+-- CREATE TABLE IF NOT EXISTS study (
+--     id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+--     study_uid TEXT NOT NULL UNIQUE,
+--     study_description TEXT,
+--     patient_id TEXT,
+--     patient_name TEXT,
+--     patient_birth_date DATE,
+--     study_date DATE,
+--     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+-- );
+-- CREATE INDEX IF NOT EXISTS idx_study_uid ON study(study_uid);
+--
+-- -- 2) Project mapping table
+-- CREATE TABLE IF NOT EXISTS project_study_map (
+--     id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+--     project_id INTEGER NOT NULL REFERENCES security_project(id) ON DELETE CASCADE,
+--     study_id INTEGER NOT NULL REFERENCES study(id) ON DELETE CASCADE,
+--     UNIQUE(project_id, study_id)
+-- );
+-- CREATE INDEX IF NOT EXISTS idx_psm_project_study ON project_study_map(project_id, study_id);
+--
+-- -- 3) Data migration (example outline)
+-- -- INSERT INTO study(...) SELECT DISTINCT ... FROM project_data_study ...;
+-- -- INSERT INTO project_study_map(project_id, study_id) SELECT p.id, s.id FROM ...;
+--
+-- -- 4) Adjust foreign keys for series/instance after verifying design
+-- -- ALTER TABLE project_data_series ...;  -- deferred until finalized
+-- -- ALTER TABLE project_data_instance ...; -- deferred
+--
+-- -- 5) Optional compatibility view
+-- -- CREATE OR REPLACE VIEW project_data_study_compat AS SELECT ... FROM study s JOIN project_study_map psm ON ...;
+--
+-- COMMIT;
+
+-- Down migration (manual) to be defined when final script is authored.

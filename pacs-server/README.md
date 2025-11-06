@@ -10,6 +10,8 @@ PACS (Picture Archiving and Communication System) Extension Server는 의료 영
 - **RESTful API**: 표준 HTTP 메서드 지원
 - **Swagger 문서**: 자동 생성된 API 문서
 - **데이터 검증**: 입력 데이터 유효성 검사
+- **뷰어 소프트웨어 필터링**: OHIF Viewer, DICOM Viewer 등으로 필터링 ✨
+- **측정값 지원**: 구조화된 측정 데이터 저장 및 관리 ✨
 
 ### 🎭 마스크 업로드 시스템 ✅
 - **Object Storage 연동**: AWS S3 및 MinIO 지원
@@ -20,8 +22,12 @@ PACS (Picture Archiving and Communication System) Extension Server는 의료 영
 
 ### 👥 사용자 관리
 - **JWT 인증**: 토큰 기반 인증 시스템
+- **토큰 갱신**: Refresh token을 사용한 Access token 갱신 ✨
 - **권한 관리**: 역할 기반 접근 제어
 - **프로젝트 관리**: 사용자별 프로젝트 할당
+- **역할-권한 매트릭스**: 표 형태로 역할과 권한 관계 관리 ✨
+- **프로젝트 데이터 접근 관리**: 프로젝트 참여자의 데이터 접근 상태 관리 ✨
+- **사용자 회원가입 및 계정 삭제**: Keycloak 연동 사용자 생명주기 관리 ✨
 
 ### 🌐 웹 서버 기능
 - **CORS 지원**: 크로스 오리진 요청 처리
@@ -43,13 +49,17 @@ Presentation Layer (Controllers)
 ├── Annotation Controller
 ├── User Controller
 ├── Project Controller
-└── Mask Controller ✅
+├── Mask Controller ✅
+├── Role Permission Matrix Controller ✨
+└── Project Data Access Controller ✨
 
 Application Layer (Use Cases)
 ├── Annotation Use Case
 ├── User Use Case
 ├── Project Use Case
-└── Mask Use Case ✅
+├── Mask Use Case ✅
+├── Role Permission Matrix Use Case ✨
+└── Project Data Access Use Case ✨
 
 Domain Layer (Entities & Services)
 ├── Annotation Entity
@@ -68,10 +78,11 @@ Infrastructure Layer (Repositories & External)
 ### 기술 스택
 - **Backend**: Rust + Actix Web
 - **Database**: PostgreSQL + SQLx
-- **Authentication**: JWT
+- **Authentication**: JWT + Keycloak
+- **Token Management**: Keycloak Refresh Token
 - **Object Storage**: AWS S3 / MinIO
 - **Documentation**: Swagger/OpenAPI
-- **Testing**: Rust built-in testing
+- **Testing**: Rust built-in testing + Mockall + Mockito
 
 ## 🚀 빠른 시작
 
@@ -125,6 +136,14 @@ APP_OBJECT_STORAGE__SECRET_KEY=your-secret-key
 # CORS
 CORS_ENABLED=true
 CORS_ALLOWED_ORIGINS=["http://localhost:3000"]
+
+# Keycloak (사용자 인증)
+APP_KEYCLOAK_URL=http://localhost:8080
+APP_KEYCLOAK_REALM=dcm4che
+APP_KEYCLOAK_CLIENT_ID=pacs-server
+APP_KEYCLOAK_CLIENT_SECRET=your-client-secret
+APP_KEYCLOAK_ADMIN_USERNAME=admin
+APP_KEYCLOAK_ADMIN_PASSWORD=adminPassword123!
 ```
 
 ### 데이터베이스 스키마
@@ -177,6 +196,53 @@ CREATE TABLE annotation_mask (
 
 ## 📚 API 사용 예시
 
+### 사용자 회원가입
+```bash
+curl -X POST http://localhost:8080/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123",
+    "full_name": "Test User",
+    "organization": "Test Org",
+    "department": "Test Dept",
+    "phone": "010-1234-5678"
+  }'
+```
+
+### 이메일 인증
+```bash
+curl -X POST http://localhost:8080/api/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "token": "verification_token"
+  }'
+```
+
+### 관리자 승인
+```bash
+curl -X POST http://localhost:8080/api/admin/users/approve \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <admin-token>" \
+  -d '{
+    "user_id": 1
+  }'
+```
+
+### 계정 삭제
+```bash
+curl -X DELETE http://localhost:8080/api/users/1 \
+  -H "Authorization: Bearer <admin-token>"
+```
+
+### 사용자 상태 조회
+```bash
+curl -X GET http://localhost:8080/api/users/1/status \
+  -H "Authorization: Bearer <user-token>"
+```
+
 ### 어노테이션 생성
 ```bash
 curl -X POST http://localhost:8080/api/annotations \
@@ -194,9 +260,57 @@ curl -X POST http://localhost:8080/api/annotations \
   }'
 ```
 
+### 측정값이 포함된 어노테이션 생성
+```bash
+curl -X POST http://localhost:8080/api/annotations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt-token>" \
+  -d '{
+    "study_uid": "1.2.3.4.5.6.7.8.9.10",
+    "series_uid": "1.2.3.4.5.6.7.8.9.11",
+    "instance_uid": "1.2.3.4.5.6.7.8.9.12",
+    "project_id": 1,
+    "annotation_data": {
+      "type": "measurement",
+      "points": [[0, 0], [100, 100]]
+    },
+    "description": "폐 결절 크기 측정",
+    "tool_name": "Measurement Tool",
+    "tool_version": "2.1.0",
+    "viewer_software": "OHIF Viewer",
+    "measurement_values": [
+      {
+        "id": "m1",
+        "type": "raw",
+        "values": [42.3, 18.7],
+        "unit": "mm"
+      },
+      {
+        "id": "m2",
+        "type": "mean",
+        "values": [30.5],
+        "unit": "mm"
+      }
+    ]
+  }'
+```
+
 ### 어노테이션 조회
 ```bash
+# 특정 어노테이션 조회
 curl -X GET http://localhost:8080/api/annotations/1 \
+  -H "Authorization: Bearer <jwt-token>"
+
+# 뷰어 소프트웨어로 필터링
+curl -X GET "http://localhost:8080/api/annotations?viewer_software=OHIF%20Viewer" \
+  -H "Authorization: Bearer <jwt-token>"
+
+# 사용자별 뷰어 소프트웨어 필터링
+curl -X GET "http://localhost:8080/api/annotations?user_id=123&viewer_software=DICOM%20Viewer" \
+  -H "Authorization: Bearer <jwt-token>"
+
+# 프로젝트별 필터링
+curl -X GET "http://localhost:8080/api/annotations?project_id=456&viewer_software=OHIF%20Viewer" \
   -H "Authorization: Bearer <jwt-token>"
 ```
 
@@ -231,9 +345,9 @@ cargo test --test annotation_use_case_test --test mask_group_controller_test --t
 ```
 
 ### 테스트 커버리지
-- **단위 테스트**: 43개 테스트, 100% 통과 ✅
-- **통합 테스트**: 79개 테스트, 100% 통과 ✅
-- **총 테스트**: 122개 테스트, 100% 통과 ✅
+- **단위 테스트**: 70개 테스트, 100% 통과 ✅
+- **통합 테스트**: 85개 테스트, 100% 통과 ✅
+- **총 테스트**: 155개 테스트, 100% 통과 ✅
 
 ### 테스트 카테고리
 - **Domain Entities**: 16개 테스트 (mask, mask_group)
@@ -242,6 +356,8 @@ cargo test --test annotation_use_case_test --test mask_group_controller_test --t
 - **API Controllers**: 20개 테스트 (annotation, mask_group, mask)
 - **Service Layer**: 52개 테스트 (user, project, permission, access_control, annotation)
 - **Use Cases**: 7개 테스트 (annotation business logic)
+- **Role Permission Matrix**: 12개 테스트 (단위 6개 + 통합 6개) ✨
+- **Project Data Access**: 21개 테스트 (단위 21개) ✨
 
 ### 통합 테스트 세부사항
 - **annotation_controller_test**: 4개 테스트 (API 엔드포인트)
@@ -249,6 +365,7 @@ cargo test --test annotation_use_case_test --test mask_group_controller_test --t
 - **mask_controller_test**: 8개 테스트 (마스크 API)
 - **mask_group_controller_test**: 8개 테스트 (마스크 그룹 API)
 - **service_test**: 52개 테스트 (서비스 레이어)
+- **role_permission_matrix_integration_tests**: 6개 테스트 (매트릭스 API) ✨
 
 ## 📊 성능
 
@@ -325,6 +442,8 @@ CMD ["pacs-server"]
 - [데이터베이스 스키마](docs/technical/DATABASE_SCHEMA_MASK_UPLOAD.md)
 - [Object Storage 연동](docs/technical/OBJECT_STORAGE_INTEGRATION.md)
 - [트랜잭션 처리 최적화](docs/technical/TRANSACTION_OPTIMIZATION_FINAL.md) ✨
+- [뷰어 소프트웨어 필터링](docs/VIEWER_SOFTWARE_FILTERING.md) ✨
+- [어노테이션 측정값 기능](docs/ANNOTATION_MEASUREMENT_VALUES.md) ✨
 
 ### 개발 가이드
 - [구현 계획서](docs/todo/implementation_plan.md)
@@ -368,6 +487,40 @@ CMD ["pacs-server"]
 자세한 변경 이력은 [CHANGELOG.md](docs/technical/CHANGELOG.md)를 참조하세요.
 
 ### 주요 버전
+- **v1.0.0-beta.6**: 프로젝트 데이터 접근 관리 API (2025-01-27) ✨
+  - 프로젝트 참여자의 데이터 접근 상태 관리
+  - 페이지네이션, 검색, 필터링 지원
+  - 데이터 접근 매트릭스 조회
+  - 완전한 테스트 커버리지 (21개 테스트)
+  - OpenAPI 문서화 완료
+
+- **v1.0.0-beta.5**: 역할-권한 매트릭스 API (2024-12-19) ✨
+  - 역할과 권한 간의 관계를 매트릭스 형태로 조회
+  - 개별 권한 할당/제거 API 구현
+  - 글로벌/프로젝트별 역할 지원
+  - 완전한 테스트 커버리지 (12개 테스트)
+  - OpenAPI 문서화 완료
+
+- **v1.0.0-beta.4**: 어노테이션 측정값 기능 (2025-01-27) ✨
+  - 구조화된 측정 데이터 저장 및 관리
+  - JSONB 기반 유연한 측정값 스키마
+  - 다양한 측정 타입 및 단위 지원
+  - 포괄적인 API 문서화 및 테스트
+  - 성능 최적화된 JSONB 인덱싱
+
+- **v1.0.0-beta.3**: 뷰어 소프트웨어 필터링 기능 (2025-01-27) ✨
+  - 뷰어 소프트웨어별 어노테이션 필터링 지원
+  - API 라우팅 404 오류 수정
+  - 포괄적인 테스트 커버리지 (15+ 새 테스트)
+  - 동적 테스트 데이터 생성 및 정리
+  - 완전한 기술 문서화
+
+- **v1.0.0-beta.2**: 통합 테스트 컴파일 수정 (2025-01-27) ✅
+  - 9개 통합 테스트 파일 컴파일 오류 해결
+  - 서비스 생성자 패턴 표준화
+  - DTO 필드 완성도 개선
+  - 100% 테스트 컴파일 성공
+
 - **v1.0.0-beta.1**: 트랜잭션 처리 최적화 (2025-10-11) ✅
   - 122개 테스트 모두 통과
   - 원자적 트랜잭션 처리 구현
@@ -386,6 +539,6 @@ CMD ["pacs-server"]
 - **v1.3.0**: AI 통합 및 자동 마스크 생성
 
 ---
-**최종 업데이트**: 2025-10-11  
+**최종 업데이트**: 2025-01-27  
 **작성자**: AI Assistant  
-**버전**: 1.0.0-beta.1
+**버전**: 1.0.0-beta.6

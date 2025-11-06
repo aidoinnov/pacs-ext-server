@@ -19,7 +19,7 @@ CREATE TABLE security_user (
     keycloak_id UUID UNIQUE NOT NULL,
     username TEXT NOT NULL UNIQUE,
     email TEXT NOT NULL UNIQUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE security_project (
@@ -27,7 +27,7 @@ CREATE TABLE security_project (
     name TEXT NOT NULL UNIQUE,
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE security_role (
@@ -35,7 +35,7 @@ CREATE TABLE security_role (
     name TEXT NOT NULL UNIQUE,
     description TEXT,
     scope TEXT NOT NULL DEFAULT 'GLOBAL' CHECK (scope IN ('GLOBAL','PROJECT')),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE security_permission (
@@ -108,7 +108,7 @@ CREATE TABLE security_grant_log (
     project_id INTEGER REFERENCES security_project(id),
     action grant_action_enum NOT NULL DEFAULT 'GRANT',
     via_group_id INTEGER,
-    logged_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    logged_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE security_access_log (
@@ -126,7 +126,7 @@ CREATE TABLE security_access_log (
     ip_address TEXT,
     session_id TEXT,
     via_group_id INTEGER,
-    logged_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    logged_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================
@@ -139,7 +139,7 @@ CREATE TABLE security_group (
     name TEXT NOT NULL,
     description TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (project_id, name)
 );
 
@@ -210,7 +210,7 @@ CREATE TABLE annotation_annotation (
     description TEXT,
     data JSONB NOT NULL,
     is_shared BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -221,7 +221,7 @@ CREATE TABLE annotation_annotation_history (
     action TEXT NOT NULL,
     data_before JSONB,
     data_after JSONB,
-    action_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    action_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================

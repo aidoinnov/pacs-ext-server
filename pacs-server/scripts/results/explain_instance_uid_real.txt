@@ -1,0 +1,22 @@
+-- EXPLAIN captured at 20251030-083342
+-- SQL: SELECT id FROM project_data_instance WHERE instance_uid = '1.2.840.10008.1.2.1.999.1.1.1' AND series_id = (SELECT id FROM project_data_series WHERE series_uid = '1.2.840.10008.1.2.1.999.1.1');
+
+                                                                         QUERY PLAN                                                                         
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using idx_project_data_instance_uid on public.project_data_instance  (cost=1.14..9.16 rows=1 width=4) (actual time=0.038..0.039 rows=1 loops=1)
+   Output: project_data_instance.id
+   Index Cond: ((project_data_instance.instance_uid)::text = '1.2.840.10008.1.2.1.999.1.1.1'::text)
+   Filter: (project_data_instance.series_id = $0)
+   Buffers: shared hit=3
+   InitPlan 1 (returns $0)
+     ->  Seq Scan on public.project_data_series  (cost=0.00..1.00 rows=1 width=4) (actual time=0.011..0.011 rows=1 loops=1)
+           Output: project_data_series.id
+           Filter: (project_data_series.series_uid = '1.2.840.10008.1.2.1.999.1.1'::text)
+           Buffers: shared hit=1
+ Query Identifier: -910931477549669425
+ Planning:
+   Buffers: shared hit=209
+ Planning Time: 0.683 ms
+ Execution Time: 0.088 ms
+(15 rows)
+

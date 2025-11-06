@@ -1,5 +1,6 @@
 use crate::application::dto::{
-    LoginRequest, LoginResponse, RefreshTokenResponse, VerifyTokenResponse,
+    mask_email, FindUsernameResponse, LoginRequest, LoginResponse, RefreshTokenRequest,
+    RefreshTokenResponse, ResetPasswordResponse, VerifyTokenResponse,
 };
 use crate::domain::services::AuthService;
 use crate::domain::ServiceError;
@@ -45,23 +46,49 @@ impl<A: AuthService> AuthUseCase<A> {
         })
     }
 
-    /// 토큰 갱신
-    pub async fn refresh_token(&self, token: &str) -> Result<RefreshTokenResponse, ServiceError> {
-        // 먼저 토큰 검증
-        let user = self.auth_service.verify_and_get_user(token).await?;
-
-        // 새 토큰 생성
-        let new_token = self.auth_service.refresh_token(&user).await?;
-
-        Ok(RefreshTokenResponse {
-            token: new_token,
-            token_type: "Bearer".to_string(),
-            expires_in: 24 * 60 * 60,
-        })
+    /// 토큰 갱신 (Keycloak 사용)
+    pub async fn refresh_token(
+        &self,
+        request: RefreshTokenRequest,
+    ) -> Result<RefreshTokenResponse, ServiceError> {
+        // Keycloak의 refresh token endpoint를 통해 토큰 갱신
+        self.auth_service
+            .refresh_token_with_keycloak(&request.refresh_token)
+            .await
     }
 
     /// 로그아웃
     pub async fn logout(&self, token: &str) -> Result<(), ServiceError> {
         self.auth_service.logout(token).await
+    }
+
+    /// 아이디 찾기
+    pub async fn find_username(&self, email: &str) -> Result<FindUsernameResponse, ServiceError> {
+        let user = self.auth_service.find_username_by_email(email).await?;
+
+        // 이메일 마스킹
+        let masked_email = mask_email(&user.email);
+
+        Ok(FindUsernameResponse {
+            username: user.username,
+            masked_email,
+            message: "아이디를 찾았습니다.".to_string(),
+        })
+    }
+
+    /// 비밀번호 재설정
+    pub async fn reset_password(
+        &self,
+        username: &str,
+        email: &str,
+        new_password: &str,
+    ) -> Result<ResetPasswordResponse, ServiceError> {
+        self.auth_service
+            .reset_password_by_credentials(username, email, new_password)
+            .await?;
+
+        Ok(ResetPasswordResponse {
+            message: "비밀번호가 성공적으로 재설정되었습니다.".to_string(),
+        })
     }
 }

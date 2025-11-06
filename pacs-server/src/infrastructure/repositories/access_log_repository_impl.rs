@@ -1,8 +1,8 @@
+use crate::domain::entities::{AccessLog, NewAccessLog};
+use crate::domain::repositories::AccessLogRepository;
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use sqlx::PgPool;
-use crate::domain::entities::{AccessLog, NewAccessLog};
-use crate::domain::repositories::AccessLogRepository;
 
 pub struct AccessLogRepositoryImpl {
     pool: PgPool,
@@ -42,7 +42,11 @@ impl AccessLogRepository for AccessLogRepositoryImpl {
         .await
     }
 
-    async fn find_by_user_id(&self, user_id: i32, limit: i64) -> Result<Vec<AccessLog>, sqlx::Error> {
+    async fn find_by_user_id(
+        &self,
+        user_id: i32,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, sqlx::Error> {
         sqlx::query_as::<_, AccessLog>(
             "SELECT id, user_id, project_id, resource_type, study_uid, series_uid, instance_uid,
                     action, result, dicom_tag_check, ae_title, ip_address, session_id, via_group_id, logged_at
@@ -57,7 +61,11 @@ impl AccessLogRepository for AccessLogRepositoryImpl {
         .await
     }
 
-    async fn find_by_project_id(&self, project_id: i32, limit: i64) -> Result<Vec<AccessLog>, sqlx::Error> {
+    async fn find_by_project_id(
+        &self,
+        project_id: i32,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, sqlx::Error> {
         sqlx::query_as::<_, AccessLog>(
             "SELECT id, user_id, project_id, resource_type, study_uid, series_uid, instance_uid,
                     action, result, dicom_tag_check, ae_title, ip_address, session_id, via_group_id, logged_at
@@ -72,7 +80,11 @@ impl AccessLogRepository for AccessLogRepositoryImpl {
         .await
     }
 
-    async fn find_by_study_uid(&self, study_uid: &str, limit: i64) -> Result<Vec<AccessLog>, sqlx::Error> {
+    async fn find_by_study_uid(
+        &self,
+        study_uid: &str,
+        limit: i64,
+    ) -> Result<Vec<AccessLog>, sqlx::Error> {
         sqlx::query_as::<_, AccessLog>(
             "SELECT id, user_id, project_id, resource_type, study_uid, series_uid, instance_uid,
                     action, result, dicom_tag_check, ae_title, ip_address, session_id, via_group_id, logged_at
@@ -87,7 +99,11 @@ impl AccessLogRepository for AccessLogRepositoryImpl {
         .await
     }
 
-    async fn find_by_time_range(&self, start: NaiveDateTime, end: NaiveDateTime) -> Result<Vec<AccessLog>, sqlx::Error> {
+    async fn find_by_time_range(
+        &self,
+        start: NaiveDateTime,
+        end: NaiveDateTime,
+    ) -> Result<Vec<AccessLog>, sqlx::Error> {
         sqlx::query_as::<_, AccessLog>(
             "SELECT id, user_id, project_id, resource_type, study_uid, series_uid, instance_uid,
                     action, result, dicom_tag_check, ae_title, ip_address, session_id, via_group_id, logged_at
@@ -102,12 +118,11 @@ impl AccessLogRepository for AccessLogRepositoryImpl {
     }
 
     async fn count_by_user_id(&self, user_id: i32) -> Result<i64, sqlx::Error> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM security_access_log WHERE user_id = $1"
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM security_access_log WHERE user_id = $1")
+                .bind(user_id)
+                .fetch_one(&self.pool)
+                .await?;
 
         Ok(row.0)
     }

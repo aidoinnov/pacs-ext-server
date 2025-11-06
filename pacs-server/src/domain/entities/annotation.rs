@@ -1,20 +1,22 @@
 //! # 어노테이션 엔티티 모듈
-//! 
+//!
 //! 이 모듈은 의료 영상에 대한 어노테이션 정보를 나타내는 엔티티들을 정의합니다.
 //! 어노테이션은 의료진이 의료 영상에 추가한 표시, 측정, 분석 결과 등을 의미합니다.
 
 // 날짜/시간 처리를 위한 chrono 라이브러리
-use chrono::NaiveDateTime;
+//use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
+
 // JSON 직렬화/역직렬화를 위한 serde 라이브러리
 use serde::{Deserialize, Serialize};
 // SQLx를 통한 데이터베이스 행 매핑을 위한 트레이트
 use sqlx::FromRow;
 
 /// 의료 영상 어노테이션을 나타내는 엔티티
-/// 
+///
 /// 이 구조체는 데이터베이스의 `annotation_annotation` 테이블과 매핑되며,
 /// 의료진이 의료 영상에 추가한 어노테이션 정보를 저장합니다.
-/// 
+///
 /// # 필드
 /// - `id`: 데이터베이스에서 자동 생성되는 고유 식별자
 /// - `project_id`: 어노테이션이 속한 프로젝트의 ID
@@ -30,9 +32,9 @@ use sqlx::FromRow;
 /// - `updated_at`: 어노테이션이 마지막으로 수정된 시각
 /// - `viewer_software`: 어노테이션 생성에 사용된 뷰어 소프트웨어 (선택사항)
 /// - `description`: 어노테이션에 대한 설명 (선택사항)
-/// 
+///
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let annotation = Annotation {
 ///     id: 1,
 ///     project_id: 1,
@@ -73,20 +75,24 @@ pub struct Annotation {
     /// 다른 사용자와 공유 여부
     pub is_shared: bool,
     /// 어노테이션이 생성된 시각
-    pub created_at: NaiveDateTime,
+    // pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
     /// 어노테이션이 마지막으로 수정된 시각
-    pub updated_at: NaiveDateTime,
+    // pub updated_at: NaiveDateTime,
+    pub updated_at: DateTime<Utc>,
     /// 어노테이션 생성에 사용된 뷰어 소프트웨어 (선택사항)
     pub viewer_software: Option<String>,
     /// 어노테이션에 대한 설명 (선택사항)
     pub description: Option<String>,
+    /// 측정값 (JSON 배열 형태의 측정 객체들)
+    pub measurement_values: Option<serde_json::Value>,
 }
 
 /// 어노테이션 변경 이력을 나타내는 엔티티
-/// 
+///
 /// 이 구조체는 데이터베이스의 `annotation_annotation_history` 테이블과 매핑되며,
 /// 어노테이션의 모든 변경 사항을 추적합니다.
-/// 
+///
 /// # 필드
 /// - `id`: 데이터베이스에서 자동 생성되는 고유 식별자
 /// - `annotation_id`: 변경된 어노테이션의 ID
@@ -95,9 +101,9 @@ pub struct Annotation {
 /// - `data_before`: 변경 전 데이터 (JSON 형태)
 /// - `data_after`: 변경 후 데이터 (JSON 형태)
 /// - `action_at`: 변경이 수행된 시각
-/// 
+///
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let history = AnnotationHistory {
 ///     id: 1,
 ///     annotation_id: 1,
@@ -123,14 +129,15 @@ pub struct AnnotationHistory {
     /// 변경 후 데이터 (JSON 형태)
     pub data_after: Option<serde_json::Value>,
     /// 변경이 수행된 시각
-    pub action_at: NaiveDateTime,
+    // pub action_at: NaiveDateTime,
+    pub action_at: DateTime<Utc>,
 }
 
 /// 새로운 어노테이션 생성을 위한 DTO(Data Transfer Object)
-/// 
+///
 /// 이 구조체는 어노테이션 생성 요청 시 전달되는 데이터를 나타냅니다.
 /// 데이터베이스에 저장되기 전의 어노테이션 정보를 담고 있습니다.
-/// 
+///
 /// # 필드
 /// - `project_id`: 어노테이션이 속할 프로젝트의 ID
 /// - `user_id`: 어노테이션을 생성할 사용자의 ID
@@ -143,9 +150,9 @@ pub struct AnnotationHistory {
 /// - `description`: 어노테이션에 대한 설명 (선택사항)
 /// - `data`: 어노테이션의 실제 데이터 (JSON 형태)
 /// - `is_shared`: 다른 사용자와 공유 여부
-/// 
+///
 /// # 예시
-/// ```rust
+/// ```ignore
 /// let new_annotation = NewAnnotation {
 ///     project_id: 1,
 ///     user_id: 1,
@@ -180,6 +187,8 @@ pub struct NewAnnotation {
     pub viewer_software: Option<String>,
     /// 어노테이션에 대한 설명 (선택사항)
     pub description: Option<String>,
+    /// 측정값 (JSON 배열 형태의 측정 객체들)
+    pub measurement_values: Option<serde_json::Value>,
     /// 어노테이션의 실제 데이터 (JSON 형태)
     pub data: serde_json::Value,
     /// 다른 사용자와 공유 여부

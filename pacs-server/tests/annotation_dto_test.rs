@@ -1,14 +1,16 @@
 #[cfg(test)]
 mod annotation_dto_tests {
+    use chrono::{TimeZone, Utc};
     use pacs_server::application::dto::annotation_dto::{
-        CreateAnnotationRequest, UpdateAnnotationRequest, AnnotationResponse
+        AnnotationResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
     };
     use serde_json::json;
-    use chrono::NaiveDateTime;
 
     #[test]
     fn test_create_annotation_request_serialization() {
         let request = CreateAnnotationRequest {
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -24,6 +26,7 @@ mod annotation_dto_tests {
             tool_name: Some("Circle Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             description: Some("Test annotation with new fields".to_string()),
+            measurement_values: None,
         };
 
         // Test serialization
@@ -34,17 +37,25 @@ mod annotation_dto_tests {
         assert!(json_str.contains("description"));
 
         // Test deserialization
-        let deserialized: CreateAnnotationRequest = serde_json::from_str(&json_str)
-            .expect("Failed to deserialize");
-        assert_eq!(deserialized.viewer_software, Some("OHIF Viewer".to_string()));
+        let deserialized: CreateAnnotationRequest =
+            serde_json::from_str(&json_str).expect("Failed to deserialize");
+        assert_eq!(
+            deserialized.viewer_software,
+            Some("OHIF Viewer".to_string())
+        );
         assert_eq!(deserialized.tool_name, Some("Circle Tool".to_string()));
         assert_eq!(deserialized.tool_version, Some("2.1.0".to_string()));
-        assert_eq!(deserialized.description, Some("Test annotation with new fields".to_string()));
+        assert_eq!(
+            deserialized.description,
+            Some("Test annotation with new fields".to_string())
+        );
     }
 
     #[test]
     fn test_create_annotation_request_with_none_fields() {
         let request = CreateAnnotationRequest {
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -53,6 +64,7 @@ mod annotation_dto_tests {
             tool_name: None,
             tool_version: None,
             description: None,
+            measurement_values: None,
         };
 
         // Test serialization with None values
@@ -63,8 +75,8 @@ mod annotation_dto_tests {
         assert!(json_str.contains("description"));
 
         // Test deserialization
-        let deserialized: CreateAnnotationRequest = serde_json::from_str(&json_str)
-            .expect("Failed to deserialize");
+        let deserialized: CreateAnnotationRequest =
+            serde_json::from_str(&json_str).expect("Failed to deserialize");
         assert_eq!(deserialized.viewer_software, None);
         assert_eq!(deserialized.tool_name, None);
         assert_eq!(deserialized.tool_version, None);
@@ -86,6 +98,7 @@ mod annotation_dto_tests {
             tool_name: Some("Updated Rectangle Tool".to_string()),
             tool_version: Some("3.0.0".to_string()),
             description: Some("Updated description".to_string()),
+            measurement_values: None,
         };
 
         // Test serialization
@@ -96,12 +109,21 @@ mod annotation_dto_tests {
         assert!(json_str.contains("description"));
 
         // Test deserialization
-        let deserialized: UpdateAnnotationRequest = serde_json::from_str(&json_str)
-            .expect("Failed to deserialize");
-        assert_eq!(deserialized.viewer_software, Some("Updated OHIF Viewer".to_string()));
-        assert_eq!(deserialized.tool_name, Some("Updated Rectangle Tool".to_string()));
+        let deserialized: UpdateAnnotationRequest =
+            serde_json::from_str(&json_str).expect("Failed to deserialize");
+        assert_eq!(
+            deserialized.viewer_software,
+            Some("Updated OHIF Viewer".to_string())
+        );
+        assert_eq!(
+            deserialized.tool_name,
+            Some("Updated Rectangle Tool".to_string())
+        );
         assert_eq!(deserialized.tool_version, Some("3.0.0".to_string()));
-        assert_eq!(deserialized.description, Some("Updated description".to_string()));
+        assert_eq!(
+            deserialized.description,
+            Some("Updated description".to_string())
+        );
     }
 
     #[test]
@@ -121,8 +143,9 @@ mod annotation_dto_tests {
             tool_name: Some("Polygon Tool".to_string()),
             tool_version: Some("2.5.0".to_string()),
             description: Some("Polygon annotation".to_string()),
-            created_at: NaiveDateTime::parse_from_str("2024-01-01T12:00:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
-            updated_at: NaiveDateTime::parse_from_str("2024-01-01T12:30:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
         };
 
         // Test serialization
@@ -135,14 +158,20 @@ mod annotation_dto_tests {
         assert!(json_str.contains("updated_at"));
 
         // Test deserialization
-        let deserialized: AnnotationResponse = serde_json::from_str(&json_str)
-            .expect("Failed to deserialize");
+        let deserialized: AnnotationResponse =
+            serde_json::from_str(&json_str).expect("Failed to deserialize");
         assert_eq!(deserialized.id, 123);
         assert_eq!(deserialized.user_id, 456);
-        assert_eq!(deserialized.viewer_software, Some("OHIF Viewer".to_string()));
+        assert_eq!(
+            deserialized.viewer_software,
+            Some("OHIF Viewer".to_string())
+        );
         assert_eq!(deserialized.tool_name, Some("Polygon Tool".to_string()));
         assert_eq!(deserialized.tool_version, Some("2.5.0".to_string()));
-        assert_eq!(deserialized.description, Some("Polygon annotation".to_string()));
+        assert_eq!(
+            deserialized.description,
+            Some("Polygon annotation".to_string())
+        );
     }
 
     #[test]
@@ -158,8 +187,9 @@ mod annotation_dto_tests {
             tool_name: None,
             tool_version: None,
             description: None,
-            created_at: NaiveDateTime::parse_from_str("2024-01-02T10:00:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
-            updated_at: NaiveDateTime::parse_from_str("2024-01-02T10:15:00", "%Y-%m-%dT%H:%M:%S").unwrap(),
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704196800, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704197700, 0).unwrap(),
         };
 
         // Test serialization with None values
@@ -170,8 +200,8 @@ mod annotation_dto_tests {
         assert!(json_str.contains("description"));
 
         // Test deserialization
-        let deserialized: AnnotationResponse = serde_json::from_str(&json_str)
-            .expect("Failed to deserialize");
+        let deserialized: AnnotationResponse =
+            serde_json::from_str(&json_str).expect("Failed to deserialize");
         assert_eq!(deserialized.id, 789);
         assert_eq!(deserialized.user_id, 101);
         assert_eq!(deserialized.viewer_software, None);
@@ -193,6 +223,8 @@ mod annotation_dto_tests {
         });
 
         let circle_request = CreateAnnotationRequest {
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -201,9 +233,11 @@ mod annotation_dto_tests {
             tool_name: Some("Circle Tool".to_string()),
             tool_version: Some("2.1.0".to_string()),
             description: Some("Circle annotation test".to_string()),
+            measurement_values: None,
         };
 
-        let circle_json = serde_json::to_string(&circle_request).expect("Failed to serialize circle");
+        let circle_json =
+            serde_json::to_string(&circle_request).expect("Failed to serialize circle");
         assert!(circle_json.contains("circle"));
         assert!(circle_json.contains("radius"));
 
@@ -219,6 +253,8 @@ mod annotation_dto_tests {
         });
 
         let rectangle_request = CreateAnnotationRequest {
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -227,9 +263,11 @@ mod annotation_dto_tests {
             tool_name: Some("Rectangle Tool".to_string()),
             tool_version: Some("1.8.0".to_string()),
             description: Some("Rectangle annotation test".to_string()),
+            measurement_values: None,
         };
 
-        let rectangle_json = serde_json::to_string(&rectangle_request).expect("Failed to serialize rectangle");
+        let rectangle_json =
+            serde_json::to_string(&rectangle_request).expect("Failed to serialize rectangle");
         assert!(rectangle_json.contains("rectangle"));
         assert!(rectangle_json.contains("width"));
         assert!(rectangle_json.contains("height"));
@@ -244,6 +282,8 @@ mod annotation_dto_tests {
         });
 
         let point_request = CreateAnnotationRequest {
+            project_id: Some(1),
+            user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -252,6 +292,7 @@ mod annotation_dto_tests {
             tool_name: Some("Point Tool".to_string()),
             tool_version: Some("3.2.1".to_string()),
             description: Some("Point annotation test".to_string()),
+            measurement_values: None,
         };
 
         let point_json = serde_json::to_string(&point_request).expect("Failed to serialize point");
@@ -259,5 +300,3 @@ mod annotation_dto_tests {
         assert!(point_json.contains("Cornerstone.js"));
     }
 }
-
-

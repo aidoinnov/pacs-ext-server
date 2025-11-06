@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// 권한 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize)]
@@ -23,6 +24,13 @@ pub struct CreateRoleRequest {
     pub description: Option<String>,
 }
 
+/// 역할 업데이트 요청 DTO
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdateRoleRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
 /// 역할 응답 DTO
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RoleResponse {
@@ -33,7 +41,7 @@ pub struct RoleResponse {
 }
 
 /// 권한 응답 DTO
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct PermissionResponse {
     pub id: i32,
     pub resource_type: String,
@@ -66,4 +74,31 @@ pub struct ProjectPermissionsResponse {
 pub struct ResourcePermissionsResponse {
     pub resource_type: String,
     pub permissions: Vec<PermissionResponse>,
+}
+
+/// 역할과 권한 정보를 포함하는 응답 DTO
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct RoleWithPermissionsResponse {
+    pub id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub scope: String,
+    pub permissions: Vec<PermissionResponse>,
+}
+
+/// 페이지네이션이 포함된 역할 목록 응답 DTO
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct RolesWithPermissionsListResponse {
+    pub roles: Vec<RoleWithPermissionsResponse>,
+    pub total_count: i64,
+    pub page: i32,
+    pub page_size: i32,
+    pub total_pages: i32,
+}
+
+/// 페이지네이션 쿼리 파라미터 DTO
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct PaginationQuery {
+    pub page: Option<i32>,
+    pub page_size: Option<i32>,
 }

@@ -6,24 +6,33 @@ use serde::{Deserialize, Serialize};
 pub enum ObjectStorageError {
     #[error("S3 operation failed: {0}")]
     S3Error(String),
-    
+
     #[error("MinIO operation failed: {0}")]
     MinIOError(String),
-    
+
     #[error("Configuration error: {0}")]
     ConfigError(String),
-    
+
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+
     #[error("File not found: {0}")]
     FileNotFound(String),
-    
+
     #[error("Permission denied: {0}")]
     PermissionDenied(String),
-    
+
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
-    
+
     #[error("Network error: {0}")]
     NetworkError(String),
+}
+
+impl From<crate::domain::ServiceError> for ObjectStorageError {
+    fn from(err: crate::domain::ServiceError) -> Self {
+        ObjectStorageError::S3Error(err.to_string())
+    }
 }
 
 /// 업로드된 파일 정보
@@ -65,40 +74,37 @@ pub trait ObjectStorageService: Send + Sync {
         file_path: &str,
         options: SignedUrlOptions,
     ) -> Result<String, ObjectStorageError>;
-    
+
     /// 다운로드용 Signed URL 생성
     async fn generate_download_url(
         &self,
         file_path: &str,
         ttl_seconds: u64,
     ) -> Result<String, ObjectStorageError>;
-    
+
     /// 파일 삭제
     async fn delete_file(&self, file_path: &str) -> Result<(), ObjectStorageError>;
-    
+
     /// 파일 메타데이터 조회
-    async fn get_file_metadata(
-        &self,
-        file_path: &str,
-    ) -> Result<UploadedFile, ObjectStorageError>;
-    
+    async fn get_file_metadata(&self, file_path: &str) -> Result<UploadedFile, ObjectStorageError>;
+
     /// 파일 존재 여부 확인
     async fn file_exists(&self, file_path: &str) -> Result<bool, ObjectStorageError>;
-    
+
     /// 파일 목록 조회 (prefix 기반)
     async fn list_files(
         &self,
         prefix: &str,
         max_keys: Option<i32>,
     ) -> Result<Vec<String>, ObjectStorageError>;
-    
+
     /// 파일 복사
     async fn copy_file(
         &self,
         source_path: &str,
         destination_path: &str,
     ) -> Result<(), ObjectStorageError>;
-    
+
     /// 파일 이동 (복사 후 삭제)
     async fn move_file(
         &self,
@@ -122,17 +128,19 @@ impl ObjectStorageServiceFactory {
     ) -> Result<Box<dyn ObjectStorageService>, ObjectStorageError> {
         match provider.to_lowercase().as_str() {
             "s3" => {
-                let s3_service = crate::infrastructure::external::s3_service::S3ObjectStorageService::new(
-                    bucket_name,
-                    region,
-                    access_key,
-                    secret_key,
-                ).await?;
+                let s3_service = crate::infrastructure::external::S3ObjectStorageService::new(
+                    bucket_name.to_string(),
+                    region.to_string(),
+                    access_key.to_string(),
+                    secret_key.to_string(),
+                )
+                .await?;
                 Ok(Box::new(s3_service))
             }
-            _ => Err(ObjectStorageError::ConfigError(
-                format!("Unsupported object storage provider: {}. Only 's3' is supported.", provider)
-            ))
+            _ => Err(ObjectStorageError::ConfigError(format!(
+                "Unsupported object storage provider: {}. Only 's3' is supported.",
+                provider
+            ))),
         }
     }
 }
@@ -158,33 +166,33 @@ impl ObjectStorageServiceBuilder {
             secret_key: String::new(),
         }
     }
-    
+
     pub fn provider(mut self, provider: &str) -> Self {
         self.provider = provider.to_string();
         self
     }
-    
+
     pub fn bucket_name(mut self, bucket_name: &str) -> Self {
         self.bucket_name = bucket_name.to_string();
         self
     }
-    
+
     pub fn region(mut self, region: &str) -> Self {
         self.region = region.to_string();
         self
     }
-    
+
     pub fn endpoint(mut self, endpoint: &str) -> Self {
         self.endpoint = endpoint.to_string();
         self
     }
-    
+
     pub fn credentials(mut self, access_key: &str, secret_key: &str) -> Self {
         self.access_key = access_key.to_string();
         self.secret_key = secret_key.to_string();
         self
     }
-    
+
     pub async fn build(self) -> Result<Box<dyn ObjectStorageService>, ObjectStorageError> {
         ObjectStorageServiceFactory::create(
             &self.provider,
@@ -193,7 +201,8 @@ impl ObjectStorageServiceBuilder {
             &self.endpoint,
             &self.access_key,
             &self.secret_key,
-        ).await
+        )
+        .await
     }
 }
 

@@ -1,0 +1,32 @@
+-- EXPLAIN captured at 20251030-081111
+-- SQL: SELECT ac.* FROM security_access_condition ac JOIN security_project_dicom_condition pc ON pc.access_condition_id = ac.id WHERE pc.project_id = 1 ORDER BY pc.priority DESC, ac.id ASC;
+
+                                                                                                                                     QUERY PLAN                                                                                                                                     
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=25.10..25.12 rows=8 width=1858) (actual time=0.045..0.046 rows=0 loops=1)
+   Output: ac.id, ac.resource_type, ac.resource_level, ac.dicom_tag, ac.operator, ac.value, ac.condition_type, ac.created_at, ac.institution_id, ac.patient_id, ac.study_uid_pattern, ac.series_uid_pattern, ac.modality, ac.date_range_start, ac.date_range_end, pc.priority
+   Sort Key: pc.priority DESC, ac.id
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=4
+   ->  Hash Join  (cost=14.47..24.98 rows=8 width=1858) (actual time=0.009..0.010 rows=0 loops=1)
+         Output: ac.id, ac.resource_type, ac.resource_level, ac.dicom_tag, ac.operator, ac.value, ac.condition_type, ac.created_at, ac.institution_id, ac.patient_id, ac.study_uid_pattern, ac.series_uid_pattern, ac.modality, ac.date_range_start, ac.date_range_end, pc.priority
+         Inner Unique: true
+         Hash Cond: (ac.id = pc.access_condition_id)
+         Buffers: shared hit=1
+         ->  Seq Scan on public.security_access_condition ac  (cost=0.00..10.40 rows=40 width=1854) (actual time=0.008..0.008 rows=0 loops=1)
+               Output: ac.id, ac.resource_type, ac.resource_level, ac.dicom_tag, ac.operator, ac.value, ac.condition_type, ac.created_at, ac.institution_id, ac.patient_id, ac.study_uid_pattern, ac.series_uid_pattern, ac.modality, ac.date_range_start, ac.date_range_end
+               Buffers: shared hit=1
+         ->  Hash  (cost=14.37..14.37 rows=8 width=8) (never executed)
+               Output: pc.priority, pc.access_condition_id
+               ->  Bitmap Heap Scan on public.security_project_dicom_condition pc  (cost=4.21..14.37 rows=8 width=8) (never executed)
+                     Output: pc.priority, pc.access_condition_id
+                     Recheck Cond: (pc.project_id = 1)
+                     ->  Bitmap Index Scan on idx_security_project_dicom_condition_project  (cost=0.00..4.21 rows=8 width=0) (never executed)
+                           Index Cond: (pc.project_id = 1)
+ Query Identifier: -2045759527522199610
+ Planning:
+   Buffers: shared hit=234
+ Planning Time: 0.874 ms
+ Execution Time: 0.139 ms
+(25 rows)
+

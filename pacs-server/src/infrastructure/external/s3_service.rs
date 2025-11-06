@@ -25,6 +25,21 @@ impl S3ObjectStorageService {
         access_key: &str,
         secret_key: &str,
     ) -> Result<Self, ObjectStorageError> {
+        // 디버깅: 자격 증명 정보 출력
+        println!("🔑 S3 자격 증명 정보:");
+        println!("   Bucket: {}", bucket_name);
+        println!("   Region: {}", region);
+        println!("   Access Key: {}...{}", 
+            &access_key[..access_key.len().min(8)], 
+            &access_key[access_key.len().saturating_sub(4)..]
+        );
+        println!("   Secret Key: {}...{}", 
+            &secret_key[..secret_key.len().min(8)], 
+            &secret_key[secret_key.len().saturating_sub(4)..]
+        );
+        println!("   Access Key Length: {}", access_key.len());
+        println!("   Secret Key Length: {}", secret_key.len());
+
         // AWS 설정 구성
         let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .region(aws_config::Region::new(region.to_string()))

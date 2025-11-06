@@ -1,6 +1,6 @@
+use crate::infrastructure::config::CorsConfig;
 use actix_cors::Cors;
 use actix_web::http::header;
-use crate::infrastructure::config::CorsConfig;
 
 /// CORS 미들웨어 설정
 pub fn configure_cors(cors_config: &CorsConfig) -> Cors {
@@ -33,7 +33,11 @@ pub fn configure_cors(cors_config: &CorsConfig) -> Cors {
     }
 
     // 허용된 메서드 설정
-    let methods: Vec<&str> = cors_config.allowed_methods.iter().map(|s| s.as_str()).collect();
+    let methods: Vec<&str> = cors_config
+        .allowed_methods
+        .iter()
+        .map(|s| s.as_str())
+        .collect();
     cors = cors.allowed_methods(methods);
 
     // 허용된 헤더 설정
@@ -42,7 +46,7 @@ pub fn configure_cors(cors_config: &CorsConfig) -> Cors {
         .iter()
         .filter_map(|h| h.parse().ok())
         .collect();
-    
+
     if headers.is_empty() {
         cors = cors.allowed_headers(vec![
             header::AUTHORIZATION,

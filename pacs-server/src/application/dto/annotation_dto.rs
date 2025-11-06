@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use chrono::NaiveDateTime;
+// use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 
 /// Annotation 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -50,6 +51,14 @@ pub struct CreateAnnotationRequest {
     /// 어노테이션에 대한 추가 설명이나 메모
     #[schema(example = "의심되는 병변 영역")]
     pub description: Option<String>,
+
+    /// 측정값
+    /// id, type, values, unit을 포함하는 측정 객체 배열
+    #[schema(example = json!([
+        {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"},
+        {"id": "m2", "type": "mean", "values": [30.5], "unit": "mm"}
+    ]))]
+    pub measurement_values: Option<serde_json::Value>,
 }
 
 /// Annotation 업데이트 요청 DTO
@@ -79,6 +88,13 @@ pub struct UpdateAnnotationRequest {
     /// 어노테이션에 대한 추가 설명이나 메모
     #[schema(example = "수정된 병변 영역")]
     pub description: Option<String>,
+
+    /// 측정값
+    /// id, type, values, unit을 포함하는 측정 객체 배열
+    #[schema(example = json!([
+        {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"}
+    ]))]
+    pub measurement_values: Option<serde_json::Value>,
 }
 
 /// Annotation 응답 DTO
@@ -128,15 +144,20 @@ pub struct AnnotationResponse {
     #[schema(example = "의심되는 병변 영역")]
     pub description: Option<String>,
 
+    /// 측정값
+    pub measurement_values: Option<serde_json::Value>,
+
     /// 생성 시간
     /// 어노테이션이 생성된 시각
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
-    pub created_at: NaiveDateTime,
+    // pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 
     /// 수정 시간
     /// 어노테이션이 마지막으로 수정된 시각
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
-    pub updated_at: NaiveDateTime,
+    // pub updated_at: NaiveDateTime,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Annotation 목록 응답 DTO

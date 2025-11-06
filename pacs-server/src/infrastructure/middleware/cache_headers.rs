@@ -1,9 +1,8 @@
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    Error, HttpMessage,
+    Error,
 };
 use futures::future::{ok, LocalBoxFuture, Ready};
-use std::task::{Context, Poll};
 
 /// HTTP Cache Headers Middleware
 /// Adds Cache-Control headers based on configuration
@@ -75,15 +74,19 @@ where
                 // Add Cache-Control header for GET requests
                 headers.insert(
                     actix_web::http::header::CACHE_CONTROL,
-                    actix_web::http::header::HeaderValue::from_str(
-                        &format!("public, max-age={}", max_age)
-                    ).unwrap(),
+                    actix_web::http::header::HeaderValue::from_str(&format!(
+                        "public, max-age={}",
+                        max_age
+                    ))
+                    .unwrap(),
                 );
             } else {
                 // Disable caching for non-GET requests or when caching is disabled
                 headers.insert(
                     actix_web::http::header::CACHE_CONTROL,
-                    actix_web::http::header::HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+                    actix_web::http::header::HeaderValue::from_static(
+                        "no-cache, no-store, must-revalidate",
+                    ),
                 );
             }
 
