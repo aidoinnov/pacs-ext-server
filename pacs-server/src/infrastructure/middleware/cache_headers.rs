@@ -69,6 +69,12 @@ where
 
             let headers = res.headers_mut();
 
+            // Check if Cache-Control header is already set by the handler
+            if headers.contains_key(actix_web::http::header::CACHE_CONTROL) {
+                // Handler already set Cache-Control, don't override it
+                return Ok(res);
+            }
+
             // Only add cache headers for GET requests and if enabled
             if enabled && method == actix_web::http::Method::GET {
                 // Add Cache-Control header for GET requests
