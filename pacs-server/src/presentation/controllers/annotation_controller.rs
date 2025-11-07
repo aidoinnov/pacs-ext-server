@@ -131,6 +131,7 @@ pub async fn get_annotation(
         ("user_id" = Option<i32>, Query, description = "사용자 ID로 필터링"),
         ("project_id" = Option<i32>, Query, description = "프로젝트 ID로 필터링"),
         ("viewer_software" = Option<String>, Query, description = "뷰어 소프트웨어로 필터링"),
+        ("level" = Option<String>, Query, description = "어노테이션 레벨로 필터링 (study, series, instance)"),
     ),
     responses(
         (status = 200, description = "List annotations successfully", body = AnnotationListResponse),
@@ -168,6 +169,9 @@ pub async fn list_annotations(
     // project_id 파라미터 추출
     let project_id = query.get("project_id").and_then(|s| s.parse::<i32>().ok());
 
+    // level 파라미터 추출
+    let level = query.get("level").map(|s| s.as_str());
+
     // 쿼리 파라미터에 따라 다른 메서드 호출
     // 우선순위: sop_instance_uid > series_instance_uid > study_instance_uid > project_id > user_id
     let result = if let Some(sop_instance_uid) = query.get("sop_instance_uid") {
@@ -176,6 +180,32 @@ pub async fn list_annotations(
             .get_annotations_by_instance(sop_instance_uid)
             .await
             .map(|mut response| {
+                // level로 필터링
+                if let Some(lvl) = level {
+                    match lvl {
+                        "study" => {
+                            // Study 레벨: series_uid와 instance_uid가 모두 비어있음
+                            response.annotations.retain(|ann| {
+                                ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        "series" => {
+                            // Series 레벨: series_uid는 있고 instance_uid는 비어있음
+                            response.annotations.retain(|ann| {
+                                !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        "instance" => {
+                            // Instance 레벨: instance_uid가 있음
+                            response.annotations.retain(|ann| {
+                                !ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        _ => {} // 잘못된 level 값은 무시
+                    }
+                    response.total = response.annotations.len();
+                }
+
                 // viewer_software로 추가 필터링
                 if let Some(viewer) = viewer_software {
                     response.annotations.retain(|ann| {
@@ -200,6 +230,32 @@ pub async fn list_annotations(
             .get_annotations_by_series(series_instance_uid)
             .await
             .map(|mut response| {
+                // level로 필터링
+                if let Some(lvl) = level {
+                    match lvl {
+                        "study" => {
+                            // Study 레벨: series_uid와 instance_uid가 모두 비어있음
+                            response.annotations.retain(|ann| {
+                                ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        "series" => {
+                            // Series 레벨: series_uid는 있고 instance_uid는 비어있음
+                            response.annotations.retain(|ann| {
+                                !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        "instance" => {
+                            // Instance 레벨: instance_uid가 있음
+                            response.annotations.retain(|ann| {
+                                !ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        _ => {} // 잘못된 level 값은 무시
+                    }
+                    response.total = response.annotations.len();
+                }
+
                 // viewer_software로 추가 필터링
                 if let Some(viewer) = viewer_software {
                     response.annotations.retain(|ann| {
@@ -226,6 +282,32 @@ pub async fn list_annotations(
                 .await
             {
                 Ok(mut response) => {
+                    // level로 필터링
+                    if let Some(lvl) = level {
+                        match lvl {
+                            "study" => {
+                                // Study 레벨: series_uid와 instance_uid가 모두 비어있음
+                                response.annotations.retain(|ann| {
+                                    ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            "series" => {
+                                // Series 레벨: series_uid는 있고 instance_uid는 비어있음
+                                response.annotations.retain(|ann| {
+                                    !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            "instance" => {
+                                // Instance 레벨: instance_uid가 있음
+                                response.annotations.retain(|ann| {
+                                    !ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            _ => {} // 잘못된 level 값은 무시
+                        }
+                        response.total = response.annotations.len();
+                    }
+
                     // viewer_software로 추가 필터링
                     if let Some(viewer) = viewer_software {
                         response.annotations.retain(|ann| {
@@ -251,17 +333,95 @@ pub async fn list_annotations(
             use_case
                 .get_annotations_by_study_with_viewer(study_uid, viewer_software)
                 .await
+                .map(|mut response| {
+                    // level로 필터링
+                    if let Some(lvl) = level {
+                        match lvl {
+                            "study" => {
+                                response.annotations.retain(|ann| {
+                                    ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            "series" => {
+                                response.annotations.retain(|ann| {
+                                    !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            "instance" => {
+                                response.annotations.retain(|ann| {
+                                    !ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            _ => {}
+                        }
+                        response.total = response.annotations.len();
+                    }
+
+                    response
+                })
         }
     } else if let Some(proj_id) = project_id {
         // project_id만 있으면 project로 필터링
         use_case
             .get_annotations_by_project_with_viewer(proj_id, viewer_software)
             .await
+            .map(|mut response| {
+                // level로 필터링
+                if let Some(lvl) = level {
+                    match lvl {
+                        "study" => {
+                            response.annotations.retain(|ann| {
+                                ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        "series" => {
+                            response.annotations.retain(|ann| {
+                                !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        "instance" => {
+                            response.annotations.retain(|ann| {
+                                !ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        _ => {}
+                    }
+                    response.total = response.annotations.len();
+                }
+
+                response
+            })
     } else {
         // 기본적으로 사용자의 annotation 목록 반환
         use_case
             .get_annotations_by_user_with_viewer(user_id, viewer_software)
             .await
+            .map(|mut response| {
+                // level로 필터링
+                if let Some(lvl) = level {
+                    match lvl {
+                        "study" => {
+                            response.annotations.retain(|ann| {
+                                ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        "series" => {
+                            response.annotations.retain(|ann| {
+                                !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        "instance" => {
+                            response.annotations.retain(|ann| {
+                                !ann.sop_instance_uid.is_empty()
+                            });
+                        }
+                        _ => {}
+                    }
+                    response.total = response.annotations.len();
+                }
+
+                response
+            })
     };
 
     match result {
