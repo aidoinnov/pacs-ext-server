@@ -2,6 +2,12 @@
 
 ## 📚 필수 문서 (반드시 읽기)
 
+### 0️⃣ **AUTH-API-REFERENCE.md** ⭐ (먼저 읽기!)
+- 로그인 API
+- 토큰 검증 API
+- 토큰 갱신 API
+- **대상**: 모든 개발자
+
 ### 1️⃣ **FRONTEND-INTEGRATION-GUIDE.md**
 - 전체 통합 전략 및 아키텍처
 - 데이터 로딩 흐름
@@ -43,7 +49,25 @@
 
 ## 🎯 핵심 요약
 
-### API 엔드포인트
+### 인증 흐름
+
+```
+1. 로그인
+   POST /api/auth/login
+   { "keycloak_id": "uuid", "username": "...", "email": "..." }
+   → access_token 획득
+
+2. API 요청 (Authorization 헤더에 token 포함)
+   GET /api/annotations
+   Authorization: Bearer <access_token>
+
+3. Token 만료 시 갱신
+   POST /api/auth/refresh
+   { "refresh_token": "..." }
+   → 새로운 access_token 획득
+```
+
+### Annotation API 엔드포인트
 
 ```
 1. 사이드바 목록 (페이지네이션)
@@ -99,11 +123,33 @@ Step 2: 캔버스 그리기 (전체 정보)
 
 ## 🔄 구현 순서
 
-1. 요약 목록 API 호출 (사이드바 표시)
-2. 상세 정보 API 호출 (캔버스 그리기)
-3. Version 검사 로직 구현
-4. Optimistic Locking 처리
-5. 캐시 검증 (HEAD 요청)
+1. **인증 구현** (필수)
+   - 로그인 API 호출
+   - Token 저장 및 관리
+   - Authorization 헤더 설정
+
+2. **사이드바 목록 구현**
+   - 요약 목록 API 호출
+   - 페이지네이션 처리
+   - 목록 표시
+
+3. **캔버스 그리기 구현**
+   - 상세 정보 API 호출
+   - annotation_data 사용
+   - 캔버스에 그리기
+
+4. **Version 검사 로직 구현**
+   - 버전 불일치 감지
+   - 최신 버전 사용
+
+5. **Optimistic Locking 처리**
+   - 수정 시 base_version 사용
+   - 409 Conflict 처리
+   - 재시도 로직
+
+6. **캐시 검증** (선택)
+   - HEAD 요청으로 캐시 검증
+   - 304 Not Modified 처리
 
 ---
 
