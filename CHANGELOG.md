@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed - 2025-11-06
 
+#### **마스크 API 500 에러 수정** 🔧
+- **브랜치**: `fix/mask-upload-and-route-issues`
+- **이슈**: `POST /api/annotations/{id}/mask-groups/{gid}/masks` 500 Internal Server Error
+- **주요 변경사항**:
+  1. **MaskUseCase를 Actix-web app_data에 등록**
+     - `MaskUseCase`, `MaskGroupUseCase`, `SignedUrlService`를 app_data에 추가
+     - Data extractor가 정상적으로 의존성 주입 가능하도록 수정
+  2. **Rust 소유권 문제 해결**
+     - `mask_service`를 `clone()`하여 소유권 이동 방지
+     - Arc::clone()으로 참조 카운트만 증가 (성능 영향 최소)
+
+- **수정된 파일**:
+  - `pacs-server/src/main.rs` - MaskUseCase 등록 및 소유권 문제 수정
+
+- **기술적 세부사항**:
+  - Actix-web의 Data extractor는 `App::app_data()`에 등록된 타입만 추출 가능
+  - 제네릭 타입의 경우 정확한 타입 시그니처 매칭 필수
+  - Arc::clone()은 참조 카운트만 증가시키므로 성능 오버헤드 거의 없음
+
+- **문서**:
+  - `docs/issues/2025-11-06-마스크-API-500-에러-수정/작업계획.md`
+  - `docs/issues/2025-11-06-마스크-API-500-에러-수정/작업내용.md`
+  - `docs/issues/2025-11-06-마스크-API-500-에러-수정/기술문서.md`
+
 #### **S3 Presigned URL 업로드 및 Mask API 라우트 수정** 🔧
 - **브랜치**: `fix/mask-upload-and-route-issues`
 - **이슈**: S3 업로드 403 에러 및 Mask API 404 에러 수정
