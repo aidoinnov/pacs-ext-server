@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-11-07
+
+#### **Annotation 응답에 사용자 이름 추가 (배치 쿼리 최적화)** ✨
+- **브랜치**: `feature/add-instance-level-annotation-query`
+- **목적**: Annotation API 응답에 작성자 이름 포함 및 N+1 쿼리 문제 해결
+- **주요 변경사항**:
+  1. **AnnotationResponse DTO 확장**
+     - `user_name: Option<String>` 필드 추가
+     - 작성자 이름을 응답에 포함하여 프론트엔드 추가 API 호출 불필요
+  2. **배치 쿼리 최적화 구현**
+     - UserRepository에 `find_by_ids()` 메서드 추가
+     - PostgreSQL `ANY($1)` 연산자로 한 번에 여러 사용자 조회
+     - N+1 쿼리 문제 완전 해결
+  3. **AnnotationUseCase 리팩토링**
+     - `to_response()`: 단일 조회용 헬퍼 메서드
+     - `to_responses()`: 배치 최적화된 목록 변환 메서드
+     - 12개 메서드의 중복 코드 제거
+
+- **성능 개선**:
+  - **Before**: N개 annotation 조회 시 N+1번의 DB 쿼리
+  - **After**: N개 annotation 조회 시 2번의 DB 쿼리 (annotations + users)
+  - **개선율**: 100개 annotation 기준 98% 쿼리 감소 (101번 → 2번)
+
+- **수정된 파일**:
+  - `pacs-server/src/application/dto/annotation_dto.rs` - user_name 필드 추가
+  - `pacs-server/src/domain/repositories/user_repository.rs` - find_by_ids 트레이트 메서드
+  - `pacs-server/src/infrastructure/repositories/user_repository_impl.rs` - 배치 조회 구현
+  - `pacs-server/src/application/use_cases/annotation_use_case.rs` - 헬퍼 메서드 및 리팩토링
+  - `pacs-server/src/presentation/controllers/annotation_controller.rs` - 제네릭 타입 업데이트
+  - `pacs-server/src/main.rs` - UserRepository 의존성 주입
+
+- **기술적 세부사항**:
+  - HashSet으로 중복 user_id 제거 (100개 annotation, 10명 사용자 → 10개 ID만 조회)
+  - HashMap으로 O(1) 사용자 이름 조회
+  - Option 타입으로 null 안전성 보장
+  - 제네릭 타입으로 컴파일 타임 타입 검증
+
+- **문서**:
+  - `docs/issues/2025-11-07-어노테이션-응답에-사용자-이름-추가/작업계획.md`
+  - `docs/issues/2025-11-07-어노테이션-응답에-사용자-이름-추가/작업내용.md`
+  - `docs/issues/2025-11-07-어노테이션-응답에-사용자-이름-추가/기술문서.md`
+
 ### Fixed - 2025-11-06
 
 #### **마스크 API 500 에러 수정** 🔧

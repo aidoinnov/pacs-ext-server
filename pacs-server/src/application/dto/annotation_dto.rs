@@ -108,6 +108,11 @@ pub struct AnnotationResponse {
     /// 어노테이션을 생성한 사용자의 식별자
     pub user_id: i32,
 
+    /// 사용자 이름
+    /// 어노테이션을 생성한 사용자의 이름
+    #[schema(example = "홍길동")]
+    pub user_name: Option<String>,
+
     /// Study Instance UID
     /// DICOM Study의 고유 식별자
     pub study_instance_uid: String,

@@ -23,7 +23,11 @@ use crate::domain::services::AnnotationService;
 // 도메인 레이어의 에러 타입
 use crate::domain::ServiceError;
 // 도메인 레이어의 엔티티
-use crate::domain::entities::NewAnnotation;
+use crate::domain::entities::{Annotation, NewAnnotation};
+// 도메인 레이어의 리포지토리
+use crate::domain::repositories::UserRepository;
+// 표준 라이브러리
+use std::collections::HashMap;
 
 /// 어노테이션 관리를 위한 Use Case
 ///
@@ -32,30 +36,143 @@ use crate::domain::entities::NewAnnotation;
 ///
 /// # 제네릭 매개변수
 /// - `A`: AnnotationService 트레이트를 구현하는 타입
+/// - `U`: UserRepository 트레이트를 구현하는 타입
 ///
 /// # 필드
 /// - `annotation_service`: 어노테이션 도메인 서비스
+/// - `user_repository`: 사용자 리포지토리 (사용자 이름 조회용)
 ///
 /// # 예시
 /// ```ignore
-/// let annotation_use_case = AnnotationUseCase::new(annotation_service);
+/// let annotation_use_case = AnnotationUseCase::new(annotation_service, user_repository);
 /// let result = annotation_use_case.create_annotation(request, user_id, project_id).await;
 /// ```
-pub struct AnnotationUseCase<A: AnnotationService> {
+pub struct AnnotationUseCase<A: AnnotationService, U: UserRepository> {
     /// 어노테이션 도메인 서비스
     annotation_service: A,
+    /// 사용자 리포지토리 (사용자 이름 조회용)
+    user_repository: U,
 }
 
-impl<A: AnnotationService> AnnotationUseCase<A> {
+impl<A: AnnotationService, U: UserRepository> AnnotationUseCase<A, U> {
     /// 새로운 어노테이션 Use Case를 생성합니다.
     ///
     /// # 매개변수
     /// - `annotation_service`: 어노테이션 도메인 서비스
+    /// - `user_repository`: 사용자 리포지토리
     ///
     /// # 반환값
     /// 생성된 `AnnotationUseCase` 인스턴스
-    pub fn new(annotation_service: A) -> Self {
-        Self { annotation_service }
+    pub fn new(annotation_service: A, user_repository: U) -> Self {
+        Self {
+            annotation_service,
+            user_repository,
+        }
+    }
+
+    /// Annotation 엔티티를 AnnotationResponse DTO로 변환합니다 (단일 조회용)
+    ///
+    /// # 매개변수
+    /// - `annotation`: 변환할 Annotation 엔티티
+    ///
+    /// # 반환값
+    /// - `Ok(AnnotationResponse)`: 변환된 응답 DTO
+    /// - `Err(ServiceError)`: 사용자 조회 실패 시
+    async fn to_response(&self, annotation: Annotation) -> Result<AnnotationResponse, ServiceError> {
+        // 사용자 이름 조회
+        let user_name = self
+            .user_repository
+            .find_by_id(annotation.user_id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
+            .and_then(|user| user.full_name);
+
+        Ok(AnnotationResponse {
+            id: annotation.id,
+            user_id: annotation.user_id,
+            user_name,
+            study_instance_uid: annotation.study_uid,
+            series_instance_uid: annotation.series_uid.unwrap_or_default(),
+            sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
+            annotation_data: annotation.data,
+            tool_name: Some(annotation.tool_name),
+            tool_version: annotation.tool_version,
+            viewer_software: annotation.viewer_software,
+            description: annotation.description,
+            measurement_values: annotation.measurement_values,
+            created_at: annotation.created_at,
+            updated_at: annotation.updated_at,
+        })
+    }
+
+    /// Annotation 엔티티 목록을 AnnotationResponse DTO 목록으로 변환합니다 (배치 최적화)
+    ///
+    /// 이 메서드는 N+1 문제를 방지하기 위해 모든 사용자 ID를 한 번에 조회합니다.
+    ///
+    /// # 매개변수
+    /// - `annotations`: 변환할 Annotation 엔티티 목록
+    ///
+    /// # 반환값
+    /// - `Ok(Vec<AnnotationResponse>)`: 변환된 응답 DTO 목록
+    /// - `Err(ServiceError)`: 사용자 조회 실패 시
+    async fn to_responses(
+        &self,
+        annotations: Vec<Annotation>,
+    ) -> Result<Vec<AnnotationResponse>, ServiceError> {
+        if annotations.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // 1. 모든 고유한 user_id 수집
+        let user_ids: Vec<i32> = annotations
+            .iter()
+            .map(|a| a.user_id)
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        // 2. 사용자 정보 배치 조회 (단 한 번의 쿼리!)
+        let users = self
+            .user_repository
+            .find_by_ids(&user_ids)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+        // 3. user_id -> full_name 매핑 생성
+        let user_name_map: HashMap<i32, Option<String>> = users
+            .into_iter()
+            .map(|user| (user.id, user.full_name))
+            .collect();
+
+        // 4. Annotation -> AnnotationResponse 변환
+        let responses = annotations
+            .into_iter()
+            .map(|annotation| {
+                let user_name = user_name_map
+                    .get(&annotation.user_id)
+                    .cloned()
+                    .flatten();
+
+                AnnotationResponse {
+                    id: annotation.id,
+                    user_id: annotation.user_id,
+                    user_name,
+                    study_instance_uid: annotation.study_uid,
+                    series_instance_uid: annotation.series_uid.unwrap_or_default(),
+                    sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
+                    annotation_data: annotation.data,
+                    tool_name: Some(annotation.tool_name),
+                    tool_version: annotation.tool_version,
+                    viewer_software: annotation.viewer_software,
+                    description: annotation.description,
+                    measurement_values: annotation.measurement_values,
+                    created_at: annotation.created_at,
+                    updated_at: annotation.updated_at,
+                }
+            })
+            .collect();
+
+        Ok(responses)
     }
 
     /// 새로운 어노테이션을 생성합니다.
@@ -135,21 +252,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .create_annotation(new_annotation)
             .await?;
 
-        Ok(AnnotationResponse {
-            id: annotation.id,
-            user_id: annotation.user_id,
-            study_instance_uid: annotation.study_uid,
-            series_instance_uid: annotation.series_uid.unwrap_or_default(),
-            sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-            annotation_data: annotation.data,
-            tool_name: Some(annotation.tool_name),
-            tool_version: annotation.tool_version,
-            viewer_software: annotation.viewer_software,
-            description: annotation.description,
-            measurement_values: annotation.measurement_values,
-            created_at: annotation.created_at,
-            updated_at: annotation.updated_at,
-        })
+        self.to_response(annotation).await
     }
 
     /// ID로 어노테이션을 조회합니다.
@@ -178,21 +281,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .get_annotation_by_id(annotation_id)
             .await?;
 
-        Ok(AnnotationResponse {
-            id: annotation.id,
-            user_id: annotation.user_id,
-            study_instance_uid: annotation.study_uid,
-            series_instance_uid: annotation.series_uid.unwrap_or_default(),
-            sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-            annotation_data: annotation.data,
-            tool_name: Some(annotation.tool_name),
-            tool_version: annotation.tool_version,
-            viewer_software: annotation.viewer_software,
-            description: annotation.description,
-            measurement_values: annotation.measurement_values,
-            created_at: annotation.created_at,
-            updated_at: annotation.updated_at,
-        })
+        self.to_response(annotation).await
     }
 
     /// 프로젝트의 어노테이션 목록을 조회합니다.
@@ -225,24 +314,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -277,24 +349,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -330,24 +385,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -383,24 +421,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -436,24 +457,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -491,24 +495,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -543,24 +530,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -617,21 +587,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             )
             .await?;
 
-        Ok(AnnotationResponse {
-            id: updated_annotation.id,
-            user_id: updated_annotation.user_id,
-            study_instance_uid: updated_annotation.study_uid,
-            series_instance_uid: updated_annotation.series_uid.unwrap_or_default(),
-            sop_instance_uid: updated_annotation.instance_uid.unwrap_or_default(),
-            annotation_data: updated_annotation.data,
-            tool_name: Some(updated_annotation.tool_name),
-            tool_version: updated_annotation.tool_version,
-            viewer_software: updated_annotation.viewer_software,
-            description: updated_annotation.description,
-            measurement_values: updated_annotation.measurement_values,
-            created_at: updated_annotation.created_at,
-            updated_at: updated_annotation.updated_at,
-        })
+        self.to_response(updated_annotation).await
     }
 
     /// 어노테이션을 삭제합니다.
@@ -710,24 +666,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -754,24 +693,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
@@ -798,24 +720,7 @@ impl<A: AnnotationService> AnnotationUseCase<A> {
             .await?;
 
         let total = annotations.len();
-        let annotation_responses = annotations
-            .into_iter()
-            .map(|annotation| AnnotationResponse {
-                id: annotation.id,
-                user_id: annotation.user_id,
-                study_instance_uid: annotation.study_uid,
-                series_instance_uid: annotation.series_uid.unwrap_or_default(),
-                sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
-                annotation_data: annotation.data,
-                tool_name: Some(annotation.tool_name),
-                tool_version: annotation.tool_version,
-                viewer_software: annotation.viewer_software,
-                description: annotation.description,
-                measurement_values: annotation.measurement_values,
-                created_at: annotation.created_at,
-                updated_at: annotation.updated_at,
-            })
-            .collect();
+        let annotation_responses = self.to_responses(annotations).await?;
 
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
