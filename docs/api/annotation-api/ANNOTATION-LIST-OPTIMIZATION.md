@@ -149,8 +149,17 @@ GET /api/annotations/summary?series_instance_uid={uid}&page=1&limit=20
       "type": "rectangle",
       "label": "Tumor",
       "color": "#FF0000",
+      "tool_name": "Rectangle Tool",
+      "measurements": {
+        "width": 100,
+        "height": 100,
+        "area": 10000
+      },
       "created_by": 1,
       "created_by_name": "Dr. Kim",
+      "study_instance_uid": "1.2.3.4.5",
+      "series_instance_uid": "1.2.3.4.5.6",
+      "sop_instance_uid": "1.2.3.4.5.6.7",
       "created_at": "2024-01-01T00:00:00Z",
       "updated_at": "2024-01-01T00:05:00Z",
       "version": 2
@@ -160,8 +169,16 @@ GET /api/annotations/summary?series_instance_uid={uid}&page=1&limit=20
       "type": "polygon",
       "label": "Lesion",
       "color": "#00FF00",
+      "tool_name": "Polygon Tool",
+      "measurements": {
+        "area": 15000,
+        "perimeter": 400
+      },
       "created_by": 2,
       "created_by_name": "Dr. Lee",
+      "study_instance_uid": "1.2.3.4.5",
+      "series_instance_uid": "1.2.3.4.5.6",
+      "sop_instance_uid": "1.2.3.4.5.6.8",
       "created_at": "2024-01-01T00:10:00Z",
       "updated_at": "2024-01-01T00:10:00Z",
       "version": 1

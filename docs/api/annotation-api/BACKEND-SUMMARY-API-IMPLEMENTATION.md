@@ -64,8 +64,13 @@ pub struct AnnotationSummaryDto {
     pub annotation_type: String,  // "rectangle", "polygon", etc.
     pub label: Option<String>,
     pub color: Option<String>,
+    pub tool_name: Option<String>,  // 도구 이름 (예: "Rectangle Tool")
+    pub measurements: Option<serde_json::Value>,  // 측정값 (width, height, area, etc.)
     pub created_by: i32,
     pub created_by_name: String,
+    pub study_instance_uid: String,
+    pub series_instance_uid: String,
+    pub sop_instance_uid: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub version: i32,
@@ -415,24 +420,37 @@ mod annotation_summary_tests {
 
 ```sql
 -- ❌ 나쁜 예: annotation_data 전체 조회
-SELECT * FROM annotation_annotation 
+SELECT * FROM annotation_annotation
 WHERE series_instance_uid = $1
 LIMIT 20;
 
--- ✅ 좋은 예: 필요한 필드만 조회
-SELECT 
+-- ✅ 좋은 예: 필수 필드만 조회 (요약 목록용)
+SELECT
     id,
-    annotation_data->>'type',
-    annotation_data->>'label',
-    annotation_data->>'color',
+    annotation_data->>'type' as annotation_type,
+    annotation_data->>'label' as label,
+    annotation_data->>'color' as color,
+    annotation_data->>'tool_name' as tool_name,
+    annotation_data->'measurements' as measurements,
     user_id,
+    u.name as created_by_name,
+    study_instance_uid,
+    series_instance_uid,
+    sop_instance_uid,
     created_at,
     updated_at,
     version
-FROM annotation_annotation 
-WHERE series_instance_uid = $1
+FROM annotation_annotation a
+LEFT JOIN security_user u ON a.user_id = u.id
+WHERE a.series_instance_uid = $1
+ORDER BY a.created_at DESC
 LIMIT 20;
 ```
+
+**응답 크기 비교:**
+- 전체 데이터: 500KB (annotation_data 포함)
+- 요약 정보: 50KB (필수 필드만)
+- **개선율: 90% 감소**
 
 ### 응답 크기 비교
 
