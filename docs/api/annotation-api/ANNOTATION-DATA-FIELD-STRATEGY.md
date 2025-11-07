@@ -2,38 +2,60 @@
 
 ## 🎯 문제 상황
 
-요약 목록(Summary)에는 `annotation_data` 필드가 없는데, 프론트엔드에서 필요한 정보를 놓칠까봐 걱정됨.
+요약 목록(Summary)에는 `annotation_data` 필드가 없는데, **캔버스에 annotation을 그리기 위해 필요한 데이터**를 놓칠까봐 걱정됨.
 
 ---
 
-## 💡 해결책: 필수 정보는 이미 포함되어 있다!
+## 💡 해결책: 2단계 로딩 전략!
 
-### 요약 목록에 포함된 정보
+### 요약 목록에 포함된 정보 (사이드바 표시용)
 
 ```json
 {
   "id": 1,
-  "type": "rectangle",                    // ← annotation_data에서 추출
-  "label": "Tumor",                       // ← annotation_data에서 추출
-  "color": "#FF0000",                     // ← annotation_data에서 추출
-  "tool_name": "Rectangle Tool",          // ← annotation_data에서 추출
-  "measurements": {                       // ← annotation_data에서 추출
+  "type": "rectangle",
+  "label": "Tumor",
+  "color": "#FF0000",
+  "tool_name": "Rectangle Tool",
+  "measurements": {
     "width": 100,
     "height": 100,
     "area": 10000
   },
-  "created_by": 1,
   "created_by_name": "Dr. Kim",
   "study_instance_uid": "1.2.3.4.5",
   "series_instance_uid": "1.2.3.4.5.6",
   "sop_instance_uid": "1.2.3.4.5.6.7",
-  "created_at": "2024-01-01T00:00:00Z",
-  "updated_at": "2024-01-01T00:05:00Z",
   "version": 2
 }
 ```
 
-**annotation_data에서 필요한 정보는 모두 추출되어 있습니다!** ✅
+**이 정보는 사이드바에 목록으로 표시하기 위한 정보입니다!** ✅
+
+### 캔버스에 그리기 위해 필요한 정보 (annotation_data)
+
+```json
+{
+  "type": "rectangle",
+  "coordinates": [100, 100, 200, 200],  // ← 캔버스에 그리기 위해 필수!
+  "label": "Tumor",
+  "color": "#FF0000",
+  "tool_name": "Rectangle Tool",
+  "description": "Suspicious lesion",
+  "measurements": {
+    "width": 100,
+    "height": 100,
+    "area": 10000
+  },
+  "metadata": {
+    "confidence": 0.95,
+    "reviewer": "Dr. Park",
+    "notes": "Follow-up needed"
+  }
+}
+```
+
+**`coordinates` 필드가 없으면 캔버스에 그릴 수 없습니다!** ⚠️
 
 ---
 
@@ -113,7 +135,7 @@ GET /api/annotations/summary?series_instance_uid={uid}
   ]
 }
 
-UI에 표시:
+사이드바에 목록 표시:
 ├─ Annotation 타입: rectangle ✅
 ├─ 라벨: Tumor ✅
 ├─ 색상: #FF0000 ✅
@@ -123,110 +145,209 @@ UI에 표시:
 └─ UID 정보: 표시 ✅
 ```
 
-**이 단계에서 필요한 모든 정보가 있습니다!** ✅
+**사이드바 목록 표시에는 이 정보로 충분합니다!** ✅
 
 ---
 
-### Step 2: 사용자가 Annotation 선택
+### Step 2: 사용자가 Annotation 선택 (캔버스에 그리기)
 
 ```
-사용자가 목록에서 annotation 클릭
+사용자가 사이드바 목록에서 annotation 클릭
     ↓
-상세 정보 필요한가?
-    ├─ YES: 좌표, 설명, 메타데이터 필요
-    │   ↓
-    │   GET /api/annotations/{id}
-    │   응답 (전체 annotation_data 포함)
-    │
-    └─ NO: 목록 정보만으로 충분
-        ↓
-        요약 정보 사용 (이미 있음)
+캔버스에 annotation을 그려야 함
+    ↓
+⚠️ 문제: 요약에는 coordinates가 없음!
+    ↓
+GET /api/annotations/{id}
+응답 (전체 annotation_data 포함):
+{
+  "id": 1,
+  "annotation_data": {
+    "type": "rectangle",
+    "coordinates": [100, 100, 200, 200],  // ← 이것이 필수!
+    "label": "Tumor",
+    "color": "#FF0000",
+    "tool_name": "Rectangle Tool",
+    "description": "Suspicious lesion",
+    "measurements": {...},
+    "metadata": {...}
+  },
+  "version": 2
+}
+    ↓
+캔버스에 그리기:
+├─ coordinates 사용: [100, 100, 200, 200] ✅
+├─ type 사용: rectangle ✅
+├─ color 사용: #FF0000 ✅
+└─ label 사용: Tumor ✅
+```
+
+**캔버스에 그리려면 annotation_data의 coordinates가 필수입니다!** ⚠️
+
+---
+
+## 🎨 시퀀스 다이어그램
+
+### 전체 흐름
+
+```
+┌─────────────┐                    ┌──────────┐                    ┌────────────┐
+│  Frontend   │                    │ Backend  │                    │ Database   │
+└──────┬──────┘                    └────┬─────┘                    └─────┬──────┘
+       │                                │                                │
+       │ 1. Series 선택                 │                                │
+       │ (사이드바 목록 필요)            │                                │
+       │                                │                                │
+       ├─────────────────────────────────>                               │
+       │ GET /api/annotations/summary    │                               │
+       │ ?series_instance_uid={uid}      │                               │
+       │                                │                                │
+       │                                ├───────────────────────────────>│
+       │                                │ SELECT id, type, label,        │
+       │                                │ color, tool_name,              │
+       │                                │ measurements, ...              │
+       │                                │ (annotation_data 제외)         │
+       │                                │                                │
+       │                                │<───────────────────────────────┤
+       │                                │ 요약 정보 반환                  │
+       │                                │ (50KB)                         │
+       │<─────────────────────────────────                               │
+       │ 응답: AnnotationSummary[]       │                               │
+       │ {                              │                               │
+       │   id, type, label, color,      │                               │
+       │   tool_name, measurements,     │                               │
+       │   created_by_name, UIDs, ...   │                               │
+       │ }                              │                               │
+       │                                │                               │
+       │ 2. 사이드바에 목록 표시         │                               │
+       │ (요약 정보로 충분)              │                               │
+       │ ✅ 완료                         │                               │
+       │                                │                               │
+       │ 3. 사용자가 annotation 선택     │                               │
+       │ (캔버스에 그려야 함)            │                               │
+       │                                │                               │
+       ├─────────────────────────────────>                               │
+       │ GET /api/annotations/{id}       │                               │
+       │ (전체 데이터 필요)              │                               │
+       │                                │                                │
+       │                                ├───────────────────────────────>│
+       │                                │ SELECT * FROM annotation       │
+       │                                │ (annotation_data 포함)         │
+       │                                │                                │
+       │                                │<───────────────────────────────┤
+       │                                │ 전체 정보 반환                  │
+       │                                │ (500KB)                        │
+       │<─────────────────────────────────                               │
+       │ 응답: AnnotationDetail          │                               │
+       │ {                              │                               │
+       │   id, annotation_data: {       │                               │
+       │     type, coordinates,         │                               │
+       │     label, color, ...          │                               │
+       │   }, version                   │                               │
+       │ }                              │                               │
+       │                                │                               │
+       │ 4. 캔버스에 그리기              │                               │
+       │ (coordinates 사용)              │                               │
+       │ ✅ 완료                         │                               │
+       │                                │                               │
 ```
 
 ---
 
-## 🎨 UI 구현 예제
+### Step 1: 사이드바 목록 조회 (요약 정보)
 
-### 요약 목록 표시 (annotation_data 없이도 충분)
+```
+프론트엔드                          백엔드                          데이터베이스
+    │                                │                                │
+    ├─ Series 선택                   │                                │
+    │                                │                                │
+    ├──────────────────────────────────>                               │
+    │ GET /api/annotations/summary    │                               │
+    │ ?series_instance_uid=1.2.3.4.5.6                               │
+    │                                │                                │
+    │                                ├───────────────────────────────>│
+    │                                │ SELECT                         │
+    │                                │   id, type, label, color,      │
+    │                                │   tool_name, measurements,     │
+    │                                │   created_by_name,             │
+    │                                │   study_instance_uid,          │
+    │                                │   series_instance_uid,         │
+    │                                │   sop_instance_uid,            │
+    │                                │   version                      │
+    │                                │ FROM annotation_annotation     │
+    │                                │ WHERE series_instance_uid = ?  │
+    │                                │ (annotation_data 제외!)        │
+    │                                │                                │
+    │                                │<───────────────────────────────┤
+    │                                │ 요약 정보 반환                  │
+    │<─────────────────────────────────                               │
+    │ 응답 (50KB):                    │                               │
+    │ [                              │                               │
+    │   {                            │                               │
+    │     id: 1,                     │                               │
+    │     type: "rectangle",         │                               │
+    │     label: "Tumor",            │                               │
+    │     color: "#FF0000",          │                               │
+    │     tool_name: "Rectangle",    │                               │
+    │     measurements: {...},       │                               │
+    │     created_by_name: "Dr. Kim",│                               │
+    │     version: 2                 │                               │
+    │   },                           │                               │
+    │   ...                          │                               │
+    │ ]                              │                               │
+    │                                │                               │
+    ├─ 사이드바에 목록 표시           │                               │
+    │ ✅ 완료 (annotation_data 불필요)│                               │
+    │                                │                               │
+```
 
-```typescript
-interface AnnotationSummary {
-  id: number;
-  type: string;
-  label?: string;
-  color?: string;
-  tool_name?: string;
-  measurements?: {
-    width?: number;
-    height?: number;
-    area?: number;
-    perimeter?: number;
-  };
-  created_by_name: string;
-  study_instance_uid: string;
-  series_instance_uid: string;
-  sop_instance_uid?: string;
-  version: number;
-}
+---
 
-function AnnotationSummaryList({ annotations }: { annotations: AnnotationSummary[] }) {
-  return (
-    <div className="annotation-list">
-      {annotations.map(annotation => (
-        <div key={annotation.id} className="annotation-item">
-          {/* 색상 표시 */}
-          <div 
-            className="annotation-color" 
-            style={{ background: annotation.color || '#999' }}
-          />
-          
-          {/* 정보 표시 */}
-          <div className="annotation-info">
-            <div className="annotation-type">
-              {annotation.type}  {/* ✅ 요약에 있음 */}
-            </div>
-            
-            <div className="annotation-label">
-              {annotation.label}  {/* ✅ 요약에 있음 */}
-            </div>
-            
-            <div className="annotation-tool">
-              {annotation.tool_name}  {/* ✅ 요약에 있음 */}
-            </div>
-            
-            <div className="annotation-measurements">
-              {annotation.measurements && (
-                <>
-                  {annotation.measurements.width && 
-                    `W: ${annotation.measurements.width}px`}
-                  {annotation.measurements.height && 
-                    ` H: ${annotation.measurements.height}px`}
-                  {annotation.measurements.area && 
-                    ` Area: ${annotation.measurements.area}px²`}
-                </>
-              )}
-            </div>
-            
-            <div className="annotation-meta">
-              {annotation.created_by_name} • {formatDate(annotation.created_at)}
-            </div>
-            
-            <div className="annotation-uids">
-              <small>Study: {annotation.study_instance_uid}</small>
-              <small>Series: {annotation.series_instance_uid}</small>
-              {annotation.sop_instance_uid && 
-                <small>SOP: {annotation.sop_instance_uid}</small>}
-            </div>
-          </div>
-          
-          <div className="annotation-version">v{annotation.version}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
+### Step 2: 캔버스에 그리기 (전체 데이터)
 
-// ✅ 모든 필드가 요약에 있으므로 annotation_data 필요 없음!
+```
+프론트엔드                          백엔드                          데이터베이스
+    │                                │                                │
+    ├─ 사이드바에서 annotation 선택   │                                │
+    │ (annotation.id = 1)            │                                │
+    │                                │                                │
+    ├──────────────────────────────────>                               │
+    │ GET /api/annotations/1          │                               │
+    │ (전체 데이터 필요!)             │                               │
+    │                                │                                │
+    │                                ├───────────────────────────────>│
+    │                                │ SELECT *                       │
+    │                                │ FROM annotation_annotation     │
+    │                                │ WHERE id = 1                   │
+    │                                │ (annotation_data 포함!)        │
+    │                                │                                │
+    │                                │<───────────────────────────────┤
+    │                                │ 전체 정보 반환                  │
+    │<─────────────────────────────────                               │
+    │ 응답 (500KB):                   │                               │
+    │ {                              │                               │
+    │   id: 1,                       │                               │
+    │   annotation_data: {           │                               │
+    │     type: "rectangle",         │                               │
+    │     coordinates: [100, 100,    │ ← 캔버스에 그리기 위해 필수!   │
+    │                    200, 200],  │                               │
+    │     label: "Tumor",            │                               │
+    │     color: "#FF0000",          │                               │
+    │     tool_name: "Rectangle",    │                               │
+    │     description: "...",        │                               │
+    │     measurements: {...},       │                               │
+    │     metadata: {...}            │                               │
+    │   },                           │                               │
+    │   version: 2                   │                               │
+    │ }                              │                               │
+    │                                │                               │
+    ├─ 캔버스에 그리기                │                               │
+    │ drawRectangle(                 │                               │
+    │   coordinates: [100, 100, 200, 200],                           │
+    │   color: "#FF0000"             │                               │
+    │ )                              │                               │
+    │ ✅ 완료 (annotation_data 필요!)  │                               │
+    │                                │                               │
 ```
 
 ---
@@ -342,80 +463,90 @@ async function onAnnotationSelected(summary: AnnotationSummary) {
 
 ## 🎯 결론
 
-### annotation_data 필드가 없어도 괜찮은 이유
+### annotation_data 필드의 역할
 
-1. **필요한 정보는 모두 추출됨**
-   - type, label, color, tool_name, measurements
-   - 목록 표시에 필요한 모든 정보 포함
-
-2. **성능 최적화**
-   - 응답 크기 90% 감소
-   - 로드 시간 90% 단축
-   - 메모리 사용 90% 감소
-
-3. **2단계 로딩 전략**
-   - Step 1: 요약 목록 (빠름, 가벼움)
-   - Step 2: 상세 정보 (필요할 때만)
-
-4. **사용자 경험 향상**
-   - 빠른 목록 로드
-   - 부드러운 UI 업데이트
-   - 필요한 정보만 표시
+| 상황 | 필요한 데이터 | annotation_data | 이유 |
+|------|-------------|-----------------|------|
+| **사이드바 목록 표시** | 요약 정보 | ❌ 필요 없음 | type, label, color, tool_name, measurements로 충분 |
+| **캔버스에 그리기** | 전체 정보 | ✅ 필수! | coordinates가 필요함 |
 
 ---
 
-## 📝 프론트엔드 구현 가이드
+### 2단계 로딩 전략
 
-### 요약 목록 표시 (annotation_data 없이)
+#### Step 1: 요약 목록 조회 (사이드바 표시)
+```
+GET /api/annotations/summary?series_instance_uid={uid}
 
-```typescript
-// ✅ 이렇게 하면 됨
-const summaryList = await loadAnnotationSummaryList(seriesUid);
-
-summaryList.annotations.forEach(annotation => {
-  // 요약에 있는 정보로 UI 구성
-  displayAnnotationItem({
-    type: annotation.type,
-    label: annotation.label,
-    color: annotation.color,
-    tool_name: annotation.tool_name,
-    measurements: annotation.measurements,
-    created_by: annotation.created_by_name,
-    version: annotation.version
-  });
-});
+응답 (50KB):
+- annotation_data 제외
+- 사이드바 목록 표시에 필요한 정보만 포함
+- 빠른 로드 (200-300ms)
 ```
 
-### 상세 정보 필요 시 (annotation_data 포함)
+#### Step 2: 전체 데이터 조회 (캔버스 그리기)
+```
+GET /api/annotations/{id}
 
-```typescript
-// 사용자가 annotation 선택
-async function onAnnotationSelected(summary: AnnotationSummary) {
-  // 상세 정보 로드 (annotation_data 포함)
-  const detail = await fetch(`/api/annotations/${summary.id}`);
-  const fullData = await detail.json();
-  
-  // 이제 annotation_data 사용 가능
-  const { coordinates, description, metadata } = fullData.annotation_data;
-  
-  // 캔버스에 그리기
-  drawAnnotation(coordinates);
-  
-  // 상세 정보 표시
-  showAnnotationDetail(fullData);
-}
+응답 (500KB):
+- annotation_data 포함 (coordinates 포함!)
+- 캔버스에 그리기 위해 필수
+- 필요할 때만 요청
+```
+
+---
+
+### 성능 개선
+
+| 항목 | 기존 | 최적화 | 개선율 |
+|------|------|--------|--------|
+| **응답 크기** | 500KB | 50KB | 90% 감소 |
+| **로드 시간** | 2-3초 | 200-300ms | 90% 단축 |
+| **메모리** | 10MB | 1MB | 90% 감소 |
+
+---
+
+### 핵심 포인트
+
+✅ **사이드바 목록 표시**
+- 요약 정보로 충분
+- annotation_data 불필요
+- 빠른 로드
+
+⚠️ **캔버스에 그리기**
+- annotation_data 필수!
+- coordinates 필요
+- 별도 요청 필요
+
+---
+
+## 📝 구현 흐름
+
+```
+1. Series 선택
+   ↓
+2. GET /api/annotations/summary
+   ↓
+3. 사이드바에 목록 표시 ✅
+   (annotation_data 없이도 가능)
+   ↓
+4. 사용자가 annotation 선택
+   ↓
+5. GET /api/annotations/{id}
+   ↓
+6. 캔버스에 그리기 ✅
+   (annotation_data의 coordinates 사용)
 ```
 
 ---
 
 ## 🚀 최종 정리
 
-| 상황 | 필요한 데이터 | API 엔드포인트 | annotation_data |
-|------|-------------|---------------|-----------------|
-| **목록 표시** | 요약 정보 | `/api/annotations/summary` | ❌ 필요 없음 |
-| **상세 정보** | 전체 정보 | `/api/annotations/{id}` | ✅ 필요함 |
+**annotation_data 필드가 없어도 사이드바 목록 표시에는 문제없습니다!** ✅
 
-**결론: annotation_data 필드가 없어도 요약 목록 표시에는 문제없습니다!** ✅
+하지만 **캔버스에 그리려면 annotation_data가 필수**입니다! ⚠️
 
-안심하고 진행하셔도 됩니다! 😊
+따라서 **2단계 로딩 전략**을 사용하면 됩니다:
+1. 빠른 목록 로드 (요약 정보)
+2. 필요할 때 상세 정보 로드 (전체 데이터)
 
