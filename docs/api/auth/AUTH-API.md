@@ -1,8 +1,8 @@
-# 🔐 인증 API 참조
+# 🔐 인증 API (Auth API)
 
 ## 📋 개요
 
-Annotation API를 사용하기 전에 먼저 인증을 받아야 합니다. 이 문서는 로그인, 토큰 검증, 토큰 갱신 API를 설명합니다.
+PACS Extension Server의 인증 API입니다. 로그인, 토큰 검증, 토큰 갱신 기능을 제공합니다.
 
 ---
 
@@ -70,44 +70,7 @@ Content-Type: application/json
 
 ---
 
-## ✅ 2. 토큰 검증 (Verify Token)
-
-### 요청
-
-```http
-GET /api/auth/verify/{token}
-```
-
-### 파라미터
-
-| 파라미터 | 타입 | 필수 | 설명 |
-|---------|------|------|------|
-| `token` | string | ✅ | JWT 토큰 (경로 파라미터) |
-
-### 응답 (200 OK)
-
-```json
-{
-  "user_id": 1,
-  "keycloak_id": "550e8400-e29b-41d4-a716-446655440000",
-  "username": "john_doe",
-  "email": "john@example.com",
-  "is_valid": true
-}
-```
-
-### 에러 응답
-
-#### 401 Unauthorized
-```json
-{
-  "error": "유효하지 않은 토큰"
-}
-```
-
----
-
-## 🔄 3. 토큰 갱신 (Refresh Token)
+## 🔄 2. 토큰 갱신 (Refresh Token)
 
 ### 요청
 
@@ -163,12 +126,12 @@ Content-Type: application/json
 
 ## 🔐 API 요청 시 인증
 
-모든 Annotation API 요청에는 Authorization 헤더에 JWT 토큰을 포함해야 합니다.
+모든 API 요청에는 Authorization 헤더에 JWT 토큰을 포함해야 합니다.
 
 ### 요청 예제
 
 ```http
-GET /api/annotations?study_instance_uid=1.2.3.4.5&level=study,series
+GET /api/annotations?study_instance_uid=1.2.3.4.5
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
@@ -203,12 +166,11 @@ Authorization: Bearer <access_token>
 
 ---
 
-## 💡 구현 팁
+## 💡 구현 예제 (TypeScript)
 
-### TypeScript 예제
+### 로그인
 
 ```typescript
-// 1. 로그인
 const loginResponse = await fetch('/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -219,23 +181,40 @@ const loginResponse = await fetch('/api/auth/login', {
   })
 });
 
-const { token, refresh_token } = await loginResponse.json();
+const { token, refresh_token, expires_in } = await loginResponse.json();
 
-// 2. API 요청
-const apiResponse = await fetch('/api/annotations', {
-  headers: {
-    'Authorization': `Bearer ${token}`
-  }
-});
+// Token 저장
+localStorage.setItem('access_token', token);
+localStorage.setItem('refresh_token', refresh_token);
+localStorage.setItem('token_expires_at', Date.now() + expires_in * 1000);
+```
 
-// 3. 토큰 갱신 (필요시)
+### 토큰 갱신
+
+```typescript
 const refreshResponse = await fetch('/api/auth/refresh', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ refresh_token })
+  body: JSON.stringify({
+    refresh_token: localStorage.getItem('refresh_token')
+  })
 });
 
-const { access_token } = await refreshResponse.json();
+const { access_token, expires_in } = await refreshResponse.json();
+
+// Token 업데이트
+localStorage.setItem('access_token', access_token);
+localStorage.setItem('token_expires_at', Date.now() + expires_in * 1000);
+```
+
+### API 요청
+
+```typescript
+const apiResponse = await fetch('/api/annotations', {
+  headers: {
+    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+  }
+});
 ```
 
 ---
@@ -250,6 +229,6 @@ const { access_token } = await refreshResponse.json();
 ## 🚀 다음 단계
 
 1. 로그인하여 access_token 획득
-2. Annotation API 요청 시 Authorization 헤더에 token 포함
+2. API 요청 시 Authorization 헤더에 token 포함
 3. Token 만료 시 refresh token으로 새로운 token 획득
 
