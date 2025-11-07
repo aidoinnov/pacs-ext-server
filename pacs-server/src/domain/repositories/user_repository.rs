@@ -10,6 +10,8 @@ pub trait UserRepository: Send + Sync {
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, sqlx::Error>;
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, sqlx::Error>;
     async fn find_all(&self) -> Result<Vec<User>, sqlx::Error>;
+    /// 여러 사용자 ID로 사용자 목록을 한 번에 조회합니다 (배치 조회)
+    async fn find_by_ids(&self, ids: &[i32]) -> Result<Vec<User>, sqlx::Error>;
     async fn create(&self, new_user: NewUser) -> Result<User, sqlx::Error>;
     async fn update(&self, update_user: &UpdateUser) -> Result<User, sqlx::Error>;
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;

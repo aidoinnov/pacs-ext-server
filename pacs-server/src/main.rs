@@ -343,7 +343,10 @@ async fn main() -> std::io::Result<()> {
     let project_use_case = Arc::new(ProjectUseCase::new(project_service.clone()));
     let permission_use_case = Arc::new(PermissionUseCase::new(permission_service.clone()));
     let access_control_use_case = Arc::new(AccessControlUseCase::new(access_control_service));
-    let annotation_use_case = Arc::new(AnnotationUseCase::new(annotation_service));
+    let annotation_use_case = Arc::new(AnnotationUseCase::new(
+        annotation_service,
+        user_repo.clone(),
+    ));
     let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
         mask_group_service.clone(),
         signed_url_service.clone(),

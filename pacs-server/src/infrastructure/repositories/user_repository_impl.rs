@@ -75,13 +75,31 @@ impl UserRepository for UserRepositoryImpl {
 
     async fn find_all(&self) -> Result<Vec<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
-            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone, 
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone,
                     created_at, updated_at, account_status, email_verified,
                     email_verification_token, email_verification_expires_at,
                     approved_by, approved_at, suspended_at, suspended_reason, deleted_at
              FROM security_user
              ORDER BY created_at DESC",
         )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    async fn find_by_ids(&self, ids: &[i32]) -> Result<Vec<User>, sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        sqlx::query_as::<_, User>(
+            "SELECT id, keycloak_id, username, email, full_name, organization, department, phone,
+                    created_at, updated_at, account_status, email_verified,
+                    email_verification_token, email_verification_expires_at,
+                    approved_by, approved_at, suspended_at, suspended_reason, deleted_at
+             FROM security_user
+             WHERE id = ANY($1)",
+        )
+        .bind(ids)
         .fetch_all(&self.pool)
         .await
     }
