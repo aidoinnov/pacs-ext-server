@@ -19,7 +19,7 @@ use crate::application::dto::{
     AnnotationListResponse, AnnotationResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
 };
 // 도메인 레이어의 서비스 인터페이스
-use crate::domain::services::AnnotationService;
+use crate::domain::services::{AnnotationService, AccessControlService};
 // 도메인 레이어의 에러 타입
 use crate::domain::ServiceError;
 // 도메인 레이어의 엔티티
@@ -37,36 +37,42 @@ use std::collections::HashMap;
 /// # 제네릭 매개변수
 /// - `A`: AnnotationService 트레이트를 구현하는 타입
 /// - `U`: UserRepository 트레이트를 구현하는 타입
+/// - `AC`: AccessControlService 트레이트를 구현하는 타입
 ///
 /// # 필드
 /// - `annotation_service`: 어노테이션 도메인 서비스
 /// - `user_repository`: 사용자 리포지토리 (사용자 이름 조회용)
+/// - `access_control_service`: 접근 제어 서비스 (권한 확인용)
 ///
 /// # 예시
 /// ```ignore
-/// let annotation_use_case = AnnotationUseCase::new(annotation_service, user_repository);
+/// let annotation_use_case = AnnotationUseCase::new(annotation_service, user_repository, access_control_service);
 /// let result = annotation_use_case.create_annotation(request, user_id, project_id).await;
 /// ```
-pub struct AnnotationUseCase<A: AnnotationService, U: UserRepository> {
+pub struct AnnotationUseCase<A: AnnotationService, U: UserRepository, AC: AccessControlService> {
     /// 어노테이션 도메인 서비스
     annotation_service: A,
     /// 사용자 리포지토리 (사용자 이름 조회용)
     user_repository: U,
+    /// 접근 제어 서비스 (권한 확인용)
+    access_control_service: AC,
 }
 
-impl<A: AnnotationService, U: UserRepository> AnnotationUseCase<A, U> {
+impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> AnnotationUseCase<A, U, AC> {
     /// 새로운 어노테이션 Use Case를 생성합니다.
     ///
     /// # 매개변수
     /// - `annotation_service`: 어노테이션 도메인 서비스
     /// - `user_repository`: 사용자 리포지토리
+    /// - `access_control_service`: 접근 제어 서비스
     ///
     /// # 반환값
     /// 생성된 `AnnotationUseCase` 인스턴스
-    pub fn new(annotation_service: A, user_repository: U) -> Self {
+    pub fn new(annotation_service: A, user_repository: U, access_control_service: AC) -> Self {
         Self {
             annotation_service,
             user_repository,
+            access_control_service,
         }
     }
 
@@ -726,5 +732,58 @@ impl<A: AnnotationService, U: UserRepository> AnnotationUseCase<A, U> {
             annotations: annotation_responses,
             total,
         })
+    }
+
+    /// 권한 기반 프로젝트 어노테이션 조회
+    ///
+    /// 사용자의 권한에 따라 다른 어노테이션을 반환합니다:
+    /// - `ANNOTATION:READ_ALL` 권한이 있으면: 프로젝트의 모든 어노테이션 반환
+    /// - `ANNOTATION:READ_ALL` 권한이 없으면: 본인의 어노테이션만 반환
+    ///
+    /// # Arguments
+    /// * `requesting_user_id` - 요청하는 사용자 ID
+    /// * `project_id` - 프로젝트 ID
+    /// * `viewer_software` - 뷰어 소프트웨어 (옵션)
+    ///
+    /// # Returns
+    /// * `Result<AnnotationListResponse, ServiceError>` - 어노테이션 목록 응답
+    ///
+    /// # Errors
+    /// * `ServiceError::Unauthorized` - 사용자가 프로젝트 멤버가 아닌 경우
+    /// * `ServiceError::NotFound` - 사용자 또는 프로젝트를 찾을 수 없는 경우
+    pub async fn get_annotations_by_project_with_permission(
+        &self,
+        requesting_user_id: i32,
+        project_id: i32,
+        viewer_software: Option<&str>,
+    ) -> Result<AnnotationListResponse, ServiceError> {
+        // 1. 사용자가 프로젝트 멤버인지 확인
+        let is_member = self
+            .access_control_service
+            .is_project_member(requesting_user_id, project_id)
+            .await?;
+
+        if !is_member {
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
+        }
+
+        // 2. READ_ALL 권한 확인
+        let has_read_all = self
+            .access_control_service
+            .check_permission(requesting_user_id, project_id, "ANNOTATION", "READ_ALL")
+            .await?;
+
+        // 3. 권한에 따라 다른 쿼리 실행
+        if has_read_all {
+            // READ_ALL 권한 있음: 프로젝트의 모든 어노테이션
+            self.get_annotations_by_project_with_viewer(project_id, viewer_software)
+                .await
+        } else {
+            // READ_ALL 권한 없음: 본인 어노테이션만
+            self.get_annotations_by_user_with_viewer(requesting_user_id, viewer_software)
+                .await
+        }
     }
 }

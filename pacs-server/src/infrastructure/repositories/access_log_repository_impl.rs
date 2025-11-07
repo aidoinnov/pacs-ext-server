@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use sqlx::PgPool;
 
+#[derive(Clone)]
 pub struct AccessLogRepositoryImpl {
     pool: PgPool,
 }

@@ -74,6 +74,7 @@ pub trait AccessControlService: Send + Sync {
     async fn is_project_member(&self, user_id: i32, project_id: i32) -> Result<bool, ServiceError>;
 }
 
+#[derive(Clone)]
 pub struct AccessControlServiceImpl<A, U, P, R, PE>
 where
     A: AccessLogRepository,

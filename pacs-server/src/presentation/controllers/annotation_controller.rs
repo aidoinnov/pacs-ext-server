@@ -4,10 +4,11 @@ use crate::application::dto::annotation_dto::{
 };
 use crate::application::use_cases::AnnotationUseCase;
 use crate::domain::services::annotation_service::AnnotationService;
-use crate::domain::services::AnnotationServiceImpl;
+use crate::domain::services::{AnnotationServiceImpl, AccessControlServiceImpl};
 use crate::domain::ServiceError;
 use crate::infrastructure::repositories::{
     AnnotationRepositoryImpl, ProjectRepositoryImpl, UserRepositoryImpl,
+    AccessLogRepositoryImpl, RoleRepositoryImpl, PermissionRepositoryImpl,
 };
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use serde_json::json;
@@ -44,6 +45,13 @@ pub async fn create_annotation(
                     ProjectRepositoryImpl,
                 >,
                 UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
             >,
         >,
     >,
@@ -101,6 +109,13 @@ pub async fn get_annotation(
                     ProjectRepositoryImpl,
                 >,
                 UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
             >,
         >,
     >,
@@ -148,6 +163,13 @@ pub async fn list_annotations(
                     ProjectRepositoryImpl,
                 >,
                 UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
             >,
         >,
     >,
@@ -361,9 +383,10 @@ pub async fn list_annotations(
                 })
         }
     } else if let Some(proj_id) = project_id {
-        // project_id만 있으면 project로 필터링
+        // project_id만 있으면 권한 기반으로 필터링
+        // READ_ALL 권한이 있으면 프로젝트의 모든 annotation, 없으면 본인 annotation만
         use_case
-            .get_annotations_by_project_with_viewer(proj_id, viewer_software)
+            .get_annotations_by_project_with_permission(user_id, proj_id, viewer_software)
             .await
             .map(|mut response| {
                 // level로 필터링
@@ -461,6 +484,13 @@ pub async fn update_annotation(
                     ProjectRepositoryImpl,
                 >,
                 UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
             >,
         >,
     >,
@@ -508,6 +538,13 @@ pub async fn delete_annotation(
                     ProjectRepositoryImpl,
                 >,
                 UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
             >,
         >,
     >,
@@ -537,6 +574,13 @@ pub fn configure_routes(
                 ProjectRepositoryImpl,
             >,
             UserRepositoryImpl,
+            AccessControlServiceImpl<
+                AccessLogRepositoryImpl,
+                UserRepositoryImpl,
+                ProjectRepositoryImpl,
+                RoleRepositoryImpl,
+                PermissionRepositoryImpl,
+            >,
         >,
     >,
     mask_group_use_case: Arc<
