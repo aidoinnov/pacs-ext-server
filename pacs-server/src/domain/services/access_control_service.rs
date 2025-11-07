@@ -277,7 +277,17 @@ where
             SELECT EXISTS(
                 SELECT 1 FROM user_membership
                 WHERE EXISTS(
-                    -- 역할 기반 권한
+                    -- 사용자-프로젝트에 직접 할당된 롤의 권한
+                    SELECT 1
+                    FROM security_user_project up
+                    INNER JOIN security_role_permission rp ON up.role_id = rp.role_id
+                    WHERE up.user_id = $1
+                      AND up.project_id = $2
+                      AND rp.permission_id = (SELECT id FROM permission_id)
+
+                    UNION ALL
+
+                    -- 프로젝트-롤 관계를 통한 권한
                     SELECT 1
                     FROM security_role_permission rp
                     INNER JOIN security_project_role pr ON rp.role_id = pr.role_id
@@ -342,7 +352,12 @@ where
             "SELECT DISTINCT p.id, p.resource_type, p.action
              FROM security_permission p
              WHERE p.id IN (
-                 -- 역할을 통한 권한
+                 -- 사용자-프로젝트에 직접 할당된 롤의 권한
+                 SELECT rp.permission_id FROM security_user_project up
+                 INNER JOIN security_role_permission rp ON up.role_id = rp.role_id
+                 WHERE up.user_id = $1 AND up.project_id = $2
+                 UNION
+                 -- 프로젝트-롤 관계를 통한 권한
                  SELECT rp.permission_id FROM security_user_project up
                  INNER JOIN security_project_role pr ON up.project_id = pr.project_id
                  INNER JOIN security_role_permission rp ON pr.role_id = rp.role_id
