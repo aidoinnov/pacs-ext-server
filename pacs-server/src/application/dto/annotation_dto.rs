@@ -98,7 +98,7 @@ pub struct UpdateAnnotationRequest {
 }
 
 /// Annotation 응답 DTO
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct AnnotationResponse {
     /// Annotation ID
     /// 데이터베이스에서 생성된 고유 식별자

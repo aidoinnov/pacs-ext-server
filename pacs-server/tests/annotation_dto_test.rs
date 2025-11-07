@@ -131,6 +131,7 @@ mod annotation_dto_tests {
         let response = AnnotationResponse {
             id: 123,
             user_id: 456,
+            user_name: Some("홍길동".to_string()),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -150,6 +151,8 @@ mod annotation_dto_tests {
 
         // Test serialization
         let json_str = serde_json::to_string(&response).expect("Failed to serialize");
+        assert!(json_str.contains("user_name"));
+        assert!(json_str.contains("홍길동"));
         assert!(json_str.contains("viewer_software"));
         assert!(json_str.contains("tool_name"));
         assert!(json_str.contains("tool_version"));
@@ -162,6 +165,7 @@ mod annotation_dto_tests {
             serde_json::from_str(&json_str).expect("Failed to deserialize");
         assert_eq!(deserialized.id, 123);
         assert_eq!(deserialized.user_id, 456);
+        assert_eq!(deserialized.user_name, Some("홍길동".to_string()));
         assert_eq!(
             deserialized.viewer_software,
             Some("OHIF Viewer".to_string())
@@ -179,6 +183,7 @@ mod annotation_dto_tests {
         let response = AnnotationResponse {
             id: 789,
             user_id: 101,
+            user_name: None,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -194,6 +199,7 @@ mod annotation_dto_tests {
 
         // Test serialization with None values
         let json_str = serde_json::to_string(&response).expect("Failed to serialize");
+        assert!(json_str.contains("user_name"));
         assert!(json_str.contains("viewer_software"));
         assert!(json_str.contains("tool_name"));
         assert!(json_str.contains("tool_version"));
@@ -204,6 +210,7 @@ mod annotation_dto_tests {
             serde_json::from_str(&json_str).expect("Failed to deserialize");
         assert_eq!(deserialized.id, 789);
         assert_eq!(deserialized.user_id, 101);
+        assert_eq!(deserialized.user_name, None);
         assert_eq!(deserialized.viewer_software, None);
         assert_eq!(deserialized.tool_name, None);
         assert_eq!(deserialized.tool_version, None);
@@ -298,5 +305,125 @@ mod annotation_dto_tests {
         let point_json = serde_json::to_string(&point_request).expect("Failed to serialize point");
         assert!(point_json.contains("point"));
         assert!(point_json.contains("Cornerstone.js"));
+    }
+
+    #[test]
+    fn test_annotation_response_with_user_name() {
+        // Test with user_name present
+        let response_with_name = AnnotationResponse {
+            id: 1,
+            user_id: 5,
+            user_name: Some("김철수".to_string()),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.5.6".to_string(),
+            sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
+            annotation_data: json!({"type": "point", "x": 100, "y": 100}),
+            viewer_software: Some("TI-DicomViewer".to_string()),
+            tool_name: Some("Point Tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            description: Some("Test".to_string()),
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+        };
+
+        let json_str = serde_json::to_string(&response_with_name).expect("Failed to serialize");
+        assert!(json_str.contains("user_name"));
+        assert!(json_str.contains("김철수"));
+
+        let deserialized: AnnotationResponse =
+            serde_json::from_str(&json_str).expect("Failed to deserialize");
+        assert_eq!(deserialized.user_name, Some("김철수".to_string()));
+
+        // Test with user_name as None
+        let response_without_name = AnnotationResponse {
+            id: 2,
+            user_id: 10,
+            user_name: None,
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.5.6".to_string(),
+            sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
+            annotation_data: json!({"type": "point", "x": 100, "y": 100}),
+            viewer_software: None,
+            tool_name: None,
+            tool_version: None,
+            description: None,
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+        };
+
+        let json_str2 = serde_json::to_string(&response_without_name).expect("Failed to serialize");
+        assert!(json_str2.contains("user_name"));
+
+        let deserialized2: AnnotationResponse =
+            serde_json::from_str(&json_str2).expect("Failed to deserialize");
+        assert_eq!(deserialized2.user_name, None);
+    }
+
+    #[test]
+    fn test_annotation_level_detection() {
+        // Study level: series_uid and instance_uid are empty
+        let study_level = AnnotationResponse {
+            id: 1,
+            user_id: 1,
+            user_name: Some("Test User".to_string()),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "".to_string(),
+            sop_instance_uid: "".to_string(),
+            annotation_data: json!({"type": "study_note", "text": "Study level annotation"}),
+            viewer_software: Some("TI-DicomViewer".to_string()),
+            tool_name: Some("Note Tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            description: Some("Study level".to_string()),
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+        };
+
+        assert!(study_level.series_instance_uid.is_empty());
+        assert!(study_level.sop_instance_uid.is_empty());
+
+        // Series level: series_uid present, instance_uid empty
+        let series_level = AnnotationResponse {
+            id: 2,
+            user_id: 1,
+            user_name: Some("Test User".to_string()),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.5.6".to_string(),
+            sop_instance_uid: "".to_string(),
+            annotation_data: json!({"type": "series_note", "text": "Series level annotation"}),
+            viewer_software: Some("TI-DicomViewer".to_string()),
+            tool_name: Some("Note Tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            description: Some("Series level".to_string()),
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+        };
+
+        assert!(!series_level.series_instance_uid.is_empty());
+        assert!(series_level.sop_instance_uid.is_empty());
+
+        // Instance level: both series_uid and instance_uid present
+        let instance_level = AnnotationResponse {
+            id: 3,
+            user_id: 1,
+            user_name: Some("Test User".to_string()),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.5.6".to_string(),
+            sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
+            annotation_data: json!({"type": "measurement", "value": 10.5}),
+            viewer_software: Some("TI-DicomViewer".to_string()),
+            tool_name: Some("Measurement Tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            description: Some("Instance level".to_string()),
+            measurement_values: None,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+        };
+
+        assert!(!instance_level.series_instance_uid.is_empty());
+        assert!(!instance_level.sop_instance_uid.is_empty());
     }
 }
