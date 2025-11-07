@@ -426,6 +426,8 @@ pub fn configure_routes(
                     web::post().to(crate::presentation::controllers::mask_controller::create_mask::<
                         crate::domain::services::MaskServiceImpl<
                             crate::infrastructure::repositories::MaskRepositoryImpl,
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
                         >,
                         crate::domain::services::MaskGroupServiceImpl<
                             crate::infrastructure::repositories::MaskGroupRepositoryImpl,
@@ -440,6 +442,8 @@ pub fn configure_routes(
                     web::get().to(crate::presentation::controllers::mask_controller::list_masks::<
                         crate::domain::services::MaskServiceImpl<
                             crate::infrastructure::repositories::MaskRepositoryImpl,
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
                         >,
                         crate::domain::services::MaskGroupServiceImpl<
                             crate::infrastructure::repositories::MaskGroupRepositoryImpl,
@@ -454,6 +458,8 @@ pub fn configure_routes(
                     web::get().to(crate::presentation::controllers::mask_controller::get_mask::<
                         crate::domain::services::MaskServiceImpl<
                             crate::infrastructure::repositories::MaskRepositoryImpl,
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
                         >,
                         crate::domain::services::MaskGroupServiceImpl<
                             crate::infrastructure::repositories::MaskGroupRepositoryImpl,
@@ -468,6 +474,8 @@ pub fn configure_routes(
                     web::put().to(crate::presentation::controllers::mask_controller::update_mask::<
                         crate::domain::services::MaskServiceImpl<
                             crate::infrastructure::repositories::MaskRepositoryImpl,
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
                         >,
                         crate::domain::services::MaskGroupServiceImpl<
                             crate::infrastructure::repositories::MaskGroupRepositoryImpl,
@@ -482,6 +490,8 @@ pub fn configure_routes(
                     web::delete().to(crate::presentation::controllers::mask_controller::delete_mask::<
                         crate::domain::services::MaskServiceImpl<
                             crate::infrastructure::repositories::MaskRepositoryImpl,
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
                         >,
                         crate::domain::services::MaskGroupServiceImpl<
                             crate::infrastructure::repositories::MaskGroupRepositoryImpl,
@@ -496,6 +506,8 @@ pub fn configure_routes(
                     web::post().to(crate::presentation::controllers::mask_controller::generate_download_url::<
                         crate::domain::services::MaskServiceImpl<
                             crate::infrastructure::repositories::MaskRepositoryImpl,
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
                         >,
                         crate::domain::services::MaskGroupServiceImpl<
                             crate::infrastructure::repositories::MaskGroupRepositoryImpl,
@@ -510,6 +522,8 @@ pub fn configure_routes(
                     web::get().to(crate::presentation::controllers::mask_controller::get_mask_stats::<
                         crate::domain::services::MaskServiceImpl<
                             crate::infrastructure::repositories::MaskRepositoryImpl,
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
                         >,
                         crate::domain::services::MaskGroupServiceImpl<
                             crate::infrastructure::repositories::MaskGroupRepositoryImpl,

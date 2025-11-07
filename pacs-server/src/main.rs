@@ -349,7 +349,7 @@ async fn main() -> std::io::Result<()> {
         signed_url_service.clone(),
     ));
     let mask_use_case = Arc::new(MaskUseCase::new(
-        mask_service,
+        mask_service.clone(),
         mask_group_service.clone(),
         signed_url_service.clone(),
     ));
@@ -507,6 +507,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(Arc::new(
                 infrastructure::repositories::UserRepositoryImpl::new(pool.clone()),
             )))
+            // Mask services and use cases for mask controller
+            .app_data(web::Data::new(mask_use_case.clone()))
+            .app_data(web::Data::new(mask_group_use_case.clone()))
+            .app_data(web::Data::new(signed_url_service.clone()))
             // Swagger UI (commented out for now)
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", openapi.clone()),
