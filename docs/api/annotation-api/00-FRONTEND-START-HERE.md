@@ -2,10 +2,10 @@
 
 ## 📚 필수 문서 (반드시 읽기)
 
-### 0️⃣ **AUTH-API-REFERENCE.md** ⭐ (먼저 읽기!)
+### 0️⃣ **docs/api/auth/AUTH-API.md** ⭐ (먼저 읽기!)
 - 로그인 API
-- 토큰 검증 API
 - 토큰 갱신 API
+- **위치**: `docs/api/auth/AUTH-API.md`
 - **대상**: 모든 개발자
 
 ### 1️⃣ **FRONTEND-INTEGRATION-GUIDE.md**

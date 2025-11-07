@@ -2,14 +2,15 @@
 
 ## 📋 전달할 문서 목록
 
-### 필수 문서 (3개)
+### 필수 문서 (5개)
 
-| 파일명 | 설명 | 크기 |
-|--------|------|------|
-| **00-FRONTEND-START-HERE.md** | 시작 가이드 (여기서 시작!) | 2KB |
-| **FRONTEND-INTEGRATION-GUIDE.md** | 통합 전략 및 아키텍처 | 15KB |
-| **FRONTEND-API-SPEC.md** | 완전한 API 명세 | 20KB |
-| **ANNOTATION-DATA-FIELD-STRATEGY.md** | 데이터 필드 전략 + 시퀀스 다이어그램 | 25KB |
+| 파일명 | 위치 | 설명 | 크기 |
+|--------|------|------|------|
+| **AUTH-API.md** | `docs/api/auth/` | 인증 API (로그인, 토큰 갱신) | 8KB |
+| **00-FRONTEND-START-HERE.md** | `docs/api/annotation-api/` | 시작 가이드 (여기서 시작!) | 2KB |
+| **FRONTEND-INTEGRATION-GUIDE.md** | `docs/api/annotation-api/` | 통합 전략 및 아키텍처 | 15KB |
+| **FRONTEND-API-SPEC.md** | `docs/api/annotation-api/` | 완전한 API 명세 | 20KB |
+| **ANNOTATION-DATA-FIELD-STRATEGY.md** | `docs/api/annotation-api/` | 데이터 필드 전략 + 시퀀스 다이어그램 | 25KB |
 
 ### 참고 문서 (3개)
 
@@ -24,48 +25,57 @@
 ## 📂 폴더 구조
 
 ```
-docs/api/annotation-api/
-├── 00-FRONTEND-START-HERE.md              ← 여기서 시작!
-├── FRONTEND-INTEGRATION-GUIDE.md          ← 필수
-├── FRONTEND-API-SPEC.md                   ← 필수
-├── ANNOTATION-DATA-FIELD-STRATEGY.md      ← 필수
-├── ANNOTATION-LIST-OPTIMIZATION.md        ← 참고
-├── VERSION-FIELD-EXPLANATION.md           ← 참고
-└── IMPLEMENTATION-ROADMAP.md              ← 참고
+docs/api/
+├── auth/
+│   └── AUTH-API.md                        ← 인증 API (필수)
+│
+└── annotation-api/
+    ├── 00-FRONTEND-START-HERE.md          ← 여기서 시작!
+    ├── FRONTEND-INTEGRATION-GUIDE.md      ← 필수
+    ├── FRONTEND-API-SPEC.md               ← 필수
+    ├── ANNOTATION-DATA-FIELD-STRATEGY.md  ← 필수
+    ├── ANNOTATION-LIST-OPTIMIZATION.md    ← 참고
+    ├── VERSION-FIELD-EXPLANATION.md       ← 참고
+    └── IMPLEMENTATION-ROADMAP.md          ← 참고
 ```
 
 ---
 
 ## 🎯 읽는 순서
 
-### 1단계: 개요 이해 (5분)
+### 1단계: 인증 이해 (10분)
+- **docs/api/auth/AUTH-API.md** 읽기
+- 로그인, 토큰 갱신 이해
+- Authorization 헤더 설정 방법 확인
+
+### 2단계: 개요 이해 (5분)
 - **00-FRONTEND-START-HERE.md** 읽기
 - 핵심 요약 파악
 
-### 2단계: 아키텍처 이해 (20분)
+### 3단계: 아키텍처 이해 (20분)
 - **FRONTEND-INTEGRATION-GUIDE.md** 읽기
 - 데이터 로딩 흐름 이해
 - 캐시 전략 이해
 
-### 3단계: API 명세 학습 (30분)
+### 4단계: API 명세 학습 (30분)
 - **FRONTEND-API-SPEC.md** 읽기
 - 각 엔드포인트 이해
 - 요청/응답 형식 확인
 
-### 4단계: 데이터 필드 이해 (20분)
+### 5단계: 데이터 필드 이해 (20분)
 - **ANNOTATION-DATA-FIELD-STRATEGY.md** 읽기
 - 시퀀스 다이어그램 분석
 - Version 검사 로직 이해
 
-### 5단계: 최적화 전략 학습 (선택)
+### 6단계: 최적화 전략 학습 (선택)
 - **ANNOTATION-LIST-OPTIMIZATION.md** 읽기
 - 페이지네이션 설계 이해
 
-### 6단계: Version 필드 이해 (선택)
+### 7단계: Version 필드 이해 (선택)
 - **VERSION-FIELD-EXPLANATION.md** 읽기
 - Optimistic Locking 이해
 
-### 7단계: 구현 계획 (선택)
+### 8단계: 구현 계획 (선택)
 - **IMPLEMENTATION-ROADMAP.md** 읽기
 - 구현 일정 확인
 
