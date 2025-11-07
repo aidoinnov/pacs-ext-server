@@ -126,6 +126,8 @@ pub async fn get_annotation(
     tag = "annotations",
     params(
         ("study_instance_uid" = Option<String>, Query, description = "Study Instance UID로 필터링"),
+        ("series_instance_uid" = Option<String>, Query, description = "Series Instance UID로 필터링"),
+        ("sop_instance_uid" = Option<String>, Query, description = "SOP Instance UID로 필터링"),
         ("user_id" = Option<i32>, Query, description = "사용자 ID로 필터링"),
         ("project_id" = Option<i32>, Query, description = "프로젝트 ID로 필터링"),
         ("viewer_software" = Option<String>, Query, description = "뷰어 소프트웨어로 필터링"),
@@ -162,14 +164,63 @@ pub async fn list_annotations(
 
     // viewer_software 파라미터 추출
     let viewer_software = query.get("viewer_software").map(|s| s.as_str());
-    
+
     // project_id 파라미터 추출
     let project_id = query.get("project_id").and_then(|s| s.parse::<i32>().ok());
-    
-    // 쿼리 파라미터에 따라 다른 메서드 호출 (우선순위: study+project > study > project > user)
-    let result = if let Some(study_uid) = query.get("study_instance_uid") {
+
+    // 쿼리 파라미터에 따라 다른 메서드 호출
+    // 우선순위: sop_instance_uid > series_instance_uid > study_instance_uid > project_id > user_id
+    let result = if let Some(sop_instance_uid) = query.get("sop_instance_uid") {
+        // SOP Instance UID (가장 구체적인 필터)
+        use_case
+            .get_annotations_by_instance(sop_instance_uid)
+            .await
+            .map(|mut response| {
+                // viewer_software로 추가 필터링
+                if let Some(viewer) = viewer_software {
+                    response.annotations.retain(|ann| {
+                        ann.viewer_software.as_ref()
+                            .map(|v| v.as_str() == viewer)
+                            .unwrap_or(false)
+                    });
+                    response.total = response.annotations.len();
+                }
+
+                // user_id로 추가 필터링 (쿼리 파라미터에 명시된 경우)
+                if query.get("user_id").is_some() {
+                    response.annotations.retain(|ann| ann.user_id == user_id);
+                    response.total = response.annotations.len();
+                }
+
+                response
+            })
+    } else if let Some(series_instance_uid) = query.get("series_instance_uid") {
+        // Series Instance UID
+        use_case
+            .get_annotations_by_series(series_instance_uid)
+            .await
+            .map(|mut response| {
+                // viewer_software로 추가 필터링
+                if let Some(viewer) = viewer_software {
+                    response.annotations.retain(|ann| {
+                        ann.viewer_software.as_ref()
+                            .map(|v| v.as_str() == viewer)
+                            .unwrap_or(false)
+                    });
+                    response.total = response.annotations.len();
+                }
+
+                // user_id로 추가 필터링 (쿼리 파라미터에 명시된 경우)
+                if query.get("user_id").is_some() {
+                    response.annotations.retain(|ann| ann.user_id == user_id);
+                    response.total = response.annotations.len();
+                }
+
+                response
+            })
+    } else if let Some(study_uid) = query.get("study_instance_uid") {
         if let Some(proj_id) = project_id {
-            // study_instance_uid + project_id 조합: 가장 구체적인 필터
+            // study_instance_uid + project_id 조합
             match use_case
                 .get_annotations_by_project_and_study(proj_id, study_uid)
                 .await
@@ -184,13 +235,13 @@ pub async fn list_annotations(
                         });
                         response.total = response.annotations.len();
                     }
-                    
+
                     // user_id로 추가 필터링 (있는 경우)
                     if query.get("user_id").is_some() {
                         response.annotations.retain(|ann| ann.user_id == user_id);
                         response.total = response.annotations.len();
                     }
-                    
+
                     Ok(response)
                 }
                 Err(e) => Err(e),
