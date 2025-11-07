@@ -79,6 +79,9 @@ pub struct Annotation {
     pub created_at: DateTime<Utc>,
     /// 어노테이션이 마지막으로 수정된 시각
     // pub updated_at: NaiveDateTime,
+    /// 낙관적 잠금(Optimistic Locking)을 위한 버전 번호
+    /// 각 업데이트마다 증가하며, 동시 편집 충돌 감지에 사용됨
+    pub version: i32,
     pub updated_at: DateTime<Utc>,
     /// 어노테이션 생성에 사용된 뷰어 소프트웨어 (선택사항)
     pub viewer_software: Option<String>,

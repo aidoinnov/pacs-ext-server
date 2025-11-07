@@ -64,6 +64,12 @@ pub struct CreateAnnotationRequest {
 /// Annotation 업데이트 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateAnnotationRequest {
+    /// 낙관적 잠금(Optimistic Locking)을 위한 기본 버전
+    /// 클라이언트가 마지막으로 조회한 어노테이션의 버전 번호
+    /// 서버의 현재 버전과 일치하지 않으면 409 Conflict 응답
+    #[schema(example = 1)]
+    pub base_version: Option<i32>,
+
     /// Annotation 데이터 (JSON 형식)
     /// 어노테이션의 실제 데이터를 담는 JSON 객체
     #[schema(example = json!({"type": "rectangle", "x": 50, "y": 50, "width": 200, "height": 100, "color": "#0000FF"}))]
@@ -151,6 +157,12 @@ pub struct AnnotationResponse {
 
     /// 측정값
     pub measurement_values: Option<serde_json::Value>,
+
+    /// 버전 번호 (Optimistic Locking)
+    /// 낙관적 잠금을 위한 버전 번호
+    /// 각 업데이트마다 증가하며, 동시 편집 충돌 감지에 사용됨
+    #[schema(example = 1)]
+    pub version: i32,
 
     /// 생성 시간
     /// 어노테이션이 생성된 시각

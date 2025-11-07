@@ -106,6 +106,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             viewer_software: annotation.viewer_software,
             description: annotation.description,
             measurement_values: annotation.measurement_values,
+            version: annotation.version,
             created_at: annotation.created_at,
             updated_at: annotation.updated_at,
         })
@@ -172,6 +173,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
                     viewer_software: annotation.viewer_software,
                     description: annotation.description,
                     measurement_values: annotation.measurement_values,
+                    version: annotation.version,
                     created_at: annotation.created_at,
                     updated_at: annotation.updated_at,
                 }
@@ -575,6 +577,17 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             .annotation_service
             .get_annotation_by_id(annotation_id)
             .await?;
+
+        // 버전 검증 (Optimistic Locking)
+        // base_version이 제공된 경우, 현재 버전과 일치하는지 확인
+        if let Some(base_version) = request.base_version {
+            if current_annotation.version != base_version {
+                return Err(ServiceError::VersionConflict {
+                    current_version: current_annotation.version,
+                    client_version: base_version,
+                });
+            }
+        }
 
         // 업데이트할 데이터 결정
         let new_data = request.annotation_data.unwrap_or(current_annotation.data);

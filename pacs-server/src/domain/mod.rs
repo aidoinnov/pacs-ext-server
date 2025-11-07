@@ -12,6 +12,12 @@ pub enum ServiceError {
     DatabaseError(String),
     Unauthorized(String),
     ExternalServiceError(String),
+    /// 버전 충돌 에러 (Optimistic Locking)
+    /// 클라이언트가 제공한 버전과 서버의 현재 버전이 일치하지 않음
+    VersionConflict {
+        current_version: i32,
+        client_version: i32,
+    },
 }
 
 impl std::fmt::Display for ServiceError {
@@ -23,6 +29,14 @@ impl std::fmt::Display for ServiceError {
             ServiceError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
             ServiceError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
             ServiceError::ExternalServiceError(msg) => write!(f, "External service error: {}", msg),
+            ServiceError::VersionConflict {
+                current_version,
+                client_version,
+            } => write!(
+                f,
+                "Version conflict: current version is {}, but client version is {}",
+                current_version, client_version
+            ),
         }
     }
 }
@@ -62,6 +76,17 @@ impl actix_web::ResponseError for ServiceError {
             ServiceError::Unauthorized(_) => {
                 actix_web::HttpResponse::Unauthorized().json(serde_json::json!({
                     "error": self.to_string()
+                }))
+            }
+            ServiceError::VersionConflict {
+                current_version,
+                client_version,
+            } => {
+                actix_web::HttpResponse::Conflict().json(serde_json::json!({
+                    "error": "Version conflict",
+                    "message": self.to_string(),
+                    "current_version": current_version,
+                    "client_version": client_version,
                 }))
             }
             _ => actix_web::HttpResponse::InternalServerError().json(serde_json::json!({

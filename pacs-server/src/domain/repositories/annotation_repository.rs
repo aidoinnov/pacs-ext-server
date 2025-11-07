@@ -58,6 +58,16 @@ pub trait AnnotationRepository: Send + Sync {
         is_shared: bool,
         measurement_values: Option<serde_json::Value>,
     ) -> Result<Option<Annotation>, sqlx::Error>;
+    /// 버전 검증을 포함한 업데이트 (Optimistic Locking)
+    /// 클라이언트가 제공한 base_version과 현재 버전이 일치할 때만 업데이트 수행
+    async fn update_with_version_check(
+        &self,
+        id: i32,
+        base_version: i32,
+        data: serde_json::Value,
+        is_shared: bool,
+        measurement_values: Option<serde_json::Value>,
+    ) -> Result<Option<Annotation>, sqlx::Error>;
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;
     async fn create_history(
         &self,

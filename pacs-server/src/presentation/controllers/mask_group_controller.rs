@@ -104,6 +104,15 @@ where
                 "message": msg
             }))
         }
+        Err(ServiceError::VersionConflict {
+            current_version,
+            client_version,
+        }) => HttpResponse::Conflict().json(json!({
+            "error": "Version Conflict",
+            "message": format!("Version conflict: current version is {}, but client version is {}", current_version, client_version),
+            "current_version": current_version,
+            "client_version": client_version,
+        })),
     }
 }
 
