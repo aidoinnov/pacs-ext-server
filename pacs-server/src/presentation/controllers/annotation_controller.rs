@@ -123,6 +123,8 @@ pub async fn get_annotation(
     match use_case.get_annotation_by_id(*annotation_id).await {
         Ok(annotation) => HttpResponse::Ok()
             .insert_header(("Cache-Control", "public, max-age=5"))
+            .insert_header(("ETag", format!("\"{}\"", annotation.version)))
+            .insert_header(("Last-Modified", annotation.updated_at.to_rfc2822()))
             .json(annotation),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
@@ -132,6 +134,84 @@ pub async fn get_annotation(
             "error": "Internal Server Error",
             "message": e.to_string()
         })),
+    }
+}
+
+/// HEAD 요청 핸들러 - 응답 헤더만 반환 (본문 없음)
+///
+/// 이 메서드는 GET 요청과 동일한 헤더를 반환하지만 응답 본문은 비어있습니다.
+/// 클라이언트는 ETag와 Last-Modified 헤더를 사용하여 캐시 검증을 수행할 수 있습니다.
+///
+/// # 사용 사례
+/// - 캐시 검증: If-None-Match, If-Modified-Since 헤더 사용
+/// - 대역폭 절약: 응답 본문 없이 메타데이터만 전송
+/// - 리소스 존재 확인: 404 응답으로 리소스 존재 여부 확인
+pub async fn head_annotation(
+    annotation_id: web::Path<i32>,
+    req: HttpRequest,
+    use_case: web::Data<
+        Arc<
+            AnnotationUseCase<
+                AnnotationServiceImpl<
+                    AnnotationRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                >,
+                UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
+            >,
+        >,
+    >,
+) -> impl Responder {
+    match use_case.get_annotation_by_id(*annotation_id).await {
+        Ok(annotation) => {
+            let etag = format!("\"{}\"", annotation.version);
+            let last_modified = annotation.updated_at.to_rfc2822();
+
+            // If-None-Match 헤더 확인 (ETag 기반 캐시 검증)
+            if let Some(if_none_match) = req.headers().get("If-None-Match") {
+                if let Ok(if_none_match_str) = if_none_match.to_str() {
+                    if if_none_match_str == etag || if_none_match_str == "*" {
+                        // 304 Not Modified 응답
+                        return HttpResponse::NotModified()
+                            .insert_header(("ETag", etag))
+                            .insert_header(("Cache-Control", "public, max-age=5"))
+                            .finish();
+                    }
+                }
+            }
+
+            // If-Modified-Since 헤더 확인 (Last-Modified 기반 캐시 검증)
+            if let Some(if_modified_since) = req.headers().get("If-Modified-Since") {
+                if let Ok(if_modified_since_str) = if_modified_since.to_str() {
+                    // RFC 2822 형식으로 파싱하여 비교
+                    if let Ok(client_time) = chrono::DateTime::parse_from_rfc2822(if_modified_since_str) {
+                        if annotation.updated_at <= client_time.with_timezone(&chrono::Utc) {
+                            // 304 Not Modified 응답
+                            return HttpResponse::NotModified()
+                                .insert_header(("Last-Modified", last_modified))
+                                .insert_header(("Cache-Control", "public, max-age=5"))
+                                .finish();
+                        }
+                    }
+                }
+            }
+
+            // 200 OK 응답 (본문 없음)
+            HttpResponse::Ok()
+                .insert_header(("ETag", etag))
+                .insert_header(("Last-Modified", last_modified))
+                .insert_header(("Cache-Control", "public, max-age=5"))
+                .finish()
+        }
+        Err(ServiceError::NotFound(_)) => HttpResponse::NotFound().finish(),
+        Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
 
@@ -718,6 +798,7 @@ pub fn configure_routes(
                 .route("", web::post().to(create_annotation))
                 .route("", web::get().to(list_annotations))
                 .route("/{annotation_id}", web::get().to(get_annotation))
+                .route("/{annotation_id}", web::head().to(head_annotation))
                 .route("/{annotation_id}", web::put().to(update_annotation))
                 .route("/{annotation_id}", web::delete().to(delete_annotation))
                 // Mask Groups routes
