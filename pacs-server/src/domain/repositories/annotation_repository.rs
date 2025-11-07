@@ -18,6 +18,11 @@ pub trait AnnotationRepository: Send + Sync {
         project_id: i32,
         study_uid: &str,
     ) -> Result<Vec<Annotation>, sqlx::Error>;
+    async fn find_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<Vec<Annotation>, sqlx::Error>;
     async fn find_shared_annotations(
         &self,
         project_id: i32,

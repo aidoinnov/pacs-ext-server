@@ -786,4 +786,154 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
                 .await
         }
     }
+
+    /// Series UID와 프로젝트 ID로 어노테이션 목록을 조회합니다 (권한 기반 필터링).
+    ///
+    /// 이 메서드는 지정된 Series UID와 프로젝트에 해당하는 어노테이션을 조회합니다.
+    /// READ_ALL 권한이 있으면 모든 어노테이션을 반환하고, 없으면 사용자 본인의 어노테이션만 반환합니다.
+    ///
+    /// # 매개변수
+    /// - `requesting_user_id`: 요청하는 사용자의 ID
+    /// - `series_uid`: 어노테이션을 조회할 Series의 UID
+    /// - `project_id`: 어노테이션을 조회할 프로젝트의 ID
+    ///
+    /// # 반환값
+    /// - `Ok(AnnotationListResponse)`: 어노테이션 목록과 총 개수
+    /// - `Err(ServiceError)`: 서비스 오류
+    ///
+    /// # 예시
+    /// ```ignore
+    /// let series_uid = "1.2.3.4.5.6.7.8.9.11";
+    /// let response = annotation_use_case
+    ///     .get_annotations_by_series_and_project_with_user(1, series_uid, 2)
+    ///     .await?;
+    /// println!("Series의 어노테이션 수: {}", response.total);
+    /// ```
+    pub async fn get_annotations_by_series_and_project_with_user(
+        &self,
+        requesting_user_id: i32,
+        series_uid: &str,
+        project_id: i32,
+    ) -> Result<AnnotationListResponse, ServiceError> {
+        // 1. 사용자가 프로젝트 멤버인지 확인
+        let is_member = self
+            .access_control_service
+            .is_project_member(requesting_user_id, project_id)
+            .await?;
+
+        if !is_member {
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
+        }
+
+        // 2. READ_ALL 권한 확인
+        let has_read_all = self
+            .access_control_service
+            .check_permission(requesting_user_id, project_id, "ANNOTATION", "READ_ALL")
+            .await?;
+
+        // 3. 프로젝트와 Series로 어노테이션 조회
+        let annotations = self
+            .annotation_service
+            .get_annotations_by_project_and_series(project_id, series_uid)
+            .await?;
+
+        // 4. 권한에 따라 필터링
+        let filtered_annotations = if has_read_all {
+            // READ_ALL 권한 있음: 모든 어노테이션 반환
+            annotations
+        } else {
+            // READ_ALL 권한 없음: 본인 어노테이션만 반환
+            annotations
+                .into_iter()
+                .filter(|ann| ann.user_id == requesting_user_id)
+                .collect()
+        };
+
+        let total = filtered_annotations.len();
+        let annotation_responses = self.to_responses(filtered_annotations).await?;
+
+        Ok(AnnotationListResponse {
+            annotations: annotation_responses,
+            total,
+        })
+    }
+
+    /// Study UID와 프로젝트 ID로 어노테이션 목록을 조회합니다 (권한 기반 필터링).
+    ///
+    /// 이 메서드는 지정된 Study UID와 프로젝트에 해당하는 어노테이션을 조회합니다.
+    /// READ_ALL 권한이 있으면 모든 어노테이션을 반환하고, 없으면 사용자 본인의 어노테이션만 반환합니다.
+    pub async fn get_annotations_by_project_and_study_with_user(
+        &self,
+        requesting_user_id: i32,
+        project_id: i32,
+        study_uid: &str,
+    ) -> Result<AnnotationListResponse, ServiceError> {
+        // 1. 사용자가 프로젝트 멤버인지 확인
+        let is_member = self
+            .access_control_service
+            .is_project_member(requesting_user_id, project_id)
+            .await?;
+
+        if !is_member {
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
+        }
+
+        // 2. READ_ALL 권한 확인
+        let has_read_all = self
+            .access_control_service
+            .check_permission(requesting_user_id, project_id, "ANNOTATION", "READ_ALL")
+            .await?;
+
+        // 3. 프로젝트와 Study로 어노테이션 조회
+        let annotations = self
+            .annotation_service
+            .get_annotations_by_project_and_study(project_id, study_uid)
+            .await?;
+
+        // 4. 권한에 따라 필터링
+        let filtered_annotations = if has_read_all {
+            // READ_ALL 권한 있음: 모든 어노테이션 반환
+            annotations
+        } else {
+            // READ_ALL 권한 없음: 본인 어노테이션만 반환
+            annotations
+                .into_iter()
+                .filter(|ann| ann.user_id == requesting_user_id)
+                .collect()
+        };
+
+        let total = filtered_annotations.len();
+        let annotation_responses = self.to_responses(filtered_annotations).await?;
+
+        Ok(AnnotationListResponse {
+            annotations: annotation_responses,
+            total,
+        })
+    }
+
+    /// 프로젝트와 Series UID로 어노테이션 목록을 조회합니다 (권한 체크 없음).
+    ///
+    /// 이 메서드는 권한 체크 없이 지정된 Series UID와 프로젝트에 해당하는 모든 어노테이션을 반환합니다.
+    pub async fn get_annotations_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<AnnotationListResponse, ServiceError> {
+        let annotations = self
+            .annotation_service
+            .get_annotations_by_project_and_series(project_id, series_uid)
+            .await?;
+
+        let total = annotations.len();
+        let annotation_responses = self.to_responses(annotations).await?;
+
+        Ok(AnnotationListResponse {
+            annotations: annotation_responses,
+            total,
+        })
+    }
 }

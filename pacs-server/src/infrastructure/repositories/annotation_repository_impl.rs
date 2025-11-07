@@ -108,7 +108,7 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         study_uid: &str,
     ) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
-            "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid, 
+            "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
                     tool_name, tool_version, data, is_shared, created_at, updated_at,
                     viewer_software, description, measurement_values
              FROM annotation_annotation
@@ -117,6 +117,25 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         )
         .bind(project_id)
         .bind(study_uid)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    async fn find_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<Vec<Annotation>, sqlx::Error> {
+        sqlx::query_as::<_, Annotation>(
+            "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description, measurement_values
+             FROM annotation_annotation
+             WHERE project_id = $1 AND series_uid = $2
+             ORDER BY created_at DESC",
+        )
+        .bind(project_id)
+        .bind(series_uid)
         .fetch_all(&self.pool)
         .await
     }

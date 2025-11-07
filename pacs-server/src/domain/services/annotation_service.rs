@@ -71,6 +71,13 @@ pub trait AnnotationService: Send + Sync {
         study_uid: &str,
     ) -> Result<Vec<Annotation>, ServiceError>;
 
+    /// 프로젝트와 Series UID로 Annotation 목록 조회
+    async fn get_annotations_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<Vec<Annotation>, ServiceError>;
+
     /// 공유 Annotation 목록 조회
     async fn get_shared_annotations(
         &self,
@@ -288,6 +295,27 @@ where
         Ok(self
             .annotation_repository
             .find_by_project_and_study(project_id, study_uid)
+            .await?)
+    }
+
+    async fn get_annotations_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<Vec<Annotation>, ServiceError> {
+        // 프로젝트 존재 확인
+        if self
+            .project_repository
+            .find_by_id(project_id)
+            .await?
+            .is_none()
+        {
+            return Err(ServiceError::NotFound("Project not found".into()));
+        }
+
+        Ok(self
+            .annotation_repository
+            .find_by_project_and_series(project_id, series_uid)
             .await?)
     }
 

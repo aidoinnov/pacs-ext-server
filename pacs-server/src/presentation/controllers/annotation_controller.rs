@@ -179,10 +179,9 @@ pub async fn list_annotations(
     let mut user_id = 336;
 
     // 쿼리 파라미터에서 user_id 추출
-    if let Some(user_id_str) = query.get("user_id") {
-        if let Ok(user_id_param) = user_id_str.parse::<i32>() {
-            user_id = user_id_param;
-        }
+    let user_id_param = query.get("user_id").and_then(|s| s.parse::<i32>().ok());
+    if let Some(uid) = user_id_param {
+        user_id = uid;
     }
 
     // viewer_software 파라미터 추출
@@ -196,6 +195,7 @@ pub async fn list_annotations(
 
     // 쿼리 파라미터에 따라 다른 메서드 호출
     // 우선순위: sop_instance_uid > series_instance_uid > study_instance_uid > project_id > user_id
+    // 주의: user_id 파라미터가 있으면 권한 기반 필터링을 수행합니다
     let result = if let Some(sop_instance_uid) = query.get("sop_instance_uid") {
         // SOP Instance UID (가장 구체적인 필터)
         use_case
@@ -247,85 +247,120 @@ pub async fn list_annotations(
                 response
             })
     } else if let Some(series_instance_uid) = query.get("series_instance_uid") {
-        // Series Instance UID
-        use_case
-            .get_annotations_by_series(series_instance_uid)
-            .await
-            .map(|mut response| {
-                // level로 필터링
-                if let Some(lvl) = level {
-                    match lvl {
-                        "study" => {
-                            // Study 레벨: series_uid와 instance_uid가 모두 비어있음
-                            response.annotations.retain(|ann| {
-                                ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
-                            });
-                        }
-                        "series" => {
-                            // Series 레벨: series_uid는 있고 instance_uid는 비어있음
-                            response.annotations.retain(|ann| {
-                                !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
-                            });
-                        }
-                        "instance" => {
-                            // Instance 레벨: instance_uid가 있음
-                            response.annotations.retain(|ann| {
-                                !ann.sop_instance_uid.is_empty()
-                            });
-                        }
-                        _ => {} // 잘못된 level 값은 무시
-                    }
-                    response.total = response.annotations.len();
-                }
-
-                // viewer_software로 추가 필터링
-                if let Some(viewer) = viewer_software {
-                    response.annotations.retain(|ann| {
-                        ann.viewer_software.as_ref()
-                            .map(|v| v.as_str() == viewer)
-                            .unwrap_or(false)
-                    });
-                    response.total = response.annotations.len();
-                }
-
-                // user_id로 추가 필터링 (쿼리 파라미터에 명시된 경우)
-                if query.get("user_id").is_some() {
-                    response.annotations.retain(|ann| ann.user_id == user_id);
-                    response.total = response.annotations.len();
-                }
-
-                response
-            })
-    } else if let Some(study_uid) = query.get("study_instance_uid") {
+        // Series Instance UID 처리
         if let Some(proj_id) = project_id {
-            // study_instance_uid + project_id 조합
-            match use_case
-                .get_annotations_by_project_and_study(proj_id, study_uid)
+            // series_instance_uid + project_id 조합
+            // user_id 파라미터가 있으면 권한 기반 필터링 수행
+            if user_id_param.is_some() {
+                use_case
+                    .get_annotations_by_series_and_project_with_user(user_id, series_instance_uid, proj_id)
+                    .await
+                    .map(|mut response| {
+                        // 권한 기반 필터링: READ_ALL 권한이 없으면 본인 어노테이션만
+                        // (이미 UseCase에서 처리됨)
+
+                        // level로 필터링
+                        if let Some(lvl) = level {
+                            match lvl {
+                                "study" => {
+                                    response.annotations.retain(|ann| {
+                                        ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                "series" => {
+                                    response.annotations.retain(|ann| {
+                                        !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                "instance" => {
+                                    response.annotations.retain(|ann| {
+                                        !ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                _ => {}
+                            }
+                            response.total = response.annotations.len();
+                        }
+
+                        // viewer_software로 추가 필터링
+                        if let Some(viewer) = viewer_software {
+                            response.annotations.retain(|ann| {
+                                ann.viewer_software.as_ref()
+                                    .map(|v| v.as_str() == viewer)
+                                    .unwrap_or(false)
+                            });
+                            response.total = response.annotations.len();
+                        }
+
+                        response
+                    })
+            } else {
+                // user_id 파라미터가 없으면 기존 방식 (권한 체크 없음)
+                use_case
+                    .get_annotations_by_project_and_series(proj_id, series_instance_uid)
+                    .await
+                    .map(|mut response| {
+                        // level로 필터링
+                        if let Some(lvl) = level {
+                            match lvl {
+                                "study" => {
+                                    response.annotations.retain(|ann| {
+                                        ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                "series" => {
+                                    response.annotations.retain(|ann| {
+                                        !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                "instance" => {
+                                    response.annotations.retain(|ann| {
+                                        !ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                _ => {}
+                            }
+                            response.total = response.annotations.len();
+                        }
+
+                        // viewer_software로 추가 필터링
+                        if let Some(viewer) = viewer_software {
+                            response.annotations.retain(|ann| {
+                                ann.viewer_software.as_ref()
+                                    .map(|v| v.as_str() == viewer)
+                                    .unwrap_or(false)
+                            });
+                            response.total = response.annotations.len();
+                        }
+
+                        response
+                    })
+            }
+        } else {
+            // series_instance_uid만 있으면 권한 체크 없이 조회
+            use_case
+                .get_annotations_by_series(series_instance_uid)
                 .await
-            {
-                Ok(mut response) => {
+                .map(|mut response| {
                     // level로 필터링
                     if let Some(lvl) = level {
                         match lvl {
                             "study" => {
-                                // Study 레벨: series_uid와 instance_uid가 모두 비어있음
                                 response.annotations.retain(|ann| {
                                     ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
                                 });
                             }
                             "series" => {
-                                // Series 레벨: series_uid는 있고 instance_uid는 비어있음
                                 response.annotations.retain(|ann| {
                                     !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
                                 });
                             }
                             "instance" => {
-                                // Instance 레벨: instance_uid가 있음
                                 response.annotations.retain(|ann| {
                                     !ann.sop_instance_uid.is_empty()
                                 });
                             }
-                            _ => {} // 잘못된 level 값은 무시
+                            _ => {}
                         }
                         response.total = response.annotations.len();
                     }
@@ -340,15 +375,97 @@ pub async fn list_annotations(
                         response.total = response.annotations.len();
                     }
 
-                    // user_id로 추가 필터링 (있는 경우)
-                    if query.get("user_id").is_some() {
-                        response.annotations.retain(|ann| ann.user_id == user_id);
-                        response.total = response.annotations.len();
-                    }
+                    response
+                })
+        }
+    } else if let Some(study_uid) = query.get("study_instance_uid") {
+        if let Some(proj_id) = project_id {
+            // study_instance_uid + project_id 조합
+            // user_id 파라미터가 있으면 권한 기반 필터링 수행
+            if user_id_param.is_some() {
+                use_case
+                    .get_annotations_by_project_and_study_with_user(user_id, proj_id, study_uid)
+                    .await
+                    .map(|mut response| {
+                        // level로 필터링
+                        if let Some(lvl) = level {
+                            match lvl {
+                                "study" => {
+                                    response.annotations.retain(|ann| {
+                                        ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                "series" => {
+                                    response.annotations.retain(|ann| {
+                                        !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                "instance" => {
+                                    response.annotations.retain(|ann| {
+                                        !ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                _ => {}
+                            }
+                            response.total = response.annotations.len();
+                        }
 
-                    Ok(response)
+                        // viewer_software로 추가 필터링
+                        if let Some(viewer) = viewer_software {
+                            response.annotations.retain(|ann| {
+                                ann.viewer_software.as_ref()
+                                    .map(|v| v.as_str() == viewer)
+                                    .unwrap_or(false)
+                            });
+                            response.total = response.annotations.len();
+                        }
+
+                        response
+                    })
+            } else {
+                // user_id 파라미터가 없으면 기존 방식 (권한 체크 없음)
+                match use_case
+                    .get_annotations_by_project_and_study(proj_id, study_uid)
+                    .await
+                {
+                    Ok(mut response) => {
+                        // level로 필터링
+                        if let Some(lvl) = level {
+                            match lvl {
+                                "study" => {
+                                    response.annotations.retain(|ann| {
+                                        ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                "series" => {
+                                    response.annotations.retain(|ann| {
+                                        !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                "instance" => {
+                                    response.annotations.retain(|ann| {
+                                        !ann.sop_instance_uid.is_empty()
+                                    });
+                                }
+                                _ => {}
+                            }
+                            response.total = response.annotations.len();
+                        }
+
+                        // viewer_software로 추가 필터링
+                        if let Some(viewer) = viewer_software {
+                            response.annotations.retain(|ann| {
+                                ann.viewer_software.as_ref()
+                                    .map(|v| v.as_str() == viewer)
+                                    .unwrap_or(false)
+                            });
+                            response.total = response.annotations.len();
+                        }
+
+                        Ok(response)
+                    }
+                    Err(e) => Err(e),
                 }
-                Err(e) => Err(e),
             }
         } else {
             // study_instance_uid만 있으면 study로 필터링
