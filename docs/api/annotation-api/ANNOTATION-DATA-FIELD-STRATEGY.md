@@ -303,13 +303,14 @@ GET /api/annotations/{id}
 
 ---
 
-### Step 2: 캔버스에 그리기 (전체 데이터)
+### Step 2: 캔버스에 그리기 (전체 데이터 + Version 검사)
 
 ```
 프론트엔드                          백엔드                          데이터베이스
     │                                │                                │
     ├─ 사이드바에서 annotation 선택   │                                │
     │ (annotation.id = 1)            │                                │
+    │ summary.version = 1            │                                │
     │                                │                                │
     ├──────────────────────────────────>                               │
     │ GET /api/annotations/1          │                               │
@@ -338,7 +339,14 @@ GET /api/annotations/{id}
     │     measurements: {...},       │                               │
     │     metadata: {...}            │                               │
     │   },                           │                               │
-    │   version: 2                   │                               │
+    │   version: 2  ← 새로운 버전!   │                               │
+    │ }                              │                               │
+    │                                │                               │
+    ├─ Version 검사                   │                               │
+    │ if (summary.version !== detail.version) {                      │
+    │   console.warn('⚠️ 버전 불일치!');                             │
+    │   console.log(`Summary: v1, Detail: v2`);                      │
+    │   // 최신 버전 사용 (detail.version = 2)                       │
     │ }                              │                               │
     │                                │                               │
     ├─ 캔버스에 그리기                │                               │
@@ -347,6 +355,123 @@ GET /api/annotations/{id}
     │   color: "#FF0000"             │                               │
     │ )                              │                               │
     │ ✅ 완료 (annotation_data 필요!)  │                               │
+    │                                │                               │
+```
+
+---
+
+### Step 3: 수정 시 Version 검사 (Optimistic Locking)
+
+```
+프론트엔드                          백엔드                          데이터베이스
+    │                                │                                │
+    ├─ 사용자가 annotation 수정       │                                │
+    │ currentVersion = 2             │                                │
+    │ (detail에서 얻은 버전)          │                                │
+    │                                │                                │
+    ├──────────────────────────────────>                               │
+    │ PUT /api/annotations/1          │                               │
+    │ {                              │                               │
+    │   "base_version": 2,           │ ← 현재 버전 사용               │
+    │   "annotation_data": {...}     │                               │
+    │ }                              │                               │
+    │                                │                                │
+    │                                ├───────────────────────────────>│
+    │                                │ SELECT version                 │
+    │                                │ FROM annotation_annotation     │
+    │                                │ WHERE id = 1                   │
+    │                                │                                │
+    │                                │<───────────────────────────────┤
+    │                                │ 현재 version = 2               │
+    │                                │                                │
+    │                                ├─ Version 검사                  │
+    │                                │ if (base_version == current) { │
+    │                                │   ✅ 일치! 수정 진행            │
+    │                                │ } else {                       │
+    │                                │   ❌ 불일치! 409 반환          │
+    │                                │ }                              │
+    │                                │                                │
+    │                                ├───────────────────────────────>│
+    │                                │ UPDATE annotation_annotation   │
+    │                                │ SET annotation_data = ...,     │
+    │                                │     version = version + 1      │
+    │                                │ WHERE id = 1 AND               │
+    │                                │       version = 2              │
+    │                                │                                │
+    │                                │<───────────────────────────────┤
+    │                                │ 수정 완료                       │
+    │<─────────────────────────────────                               │
+    │ 응답 (200 OK):                  │                               │
+    │ {                              │                               │
+    │   id: 1,                       │                               │
+    │   annotation_data: {...},      │                               │
+    │   version: 3  ← 증가!          │                               │
+    │ }                              │                               │
+    │                                │                               │
+    │ ✅ 수정 완료                    │                               │
+    │                                │                               │
+```
+
+---
+
+### Step 4: Version 충돌 시나리오
+
+```
+프론트엔드 A                        백엔드                          프론트엔드 B
+    │                                │                                │
+    ├─ annotation 조회               │                                │
+    │ version = 1                    │                                │
+    │                                │                                ├─ annotation 조회
+    │                                │                                │ version = 1
+    │                                │                                │
+    ├─ 수정 시작                      │                                ├─ 수정 시작
+    │                                │                                │
+    │                                │                                ├──────────────────────>
+    │                                │                                │ PUT /api/annotations/1
+    │                                │                                │ base_version: 1
+    │                                │                                │
+    │                                │<──────────────────────────────┤
+    │                                │ ✅ 수정 완료                    │
+    │                                │ version: 1 → 2                 │
+    │                                │                                │
+    ├──────────────────────────────────>                               │
+    │ PUT /api/annotations/1          │                               │
+    │ base_version: 1                │                               │
+    │ (구버전!)                       │                               │
+    │                                │                                │
+    │                                ├─ Version 검사                  │
+    │                                │ base_version (1) ≠ current (2) │
+    │                                │ ❌ 불일치!                     │
+    │<──────────────────────────────────                               │
+    │ 응답 (409 Conflict):            │                               │
+    │ {                              │                               │
+    │   "error": "Version Conflict", │                               │
+    │   "current_version": 2,        │                               │
+    │   "client_version": 1          │                               │
+    │ }                              │                               │
+    │                                │                               │
+    ├─ 최신 버전 조회                 │                               │
+    │ GET /api/annotations/1          │                               │
+    │                                │                                │
+    │                                ├───────────────────────────────>│
+    │                                │ SELECT * WHERE id = 1          │
+    │                                │                                │
+    │                                │<───────────────────────────────┤
+    │<──────────────────────────────────                               │
+    │ 응답: version = 2               │                               │
+    │                                │                               │
+    ├─ 재시도                         │                               │
+    │ PUT /api/annotations/1          │                               │
+    │ base_version: 2                │ ← 최신 버전 사용               │
+    │                                │                               │
+    │                                ├─ Version 검사                  │
+    │                                │ base_version (2) == current (2)│
+    │                                │ ✅ 일치!                       │
+    │                                │                               │
+    │<──────────────────────────────────                               │
+    │ 응답 (200 OK):                  │                               │
+    │ version: 3                     │                               │
+    │ ✅ 수정 완료                    │                               │
     │                                │                               │
 ```
 
@@ -461,6 +586,115 @@ async function onAnnotationSelected(summary: AnnotationSummary) {
 
 ---
 
+## ⚠️ Version 검사 (중요!)
+
+### Version 검사가 필요한 시점
+
+```
+Step 1: 사이드바 목록 조회
+GET /api/annotations/summary
+응답: version = 1
+
+Step 2: 사용자가 annotation 선택
+GET /api/annotations/{id}
+응답: version = 1 (또는 2, 3, ...)
+
+⚠️ 문제: 사이드바의 version과 상세 정보의 version이 다를 수 있음!
+
+예시:
+- 사이드바 조회 시: version = 1
+- 다른 사용자가 수정: version = 1 → 2
+- 상세 정보 조회 시: version = 2
+
+→ 버전 불일치 감지!
+```
+
+### Version 검사 로직
+
+```
+Step 1: 요약 목록 조회
+GET /api/annotations/summary?series_instance_uid={uid}
+응답:
+{
+  "annotations": [
+    {
+      "id": 1,
+      "version": 1,  ← 캐시에 저장
+      ...
+    }
+  ]
+}
+
+Step 2: 사용자가 annotation 선택
+GET /api/annotations/{id}
+응답:
+{
+  "id": 1,
+  "annotation_data": {...},
+  "version": 2  ← 새로운 버전!
+}
+
+Step 3: Version 검사
+if (summaryVersion !== detailVersion) {
+  console.warn('⚠️ 버전 불일치!');
+  console.log(`Summary: v${summaryVersion}, Detail: v${detailVersion}`);
+
+  // 선택지:
+  // 1. 최신 버전 사용 (detail의 version)
+  // 2. 사용자에게 알림
+  // 3. 캐시 무효화
+}
+```
+
+---
+
+### 수정 시 Version 검사 (Optimistic Locking)
+
+```
+Step 1: 사이드바에서 annotation 선택
+summary.version = 1
+
+Step 2: 캔버스에 그리기
+detail.version = 1
+
+Step 3: 사용자가 annotation 수정
+PUT /api/annotations/{id}
+요청:
+{
+  "base_version": 1,  ← 사이드바 또는 상세 정보의 version
+  "annotation_data": {...}
+}
+
+Step 4: 서버에서 Version 검사
+SELECT version FROM annotation_annotation WHERE id = 1;
+현재 version = 2 (다른 사용자가 수정함)
+
+⚠️ base_version (1) ≠ 현재 version (2)
+→ 409 Conflict 응답!
+
+응답:
+{
+  "error": "Version Conflict",
+  "current_version": 2,
+  "client_version": 1
+}
+
+Step 5: 클라이언트에서 처리
+// 최신 버전 조회
+GET /api/annotations/{id}
+응답: version = 2
+
+// 최신 버전으로 재시도
+PUT /api/annotations/{id}
+요청:
+{
+  "base_version": 2,  ← 최신 버전 사용
+  "annotation_data": {...}
+}
+```
+
+---
+
 ## 🎯 결론
 
 ### annotation_data 필드의 역할
@@ -469,6 +703,7 @@ async function onAnnotationSelected(summary: AnnotationSummary) {
 |------|-------------|-----------------|------|
 | **사이드바 목록 표시** | 요약 정보 | ❌ 필요 없음 | type, label, color, tool_name, measurements로 충분 |
 | **캔버스에 그리기** | 전체 정보 | ✅ 필수! | coordinates가 필요함 |
+| **Version 검사** | 버전 정보 | ❌ 필요 없음 | version 필드만 필요 |
 
 ---
 
