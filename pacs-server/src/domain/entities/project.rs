@@ -16,28 +16,22 @@ use sqlx::{FromRow, Type};
 /// 프로젝트의 생명주기 상태를 나타내며, 데이터베이스의 `project_status` ENUM과 매핑됩니다.
 ///
 /// # Variants
-/// - `Planning`: 기획중 - 프로젝트가 기획 단계
-/// - `Active`: 진행중 - 프로젝트가 활발히 진행 중
+/// - `Preparing`: 준비중 - 프로젝트가 준비 단계
+/// - `InProgress`: 진행중 - 프로젝트가 활발히 진행 중
 /// - `Completed`: 완료 - 프로젝트가 성공적으로 완료됨
-/// - `Suspended`: 보류 - 프로젝트가 일시적으로 중단됨
+/// - `OnHold`: 보류 - 프로젝트가 일시적으로 중단됨
 /// - `Cancelled`: 취소 - 프로젝트가 취소됨
-/// - `PendingCompletion`: 완료 대기 - 프로젝트 종료 대기 중
-/// - `OverPlanning`: 계획 초과 - 프로젝트 계획 초과 상태
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[sqlx(type_name = "project_status", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ProjectStatus {
-    #[sqlx(rename = "PLANNING")]
-    Planning,
-    #[sqlx(rename = "ACTIVE")]
-    Active,
+    #[sqlx(rename = "PREPARING")]
+    Preparing,
+    #[sqlx(rename = "IN_PROGRESS")]
+    InProgress,
     Completed,
-    #[sqlx(rename = "SUSPENDED")]
-    Suspended,
+    #[sqlx(rename = "ON_HOLD")]
+    OnHold,
     Cancelled,
-    #[sqlx(rename = "PENDING_COMPLETION")]
-    PendingCompletion,
-    #[sqlx(rename = "OVER_PLANNING")]
-    OverPlanning,
 }
 
 /// 시스템 프로젝트를 나타내는 엔티티

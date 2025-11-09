@@ -1,5 +1,6 @@
 use crate::domain::entities::{Annotation, AnnotationHistory, NewAnnotation};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[async_trait]
@@ -78,5 +79,22 @@ pub trait AnnotationRepository: Send + Sync {
         data_after: Option<serde_json::Value>,
     ) -> Result<AnnotationHistory, sqlx::Error>;
     async fn get_history(&self, annotation_id: i32) -> Result<Vec<AnnotationHistory>, sqlx::Error>;
+
+    /// 프로젝트와 Series UID로 최신 수정 시간 조회 (리스트 버전용)
+    async fn get_max_updated_at_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<Option<DateTime<Utc>>, sqlx::Error>;
+
+    /// 프로젝트와 Series UID로 페이지네이션된 어노테이션 조회
+    async fn find_by_project_and_series_paginated(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+        page: i32,
+        limit: i32,
+    ) -> Result<Vec<Annotation>, sqlx::Error>;
+
     fn pool(&self) -> &PgPool;
 }

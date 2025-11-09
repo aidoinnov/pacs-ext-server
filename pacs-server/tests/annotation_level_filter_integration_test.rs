@@ -211,10 +211,11 @@ mod annotation_level_filter_tests {
     #[test]
     fn test_annotation_response_list_structure() {
         let annotations = create_mock_annotations();
-        
+
         let response = AnnotationListResponse {
             annotations: annotations.clone(),
             total: annotations.len(),
+            list_version: None,
         };
 
         assert_eq!(response.total, 4);

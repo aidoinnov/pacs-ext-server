@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE security_user \n             SET account_status = 'PENDING_APPROVAL', email_verified = true \n             WHERE id = $1 AND account_status = 'PENDING_EMAIL'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "431bde5c12c360e379d483fedfcebe22c64250c4a0dbd393fcb08262605c714e"
+}

@@ -638,13 +638,11 @@ where
             statuses
                 .into_iter()
                 .map(|status| match status {
-                    ProjectStatus::Planning => "PLANNING".to_string(),
-                    ProjectStatus::Active => "ACTIVE".to_string(),
+                    ProjectStatus::Preparing => "PREPARING".to_string(),
+                    ProjectStatus::InProgress => "IN_PROGRESS".to_string(),
                     ProjectStatus::Completed => "COMPLETED".to_string(),
-                    ProjectStatus::Suspended => "SUSPENDED".to_string(),
+                    ProjectStatus::OnHold => "ON_HOLD".to_string(),
                     ProjectStatus::Cancelled => "CANCELLED".to_string(),
-                    ProjectStatus::PendingCompletion => "PENDING_COMPLETION".to_string(),
-                    ProjectStatus::OverPlanning => "OVER_PLANNING".to_string(),
                 })
                 .collect()
         });

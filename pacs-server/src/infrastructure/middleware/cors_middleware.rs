@@ -5,15 +5,12 @@ use actix_web::http::header;
 /// CORS 미들웨어 설정
 pub fn configure_cors(cors_config: &CorsConfig) -> Cors {
     if !cors_config.enabled {
-        // CORS가 비활성화된 경우, 기본 CORS 설정 (모든 요청 거부)
+        // CORS가 비활성화된 경우, 기본 CORS 설정 (모든 오리진 허용 - 개발용)
         return Cors::default()
             .allow_any_origin()
-            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-            .allowed_headers(vec![
-                header::AUTHORIZATION,
-                header::ACCEPT,
-                header::CONTENT_TYPE,
-            ])
+            .allow_any_method()
+            .allow_any_header()
+            .expose_any_header()
             .max_age(3600);
     }
 

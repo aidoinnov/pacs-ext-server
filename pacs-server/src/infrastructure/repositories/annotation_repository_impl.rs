@@ -1,6 +1,7 @@
 use crate::domain::entities::{Annotation, AnnotationHistory, NewAnnotation};
 use crate::domain::repositories::AnnotationRepository;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[derive(Clone)]
@@ -574,6 +575,55 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                 .await
             }
         }
+    }
+
+    async fn get_max_updated_at_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<Option<DateTime<Utc>>, sqlx::Error> {
+        #[derive(sqlx::FromRow)]
+        struct MaxUpdatedAt {
+            max_updated_at: Option<DateTime<Utc>>,
+        }
+
+        let result = sqlx::query_as::<_, MaxUpdatedAt>(
+            "SELECT MAX(updated_at) as max_updated_at
+             FROM annotation_annotation
+             WHERE project_id = $1 AND series_uid = $2",
+        )
+        .bind(project_id)
+        .bind(series_uid)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(result.max_updated_at)
+    }
+
+    async fn find_by_project_and_series_paginated(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+        page: i32,
+        limit: i32,
+    ) -> Result<Vec<Annotation>, sqlx::Error> {
+        let offset = (page - 1) * limit;
+
+        sqlx::query_as::<_, Annotation>(
+            "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
+                    tool_name, tool_version, data, is_shared, created_at, updated_at,
+                    viewer_software, description, measurement_values, version
+             FROM annotation_annotation
+             WHERE project_id = $1 AND series_uid = $2
+             ORDER BY created_at DESC
+             LIMIT $3 OFFSET $4",
+        )
+        .bind(project_id)
+        .bind(series_uid)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
     }
 
     fn pool(&self) -> &PgPool {

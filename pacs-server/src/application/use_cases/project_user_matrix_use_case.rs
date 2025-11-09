@@ -57,13 +57,11 @@ where
             statuses
                 .iter()
                 .filter_map(|s| match s.as_str() {
-                    "PLANNING" => Some(ProjectStatus::Planning),
-                    "ACTIVE" => Some(ProjectStatus::Active),
+                    "PREPARING" => Some(ProjectStatus::Preparing),
+                    "IN_PROGRESS" => Some(ProjectStatus::InProgress),
                     "COMPLETED" => Some(ProjectStatus::Completed),
-                    "SUSPENDED" => Some(ProjectStatus::Suspended),
+                    "ON_HOLD" => Some(ProjectStatus::OnHold),
                     "CANCELLED" => Some(ProjectStatus::Cancelled),
-                    "PENDING_COMPLETION" => Some(ProjectStatus::PendingCompletion),
-                    "OVER_PLANNING" => Some(ProjectStatus::OverPlanning),
                     _ => None,
                 })
                 .collect()

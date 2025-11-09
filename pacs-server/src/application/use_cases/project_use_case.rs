@@ -152,15 +152,11 @@ impl<P: ProjectService> ProjectUseCase<P> {
         // 문자열 status를 ProjectStatus enum으로 변환
         if let Some(status_str) = request.status {
             update.status = match status_str.as_str() {
-                "Planning" | "PLANNING" => Some(ProjectStatus::Planning),
-                "Active" | "ACTIVE" => Some(ProjectStatus::Active),
+                "Preparing" | "PREPARING" => Some(ProjectStatus::Preparing),
+                "InProgress" | "IN_PROGRESS" => Some(ProjectStatus::InProgress),
                 "Completed" | "COMPLETED" => Some(ProjectStatus::Completed),
-                "Suspended" | "SUSPENDED" => Some(ProjectStatus::Suspended),
+                "OnHold" | "ON_HOLD" => Some(ProjectStatus::OnHold),
                 "Cancelled" | "CANCELLED" => Some(ProjectStatus::Cancelled),
-                "PendingCompletion" | "PENDING_COMPLETION" => {
-                    Some(ProjectStatus::PendingCompletion)
-                }
-                "OverPlanning" | "OVER_PLANNING" => Some(ProjectStatus::OverPlanning),
                 _ => None,
             };
         }

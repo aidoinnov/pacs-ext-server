@@ -63,7 +63,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
     async fn create(&self, new_project: NewProject) -> Result<Project, sqlx::Error> {
         sqlx::query_as::<_, Project>(
             "INSERT INTO security_project (name, description, sponsor, start_date, end_date, auto_complete, status)
-             VALUES ($1, $2, $3, $4, $5, $6, 'PLANNING'::project_status)
+             VALUES ($1, $2, $3, $4, $5, $6, 'PREPARING'::project_status)
              RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at"
         )
         .bind(new_project.name)

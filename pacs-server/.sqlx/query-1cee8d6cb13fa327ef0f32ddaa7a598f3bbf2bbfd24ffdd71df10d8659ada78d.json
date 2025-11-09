@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE security_user \n             SET account_status = 'ACTIVE', approved_by = $1, approved_at = CURRENT_TIMESTAMP\n             WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1cee8d6cb13fa327ef0f32ddaa7a598f3bbf2bbfd24ffdd71df10d8659ada78d"
+}

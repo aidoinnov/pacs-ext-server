@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT label_name, COUNT(*) as count\n            FROM annotation_mask\n            WHERE ($1::INTEGER IS NULL OR mask_group_id = $1)\n            AND label_name IS NOT NULL\n            GROUP BY label_name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "label_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "7b30e2eb0eadbf834e81ef0e51e20c50827c8bd62cde20618a1193c00fd08d1d"
+}

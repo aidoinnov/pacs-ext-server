@@ -2,6 +2,7 @@ use crate::domain::entities::{Annotation, AnnotationHistory, NewAnnotation};
 use crate::domain::repositories::{AnnotationRepository, ProjectRepository, UserRepository};
 use crate::domain::ServiceError;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 
 /// Annotation 관리 도메인 서비스
 #[async_trait]
@@ -126,6 +127,22 @@ pub trait AnnotationService: Send + Sync {
         user_id: i32,
         annotation_id: i32,
     ) -> Result<bool, ServiceError>;
+
+    /// 프로젝트와 Series UID로 최신 수정 시간 조회 (리스트 버전용)
+    async fn get_max_updated_at_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<Option<DateTime<Utc>>, ServiceError>;
+
+    /// 프로젝트와 Series UID로 페이지네이션된 Annotation 목록 조회
+    async fn get_annotations_by_project_and_series_paginated(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+        page: i32,
+        limit: i32,
+    ) -> Result<Vec<Annotation>, ServiceError>;
 }
 
 pub struct AnnotationServiceImpl<A, U, P>
@@ -508,6 +525,30 @@ where
         Ok(self
             .annotation_repository
             .find_by_study_uid_with_viewer(study_uid, viewer_software)
+            .await?)
+    }
+
+    async fn get_max_updated_at_by_project_and_series(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+    ) -> Result<Option<DateTime<Utc>>, ServiceError> {
+        Ok(self
+            .annotation_repository
+            .get_max_updated_at_by_project_and_series(project_id, series_uid)
+            .await?)
+    }
+
+    async fn get_annotations_by_project_and_series_paginated(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+        page: i32,
+        limit: i32,
+    ) -> Result<Vec<Annotation>, ServiceError> {
+        Ok(self
+            .annotation_repository
+            .find_by_project_and_series_paginated(project_id, series_uid, page, limit)
             .await?)
     }
 }

@@ -215,6 +215,193 @@ pub async fn head_annotation(
     }
 }
 
+/// 어노테이션 요약 목록 조회 (HEAD 요청)
+///
+/// Series UID로 어노테이션 목록의 메타데이터를 조회합니다.
+/// 응답 헤더에 list_version을 포함하여 캐시 검증에 사용할 수 있습니다.
+#[utoipa::path(
+    head,
+    path = "/api/annotations/summary",
+    tag = "annotations",
+    params(
+        ("series_instance_uid" = String, Query, description = "Series Instance UID"),
+        ("project_id" = i32, Query, description = "프로젝트 ID"),
+        ("page" = Option<i32>, Query, description = "페이지 번호 (기본값: 1)"),
+        ("limit" = Option<i32>, Query, description = "페이지 크기 (기본값: 20)"),
+    ),
+    responses(
+        (status = 200, description = "Annotation summary metadata retrieved successfully"),
+        (status = 304, description = "Not Modified (캐시 유효)"),
+        (status = 400, description = "Invalid parameters"),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
+pub async fn head_annotation_summary(
+    query: web::Query<std::collections::HashMap<String, String>>,
+    req: HttpRequest,
+    use_case: web::Data<
+        Arc<
+            AnnotationUseCase<
+                AnnotationServiceImpl<
+                    AnnotationRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                >,
+                UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
+            >,
+        >,
+    >,
+) -> impl Responder {
+    // 필수 파라미터 추출
+    let series_instance_uid = match query.get("series_instance_uid") {
+        Some(uid) => uid.clone(),
+        None => {
+            return HttpResponse::BadRequest().finish()
+        }
+    };
+
+    let project_id = match query.get("project_id").and_then(|s| s.parse::<i32>().ok()) {
+        Some(id) => id,
+        None => {
+            return HttpResponse::BadRequest().finish()
+        }
+    };
+
+    // 선택적 파라미터 추출
+    let page = query.get("page").and_then(|s| s.parse::<i32>().ok()).unwrap_or(1);
+    let limit = query.get("limit").and_then(|s| s.parse::<i32>().ok()).unwrap_or(20);
+
+    // 어노테이션 조회 (페이지네이션 포함)
+    match use_case
+        .get_annotations_by_project_and_series_paginated(project_id, &series_instance_uid, page, limit)
+        .await
+    {
+        Ok(response) => {
+            // If-Modified-Since 헤더 확인 (캐시 검증)
+            if let Some(if_modified_since) = req.headers().get("If-Modified-Since") {
+                if let Ok(if_modified_since_str) = if_modified_since.to_str() {
+                    if let Ok(client_time) = chrono::DateTime::parse_from_rfc2822(if_modified_since_str) {
+                        if let Some(list_version) = response.list_version {
+                            if list_version <= client_time.with_timezone(&chrono::Utc) {
+                                // 304 Not Modified 응답
+                                return HttpResponse::NotModified()
+                                    .insert_header(("Last-Modified", list_version.to_rfc2822()))
+                                    .insert_header(("Cache-Control", "public, max-age=30"))
+                                    .finish();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // list_version을 Last-Modified 헤더로 설정
+            if let Some(list_version) = response.list_version {
+                HttpResponse::Ok()
+                    .insert_header(("Cache-Control", "public, max-age=30"))
+                    .insert_header(("Last-Modified", list_version.to_rfc2822()))
+                    .insert_header(("X-List-Version", list_version.to_rfc3339()))
+                    .finish()
+            } else {
+                HttpResponse::Ok()
+                    .insert_header(("Cache-Control", "public, max-age=30"))
+                    .finish()
+            }
+        }
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+/// 어노테이션 요약 목록 조회
+///
+/// Series UID로 어노테이션의 요약 정보를 조회합니다.
+/// 사이드바에 표시할 목록 데이터를 빠르게 로드하기 위한 엔드포인트입니다.
+#[utoipa::path(
+    get,
+    path = "/api/annotations/summary",
+    tag = "annotations",
+    params(
+        ("series_instance_uid" = String, Query, description = "Series Instance UID"),
+        ("project_id" = i32, Query, description = "프로젝트 ID"),
+        ("user_id" = Option<i32>, Query, description = "사용자 ID (선택사항)"),
+        ("page" = Option<i32>, Query, description = "페이지 번호 (기본값: 1)"),
+        ("limit" = Option<i32>, Query, description = "페이지 크기 (기본값: 20, 최대: 100)"),
+    ),
+    responses(
+        (status = 200, description = "Annotation summary list retrieved successfully", body = AnnotationListResponse),
+        (status = 400, description = "Invalid parameters"),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
+pub async fn get_annotation_summary(
+    query: web::Query<std::collections::HashMap<String, String>>,
+    use_case: web::Data<
+        Arc<
+            AnnotationUseCase<
+                AnnotationServiceImpl<
+                    AnnotationRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                >,
+                UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
+            >,
+        >,
+    >,
+) -> impl Responder {
+    // 필수 파라미터 추출
+    let series_instance_uid = match query.get("series_instance_uid") {
+        Some(uid) => uid.clone(),
+        None => {
+            return HttpResponse::BadRequest().json(json!({
+                "error": "Bad Request",
+                "message": "series_instance_uid is required"
+            }))
+        }
+    };
+
+    let project_id = match query.get("project_id").and_then(|s| s.parse::<i32>().ok()) {
+        Some(id) => id,
+        None => {
+            return HttpResponse::BadRequest().json(json!({
+                "error": "Bad Request",
+                "message": "project_id is required and must be a valid integer"
+            }))
+        }
+    };
+
+    // 선택적 파라미터 추출
+    let _user_id = query.get("user_id").and_then(|s| s.parse::<i32>().ok());
+    let page = query.get("page").and_then(|s| s.parse::<i32>().ok()).unwrap_or(1);
+    let limit = query.get("limit").and_then(|s| s.parse::<i32>().ok()).unwrap_or(20);
+
+    // 어노테이션 조회 (페이지네이션 포함)
+    match use_case
+        .get_annotations_by_project_and_series_paginated(project_id, &series_instance_uid, page, limit)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok()
+            .insert_header(("Cache-Control", "public, max-age=30"))
+            .json(response),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": e.to_string()
+        })),
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/api/annotations",
@@ -795,6 +982,8 @@ pub fn configure_routes(
         .app_data(web::Data::new(mask_group_use_case))
         .service(
             web::scope("/annotations")
+                .route("/summary", web::get().to(get_annotation_summary))
+                .route("/summary", web::head().to(head_annotation_summary))
                 .route("", web::post().to(create_annotation))
                 .route("", web::get().to(list_annotations))
                 .route("/{annotation_id}", web::get().to(get_annotation))

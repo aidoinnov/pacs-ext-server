@@ -327,6 +327,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -362,6 +367,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -398,6 +408,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -434,6 +449,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -470,6 +490,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -508,6 +533,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -543,6 +573,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -690,6 +725,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -717,6 +757,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -744,6 +789,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -870,6 +920,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -925,6 +980,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
             total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
         })
     }
 
@@ -944,9 +1004,68 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         let total = annotations.len();
         let annotation_responses = self.to_responses(annotations).await?;
 
+        // 리스트 버전 계산 (최신 수정 시간)
+        let list_version = self
+            .annotation_service
+            .get_max_updated_at_by_project_and_series(project_id, series_uid)
+            .await
+            .ok()
+            .flatten();
+
         Ok(AnnotationListResponse {
             annotations: annotation_responses,
-            total,
+            total: total as usize,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version,
+        })
+    }
+
+    /// 페이지네이션을 포함한 어노테이션 조회
+    pub async fn get_annotations_by_project_and_series_paginated(
+        &self,
+        project_id: i32,
+        series_uid: &str,
+        page: i32,
+        limit: i32,
+    ) -> Result<AnnotationListResponse, ServiceError> {
+        // 전체 개수 조회
+        let all_annotations = self
+            .annotation_service
+            .get_annotations_by_project_and_series(project_id, series_uid)
+            .await?;
+        let total = all_annotations.len() as i32;
+
+        // 페이지네이션된 데이터 조회
+        let annotations = self
+            .annotation_service
+            .get_annotations_by_project_and_series_paginated(project_id, series_uid, page, limit)
+            .await?;
+
+        let annotation_responses = self.to_responses(annotations).await?;
+
+        // 전체 페이지 수 계산
+        let total_pages = (total + limit - 1) / limit;
+        let has_next = page < total_pages;
+
+        // 리스트 버전 계산 (최신 수정 시간)
+        let list_version = self
+            .annotation_service
+            .get_max_updated_at_by_project_and_series(project_id, series_uid)
+            .await
+            .ok()
+            .flatten();
+
+        Ok(AnnotationListResponse {
+            annotations: annotation_responses,
+            total: total as usize,
+            page,
+            limit,
+            total_pages,
+            has_next,
+            list_version,
         })
     }
 }

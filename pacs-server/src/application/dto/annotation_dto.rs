@@ -185,4 +185,26 @@ pub struct AnnotationListResponse {
 
     /// 전체 개수
     pub total: usize,
+
+    /// 현재 페이지 번호 (1부터 시작)
+    #[schema(example = 1)]
+    pub page: i32,
+
+    /// 페이지당 항목 수
+    #[schema(example = 20)]
+    pub limit: i32,
+
+    /// 전체 페이지 수
+    #[schema(example = 5)]
+    pub total_pages: i32,
+
+    /// 다음 페이지 존재 여부
+    #[schema(example = true)]
+    pub has_next: bool,
+
+    /// 목록 버전 (리스트 자체의 변경 감지용)
+    /// 리스트 내 모든 annotation의 최신 수정 시간
+    /// 캐시 무효화 및 리스트 변경 감지에 사용
+    #[schema(value_type = String, example = "2024-01-01T00:00:00")]
+    pub list_version: Option<DateTime<Utc>>,
 }
