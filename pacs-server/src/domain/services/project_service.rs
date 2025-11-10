@@ -565,61 +565,122 @@ where
         user_id: i32,
         role_id: i32,
     ) -> Result<(), ServiceError> {
-        println!("000");
-        // 프로젝트 존재 확인
-        if self
-            .project_repository
-            .find_by_id(project_id)
-            .await?
-            .is_none()
-        {
+        // 트랜잭션 시작
+        let pool = self.project_repository.pool();
+        let mut tx = pool.begin().await?;
+
+        // 1. 프로젝트 존재 확인
+        let project_exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM security_project WHERE id = $1)"
+        )
+        .bind(project_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if !project_exists {
+            tx.rollback().await?;
             return Err(ServiceError::NotFound("Project not found".into()));
         }
 
-        // 사용자 존재 확인
-        if self.user_repository.find_by_id(user_id).await?.is_none() {
+        // 2. 사용자 존재 확인
+        let user_exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM security_user WHERE id = $1)"
+        )
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if !user_exists {
+            tx.rollback().await?;
             return Err(ServiceError::NotFound("User not found".into()));
         }
 
-        // 역할 존재 확인
-        if self.role_repository.find_by_id(role_id).await?.is_none() {
+        // 3. 역할 존재 확인
+        let role_exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM security_role WHERE id = $1)"
+        )
+        .bind(role_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if !role_exists {
+            tx.rollback().await?;
             return Err(ServiceError::NotFound("Role not found".into()));
         }
-        println!("111");
-        // 사용자가 프로젝트 멤버인지 확인
+
+        // 4. 사용자-프로젝트 참여 상태 조회
         let is_member = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM security_user_project WHERE user_id = $1 AND project_id = $2)"
         )
         .bind(user_id)
         .bind(project_id)
-        .fetch_one(self.project_repository.pool())
+        .fetch_one(&mut *tx)
         .await?;
-        println!("222");
-        if !is_member {
-            return Err(ServiceError::NotFound(
-                "User is not a member of this project".into(),
-            ));
-        }
-        println!("333");
-        // 역할 할당 (UPDATE)
-        let result = sqlx::query(
-            "UPDATE security_user_project 
-             SET role_id = $1 
-             WHERE user_id = $2 AND project_id = $3",
-        )
-        .bind(role_id)
-        .bind(user_id)
-        .bind(project_id)
-        .execute(self.project_repository.pool())
-        .await?;
-        println!("444");
-        if result.rows_affected() > 0 {
-            Ok(())
+
+        if is_member {
+            // 4-1. 이미 참여중인 경우: 기존 레코드의 role_id만 UPDATE
+            tracing::info!(
+                "User {} is already a member of project {}. Updating role to {}",
+                user_id,
+                project_id,
+                role_id
+            );
+
+            let result = sqlx::query(
+                "UPDATE security_user_project
+                 SET role_id = $1
+                 WHERE user_id = $2 AND project_id = $3",
+            )
+            .bind(role_id)
+            .bind(user_id)
+            .bind(project_id)
+            .execute(&mut *tx)
+            .await?;
+
+            if result.rows_affected() == 0 {
+                tx.rollback().await?;
+                return Err(ServiceError::DatabaseError(
+                    "Failed to update role for existing member".into(),
+                ));
+            }
         } else {
-            Err(ServiceError::NotFound(
-                "Failed to assign role to user".into(),
-            ))
+            // 4-2. 참여중이 아닌 경우: 새로운 참여 레코드 추가 (INSERT)
+            tracing::info!(
+                "User {} is not a member of project {}. Adding as new member with role {}",
+                user_id,
+                project_id,
+                role_id
+            );
+
+            let result = sqlx::query(
+                "INSERT INTO security_user_project (user_id, project_id, role_id, created_at)
+                 VALUES ($1, $2, $3, NOW())",
+            )
+            .bind(user_id)
+            .bind(project_id)
+            .bind(role_id)
+            .execute(&mut *tx)
+            .await?;
+
+            if result.rows_affected() == 0 {
+                tx.rollback().await?;
+                return Err(ServiceError::DatabaseError(
+                    "Failed to add user to project with role".into(),
+                ));
+            }
         }
+
+        // 5. 트랜잭션 커밋
+        tx.commit().await?;
+
+        tracing::info!(
+            "Successfully assigned role {} to user {} in project {}",
+            role_id,
+            user_id,
+            project_id
+        );
+
+        Ok(())
     }
 
     // === 매트릭스 API 지원 구현 ===
