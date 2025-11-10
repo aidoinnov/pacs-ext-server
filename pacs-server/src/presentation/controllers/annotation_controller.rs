@@ -318,6 +318,118 @@ pub async fn head_annotation_summary(
     }
 }
 
+/// 어노테이션 목록 버전 조회 (HEAD 요청)
+///
+/// SOP Instance UID, Series UID, 또는 Study UID로 어노테이션 목록의 버전 정보를 조회합니다.
+/// 응답 헤더에 list_version을 포함하여 캐시 검증에 사용할 수 있습니다.
+#[utoipa::path(
+    head,
+    path = "/api/annotations",
+    tag = "annotations",
+    params(
+        ("sop_instance_uid" = Option<String>, Query, description = "SOP Instance UID로 필터링"),
+        ("series_instance_uid" = Option<String>, Query, description = "Series Instance UID로 필터링"),
+        ("study_instance_uid" = Option<String>, Query, description = "Study Instance UID로 필터링"),
+    ),
+    responses(
+        (status = 200, description = "Annotation list metadata", headers(
+            ("Last-Modified" = String, description = "최신 어노테이션 수정 시간"),
+            ("X-List-Version" = String, description = "목록 버전 (ISO 8601)"),
+            ("X-Total-Count" = String, description = "총 어노테이션 개수"),
+        )),
+        (status = 304, description = "Not Modified"),
+        (status = 400, description = "Bad Request"),
+    )
+)]
+pub async fn head_annotations(
+    query: web::Query<std::collections::HashMap<String, String>>,
+    req: HttpRequest,
+    use_case: web::Data<
+        Arc<
+            AnnotationUseCase<
+                AnnotationServiceImpl<
+                    AnnotationRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                >,
+                UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
+            >,
+        >,
+    >,
+) -> impl Responder {
+    // 쿼리 파라미터 확인
+    let sop_instance_uid = query.get("sop_instance_uid");
+    let series_instance_uid = query.get("series_instance_uid");
+    let study_instance_uid = query.get("study_instance_uid");
+
+    // 최소한 하나의 UID가 필요
+    if sop_instance_uid.is_none() && series_instance_uid.is_none() && study_instance_uid.is_none() {
+        return HttpResponse::BadRequest().json(json!({
+            "error": "Bad Request",
+            "message": "At least one of sop_instance_uid, series_instance_uid, or study_instance_uid is required"
+        }));
+    }
+
+    // 우선순위: sop_instance_uid > series_instance_uid > study_instance_uid
+    let result = if let Some(sop_uid) = sop_instance_uid {
+        use_case.get_annotations_by_instance(sop_uid).await
+    } else if let Some(series_uid) = series_instance_uid {
+        use_case.get_annotations_by_series(series_uid).await
+    } else if let Some(study_uid) = study_instance_uid {
+        use_case.get_annotations_by_study(study_uid).await
+    } else {
+        return HttpResponse::BadRequest().finish();
+    };
+
+    match result {
+        Ok(response) => {
+            // list_version 계산 (가장 최근 updated_at)
+            let list_version = response
+                .annotations
+                .iter()
+                .map(|ann| ann.updated_at)
+                .max();
+
+            // If-Modified-Since 헤더 확인 (캐시 검증)
+            if let Some(if_modified_since) = req.headers().get("If-Modified-Since") {
+                if let Ok(if_modified_since_str) = if_modified_since.to_str() {
+                    if let Ok(client_time) = chrono::DateTime::parse_from_rfc2822(if_modified_since_str) {
+                        if let Some(lv) = list_version {
+                            if lv <= client_time.with_timezone(&chrono::Utc) {
+                                // 304 Not Modified 응답
+                                return HttpResponse::NotModified()
+                                    .insert_header(("Last-Modified", lv.to_rfc2822()))
+                                    .insert_header(("Cache-Control", "public, max-age=5"))
+                                    .finish();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 200 OK 응답 (본문 없음)
+            let mut resp = HttpResponse::Ok();
+            resp.insert_header(("Cache-Control", "public, max-age=5"))
+                .insert_header(("X-Total-Count", response.total.to_string()));
+
+            if let Some(lv) = list_version {
+                resp.insert_header(("Last-Modified", lv.to_rfc2822()))
+                    .insert_header(("X-List-Version", lv.to_rfc3339()));
+            }
+
+            resp.finish()
+        }
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
 /// 어노테이션 요약 목록 조회
 ///
 /// Series UID로 어노테이션의 요약 정보를 조회합니다.
@@ -986,6 +1098,7 @@ pub fn configure_routes(
                 .route("/summary", web::head().to(head_annotation_summary))
                 .route("", web::post().to(create_annotation))
                 .route("", web::get().to(list_annotations))
+                .route("", web::head().to(head_annotations))
                 .route("/{annotation_id}", web::get().to(get_annotation))
                 .route("/{annotation_id}", web::head().to(head_annotation))
                 .route("/{annotation_id}", web::put().to(update_annotation))
