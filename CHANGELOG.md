@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed - 2025-11-10
+
+#### **RBAC Unassigned Role 버그 수정** 🔧
+- **브랜치**: `fix/rbac-unassigned-role-assignment-bug`
+- **이슈**: 사용자가 프로젝트에 참여중이지만 `role_id = NULL` (Unassigned 상태)인 경우 역할 할당 및 멤버 추가 API 실패
+- **주요 변경사항**:
+  1. **역할 할당 API 수정** (`PUT /api/projects/{project_id}/users/{user_id}/role`)
+     - `ProjectServiceImpl::assign_user_role_in_project()` 함수 재작성
+     - 멤버십 존재 시 UPDATE, 없으면 INSERT 로직으로 변경
+     - 트랜잭션 관리 추가로 원자성 보장
+  2. **멤버 추가 API 수정** (`POST /api/projects/{project_id}/members`)
+     - `UserServiceImpl::add_user_to_project_with_role()` 함수 재작성
+     - 멤버십 존재 시 UPDATE, 없으면 INSERT 로직으로 변경
+     - 기본 역할(Viewer) 자동 할당 기능 추가
+  3. **DTO 개선**
+     - `AddMemberRequest`에 `Serialize` trait 추가 (테스트 호환성)
+
+- **수정된 파일**:
+  - `pacs-server/src/domain/services/project_service.rs` - 역할 할당 로직 개선
+  - `pacs-server/src/domain/services/user_service.rs` - 멤버 추가 로직 개선
+  - `pacs-server/src/application/dto/project_user_dto.rs` - DTO Serialize 추가
+
+- **추가된 테스트**:
+  - `pacs-server/tests/assign_role_to_unassigned_user_test.rs` (390 라인)
+    - `test_assign_role_to_unassigned_user` - Unassigned 상태 사용자에게 역할 할당
+    - `test_assign_role_to_non_member_user` - Non-member 사용자에게 역할 할당
+  - `pacs-server/tests/add_member_to_project_test.rs` (346 라인)
+    - `test_add_member_with_existing_membership` - Unassigned 상태 사용자를 멤버로 추가
+    - `test_add_new_member_with_role` - Non-member 사용자를 멤버로 추가
+
+- **테스트 결과**:
+  - ✅ 모든 통합 테스트 통과 (4개 테스트)
+  - ✅ Unassigned 상태 사용자에게 역할 할당 가능
+  - ✅ Non-member 사용자에게 역할 할당 가능
+  - ✅ 트랜잭션 안전성 보장
+
+- **기술적 개선사항**:
+  - UPDATE vs INSERT 전략으로 중복 INSERT 에러 방지
+  - 트랜잭션으로 원자성 보장 (모든 작업 성공 또는 모두 실패)
+  - `tracing::info!` 로그 추가로 디버깅 용이성 향상
+  - `updated_at` 컬럼 제거 (테이블에 존재하지 않음)
+
+- **문서**:
+  - `docs/fix-rbac-unassigned-role-bug/01-작업계획.md` - 작업 계획
+  - `docs/fix-rbac-unassigned-role-bug/02-작업내용.md` - 작업 내용 상세
+  - `docs/fix-rbac-unassigned-role-bug/03-기술문서.md` - 기술 문서
+
+- **커밋**:
+  - `bc47557` - fix: allow role assignment to users with NULL role_id in project
+  - `2c3b080` - fix: allow adding member to project when user already exists with NULL role
+
 ### Added - 2025-11-07
 
 #### **Annotation 응답에 사용자 이름 추가 (배치 쿼리 최적화)** ✨
