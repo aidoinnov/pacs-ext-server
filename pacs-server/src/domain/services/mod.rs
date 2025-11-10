@@ -14,7 +14,7 @@ pub mod user_service;
 
 pub use access_control_service::{AccessControlService, AccessControlServiceImpl};
 pub use annotation_service::{AnnotationService, AnnotationServiceImpl};
-pub use auth_service::{AuthService, AuthServiceImpl};
+pub use auth_service::{AuthService, AuthServiceImpl, AuthResponse};
 pub use capability_service::CapabilityService;
 pub use dicom_rbac_evaluator::*;
 pub use mask_group_service::{MaskGroupService, MaskGroupServiceImpl};

@@ -11,7 +11,7 @@ use pacs_server::domain::ServiceError;
 // Mock AuthService for testing
 #[derive(Clone)]
 struct MockAuthService {
-    users: std::collections::HashMap<Uuid, User>,
+    users: std::collections::HashMap<String, User>, // username -> User
     tokens: std::collections::HashMap<String, User>,
 }
 
@@ -24,7 +24,7 @@ impl MockAuthService {
     }
 
     fn add_user(&mut self, user: User) {
-        self.users.insert(user.keycloak_id, user);
+        self.users.insert(user.username.clone(), user);
     }
 
     fn add_token(&mut self, token: String, user: User) {
@@ -34,15 +34,18 @@ impl MockAuthService {
 
 #[async_trait::async_trait]
 impl AuthService for MockAuthService {
-    async fn login(&self, keycloak_id: Uuid, username: String, email: String) -> Result<pacs_server::domain::services::AuthResponse, ServiceError> {
-        let user = self.users.get(&keycloak_id)
+    async fn login(&self, username: &str, _password: &str) -> Result<pacs_server::domain::services::AuthResponse, ServiceError> {
+        let user = self.users.get(username)
             .ok_or(ServiceError::NotFound("User not found".into()))?;
-        
-        let token = format!("token_{}_{}", keycloak_id, username);
-        
+
+        let token = format!("token_{}", username);
+
         Ok(pacs_server::domain::services::AuthResponse {
             user: user.clone(),
             token,
+            refresh_token: "mock_refresh_token".to_string(),
+            expires_in: 300,
+            refresh_expires_in: 1800,
         })
     }
 
@@ -60,8 +63,19 @@ impl AuthService for MockAuthService {
         Ok(())
     }
 
-    async fn refresh_token_with_keycloak(&self, _refresh_token: &str) -> Result<RefreshTokenResponse, ServiceError> {
-        Err(ServiceError::ValidationError("Not implemented in mock".into()))
+    async fn refresh_token_with_keycloak(&self, refresh_token: &str) -> Result<RefreshTokenResponse, ServiceError> {
+        // Mock implementation: return new tokens for any valid-looking token
+        if refresh_token.starts_with("valid_token") || refresh_token == "mock_refresh_token" {
+            Ok(RefreshTokenResponse {
+                token: format!("new_{}", refresh_token),
+                refresh_token: format!("new_refresh_{}", refresh_token),
+                token_type: "Bearer".to_string(),
+                expires_in: 300,
+                refresh_expires_in: 1800,
+            })
+        } else {
+            Err(ServiceError::Unauthorized("Invalid refresh token".into()))
+        }
     }
 
     async fn reset_user_password(&self, _keycloak_user_id: &str, _new_password: &str) -> Result<(), ServiceError> {
@@ -106,13 +120,12 @@ async fn test_auth_use_case_login_success() {
     let mut mock_auth_service = MockAuthService::new();
     let user = create_test_user();
     mock_auth_service.add_user(user.clone());
-    
+
     let auth_use_case = AuthUseCase::new(mock_auth_service);
 
     let login_request = LoginRequest {
-        keycloak_id: user.keycloak_id,
         username: user.username.clone(),
-        email: user.email.clone(),
+        password: "test_password".to_string(),
     };
 
     let result = auth_use_case.login(login_request).await;
@@ -124,8 +137,10 @@ async fn test_auth_use_case_login_success() {
     assert_eq!(login_response.username, user.username);
     assert_eq!(login_response.email, user.email);
     assert_eq!(login_response.token_type, "Bearer");
-    assert_eq!(login_response.expires_in, 24 * 60 * 60);
+    assert_eq!(login_response.expires_in, 300);
+    assert_eq!(login_response.refresh_expires_in, 1800);
     assert!(!login_response.token.is_empty());
+    assert!(!login_response.refresh_token.is_empty());
 }
 
 #[tokio::test]
@@ -134,9 +149,8 @@ async fn test_auth_use_case_login_user_not_found() {
     let auth_use_case = AuthUseCase::new(mock_auth_service);
 
     let login_request = LoginRequest {
-        keycloak_id: Uuid::new_v4(),
         username: "nonexistent".to_string(),
-        email: "nonexistent@example.com".to_string(),
+        password: "test_password".to_string(),
     };
 
     let result = auth_use_case.login(login_request).await;
@@ -178,7 +192,7 @@ async fn test_auth_use_case_refresh_token_success() {
     let user = create_test_user();
     let token = "valid_token_123";
     mock_auth_service.add_token(token.to_string(), user.clone());
-    
+
     let auth_use_case = AuthUseCase::new(mock_auth_service);
 
     let result = auth_use_case.refresh_token(RefreshTokenRequest { refresh_token: token.to_string() }).await;
@@ -186,9 +200,10 @@ async fn test_auth_use_case_refresh_token_success() {
 
     let refresh_response = result.unwrap();
     assert_eq!(refresh_response.token_type, "Bearer");
-    assert_eq!(refresh_response.expires_in, 24 * 60 * 60);
+    assert_eq!(refresh_response.expires_in, 300);
+    assert_eq!(refresh_response.refresh_expires_in, 1800);
     assert!(!refresh_response.token.is_empty());
-    assert!(refresh_response.token.starts_with("refreshed_token_"));
+    assert!(!refresh_response.refresh_token.is_empty());
 }
 
 #[tokio::test]
@@ -214,25 +229,26 @@ async fn test_login_response_structure() {
     let mut mock_auth_service = MockAuthService::new();
     let user = create_test_user();
     mock_auth_service.add_user(user.clone());
-    
+
     let auth_use_case = AuthUseCase::new(mock_auth_service);
 
     let login_request = LoginRequest {
-        keycloak_id: user.keycloak_id,
         username: user.username.clone(),
-        email: user.email.clone(),
+        password: "test_password".to_string(),
     };
 
     let login_response = auth_use_case.login(login_request).await.unwrap();
-    
+
     // Verify all required fields are present
     assert!(login_response.user_id > 0);
     assert!(!login_response.keycloak_id.is_nil());
     assert!(!login_response.username.is_empty());
     assert!(!login_response.email.is_empty());
     assert!(!login_response.token.is_empty());
+    assert!(!login_response.refresh_token.is_empty());
     assert_eq!(login_response.token_type, "Bearer");
     assert!(login_response.expires_in > 0);
+    assert!(login_response.refresh_expires_in > 0);
 }
 
 #[tokio::test]
