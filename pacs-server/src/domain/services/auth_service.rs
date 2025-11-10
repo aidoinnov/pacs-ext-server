@@ -84,23 +84,20 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
             .authenticate_user(username, password)
             .await?;
 
-        // 2. Keycloak access token에서 사용자 정보 추출
-        // TODO: Keycloak token을 파싱하여 keycloak_id, email 추출
-        // 현재는 username으로 조회 후 없으면 생성하는 방식 사용
+        // 2. 로컬 DB에서 사용자 조회
+        // 회원가입 시 이미 Keycloak과 로컬 DB에 모두 생성되어 있어야 함
+        let user = self
+            .user_repository
+            .find_by_username(username)
+            .await?
+            .ok_or_else(|| {
+                ServiceError::NotFound(format!(
+                    "User '{}' not found in local database. Please sign up first.",
+                    username
+                ))
+            })?;
 
-        // 3. 사용자 조회 또는 생성
-        let user = match self.user_repository.find_by_username(username).await? {
-            Some(user) => user,
-            None => {
-                // Keycloak에서 사용자 정보를 가져와서 생성해야 함
-                // 임시로 에러 반환 (실제로는 Keycloak API로 사용자 정보 조회 필요)
-                return Err(ServiceError::NotFound(
-                    "User not found in local database. Please signup first.".into(),
-                ));
-            }
-        };
-
-        // 4. JWT 토큰 생성
+        // 3. JWT 토큰 생성
         let claims = Claims::new(
             user.id,
             user.keycloak_id,
