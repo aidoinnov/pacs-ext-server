@@ -93,7 +93,7 @@ pub struct FailedAssignment {
 }
 
 /// Request to add a member to a project
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AddMemberRequest {
     pub user_id: i32,
     pub role_id: Option<i32>, // Optional, defaults to Viewer role if not provided
