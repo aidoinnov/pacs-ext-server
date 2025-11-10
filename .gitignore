@@ -16,3 +16,12 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 *.log
+
+# Process management
+.backend.pid
+.frontend.pid
+backend.log
+frontend.log
+
+# Node modules
+node_modules/
