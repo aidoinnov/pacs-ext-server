@@ -17,12 +17,11 @@ pub fn mask_email(email: &str) -> String {
     }
 }
 
-/// 로그인 요청 DTO
+/// 로그인 요청 DTO (username/password 방식)
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct LoginRequest {
-    pub keycloak_id: Uuid,
     pub username: String,
-    pub email: String,
+    pub password: String,
 }
 
 /// 로그인 응답 DTO
@@ -33,8 +32,10 @@ pub struct LoginResponse {
     pub username: String,
     pub email: String,
     pub token: String,
+    pub refresh_token: String,
     pub token_type: String, // "Bearer"
     pub expires_in: i64,    // seconds
+    pub refresh_expires_in: i64, // seconds
 }
 
 /// 토큰 갱신 요청 DTO
@@ -47,8 +48,10 @@ pub struct RefreshTokenRequest {
 #[derive(Debug, Deserialize, Serialize, ToSchema, Clone)]
 pub struct RefreshTokenResponse {
     pub token: String,
+    pub refresh_token: String,
     pub token_type: String,
     pub expires_in: i64,
+    pub refresh_expires_in: i64,
 }
 
 /// 토큰 검증 응답 DTO

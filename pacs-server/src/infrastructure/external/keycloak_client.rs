@@ -402,6 +402,54 @@ impl KeycloakClient {
         Ok(())
     }
 
+    /// Authenticate user with username and password
+    pub async fn authenticate_user(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Result<KeycloakTokenResponse, ServiceError> {
+        let url = format!(
+            "{}/realms/{}/protocol/openid-connect/token",
+            self.base_url, self.realm
+        );
+
+        let params = [
+            ("grant_type", "password"),
+            ("client_id", &self.client_id),
+            ("client_secret", &self.client_secret),
+            ("username", username),
+            ("password", password),
+        ];
+
+        let response = self
+            .http_client
+            .post(&url)
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Authentication request failed: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ServiceError::Unauthorized(format!(
+                "Authentication failed ({}): {}",
+                status, body
+            )));
+        }
+
+        let token_response: KeycloakTokenResponse = response.json().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!(
+                "Failed to parse authentication response: {}",
+                e
+            ))
+        })?;
+
+        Ok(token_response)
+    }
+
     /// Refresh access token using Keycloak's refresh token endpoint
     pub async fn refresh_access_token(
         &self,

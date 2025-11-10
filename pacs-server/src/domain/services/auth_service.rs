@@ -10,12 +10,11 @@ use uuid::Uuid;
 /// 인증 도메인 서비스
 #[async_trait]
 pub trait AuthService: Send + Sync {
-    /// 사용자 로그인 (Keycloak ID로)
+    /// 사용자 로그인 (username/password로 Keycloak 인증)
     async fn login(
         &self,
-        keycloak_id: Uuid,
-        username: String,
-        email: String,
+        username: &str,
+        password: &str,
     ) -> Result<AuthResponse, ServiceError>;
 
     /// 토큰 검증 및 사용자 조회
@@ -76,26 +75,32 @@ impl<U: UserRepository> AuthServiceImpl<U> {
 impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
     async fn login(
         &self,
-        keycloak_id: Uuid,
-        username: String,
-        email: String,
+        username: &str,
+        password: &str,
     ) -> Result<AuthResponse, ServiceError> {
-        // UPSERT 패턴으로 동시 로그인 Race condition 방지
-        let user = sqlx::query_as::<_, crate::domain::entities::User>(
-            "INSERT INTO security_user (keycloak_id, username, email)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (keycloak_id) DO UPDATE
-             SET username = EXCLUDED.username,
-                 email = EXCLUDED.email
-             RETURNING id, keycloak_id, username, email, created_at",
-        )
-        .bind(keycloak_id)
-        .bind(&username)
-        .bind(&email)
-        .fetch_one(self.user_repository.pool())
-        .await?;
+        // 1. Keycloak으로 인증
+        let keycloak_response = self
+            .keycloak_client
+            .authenticate_user(username, password)
+            .await?;
 
-        // JWT 토큰 생성
+        // 2. Keycloak access token에서 사용자 정보 추출
+        // TODO: Keycloak token을 파싱하여 keycloak_id, email 추출
+        // 현재는 username으로 조회 후 없으면 생성하는 방식 사용
+
+        // 3. 사용자 조회 또는 생성
+        let user = match self.user_repository.find_by_username(username).await? {
+            Some(user) => user,
+            None => {
+                // Keycloak에서 사용자 정보를 가져와서 생성해야 함
+                // 임시로 에러 반환 (실제로는 Keycloak API로 사용자 정보 조회 필요)
+                return Err(ServiceError::NotFound(
+                    "User not found in local database. Please signup first.".into(),
+                ));
+            }
+        };
+
+        // 4. JWT 토큰 생성
         let claims = Claims::new(
             user.id,
             user.keycloak_id,
@@ -109,7 +114,13 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
             .create_token(&claims)
             .map_err(|e| ServiceError::Unauthorized(format!("Failed to create token: {}", e)))?;
 
-        Ok(AuthResponse { user, token })
+        Ok(AuthResponse {
+            user,
+            token,
+            refresh_token: keycloak_response.refresh_token,
+            expires_in: keycloak_response.expires_in,
+            refresh_expires_in: keycloak_response.refresh_expires_in,
+        })
     }
 
     async fn verify_and_get_user(&self, token: &str) -> Result<User, ServiceError> {
@@ -169,8 +180,10 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
         // Keycloak 응답을 우리 DTO로 변환
         Ok(crate::application::dto::auth_dto::RefreshTokenResponse {
             token: keycloak_response.access_token,
+            refresh_token: keycloak_response.refresh_token,
             token_type: keycloak_response.token_type,
             expires_in: keycloak_response.expires_in,
+            refresh_expires_in: keycloak_response.refresh_expires_in,
         })
     }
 
@@ -233,4 +246,7 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
 pub struct AuthResponse {
     pub user: User,
     pub token: String,
+    pub refresh_token: String,
+    pub expires_in: i64,
+    pub refresh_expires_in: i64,
 }

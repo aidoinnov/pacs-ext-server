@@ -11,7 +11,7 @@ use crate::infrastructure::repositories::UserRepositoryImpl;
 
 /// 사용자 로그인
 ///
-/// Keycloak ID, username, email을 통해 로그인하고 JWT 토큰을 발급받습니다.
+/// username/password로 Keycloak 인증 후 JWT 토큰과 refresh token을 발급받습니다.
 #[utoipa::path(
     post,
     path = "/api/auth/login",
@@ -55,7 +55,7 @@ pub async fn verify_token_doc(
 
 /// 토큰 갱신
 ///
-/// Keycloak의 refresh token을 사용하여 새로운 access token을 발급받습니다.
+/// Keycloak의 refresh token을 사용하여 새로운 access token과 refresh token을 발급받습니다.
 #[utoipa::path(
     post,
     path = "/api/auth/refresh",

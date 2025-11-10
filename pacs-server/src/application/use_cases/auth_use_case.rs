@@ -19,7 +19,7 @@ impl<A: AuthService> AuthUseCase<A> {
     pub async fn login(&self, request: LoginRequest) -> Result<LoginResponse, ServiceError> {
         let auth_response = self
             .auth_service
-            .login(request.keycloak_id, request.username, request.email)
+            .login(&request.username, &request.password)
             .await?;
 
         Ok(LoginResponse {
@@ -28,8 +28,10 @@ impl<A: AuthService> AuthUseCase<A> {
             username: auth_response.user.username,
             email: auth_response.user.email,
             token: auth_response.token,
+            refresh_token: auth_response.refresh_token,
             token_type: "Bearer".to_string(),
-            expires_in: 24 * 60 * 60, // 24 hours in seconds
+            expires_in: auth_response.expires_in,
+            refresh_expires_in: auth_response.refresh_expires_in,
         })
     }
 
