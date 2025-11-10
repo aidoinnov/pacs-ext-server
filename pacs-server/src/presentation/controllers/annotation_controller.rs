@@ -944,9 +944,25 @@ pub async fn list_annotations(
     };
 
     match result {
-        Ok(annotations) => HttpResponse::Ok()
-            .insert_header(("Cache-Control", "public, max-age=5"))
-            .json(annotations),
+        Ok(annotations) => {
+            // list_version 계산 (가장 최근 updated_at)
+            let list_version = annotations
+                .annotations
+                .iter()
+                .map(|ann| ann.updated_at)
+                .max();
+
+            let mut resp = HttpResponse::Ok();
+            resp.insert_header(("Cache-Control", "public, max-age=5"))
+                .insert_header(("X-Total-Count", annotations.total.to_string()));
+
+            if let Some(lv) = list_version {
+                resp.insert_header(("Last-Modified", lv.to_rfc2822()))
+                    .insert_header(("X-List-Version", lv.to_rfc3339()));
+            }
+
+            resp.json(annotations)
+        }
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": "Internal Server Error",
             "message": e.to_string()
