@@ -537,64 +537,19 @@ pub async fn request_data_access(
 }
 
 /// 라우팅 설정
+///
+/// 주의: /projects 경로는 project_controller에서 관리합니다.
+/// 이 컨트롤러는 더 이상 라우트를 등록하지 않습니다.
+/// 모든 핸들러는 project_controller에서 import하여 사용합니다.
 pub fn configure_routes<P, U, D>(
-    cfg: &mut web::ServiceConfig,
-    project_user_use_case: Arc<ProjectUserUseCase<P, U, D>>,
-    project_data_access_use_case: Arc<ProjectDataAccessUseCase>,
+    _cfg: &mut web::ServiceConfig,
+    _project_user_use_case: Arc<ProjectUserUseCase<P, U, D>>,
+    _project_data_access_use_case: Arc<ProjectDataAccessUseCase>,
 ) where
     P: ProjectService + 'static,
     U: UserService + 'static,
     D: ProjectDataService + 'static,
 {
-    cfg.app_data(web::Data::new(project_user_use_case))
-        .app_data(web::Data::new(project_data_access_use_case))
-        .service(
-            web::scope("/projects")
-                .route(
-                    "/{project_id}/users",
-                    web::get().to(get_project_members::<P, U, D>),
-                )
-                .route(
-                    "/{project_id}/users/{user_id}/role",
-                    web::put().to(assign_user_role::<P, U, D>),
-                )
-                .route(
-                    "/{project_id}/users/{user_id}/role",
-                    web::delete().to(remove_user_role::<P, U, D>),
-                )
-                .route(
-                    "/{project_id}/users/roles",
-                    web::post().to(batch_assign_roles::<P, U, D>),
-                )
-                .route(
-                    "/{project_id}/members",
-                    web::post().to(add_project_member::<P, U, D>),
-                )
-                .route(
-                    "/{project_id}/members/{user_id}",
-                    web::delete().to(remove_project_member::<P, U, D>),
-                )
-                .route(
-                    "/{project_id}/members/{user_id}/membership",
-                    web::get().to(check_project_membership::<P, U, D>),
-                )
-                // Data access routes
-                .route(
-                    "/{project_id}/data-access/matrix",
-                    web::get().to(get_project_data_access_matrix),
-                )
-                .route("/{project_id}/data", web::post().to(create_project_data))
-                .route(
-                    "/{project_id}/data/{data_id}/access/{user_id}",
-                    web::put().to(update_data_access),
-                )
-                .route(
-                    "/{project_id}/data/{data_id}/access/batch",
-                    web::put().to(batch_update_data_access),
-                )
-                .route(
-                    "/{project_id}/data/{data_id}/access/request",
-                    web::post().to(request_data_access),
-                ),
-        );
+    // 모든 라우트는 project_controller에서 등록됩니다.
+    // 이 함수는 호환성을 위해 유지되지만 아무 작업도 하지 않습니다.
 }

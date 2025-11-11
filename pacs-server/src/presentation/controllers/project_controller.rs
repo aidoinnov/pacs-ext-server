@@ -202,18 +202,28 @@ pub async fn get_project_metadata<P: ProjectService>(
     HttpResponse::Ok().json(metadata)
 }
 
-pub fn configure_routes<P: ProjectService + 'static>(
+pub fn configure_routes<P, U, D>(
     cfg: &mut web::ServiceConfig,
     project_use_case: Arc<ProjectUseCase<P>>,
     project_data_access_use_case: Arc<crate::application::use_cases::ProjectDataAccessUseCase>,
-) {
+    project_user_use_case: Arc<crate::application::use_cases::ProjectUserUseCase<P, U, D>>,
+) where
+    P: ProjectService + 'static,
+    U: crate::domain::services::UserService + 'static,
+    D: crate::domain::services::ProjectDataService + 'static,
+{
     use crate::presentation::controllers::project_data_access_controller::{
         assign_series_to_project, assign_study_to_project, unassign_series_from_project,
         unassign_study_from_project,
     };
+    use crate::presentation::controllers::project_user_controller::{
+        add_project_member, assign_user_role, batch_assign_roles, check_project_membership,
+        get_project_members, remove_project_member, remove_user_role,
+    };
 
     cfg.app_data(web::Data::new(project_use_case))
         .app_data(web::Data::new(project_data_access_use_case))
+        .app_data(web::Data::new(project_user_use_case))
         .route("/projects", web::post().to(create_project::<P>))
         .route("/projects", web::get().to(list_projects::<P>))
         // 중요: 구체적인 경로를 먼저 등록해야 {project_id}와 충돌하지 않음
@@ -236,6 +246,35 @@ pub fn configure_routes<P: ProjectService + 'static>(
         .route(
             "/projects/{project_id}/studies/{study_id}/unassign",
             web::delete().to(unassign_study_from_project),
+        )
+        // 프로젝트-사용자 관리 API (구체적인 경로)
+        .route(
+            "/projects/{project_id}/users",
+            web::get().to(get_project_members::<P, U, D>),
+        )
+        .route(
+            "/projects/{project_id}/users/{user_id}/role",
+            web::put().to(assign_user_role::<P, U, D>),
+        )
+        .route(
+            "/projects/{project_id}/users/{user_id}/role",
+            web::delete().to(remove_user_role::<P, U, D>),
+        )
+        .route(
+            "/projects/{project_id}/users/roles",
+            web::post().to(batch_assign_roles::<P, U, D>),
+        )
+        .route(
+            "/projects/{project_id}/members",
+            web::post().to(add_project_member::<P, U, D>),
+        )
+        .route(
+            "/projects/{project_id}/members/{user_id}",
+            web::delete().to(remove_project_member::<P, U, D>),
+        )
+        .route(
+            "/projects/{project_id}/members/{user_id}/membership",
+            web::get().to(check_project_membership::<P, U, D>),
         )
         // 동적 경로({project_id})는 마지막에 등록
         .route("/projects/{project_id}", web::get().to(get_project::<P>))

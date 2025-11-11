@@ -566,9 +566,20 @@ async fn main() -> std::io::Result<()> {
                         }
                     })
                     // ========================================
+                    // 👥 사용자 관리 API (/users/*)
+                    // - 사용자 CRUD
+                    // - /me, /username/{username} 등
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            user_controller::configure_routes(cfg, user_use_case.clone(), Arc::new(user_service.clone()))
+                        }
+                    })
+                    // ========================================
                     // 🏗️ 프로젝트 관리 API (/projects/*)
                     // - 프로젝트 CRUD
-                    // - 데이터 할당/해제 API 포함
+                    // - 데이터 할당/해제 API
+                    // - 프로젝트-사용자 관리 API
                     // ========================================
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
@@ -576,6 +587,7 @@ async fn main() -> std::io::Result<()> {
                                 cfg,
                                 project_use_case.clone(),
                                 project_data_access_use_case.clone(),
+                                project_user_use_case.clone(),
                             )
                         }
                     })
@@ -587,24 +599,6 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| {
                         project_data_access_controller::configure_routes(
                             cfg,
-                            project_data_access_use_case.clone(),
-                        )
-                    })
-                    // ========================================
-                    // 👥 사용자 관리 API (구체적인 경로 우선 - /me, /username/{username})
-                    // ========================================
-                    .configure(|cfg| {
-                        if settings.server.mode != ServerMode::SyncOnly {
-                            user_controller::configure_routes(cfg, user_use_case.clone(), Arc::new(user_service.clone()))
-                        }
-                    })
-                    // ========================================
-                    // 📊 프로젝트-사용자 매트릭스 API
-                    // ========================================
-                    .configure(|cfg| {
-                        project_user_controller::configure_routes(
-                            cfg,
-                            project_user_use_case.clone(),
                             project_data_access_use_case.clone(),
                         )
                     })
