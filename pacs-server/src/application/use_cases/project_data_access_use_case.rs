@@ -392,45 +392,20 @@ impl ProjectDataAccessUseCase {
         // 1. 프로젝트 존재 확인
         self.project_service.get_project(project_id).await?;
 
-        // 2. Study 조회 또는 생성
-        let study = match self
-            .project_data_service
-            .get_study_by_uid(project_id, &request.study_uid)
-            .await
-        {
-            Ok(study) => study,
-            Err(ServiceError::NotFound(_)) => {
-                // Study가 없으면 생성
-                let pool = self.project_data_service.pool();
-                let study: ProjectDataStudy = sqlx::query_as(
-                    "INSERT INTO project_data_study (study_uid, study_description)
-                     VALUES ($1, $2)
-                     ON CONFLICT (study_uid) DO UPDATE SET study_uid = EXCLUDED.study_uid
-                     RETURNING id, study_uid, study_description, patient_id, patient_name,
-                               patient_birth_date, study_date, created_at, updated_at",
-                )
-                .bind(&request.study_uid)
-                .bind(format!("Study for series {}", request.series_uid))
-                .fetch_one(pool)
-                .await
-                .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
-
-                // project_data에 Study 매핑 추가
-                sqlx::query(
-                    "INSERT INTO project_data (project_id, resource_level, study_id)
-                     VALUES ($1, 'STUDY'::resource_level_enum, $2)
-                     ON CONFLICT DO NOTHING",
-                )
-                .bind(project_id)
-                .bind(study.id)
-                .execute(pool)
-                .await
-                .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
-
-                study
-            }
-            Err(e) => return Err(e),
-        };
+        // 2. Study 조회 또는 생성 (전역 엔티티만 생성, project_data에는 추가하지 않음)
+        let pool = self.project_data_service.pool();
+        let study: ProjectDataStudy = sqlx::query_as(
+            "INSERT INTO project_data_study (study_uid, study_description)
+             VALUES ($1, $2)
+             ON CONFLICT (study_uid) DO UPDATE SET study_uid = EXCLUDED.study_uid
+             RETURNING id, study_uid, study_description, patient_id, patient_name,
+                       patient_birth_date, study_date, created_at, updated_at",
+        )
+        .bind(&request.study_uid)
+        .bind(format!("Study for series {}", request.series_uid))
+        .fetch_one(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
         // 3. Series 조회 또는 생성
         let pool = self.project_data_service.pool();
