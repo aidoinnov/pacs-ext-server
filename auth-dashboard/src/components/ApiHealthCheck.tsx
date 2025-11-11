@@ -101,14 +101,90 @@ const ApiHealthCheck: React.FC = () => {
         },
       ],
     },
+    {
+      title: '📦 프로젝트 데이터 할당/제거',
+      description: 'DICOM Study/Series 할당 및 조회 테스트 (순차 실행)',
+      isSequential: true,
+      tests: [
+        {
+          name: '데이터 테스트용 프로젝트 생성',
+          status: 'pending',
+          isSequential: true,
+          indentLevel: 0,
+          delayAfter: 1500,
+        },
+        {
+          name: 'Study 할당',
+          status: 'pending',
+          dependencies: ['데이터 테스트용 프로젝트 생성'],
+          isSequential: true,
+          indentLevel: 1,
+        },
+        {
+          name: 'Series 할당 (3개)',
+          status: 'pending',
+          dependencies: ['Study 할당'],
+          isSequential: true,
+          indentLevel: 1,
+        },
+        {
+          name: '프로젝트 Study 목록 조회',
+          status: 'pending',
+          dependencies: ['Series 할당 (3개)'],
+          indentLevel: 2,
+        },
+        {
+          name: '프로젝트 Series 목록 조회',
+          status: 'pending',
+          dependencies: ['프로젝트 Study 목록 조회'],
+          indentLevel: 2,
+        },
+        {
+          name: 'Series 중복 할당 시도 (409 에러)',
+          status: 'pending',
+          dependencies: ['프로젝트 Series 목록 조회'],
+          indentLevel: 2,
+        },
+        {
+          name: '존재하지 않는 프로젝트에 할당 (404 에러)',
+          status: 'pending',
+          dependencies: ['Series 중복 할당 시도 (409 에러)'],
+          indentLevel: 2,
+        },
+        {
+          name: '다른 프로젝트 생성 (격리 테스트)',
+          status: 'pending',
+          dependencies: ['존재하지 않는 프로젝트에 할당 (404 에러)'],
+          indentLevel: 1,
+        },
+        {
+          name: '다른 프로젝트 데이터 조회 (빈 목록)',
+          status: 'pending',
+          dependencies: ['다른 프로젝트 생성 (격리 테스트)'],
+          indentLevel: 2,
+        },
+        {
+          name: '데이터 테스트 프로젝트 삭제',
+          status: 'pending',
+          dependencies: ['다른 프로젝트 데이터 조회 (빈 목록)'],
+          cleanup: true,
+          isSequential: true,
+          indentLevel: 1,
+        },
+      ],
+    },
   ]);
 
   const [expandedTest, setExpandedTest] = useState<string | null>(null);
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [createdProjectId, setCreatedProjectId] = useState<number | null>(null);
 
-  // useRef로 즉시 접근 가능한 프로젝트 ID 관리
+  // useRef로 즉시 접근 가능한 프로젝트 ID 및 데이터 ID 관리
   const createdProjectIdRef = useRef<number | null>(null);
+  const createdStudyIdRef = useRef<number | null>(null);
+  const createdStudyUidRef = useRef<string | null>(null);
+  const createdSeriesIdsRef = useRef<number[]>([]);
+  const createdSeriesUidsRef = useRef<string[]>([]);
 
   // 통계 계산
   const getStats = () => {
@@ -181,6 +257,9 @@ const ApiHealthCheck: React.FC = () => {
       } else if (sectionIndex === 1) {
         // 프로젝트 생명주기 섹션
         result = await runLifecycleTest(testIndex);
+      } else if (sectionIndex === 2) {
+        // 프로젝트 데이터 할당/제거 섹션
+        result = await runDataAssignmentTest(testIndex);
       }
 
       test.status = 'success';
@@ -520,11 +599,440 @@ const ApiHealthCheck: React.FC = () => {
     }
   };
 
+  // 프로젝트 데이터 할당/제거 테스트
+  const runDataAssignmentTest = async (testIndex: number) => {
+    if (testIndex === 0) {
+      // 데이터 테스트용 프로젝트 생성
+      const projectData = {
+        name: `Data Test ${Date.now()}`,
+        description: 'DICOM Data Assignment Test',
+        sponsor: 'Test Sponsor',
+        start_date: '2025-01-01',
+        end_date: '2025-12-31',
+        auto_complete: false,
+      };
+
+      try {
+        const response = await axios.post(`${apiUrl}/api/projects`, projectData);
+
+        console.log(`  ✅ 데이터 테스트용 프로젝트 생성 성공:`, response.data);
+        console.log(`  📝 생성된 프로젝트 ID: ${response.data.id}`);
+
+        // 상태와 ref 모두 업데이트
+        const projectId = response.data.id;
+        setCreatedProjectId(projectId);
+        createdProjectIdRef.current = projectId;
+        console.log(`  💾 createdProjectId 저장 완료: ${projectId} (state + ref)`);
+
+        return {
+          request: { method: 'POST', url: '/api/projects', body: projectData },
+          response: response.data,
+          createdId: projectId,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/projects`,
+            data: projectData,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
+      // Study 할당
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다. 먼저 프로젝트 생성 테스트를 실행하세요.');
+      }
+
+      const studyUid = `1.2.840.113619.2.1.1.${Date.now()}`;
+      const studyData = {
+        study_uid: studyUid,
+        study_description: 'Test Study for E2E',
+        patient_id: 'TEST001',
+        patient_name: 'Test Patient',
+        study_date: '2025-01-15',
+      };
+
+      try {
+        const response = await axios.post(
+          `${apiUrl}/api/projects/${projectId}/studies/assign`,
+          studyData
+        );
+
+        console.log(`  ✅ Study 할당 성공:`, response.data);
+        console.log(`  📝 생성된 Study ID: ${response.data.study_id}`);
+
+        // Study ID 및 UID 저장
+        createdStudyIdRef.current = response.data.study_id;
+        createdStudyUidRef.current = studyUid;
+
+        return {
+          request: { method: 'POST', url: `/api/projects/${projectId}/studies/assign`, body: studyData },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/projects/${projectId}/studies/assign`,
+            data: studyData,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 2) {
+      // Series 할당 (3개)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
+
+      const studyId = createdStudyIdRef.current;
+      if (!studyId) {
+        throw new Error('Study가 할당되지 않았습니다.');
+      }
+
+      // 3개의 Series 할당
+      const studyUid = createdStudyUidRef.current;
+      if (!studyUid) {
+        throw new Error('Study UID가 저장되지 않았습니다.');
+      }
+
+      const timestamp = Date.now();
+      const seriesIds: number[] = [];
+      const seriesUids: string[] = [];
+      const seriesDataList = [
+        {
+          study_uid: studyUid,
+          series_uid: `1.2.840.113619.2.1.2.${timestamp}.1`,
+          series_description: 'Axial CT 5mm',
+          modality: 'CT',
+          series_number: 1,
+        },
+        {
+          study_uid: studyUid,
+          series_uid: `1.2.840.113619.2.1.2.${timestamp}.2`,
+          series_description: 'Coronal CT 5mm',
+          modality: 'CT',
+          series_number: 2,
+        },
+        {
+          study_uid: studyUid,
+          series_uid: `1.2.840.113619.2.1.2.${timestamp}.3`,
+          series_description: 'Sagittal CT 5mm',
+          modality: 'CT',
+          series_number: 3,
+        },
+      ];
+
+      try {
+        for (let i = 0; i < seriesDataList.length; i++) {
+          const response = await axios.post(
+            `${apiUrl}/api/projects/${projectId}/series/assign`,
+            seriesDataList[i]
+          );
+
+          console.log(`  ✅ Series ${i + 1}/3 할당 성공:`, response.data);
+          seriesIds.push(response.data.series_id);
+          seriesUids.push(seriesDataList[i].series_uid);
+        }
+
+        // Series IDs 및 UIDs 저장
+        createdSeriesIdsRef.current = seriesIds;
+        createdSeriesUidsRef.current = seriesUids;
+
+        return {
+          request: { method: 'POST', url: `/api/projects/${projectId}/series/assign`, body: seriesDataList },
+          response: { message: `${seriesIds.length}개의 Series 할당 완료`, series_ids: seriesIds },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/projects/${projectId}/series/assign`,
+            data: seriesDataList,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 3) {
+      // 프로젝트 Study 목록 조회
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/studies`);
+
+        console.log(`  ✅ Study 목록 조회 성공:`, response.data);
+
+        // 할당한 Study가 목록에 있는지 확인
+        if (!response.data.studies || response.data.studies.length === 0) {
+          throw new Error('할당한 Study가 목록에 없습니다.');
+        }
+
+        return {
+          request: { method: 'GET', url: `/api/project-data/${projectId}/studies` },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/studies`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 4) {
+      // 프로젝트 Series 목록 조회
+      const projectId = createdProjectIdRef.current;
+      const studyId = createdStudyIdRef.current;
+
+      if (!projectId || !studyId) {
+        throw new Error('프로젝트 또는 Study가 생성되지 않았습니다.');
+      }
+
+      try {
+        const response = await axios.get(
+          `${apiUrl}/api/project-data/${projectId}/studies/${studyId}/series`
+        );
+
+        console.log(`  ✅ Series 목록 조회 성공:`, response.data);
+
+        // 할당한 Series가 목록에 있는지 확인
+        if (!response.data.series || response.data.series.length !== 3) {
+          throw new Error(`할당한 3개의 Series가 목록에 없습니다. (실제: ${response.data.series?.length || 0}개)`);
+        }
+
+        return {
+          request: { method: 'GET', url: `/api/project-data/${projectId}/studies/${studyId}/series` },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/studies/${studyId}/series`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 5) {
+      // Series 중복 할당 시도 (409 에러)
+      const projectId = createdProjectIdRef.current;
+      const studyUid = createdStudyUidRef.current;
+      const seriesUids = createdSeriesUidsRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
+
+      if (!studyUid || seriesUids.length === 0) {
+        throw new Error('Study 또는 Series가 할당되지 않았습니다.');
+      }
+
+      // 첫 번째 Series와 동일한 UID 사용
+      const duplicateSeriesData = {
+        study_uid: studyUid,
+        series_uid: seriesUids[0], // 첫 번째 Series UID 재사용
+        series_description: 'Duplicate Series',
+        modality: 'CT',
+        series_number: 1,
+      };
+
+      try {
+        await axios.post(
+          `${apiUrl}/api/projects/${projectId}/series/assign`,
+          duplicateSeriesData
+        );
+        throw new Error('409 에러가 발생해야 하는데 성공했습니다');
+      } catch (error: any) {
+        if (error.response?.status === 409) {
+          console.log(`  ✅ 중복 할당 시 409 에러 정상 반환`);
+          return {
+            request: { method: 'POST', url: `/api/projects/${projectId}/series/assign`, body: duplicateSeriesData },
+            response: error.response.data || { status: 409, message: 'Conflict' },
+          };
+        }
+
+        // 409가 아닌 다른 에러
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/projects/${projectId}/series/assign`,
+            data: duplicateSeriesData,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 6) {
+      // 존재하지 않는 프로젝트에 할당 (404 에러)
+      const nonExistentProjectId = 999999;
+      const seriesData = {
+        study_uid: `1.2.840.113619.2.1.1.${Date.now()}`,
+        series_uid: `1.2.840.113619.2.1.2.${Date.now()}.999`,
+        series_description: 'Test Series',
+        modality: 'CT',
+        series_number: 1,
+      };
+
+      try {
+        await axios.post(
+          `${apiUrl}/api/projects/${nonExistentProjectId}/series/assign`,
+          seriesData
+        );
+        throw new Error('404 에러가 발생해야 하는데 성공했습니다');
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          console.log(`  ✅ 존재하지 않는 프로젝트에 할당 시 404 에러 정상 반환`);
+          return {
+            request: { method: 'POST', url: `/api/projects/${nonExistentProjectId}/series/assign`, body: seriesData },
+            response: error.response.data || { status: 404, message: 'Not Found' },
+          };
+        }
+
+        // 404가 아닌 다른 에러
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/projects/${nonExistentProjectId}/series/assign`,
+            data: seriesData,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 7) {
+      // 다른 프로젝트 생성 (격리 테스트)
+      const projectData = {
+        name: `Isolation Test ${Date.now()}`,
+        description: 'Project Isolation Test',
+        sponsor: 'Test Sponsor',
+        start_date: '2025-01-01',
+        end_date: '2025-12-31',
+        auto_complete: false,
+      };
+
+      try {
+        const response = await axios.post(`${apiUrl}/api/projects`, projectData);
+
+        console.log(`  ✅ 격리 테스트용 프로젝트 생성 성공:`, response.data);
+        console.log(`  📝 생성된 프로젝트 ID: ${response.data.id}`);
+
+        return {
+          request: { method: 'POST', url: '/api/projects', body: projectData },
+          response: response.data,
+          isolationProjectId: response.data.id,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/projects`,
+            data: projectData,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 8) {
+      // 다른 프로젝트 데이터 조회 (빈 목록)
+      // 이전 테스트에서 생성한 격리 테스트용 프로젝트 ID를 가져와야 함
+      // 임시로 sections에서 이전 테스트 결과를 찾아서 ID 추출
+      const allTests = sections.flatMap(s => s.tests);
+      const isolationTest = allTests.find(t => t.name === '다른 프로젝트 생성 (격리 테스트)');
+
+      if (!isolationTest || !isolationTest.response) {
+        throw new Error('격리 테스트용 프로젝트가 생성되지 않았습니다.');
+      }
+
+      const isolationProjectId = (isolationTest.response as any).id;
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${isolationProjectId}/studies`);
+
+        console.log(`  ✅ 다른 프로젝트 데이터 조회 성공:`, response.data);
+
+        // 빈 목록이어야 함 (다른 프로젝트의 데이터는 보이지 않아야 함)
+        if (response.data.studies && response.data.studies.length > 0) {
+          throw new Error(`다른 프로젝트의 데이터가 조회되었습니다. (${response.data.studies.length}개)`);
+        }
+
+        return {
+          request: { method: 'GET', url: `/api/project-data/${isolationProjectId}/studies` },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${isolationProjectId}/studies`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 9) {
+      // 데이터 테스트 프로젝트 삭제 (cleanup)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('삭제할 프로젝트가 없습니다.');
+      }
+
+      const deletedId = projectId;
+
+      try {
+        const response = await axios.delete(`${apiUrl}/api/projects/${projectId}`);
+
+        // 삭제 후 ID 초기화 (state + ref)
+        setCreatedProjectId(null);
+        createdProjectIdRef.current = null;
+        createdStudyIdRef.current = null;
+        createdStudyUidRef.current = null;
+        createdSeriesIdsRef.current = [];
+        createdSeriesUidsRef.current = [];
+
+        console.log(`  ✅ 데이터 테스트 프로젝트 삭제 완료`);
+
+        return {
+          request: { method: 'DELETE', url: `/api/projects/${deletedId}` },
+          response: response.data || { message: '프로젝트가 삭제되었습니다' },
+        };
+      } catch (error: any) {
+        // 삭제 실패해도 ID 초기화 (다음 테스트를 위해)
+        setCreatedProjectId(null);
+        createdProjectIdRef.current = null;
+        createdStudyIdRef.current = null;
+        createdStudyUidRef.current = null;
+        createdSeriesIdsRef.current = [];
+        createdSeriesUidsRef.current = [];
+
+        // 에러에 요청 정보 포함
+        if (!error.config) {
+          error.config = {
+            method: 'delete',
+            url: `${apiUrl}/api/projects/${deletedId}`,
+          };
+        }
+        throw error;
+      }
+    }
+  };
+
   // 모든 테스트 실행 (의존성 및 순차 실행 고려)
   const runAllTests = async () => {
     setIsRunningAll(true);
     setCreatedProjectId(null);
     createdProjectIdRef.current = null; // ref도 초기화
+    createdStudyIdRef.current = null;
+    createdStudyUidRef.current = null;
+    createdSeriesIdsRef.current = [];
+    createdSeriesUidsRef.current = [];
 
     // 모든 테스트를 pending으로 초기화
     const newSections = sections.map(section => ({
