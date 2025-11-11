@@ -6,6 +6,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-11-11
+
+#### **프로젝트 Series/Study 할당 API 구현** 🎯
+- **브랜치**: `fix/project-series-assignment-404`
+- **목표**: DICOM 데이터를 프로젝트에 할당할 수 있는 API 구현
+- **문제**: `POST /api/projects/107/series/assign` 요청 시 404 오류 발생
+- **원인**: Series 할당 API가 구현되지 않았고, 라우트도 등록되지 않음
+
+- **주요 변경사항**:
+  1. **DTO 추가** (`pacs-server/src/application/dto/project_data_access_dto.rs`)
+     - `AssignSeriesToProjectRequest` - Series 할당 요청
+     - `AssignSeriesToProjectResponse` - Series 할당 응답
+     - `AssignStudyToProjectRequest` - Study 할당 요청
+     - `AssignStudyToProjectResponse` - Study 할당 응답
+
+  2. **Domain Service 확장** (`pacs-server/src/domain/services/project_data_service.rs`)
+     - `pool()` 메서드 추가 - 데이터베이스 연결 풀 접근
+
+  3. **Use Case 메서드 추가** (`pacs-server/src/application/use_cases/project_data_access_use_case.rs`)
+     - `assign_series_to_project()` - Series 할당 로직
+       - Study 조회/생성 (없으면 자동 생성)
+       - Series 조회/생성 (ON CONFLICT 사용)
+       - project_data 테이블에 매핑 추가 (resource_level='SERIES')
+     - `assign_study_to_project()` - Study 할당 로직
+       - Study 조회/생성 (ON CONFLICT 사용)
+       - project_data 테이블에 매핑 추가 (resource_level='STUDY')
+
+  4. **Controller 핸들러 추가** (`pacs-server/src/presentation/controllers/project_data_access_controller.rs`)
+     - `assign_series_to_project()` - POST /api/projects/{project_id}/series/assign
+     - `assign_study_to_project()` - POST /api/projects/{project_id}/studies/assign
+     - OpenAPI 문서 자동 생성 지원 (utoipa::path)
+
+  5. **라우트 등록**
+     - `/api/projects/{project_id}/series/assign` (POST)
+     - `/api/projects/{project_id}/studies/assign` (POST)
+     - 별도 `/projects` scope로 관리 (project_controller와 분리)
+
+- **기술적 특징**:
+  - **중복 방지**: `ON CONFLICT DO NOTHING` 사용
+  - **계층 구조 유지**: Study → Series → Instance
+  - **전역 엔티티**: Study는 전역 고유 (study_uid UNIQUE)
+  - **프로젝트 매핑**: project_data 테이블로 다대다 관계 관리
+  - **자동 생성**: Series 할당 시 부모 Study가 없으면 자동 생성
+
+- **에러 처리**:
+  - 404: 프로젝트를 찾을 수 없음
+  - 409: 이미 할당된 Series/Study (중복)
+  - 500: 데이터베이스 오류
+
+- **수정된 파일**:
+  - `pacs-server/src/application/dto/project_data_access_dto.rs` (+65 lines)
+  - `pacs-server/src/domain/services/project_data_service.rs` (+3 lines)
+  - `pacs-server/src/infrastructure/services/project_data_service_impl.rs` (+4 lines)
+  - `pacs-server/src/application/use_cases/project_data_access_use_case.rs` (+165 lines)
+  - `pacs-server/src/presentation/controllers/project_data_access_controller.rs` (+119 lines)
+
+- **새로 생성된 파일**:
+  - `docs/fix-project-series-assignment-404/작업계획.md`
+  - `docs/fix-project-series-assignment-404/작업내용.md`
+  - `docs/fix-project-series-assignment-404/기술문서.md`
+
+- **다음 단계**:
+  - [ ] 통합 테스트 작성
+  - [ ] E2E 테스트 작성
+  - [ ] 프로젝트 데이터 필터링 검증
+  - [ ] API 문서 업데이트 (`docs/api/project-study-series-assignment-api.md`)
+
 ### Changed - 2025-11-11
 
 #### **API Health Check 테스트 구조 재구성** 🔄

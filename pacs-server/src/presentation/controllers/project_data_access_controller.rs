@@ -482,6 +482,70 @@ pub async fn get_series_instances(
     }
 }
 
+/// 프로젝트에 Series 할당
+#[utoipa::path(
+    post,
+    path = "/api/projects/{project_id}/series/assign",
+    request_body = AssignSeriesToProjectRequest,
+    responses(
+        (status = 200, description = "Series 할당 성공", body = AssignSeriesToProjectResponse),
+        (status = 404, description = "프로젝트 또는 부모 Study를 찾을 수 없음"),
+        (status = 409, description = "이미 할당된 Series"),
+        (status = 500, description = "서버 내부 오류")
+    ),
+    params(
+        ("project_id" = i32, Path, description = "프로젝트 ID")
+    ),
+    tag = "project-data-assignment"
+)]
+pub async fn assign_series_to_project(
+    path: web::Path<i32>,
+    request: web::Json<AssignSeriesToProjectRequest>,
+    use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let project_id = path.into_inner();
+
+    match use_case
+        .assign_series_to_project(project_id, request.into_inner())
+        .await
+    {
+        Ok(response) => Ok(HttpResponse::Ok().json(response)),
+        Err(e) => Ok(handle_service_error(e)),
+    }
+}
+
+/// 프로젝트에 Study 할당
+#[utoipa::path(
+    post,
+    path = "/api/projects/{project_id}/studies/assign",
+    request_body = AssignStudyToProjectRequest,
+    responses(
+        (status = 200, description = "Study 할당 성공", body = AssignStudyToProjectResponse),
+        (status = 404, description = "프로젝트를 찾을 수 없음"),
+        (status = 409, description = "이미 할당된 Study"),
+        (status = 500, description = "서버 내부 오류")
+    ),
+    params(
+        ("project_id" = i32, Path, description = "프로젝트 ID")
+    ),
+    tag = "project-data-assignment"
+)]
+pub async fn assign_study_to_project(
+    path: web::Path<i32>,
+    request: web::Json<AssignStudyToProjectRequest>,
+    use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let project_id = path.into_inner();
+
+    match use_case
+        .assign_study_to_project(project_id, request.into_inner())
+        .await
+    {
+        Ok(response) => Ok(HttpResponse::Ok().json(response)),
+        Err(e) => Ok(handle_service_error(e)),
+    }
+}
+
 /// 라우트 설정
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataAccessUseCase>) {
     cfg.app_data(web::Data::new(use_case))
@@ -514,6 +578,18 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataA
                 .route(
                     "/{project_id}/series/{series_id}/instances",
                     web::get().to(get_series_instances),
+                ),
+        )
+        .service(
+            // 새로운 /projects scope (데이터 할당용)
+            web::scope("/projects")
+                .route(
+                    "/{project_id}/series/assign",
+                    web::post().to(assign_series_to_project),
+                )
+                .route(
+                    "/{project_id}/studies/assign",
+                    web::post().to(assign_study_to_project),
                 ),
         )
         .service(

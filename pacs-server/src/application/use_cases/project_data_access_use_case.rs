@@ -369,4 +369,159 @@ impl ProjectDataAccessUseCase {
             .get_instances_by_series(series_id)
             .await
     }
+
+    // ========== Series/Study 할당 API ==========
+
+    /// 프로젝트에 Series 할당
+    pub async fn assign_series_to_project(
+        &self,
+        project_id: i32,
+        request: AssignSeriesToProjectRequest,
+    ) -> Result<AssignSeriesToProjectResponse, ServiceError> {
+        // 1. 프로젝트 존재 확인
+        self.project_service.get_project(project_id).await?;
+
+        // 2. Study 조회 또는 생성
+        let study = match self
+            .project_data_service
+            .get_study_by_uid(project_id, &request.study_uid)
+            .await
+        {
+            Ok(study) => study,
+            Err(ServiceError::NotFound(_)) => {
+                // Study가 없으면 생성
+                let pool = self.project_data_service.pool();
+                let study: ProjectDataStudy = sqlx::query_as(
+                    "INSERT INTO project_data_study (study_uid, study_description)
+                     VALUES ($1, $2)
+                     ON CONFLICT (study_uid) DO UPDATE SET study_uid = EXCLUDED.study_uid
+                     RETURNING id, study_uid, study_description, patient_id, patient_name,
+                               patient_birth_date, study_date, created_at, updated_at",
+                )
+                .bind(&request.study_uid)
+                .bind(format!("Study for series {}", request.series_uid))
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+                // project_data에 Study 매핑 추가
+                sqlx::query(
+                    "INSERT INTO project_data (project_id, resource_level, study_id)
+                     VALUES ($1, 'STUDY'::resource_level_enum, $2)
+                     ON CONFLICT DO NOTHING",
+                )
+                .bind(project_id)
+                .bind(study.id)
+                .execute(pool)
+                .await
+                .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+                study
+            }
+            Err(e) => return Err(e),
+        };
+
+        // 3. Series 조회 또는 생성
+        let pool = self.project_data_service.pool();
+        let series: ProjectDataSeries = sqlx::query_as(
+            "INSERT INTO project_data_series (study_id, series_uid, series_description, modality, series_number)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (study_id, series_uid) DO UPDATE
+             SET series_description = EXCLUDED.series_description,
+                 modality = EXCLUDED.modality,
+                 series_number = EXCLUDED.series_number
+             RETURNING id, study_id, series_uid, series_description, modality, series_number, created_at",
+        )
+        .bind(study.id)
+        .bind(&request.series_uid)
+        .bind(&request.series_description)
+        .bind(&request.modality)
+        .bind(request.series_number)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+        // 4. project_data에 Series 매핑 추가
+        let result = sqlx::query(
+            "INSERT INTO project_data (project_id, resource_level, study_id, series_id)
+             VALUES ($1, 'SERIES'::resource_level_enum, $2, $3)
+             ON CONFLICT DO NOTHING
+             RETURNING id",
+        )
+        .bind(project_id)
+        .bind(study.id)
+        .bind(series.id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+        if result.is_none() {
+            return Err(ServiceError::AlreadyExists(
+                "Series already assigned to this project".to_string(),
+            ));
+        }
+
+        Ok(AssignSeriesToProjectResponse {
+            success: true,
+            message: format!("Series {} assigned to project successfully", request.series_uid),
+            series_id: series.id,
+        })
+    }
+
+    /// 프로젝트에 Study 할당
+    pub async fn assign_study_to_project(
+        &self,
+        project_id: i32,
+        request: AssignStudyToProjectRequest,
+    ) -> Result<AssignStudyToProjectResponse, ServiceError> {
+        // 1. 프로젝트 존재 확인
+        self.project_service.get_project(project_id).await?;
+
+        // 2. Study 조회 또는 생성
+        let pool = self.project_data_service.pool();
+        let study: ProjectDataStudy = sqlx::query_as(
+            "INSERT INTO project_data_study (study_uid, study_description, patient_id, patient_name, study_date)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (study_uid) DO UPDATE
+             SET study_description = EXCLUDED.study_description,
+                 patient_id = EXCLUDED.patient_id,
+                 patient_name = EXCLUDED.patient_name,
+                 study_date = EXCLUDED.study_date
+             RETURNING id, study_uid, study_description, patient_id, patient_name,
+                       patient_birth_date, study_date, created_at, updated_at",
+        )
+        .bind(&request.study_uid)
+        .bind(&request.study_description)
+        .bind(&request.patient_id)
+        .bind(&request.patient_name)
+        .bind(request.study_date.and_then(|d| chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok()))
+        .fetch_one(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+        // 3. project_data에 Study 매핑 추가
+        let result = sqlx::query(
+            "INSERT INTO project_data (project_id, resource_level, study_id)
+             VALUES ($1, 'STUDY'::resource_level_enum, $2)
+             ON CONFLICT DO NOTHING
+             RETURNING id",
+        )
+        .bind(project_id)
+        .bind(study.id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+        if result.is_none() {
+            return Err(ServiceError::AlreadyExists(
+                "Study already assigned to this project".to_string(),
+            ));
+        }
+
+        Ok(AssignStudyToProjectResponse {
+            success: true,
+            message: format!("Study {} assigned to project successfully", request.study_uid),
+            study_id: study.id,
+        })
+    }
 }
