@@ -23,8 +23,35 @@ interface TestSection {
   isSequential?: boolean; // 섹션 전체가 순차 실행되어야 하는지
 }
 
+// 테스트 계정 정보
+interface TestAccount {
+  username: string;
+  keycloak_id: string;
+  role: string;
+}
+
+const TEST_ACCOUNTS: Record<string, TestAccount> = {
+  SUPER_ADMIN: {
+    username: 'test_super_admin',
+    keycloak_id: 'a0000000-0000-0000-0000-000000000001',
+    role: 'SUPER_ADMIN',
+  },
+  ADMIN: {
+    username: 'test_admin',
+    keycloak_id: 'a0000000-0000-0000-0000-000000000002',
+    role: 'ADMIN',
+  },
+  USER: {
+    username: 'test_user',
+    keycloak_id: 'a0000000-0000-0000-0000-000000000003',
+    role: 'USER',
+  },
+};
+
 const ApiHealthCheck: React.FC = () => {
   const [apiUrl] = useState('http://localhost:8080');
+  const [testToken, setTestToken] = useState<string | null>(null);
+  const [currentTestAccount, setCurrentTestAccount] = useState<TestAccount>(TEST_ACCOUNTS.SUPER_ADMIN);
   const [sections, setSections] = useState<TestSection[]>([
     {
       title: '📊 프로젝트 메타데이터',
@@ -278,6 +305,42 @@ const ApiHealthCheck: React.FC = () => {
       running: allTests.filter(t => t.status === 'running').length,
       pending: allTests.filter(t => t.status === 'pending').length,
       skipped: allTests.filter(t => t.status === 'skipped').length,
+    };
+  };
+
+  // 테스트 계정으로 토큰 획득
+  const getTestToken = async (account: TestAccount): Promise<string> => {
+    try {
+      console.log(`🔑 테스트 토큰 획득 중... (계정: ${account.username}, 역할: ${account.role})`);
+
+      // JWT 서비스를 사용하여 토큰 생성
+      const response = await axios.post(`${apiUrl}/api/auth/test-token`, {
+        keycloak_id: account.keycloak_id,
+        username: account.username,
+      });
+
+      const token = response.data.token;
+      console.log(`✅ 토큰 획득 성공! (계정: ${account.username})`);
+
+      setTestToken(token);
+      setCurrentTestAccount(account);
+
+      return token;
+    } catch (error: any) {
+      console.error(`❌ 토큰 획득 실패:`, error);
+      throw new Error(`토큰 획득 실패: ${error.message}`);
+    }
+  };
+
+  // axios 요청에 토큰 추가
+  const getAxiosConfig = () => {
+    if (!testToken) {
+      return {};
+    }
+    return {
+      headers: {
+        Authorization: `Bearer ${testToken}`,
+      },
     };
   };
 
@@ -1253,7 +1316,7 @@ const ApiHealthCheck: React.FC = () => {
       const requestInfo = { method: 'GET', url: '/api/dicom/studies' };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/studies`);
+        const response = await axios.get(`${apiUrl}/api/dicom/studies`, getAxiosConfig());
 
         console.log(`  ✅ DICOM Studies 전체 조회 성공:`, response.data);
 
@@ -1276,7 +1339,7 @@ const ApiHealthCheck: React.FC = () => {
       const requestInfo = { method: 'GET', url: `/api/dicom/studies?project_id=${projectId}` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/studies?project_id=${projectId}`);
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?project_id=${projectId}`, getAxiosConfig());
 
         console.log(`  ✅ DICOM Studies 프로젝트별 조회 성공 (project_id=${projectId}):`, response.data);
 
@@ -1298,7 +1361,7 @@ const ApiHealthCheck: React.FC = () => {
       const requestInfo = { method: 'GET', url: '/api/dicom/series' };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/series`);
+        const response = await axios.get(`${apiUrl}/api/dicom/series`, getAxiosConfig());
 
         console.log(`  ✅ DICOM Series 전체 조회 성공:`, response.data);
 
@@ -1320,7 +1383,7 @@ const ApiHealthCheck: React.FC = () => {
       const requestInfo = { method: 'GET', url: '/api/dicom/instances' };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/instances`);
+        const response = await axios.get(`${apiUrl}/api/dicom/instances`, getAxiosConfig());
 
         console.log(`  ✅ DICOM Instances 전체 조회 성공:`, response.data);
 
@@ -1343,7 +1406,7 @@ const ApiHealthCheck: React.FC = () => {
       const requestInfo = { method: 'GET', url: `/api/dicom/studies?check_assignment_for_project=${projectId}` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`);
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`, getAxiosConfig());
 
         console.log(`  ✅ 할당 여부 확인 성공 (project_id=${projectId}):`, response.data);
 
@@ -1377,7 +1440,7 @@ const ApiHealthCheck: React.FC = () => {
       const requestInfo = { method: 'GET', url: `/api/dicom/studies?check_assignment_for_project=${projectId}` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`);
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`, getAxiosConfig());
 
         console.log(`  ✅ 전체 조회 + 할당 여부 확인 성공:`, response.data);
 
@@ -1404,7 +1467,8 @@ const ApiHealthCheck: React.FC = () => {
 
       try {
         const response = await axios.get(
-          `${apiUrl}/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`
+          `${apiUrl}/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`,
+          getAxiosConfig()
         );
 
         console.log(`  ✅ 프로젝트별 조회 + 할당 여부 확인 성공:`, response.data);
@@ -1433,7 +1497,8 @@ const ApiHealthCheck: React.FC = () => {
 
       try {
         const response = await axios.get(
-          `${apiUrl}/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`
+          `${apiUrl}/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`,
+          getAxiosConfig()
         );
 
         console.log(`  ✅ 다른 프로젝트 할당 여부 확인 성공:`, response.data);
@@ -1456,7 +1521,7 @@ const ApiHealthCheck: React.FC = () => {
       const requestInfo = { method: 'GET', url: '/api/dicom/studies?project_id=0' };
 
       try {
-        await axios.get(`${apiUrl}/api/dicom/studies?project_id=0`);
+        await axios.get(`${apiUrl}/api/dicom/studies?project_id=0`, getAxiosConfig());
         throw new Error('400 에러가 발생해야 하는데 성공했습니다');
       } catch (error: any) {
         if (error.response?.status === 400) {
@@ -1480,7 +1545,7 @@ const ApiHealthCheck: React.FC = () => {
       const requestInfo = { method: 'GET', url: '/api/dicom/studies?project_id=-1' };
 
       try {
-        await axios.get(`${apiUrl}/api/dicom/studies?project_id=-1`);
+        await axios.get(`${apiUrl}/api/dicom/studies?project_id=-1`, getAxiosConfig());
         throw new Error('400 에러가 발생해야 하는데 성공했습니다');
       } catch (error: any) {
         if (error.response?.status === 400) {
@@ -1631,10 +1696,42 @@ const ApiHealthCheck: React.FC = () => {
         </div>
       </div>
 
+      {/* 테스트 계정 선택 및 토큰 획득 */}
+      <div className="test-account-section">
+        <div className="account-selector">
+          <label>테스트 계정:</label>
+          <select
+            value={currentTestAccount.username}
+            onChange={(e) => {
+              const account = Object.values(TEST_ACCOUNTS).find(a => a.username === e.target.value);
+              if (account) {
+                setCurrentTestAccount(account);
+                setTestToken(null); // 계정 변경 시 토큰 초기화
+              }
+            }}
+          >
+            {Object.values(TEST_ACCOUNTS).map(account => (
+              <option key={account.username} value={account.username}>
+                {account.username} ({account.role})
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => getTestToken(currentTestAccount)}
+            className="get-token-button"
+          >
+            🔑 토큰 획득
+          </button>
+          {testToken && (
+            <span className="token-status">✅ 토큰 획득 완료</span>
+          )}
+        </div>
+      </div>
+
       {/* 일괄 테스트 버튼 */}
       <div className="bulk-actions">
-        <button 
-          onClick={runAllTests} 
+        <button
+          onClick={runAllTests}
           disabled={isRunningAll}
           className="run-all-button"
         >

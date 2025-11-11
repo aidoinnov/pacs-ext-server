@@ -256,7 +256,7 @@ async fn main() -> std::io::Result<()> {
     // JWT(JSON Web Token) 서비스 초기화
     // 사용자 인증을 위한 토큰 생성 및 검증 서비스
     print!("🔐 Initializing JWT service... ");
-    let jwt_service = JwtService::new(&settings.jwt);
+    let jwt_service = Arc::new(JwtService::new(&settings.jwt));
     println!("✅ Done (TTL: {}h)", settings.jwt.expiration_hours);
 
     // Keycloak 클라이언트 초기화
@@ -270,7 +270,7 @@ async fn main() -> std::io::Result<()> {
 
     // 인증 서비스: 로그인, 토큰 생성/검증 등
     let auth_service =
-        AuthServiceImpl::new(user_repo.clone(), jwt_service, keycloak_client.clone());
+        AuthServiceImpl::new(user_repo.clone(), (*jwt_service).clone(), keycloak_client.clone());
     // 사용자 서비스: 사용자 CRUD, 프로젝트 멤버십 관리 등
     let user_service = UserServiceImpl::new(user_repo.clone(), project_repo.clone());
     // 프로젝트 서비스: 프로젝트 CRUD, 사용자 관리 등
@@ -536,15 +536,16 @@ async fn main() -> std::io::Result<()> {
                             cfg,
                             auth_use_case.clone(),
                             user_registration_use_case.clone(),
+                            jwt_service.clone(),
+                            Arc::new(user_repo.clone()),
                         )
                     })
                     .configure(|cfg| {
-                        let jwt_svc = Arc::new(JwtService::new(&settings.jwt));
                         presentation::controllers::dicom_gateway_controller::configure_routes(
                             cfg,
                             (*qido_client).clone(),
                             dicom_evaluator.clone(),
-                            jwt_svc,
+                            jwt_service.clone(),
                             Arc::new(
                                 infrastructure::repositories::AccessConditionRepositoryImpl {
                                     pool: pool.clone(),

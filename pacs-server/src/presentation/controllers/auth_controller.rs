@@ -1,13 +1,32 @@
 use actix_web::{web, HttpResponse, Responder};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::dto::auth_dto::{LoginRequest, RefreshTokenRequest};
 use crate::application::dto::user_registration_dto::*;
 use crate::application::use_cases::auth_use_case::AuthUseCase;
 use crate::application::use_cases::user_registration_use_case::UserRegistrationUseCase;
 use crate::domain::services::auth_service::AuthService;
+use crate::domain::repositories::UserRepository;
 use crate::infrastructure::services::UserRegistrationServiceImpl;
+use crate::infrastructure::auth::claims::Claims;
+use crate::infrastructure::auth::jwt_service::JwtService;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TestTokenRequest {
+    pub keycloak_id: Uuid,
+    pub username: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TestTokenResponse {
+    pub token: String,
+    pub user_id: i32,
+    pub username: String,
+    pub email: String,
+}
 
 pub struct AuthController<A: AuthService> {
     auth_use_case: Arc<AuthUseCase<A>>,
@@ -147,15 +166,75 @@ impl<A: AuthService> AuthController<A> {
             })),
         }
     }
+
+    /// 테스트 토큰 생성 (개발 환경 전용)
+    ///
+    /// 테스트 계정의 keycloak_id로 JWT 토큰을 생성합니다.
+    /// 프로덕션 환경에서는 비활성화되어야 합니다.
+    pub async fn create_test_token<U: UserRepository + 'static>(
+        jwt_service: web::Data<Arc<JwtService>>,
+        user_repository: web::Data<Arc<U>>,
+        req: web::Json<TestTokenRequest>,
+    ) -> impl Responder {
+        // 테스트 계정 UUID 목록 (a0000000-0000-0000-0000-00000000000X)
+        let test_account_uuids = vec![
+            Uuid::parse_str("a0000000-0000-0000-0000-000000000001").unwrap(), // test_super_admin
+            Uuid::parse_str("a0000000-0000-0000-0000-000000000002").unwrap(), // test_admin
+            Uuid::parse_str("a0000000-0000-0000-0000-000000000003").unwrap(), // test_user
+        ];
+
+        // 요청된 keycloak_id가 테스트 계정인지 확인
+        if !test_account_uuids.contains(&req.keycloak_id) {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "Only test accounts are allowed"
+            }));
+        }
+
+        // 사용자 조회
+        match user_repository.find_by_keycloak_id(req.keycloak_id).await {
+            Ok(Some(user)) => {
+                // JWT 토큰 생성
+                let claims = Claims::new(
+                    user.id,
+                    user.keycloak_id,
+                    user.username.clone(),
+                    user.email.clone(),
+                    24, // 24시간 유효
+                );
+
+                match jwt_service.create_token(&claims) {
+                    Ok(token) => HttpResponse::Ok().json(TestTokenResponse {
+                        token,
+                        user_id: user.id,
+                        username: user.username,
+                        email: user.email,
+                    }),
+                    Err(e) => HttpResponse::InternalServerError().json(json!({
+                        "error": format!("Token creation failed: {}", e)
+                    })),
+                }
+            }
+            Ok(None) => HttpResponse::NotFound().json(json!({
+                "error": "User not found"
+            })),
+            Err(e) => HttpResponse::InternalServerError().json(json!({
+                "error": format!("Database error: {}", e)
+            })),
+        }
+    }
 }
 
-pub fn configure_routes<A: AuthService + 'static>(
+pub fn configure_routes<A: AuthService + 'static, U: UserRepository + 'static>(
     cfg: &mut web::ServiceConfig,
     auth_use_case: Arc<AuthUseCase<A>>,
     user_registration_use_case: Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+    jwt_service: Arc<JwtService>,
+    user_repository: Arc<U>,
 ) {
     cfg.app_data(web::Data::new(auth_use_case))
         .app_data(web::Data::new(user_registration_use_case))
+        .app_data(web::Data::new(jwt_service))
+        .app_data(web::Data::new(user_repository))
         .service(
             web::scope("/auth")
                 .route("/login", web::post().to(AuthController::<A>::login))
@@ -179,6 +258,10 @@ pub fn configure_routes<A: AuthService + 'static>(
                 .route(
                     "/reset-password",
                     web::post().to(AuthController::<A>::reset_password),
+                )
+                .route(
+                    "/test-token",
+                    web::post().to(AuthController::<A>::create_test_token::<U>),
                 )
                 .route(
                     "/admin/users/approve",
