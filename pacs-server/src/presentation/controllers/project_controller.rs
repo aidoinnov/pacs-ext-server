@@ -205,13 +205,38 @@ pub async fn get_project_metadata<P: ProjectService>(
 pub fn configure_routes<P: ProjectService + 'static>(
     cfg: &mut web::ServiceConfig,
     project_use_case: Arc<ProjectUseCase<P>>,
+    project_data_access_use_case: Arc<crate::application::use_cases::ProjectDataAccessUseCase>,
 ) {
+    use crate::presentation::controllers::project_data_access_controller::{
+        assign_series_to_project, assign_study_to_project, unassign_series_from_project,
+        unassign_study_from_project,
+    };
+
     cfg.app_data(web::Data::new(project_use_case))
+        .app_data(web::Data::new(project_data_access_use_case))
         .route("/projects", web::post().to(create_project::<P>))
         .route("/projects", web::get().to(list_projects::<P>))
-        // 중요: 구체적인 경로(/meta, /active)를 먼저 등록해야 {project_id}와 충돌하지 않음
+        // 중요: 구체적인 경로를 먼저 등록해야 {project_id}와 충돌하지 않음
         .route("/projects/meta", web::get().to(get_project_metadata::<P>))
         .route("/projects/active", web::get().to(get_active_projects::<P>))
+        // 데이터 할당 API (구체적인 경로)
+        .route(
+            "/projects/{project_id}/series/assign",
+            web::post().to(assign_series_to_project),
+        )
+        .route(
+            "/projects/{project_id}/studies/assign",
+            web::post().to(assign_study_to_project),
+        )
+        // 데이터 할당 해제 API (구체적인 경로)
+        .route(
+            "/projects/{project_id}/series/{series_id}/unassign",
+            web::delete().to(unassign_series_from_project),
+        )
+        .route(
+            "/projects/{project_id}/studies/{study_id}/unassign",
+            web::delete().to(unassign_study_from_project),
+        )
         // 동적 경로({project_id})는 마지막에 등록
         .route("/projects/{project_id}", web::get().to(get_project::<P>))
         .route("/projects/{project_id}", web::put().to(update_project::<P>))

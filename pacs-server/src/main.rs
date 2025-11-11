@@ -566,21 +566,29 @@ async fn main() -> std::io::Result<()> {
                         }
                     })
                     // ========================================
-                    // 📊 프로젝트 데이터 접근 관리 API (구체적인 경로 우선 - /projects/{id}/studies/assign 등)
+                    // 🏗️ 프로젝트 관리 API (/projects/*)
+                    // - 프로젝트 CRUD
+                    // - 데이터 할당/해제 API 포함
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            project_controller::configure_routes(
+                                cfg,
+                                project_use_case.clone(),
+                                project_data_access_use_case.clone(),
+                            )
+                        }
+                    })
+                    // ========================================
+                    // 📊 프로젝트 데이터 접근 관리 API (/project-data/*)
+                    // - 데이터 접근 매트릭스
+                    // - Study/Series/Instance 목록 조회
                     // ========================================
                     .configure(|cfg| {
                         project_data_access_controller::configure_routes(
                             cfg,
                             project_data_access_use_case.clone(),
                         )
-                    })
-                    // ========================================
-                    // 🏗️ 프로젝트 관리 API (덜 구체적인 경로 - /projects/{id})
-                    // ========================================
-                    .configure(|cfg| {
-                        if settings.server.mode != ServerMode::SyncOnly {
-                            project_controller::configure_routes(cfg, project_use_case.clone())
-                        }
                     })
                     // ========================================
                     // 👥 사용자 관리 API (구체적인 경로 우선 - /me, /username/{username})

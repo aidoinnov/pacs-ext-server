@@ -610,10 +610,13 @@ pub async fn unassign_study_from_project(
 }
 
 /// 라우트 설정
+///
+/// 주의: /projects 경로는 project_controller에서 관리합니다.
+/// 이 컨트롤러는 /project-data scope만 사용합니다.
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataAccessUseCase>) {
     cfg.app_data(web::Data::new(use_case))
         .service(
-            // 별도 scope 사용하여 경로 충돌 방지
+            // /project-data scope - 프로젝트 데이터 접근 관리
             web::scope("/project-data")
                 .route(
                     "/{project_id}/data-access/matrix",
@@ -642,24 +645,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataA
                     "/{project_id}/series/{series_id}/instances",
                     web::get().to(get_series_instances),
                 ),
-        )
-        // 데이터 할당 API - scope 없이 직접 등록 (project_controller와 충돌 방지)
-        .route(
-            "/projects/{project_id}/series/assign",
-            web::post().to(assign_series_to_project),
-        )
-        .route(
-            "/projects/{project_id}/studies/assign",
-            web::post().to(assign_study_to_project),
-        )
-        // 데이터 할당 해제 API
-        .route(
-            "/projects/{project_id}/series/{series_id}/unassign",
-            web::delete().to(unassign_series_from_project),
-        )
-        .route(
-            "/projects/{project_id}/studies/{study_id}/unassign",
-            web::delete().to(unassign_study_from_project),
         )
         .service(
             web::scope("/data-access")
