@@ -168,6 +168,7 @@ const ApiHealthCheck: React.FC = () => {
           status: 'pending',
           dependencies: ['다른 프로젝트 데이터 조회 (빈 목록)'],
           indentLevel: 1,
+          delayAfter: 500, // DB 트랜잭션 완료 대기
         },
         {
           name: 'Series 목록 재조회 (2개 확인)',

@@ -470,6 +470,11 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         study_id: i32,
     ) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
         // project_data 테이블과 JOIN하여 프로젝트에 할당된 Series만 조회
+        println!(
+            "🔍 [DEBUG] find_series_by_project_and_study_id: project_id={}, study_id={}",
+            project_id, study_id
+        );
+
         let results = sqlx::query_as::<_, ProjectDataSeries>(
             "SELECT pds.id, pds.study_id, pds.series_uid, pds.series_description, pds.modality, pds.series_number, pds.created_at
              FROM project_data_series pds
@@ -483,6 +488,11 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .bind(study_id)
         .fetch_all(&self.pool)
         .await?;
+
+        println!(
+            "✅ [DEBUG] find_series_by_project_and_study_id: found {} series",
+            results.len()
+        );
 
         Ok(results)
     }

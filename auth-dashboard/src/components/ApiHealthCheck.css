@@ -173,9 +173,14 @@
 }
 
 .test-item.running {
-  border-color: #f59e0b;
-  background: #fffbeb;
-  animation: pulse 1.5s ease-in-out infinite;
+  border-color: #3b82f6;
+  border-width: 3px;
+  background: linear-gradient(90deg, #dbeafe 0%, #eff6ff 50%, #dbeafe 100%);
+  background-size: 200% 100%;
+  animation: runningGradient 2s ease-in-out infinite, pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+  transform: scale(1.02);
+  transition: all 0.3s ease;
 }
 
 .test-item.skipped {
@@ -353,3 +358,24 @@
   }
 }
 
+/* 애니메이션 */
+@keyframes runningGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
