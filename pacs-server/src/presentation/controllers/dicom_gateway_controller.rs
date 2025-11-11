@@ -5,11 +5,11 @@ use serde_json::Value;
 use std::sync::Arc;
 
 use crate::domain::entities::access_condition::AccessCondition;
-use crate::domain::repositories::{AccessConditionRepository, UserRepository};
+use crate::domain::repositories::{AccessConditionRepository, ProjectDataRepository, UserRepository};
 use crate::domain::services::DicomRbacEvaluator;
 use crate::infrastructure::auth::{JwtService, extract_user_id_from_request, decode_keycloak_token_sub};
 use crate::infrastructure::external::Dcm4cheeQidoClient;
-use crate::infrastructure::repositories::{AccessConditionRepositoryImpl, UserRepositoryImpl};
+use crate::infrastructure::repositories::{AccessConditionRepositoryImpl, ProjectDataRepositoryImpl, UserRepositoryImpl};
 use crate::infrastructure::services::DicomRbacEvaluatorImpl;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -100,25 +100,34 @@ async fn debug_deps(req: HttpRequest) -> HttpResponse {
     }))
 }
 
+/// 사용자가 DICOM 전체 접근 권한을 가지고 있는지 확인
+async fn has_global_dicom_access(user_id: i32, pool: &sqlx::PgPool) -> bool {
+    sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(
+            SELECT 1 FROM security_user_project sup
+            INNER JOIN security_role r ON sup.role_id = r.id
+            INNER JOIN security_role_capability src ON r.id = src.role_id
+            INNER JOIN security_capability c ON src.capability_id = c.id
+            WHERE sup.user_id = $1
+              AND c.name = 'DICOM_GLOBAL_ACCESS'
+        )"
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(false)
+}
+
 pub async fn get_studies(
     qido: web::Data<Dcm4cheeQidoClient>,
     evaluator: web::Data<Arc<DicomRbacEvaluatorImpl>>,
     jwt: web::Data<Arc<JwtService>>,
     access_condition_repo: web::Data<Arc<AccessConditionRepositoryImpl>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
     query: web::Query<GatewayQuery>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // 프로젝트 ID 검증
-    let project_id = match query.project_id {
-        Some(id) if id > 0 => id,
-        _ => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "project_id is required and must be greater than 0"
-            }));
-        }
-    };
-
     // 사용자 ID 추출
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
@@ -129,6 +138,28 @@ pub async fn get_studies(
             }));
         }
     };
+
+    // 전체 데이터 조회 권한 확인
+    let has_global_access = has_global_dicom_access(user_id, project_data_repo.pool()).await;
+
+    // 프로젝트 ID 검증
+    let project_id_opt = query.project_id;
+
+    // 전체 데이터 조회 권한이 없으면 project_id 필수
+    if !has_global_access && project_id_opt.is_none() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "project_id is required (no global access permission)"
+        }));
+    }
+
+    // project_id가 있으면 검증
+    if let Some(id) = project_id_opt {
+        if id <= 0 {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "project_id must be greater than 0"
+            }));
+        }
+    }
 
     // 1. 규칙 기반 QIDO 파라미터 병합 + 사용자 입력 우선 병합
     // 사용자 필터/페이지네이션 파라미터 파싱 및 검증
@@ -141,18 +172,23 @@ pub async fn get_studies(
 
     tracing::debug!("Gateway: User params: {:?}", user_params);
 
-    let qido_params =
-        if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
-            tracing::debug!("Gateway: Found {} access conditions for project {}", conditions.len(), project_id);
+    // Access Condition은 project_id가 있을 때만 적용
+    let qido_params = if let Some(pid) = project_id_opt {
+        if let Ok(conditions) = access_condition_repo.list_by_project(pid).await {
+            tracing::debug!("Gateway: Found {} access conditions for project {}", conditions.len(), pid);
             let rule_params = build_qido_params_from_conditions(&conditions);
             tracing::debug!("Gateway: Rule params from conditions: {:?}", rule_params);
             let merged = merge_qido_params(rule_params, user_params); // 사용자 입력이 우선
             tracing::debug!("Gateway: Merged QIDO params: {:?}", merged);
             merged
         } else {
-            tracing::debug!("Gateway: No access conditions found for project {}, using user params only", project_id);
+            tracing::debug!("Gateway: No access conditions found for project {}, using user params only", pid);
             user_params
-        };
+        }
+    } else {
+        tracing::debug!("Gateway: No project_id provided (global access), using user params only");
+        user_params
+    };
 
     // 2. Dcm4chee QIDO 호출
     let bearer_opt = req
@@ -194,20 +230,30 @@ pub async fn get_studies(
     };
 
     // 3. RBAC 필터링 적용
-    let filtered = if let Some(array) = qido_response.as_array() {
-        let mut allowed_items = Vec::new();
-        for item in array.iter() {
-            if let Some(study_uid) = extract_study_uid(item) {
-                let result = evaluator
-                    .evaluate_study_uid(user_id, project_id, &study_uid)
-                    .await;
-                if result.allowed {
-                    allowed_items.push(item.clone());
+    let filtered = if has_global_access && project_id_opt.is_none() {
+        // 전체 데이터 조회 권한이 있고 project_id가 없으면 필터링 안 함
+        tracing::debug!("Gateway: Global access granted, skipping RBAC filtering");
+        qido_response
+    } else if let Some(pid) = project_id_opt {
+        // project_id가 있으면 RBAC 필터링 적용
+        if let Some(array) = qido_response.as_array() {
+            let mut allowed_items = Vec::new();
+            for item in array.iter() {
+                if let Some(study_uid) = extract_study_uid(item) {
+                    let result = evaluator
+                        .evaluate_study_uid(user_id, pid, &study_uid)
+                        .await;
+                    if result.allowed {
+                        allowed_items.push(item.clone());
+                    }
                 }
             }
+            serde_json::Value::Array(allowed_items)
+        } else {
+            qido_response
         }
-        serde_json::Value::Array(allowed_items)
     } else {
+        // 이 경우는 발생하지 않아야 함 (위에서 검증됨)
         qido_response
     };
 
@@ -220,19 +266,14 @@ pub async fn get_series(
     jwt: web::Data<Arc<JwtService>>,
     access_condition_repo: web::Data<Arc<AccessConditionRepositoryImpl>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
     path: web::Path<String>,
     query: web::Query<GatewayQuery>,
     req: HttpRequest,
 ) -> HttpResponse {
     let study_uid = path.into_inner();
-    let project_id = match query.project_id {
-        Some(id) if id > 0 => id,
-        _ => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "project_id is required and must be greater than 0"
-            }));
-        }
-    };
+
+    // 사용자 ID 추출
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
         _ => {
@@ -243,6 +284,28 @@ pub async fn get_series(
         }
     };
 
+    // 전체 데이터 조회 권한 확인
+    let has_global_access = has_global_dicom_access(user_id, project_data_repo.pool()).await;
+
+    // 프로젝트 ID 검증
+    let project_id_opt = query.project_id;
+
+    // 전체 데이터 조회 권한이 없으면 project_id 필수
+    if !has_global_access && project_id_opt.is_none() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "project_id is required (no global access permission)"
+        }));
+    }
+
+    // project_id가 있으면 검증
+    if let Some(id) = project_id_opt {
+        if id <= 0 {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "project_id must be greater than 0"
+            }));
+        }
+    }
+
     // 1. 규칙 기반 QIDO 파라미터 병합 + 사용자 입력 우선 병합
     let user_params = match build_qido_params_from_user_query(&query.extra) {
         Ok(p) => p,
@@ -250,13 +313,18 @@ pub async fn get_series(
             return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
         }
     };
-    let qido_params =
-        if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
+
+    // Access Condition은 project_id가 있을 때만 적용
+    let qido_params = if let Some(pid) = project_id_opt {
+        if let Ok(conditions) = access_condition_repo.list_by_project(pid).await {
             let rule_params = build_qido_params_from_conditions(&conditions);
             merge_qido_params(rule_params, user_params)
         } else {
             user_params
-        };
+        }
+    } else {
+        user_params
+    };
 
     // 2. Dcm4chee QIDO 호출
     let bearer_opt = req
@@ -276,20 +344,30 @@ pub async fn get_series(
     };
 
     // 3. RBAC 필터링 적용
-    let filtered = if let Some(array) = qido_response.as_array() {
-        let mut allowed_items = Vec::new();
-        for item in array.iter() {
-            if let Some(series_uid) = extract_series_uid(item) {
-                let result = evaluator
-                    .evaluate_series_uid(user_id, project_id, &series_uid)
-                    .await;
-                if result.allowed {
-                    allowed_items.push(item.clone());
+    let filtered = if has_global_access && project_id_opt.is_none() {
+        // 전체 데이터 조회 권한이 있고 project_id가 없으면 필터링 안 함
+        tracing::debug!("Gateway: Global access granted, skipping RBAC filtering");
+        qido_response
+    } else if let Some(pid) = project_id_opt {
+        // project_id가 있으면 RBAC 필터링 적용
+        if let Some(array) = qido_response.as_array() {
+            let mut allowed_items = Vec::new();
+            for item in array.iter() {
+                if let Some(series_uid) = extract_series_uid(item) {
+                    let result = evaluator
+                        .evaluate_series_uid(user_id, pid, &series_uid)
+                        .await;
+                    if result.allowed {
+                        allowed_items.push(item.clone());
+                    }
                 }
             }
+            serde_json::Value::Array(allowed_items)
+        } else {
+            qido_response
         }
-        serde_json::Value::Array(allowed_items)
     } else {
+        // 이 경우는 발생하지 않아야 함 (위에서 검증됨)
         qido_response
     };
 
@@ -302,19 +380,14 @@ pub async fn get_instances(
     jwt: web::Data<Arc<JwtService>>,
     access_condition_repo: web::Data<Arc<AccessConditionRepositoryImpl>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
     path: web::Path<(String, String)>,
     query: web::Query<GatewayQuery>,
     req: HttpRequest,
 ) -> HttpResponse {
     let (study_uid, series_uid) = path.into_inner();
-    let project_id = match query.project_id {
-        Some(id) if id > 0 => id,
-        _ => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "project_id is required and must be greater than 0"
-            }));
-        }
-    };
+
+    // 사용자 ID 추출
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
         _ => {
@@ -325,6 +398,28 @@ pub async fn get_instances(
         }
     };
 
+    // 전체 데이터 조회 권한 확인
+    let has_global_access = has_global_dicom_access(user_id, project_data_repo.pool()).await;
+
+    // 프로젝트 ID 검증
+    let project_id_opt = query.project_id;
+
+    // 전체 데이터 조회 권한이 없으면 project_id 필수
+    if !has_global_access && project_id_opt.is_none() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "project_id is required (no global access permission)"
+        }));
+    }
+
+    // project_id가 있으면 검증
+    if let Some(id) = project_id_opt {
+        if id <= 0 {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "project_id must be greater than 0"
+            }));
+        }
+    }
+
     // 1. 규칙 기반 QIDO 파라미터 병합 + 사용자 입력 우선 병합
     let user_params = match build_qido_params_from_user_query(&query.extra) {
         Ok(p) => p,
@@ -332,13 +427,18 @@ pub async fn get_instances(
             return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
         }
     };
-    let qido_params =
-        if let Ok(conditions) = access_condition_repo.list_by_project(project_id).await {
+
+    // Access Condition은 project_id가 있을 때만 적용
+    let qido_params = if let Some(pid) = project_id_opt {
+        if let Ok(conditions) = access_condition_repo.list_by_project(pid).await {
             let rule_params = build_qido_params_from_conditions(&conditions);
             merge_qido_params(rule_params, user_params)
         } else {
             user_params
-        };
+        }
+    } else {
+        user_params
+    };
 
     // 2. Dcm4chee QIDO 호출
     let bearer_opt = req
@@ -358,20 +458,30 @@ pub async fn get_instances(
     };
 
     // 3. RBAC 필터링 적용
-    let filtered = if let Some(array) = qido_response.as_array() {
-        let mut allowed_items = Vec::new();
-        for item in array.iter() {
-            if let Some(instance_uid) = extract_instance_uid(item) {
-                let result = evaluator
-                    .evaluate_instance_uid(user_id, project_id, &instance_uid)
-                    .await;
-                if result.allowed {
-                    allowed_items.push(item.clone());
+    let filtered = if has_global_access && project_id_opt.is_none() {
+        // 전체 데이터 조회 권한이 있고 project_id가 없으면 필터링 안 함
+        tracing::debug!("Gateway: Global access granted, skipping RBAC filtering");
+        qido_response
+    } else if let Some(pid) = project_id_opt {
+        // project_id가 있으면 RBAC 필터링 적용
+        if let Some(array) = qido_response.as_array() {
+            let mut allowed_items = Vec::new();
+            for item in array.iter() {
+                if let Some(instance_uid) = extract_instance_uid(item) {
+                    let result = evaluator
+                        .evaluate_instance_uid(user_id, pid, &instance_uid)
+                        .await;
+                    if result.allowed {
+                        allowed_items.push(item.clone());
+                    }
                 }
             }
+            serde_json::Value::Array(allowed_items)
+        } else {
+            qido_response
         }
-        serde_json::Value::Array(allowed_items)
     } else {
+        // 이 경우는 발생하지 않아야 함 (위에서 검증됨)
         qido_response
     };
 
