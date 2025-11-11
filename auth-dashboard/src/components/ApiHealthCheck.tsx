@@ -198,6 +198,63 @@ const ApiHealthCheck: React.FC = () => {
         },
       ],
     },
+    {
+      title: '🔍 DICOM 전체 조회 + 할당 여부 확인',
+      description: 'project_id 옵셔널화, READ_ALL 권한, check_assignment_for_project 테스트',
+      isSequential: false,
+      tests: [
+        {
+          name: 'DICOM Studies 전체 조회 (project_id 없음)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: 'DICOM Studies 프로젝트별 조회 (project_id 있음)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: 'DICOM Series 전체 조회 (project_id 없음)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: 'DICOM Instances 전체 조회 (project_id 없음)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '할당 여부 확인 (check_assignment_for_project)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '전체 조회 + 할당 여부 확인 (통합)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '프로젝트별 조회 + 할당 여부 확인',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '다른 프로젝트 할당 여부 확인',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '잘못된 project_id (0) 에러 처리',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '잘못된 project_id (음수) 에러 처리',
+          status: 'pending',
+          indentLevel: 0,
+        },
+      ],
+    },
   ]);
 
   const [expandedTest, setExpandedTest] = useState<string | null>(null);
@@ -285,6 +342,9 @@ const ApiHealthCheck: React.FC = () => {
       } else if (sectionIndex === 2) {
         // 프로젝트 데이터 할당/제거 섹션
         result = await runDataAssignmentTest(testIndex);
+      } else if (sectionIndex === 3) {
+        // DICOM 전체 조회 + 할당 여부 확인 섹션
+        result = await runDicomTest(testIndex);
       }
 
       test.status = 'success';
@@ -1179,6 +1239,262 @@ const ApiHealthCheck: React.FC = () => {
           error.config = {
             method: 'delete',
             url: `${apiUrl}/api/projects/${deletedId}`,
+          };
+        }
+        throw error;
+      }
+    }
+  };
+
+  // DICOM 전체 조회 + 할당 여부 확인 테스트
+  const runDicomTest = async (testIndex: number) => {
+    if (testIndex === 0) {
+      // DICOM Studies 전체 조회 (project_id 없음)
+      const requestInfo = { method: 'GET', url: '/api/dicom/studies' };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/dicom/studies`);
+
+        console.log(`  ✅ DICOM Studies 전체 조회 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
+      // DICOM Studies 프로젝트별 조회 (project_id 있음)
+      const projectId = createdProjectIdRef.current || 150; // 기본값 150
+      const requestInfo = { method: 'GET', url: `/api/dicom/studies?project_id=${projectId}` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?project_id=${projectId}`);
+
+        console.log(`  ✅ DICOM Studies 프로젝트별 조회 성공 (project_id=${projectId}):`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 2) {
+      // DICOM Series 전체 조회 (project_id 없음)
+      const requestInfo = { method: 'GET', url: '/api/dicom/series' };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/dicom/series`);
+
+        console.log(`  ✅ DICOM Series 전체 조회 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/series`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 3) {
+      // DICOM Instances 전체 조회 (project_id 없음)
+      const requestInfo = { method: 'GET', url: '/api/dicom/instances' };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/dicom/instances`);
+
+        console.log(`  ✅ DICOM Instances 전체 조회 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/instances`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 4) {
+      // 할당 여부 확인 (check_assignment_for_project)
+      const projectId = createdProjectIdRef.current || 150;
+      const requestInfo = { method: 'GET', url: `/api/dicom/studies?check_assignment_for_project=${projectId}` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`);
+
+        console.log(`  ✅ 할당 여부 확인 성공 (project_id=${projectId}):`, response.data);
+
+        // is_assigned 필드 확인
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          const hasAssignmentField = response.data.every((study: any) =>
+            study.hasOwnProperty('is_assigned') && study.hasOwnProperty('checked_project_id')
+          );
+
+          if (!hasAssignmentField) {
+            throw new Error('응답에 is_assigned 또는 checked_project_id 필드가 없습니다');
+          }
+        }
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 5) {
+      // 전체 조회 + 할당 여부 확인 (통합)
+      const projectId = createdProjectIdRef.current || 150;
+      const requestInfo = { method: 'GET', url: `/api/dicom/studies?check_assignment_for_project=${projectId}` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`);
+
+        console.log(`  ✅ 전체 조회 + 할당 여부 확인 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 6) {
+      // 프로젝트별 조회 + 할당 여부 확인
+      const projectId = createdProjectIdRef.current || 150;
+      const requestInfo = {
+        method: 'GET',
+        url: `/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`
+      };
+
+      try {
+        const response = await axios.get(
+          `${apiUrl}/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`
+        );
+
+        console.log(`  ✅ 프로젝트별 조회 + 할당 여부 확인 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 7) {
+      // 다른 프로젝트 할당 여부 확인
+      const filterProjectId = createdProjectIdRef.current || 150;
+      const checkProjectId = 200; // 다른 프로젝트
+      const requestInfo = {
+        method: 'GET',
+        url: `/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`
+      };
+
+      try {
+        const response = await axios.get(
+          `${apiUrl}/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`
+        );
+
+        console.log(`  ✅ 다른 프로젝트 할당 여부 확인 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 8) {
+      // 잘못된 project_id (0) 에러 처리
+      const requestInfo = { method: 'GET', url: '/api/dicom/studies?project_id=0' };
+
+      try {
+        await axios.get(`${apiUrl}/api/dicom/studies?project_id=0`);
+        throw new Error('400 에러가 발생해야 하는데 성공했습니다');
+      } catch (error: any) {
+        if (error.response?.status === 400) {
+          console.log(`  ✅ project_id=0 에러 처리 성공:`, error.response.data);
+          return {
+            request: requestInfo,
+            response: error.response.data || { status: 400, message: 'Bad Request' },
+          };
+        }
+
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=0`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 9) {
+      // 잘못된 project_id (음수) 에러 처리
+      const requestInfo = { method: 'GET', url: '/api/dicom/studies?project_id=-1' };
+
+      try {
+        await axios.get(`${apiUrl}/api/dicom/studies?project_id=-1`);
+        throw new Error('400 에러가 발생해야 하는데 성공했습니다');
+      } catch (error: any) {
+        if (error.response?.status === 400) {
+          console.log(`  ✅ project_id=-1 에러 처리 성공:`, error.response.data);
+          return {
+            request: requestInfo,
+            response: error.response.data || { status: 400, message: 'Bad Request' },
+          };
+        }
+
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=-1`,
           };
         }
         throw error;
