@@ -546,6 +546,66 @@ pub async fn assign_study_to_project(
     }
 }
 
+/// 프로젝트에서 Series 할당 해제
+#[utoipa::path(
+    delete,
+    path = "/api/projects/{project_id}/series/{series_id}/unassign",
+    responses(
+        (status = 200, description = "Series 할당 해제 성공", body = UnassignSeriesFromProjectResponse),
+        (status = 404, description = "프로젝트 또는 Series를 찾을 수 없음"),
+        (status = 500, description = "서버 오류")
+    ),
+    params(
+        ("project_id" = i32, Path, description = "프로젝트 ID"),
+        ("series_id" = i32, Path, description = "Series ID")
+    ),
+    tag = "project-data-assignment"
+)]
+pub async fn unassign_series_from_project(
+    path: web::Path<(i32, i32)>,
+    use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let (project_id, series_id) = path.into_inner();
+
+    match use_case
+        .unassign_series_from_project(project_id, series_id)
+        .await
+    {
+        Ok(response) => Ok(HttpResponse::Ok().json(response)),
+        Err(e) => Ok(handle_service_error(e)),
+    }
+}
+
+/// 프로젝트에서 Study 할당 해제
+#[utoipa::path(
+    delete,
+    path = "/api/projects/{project_id}/studies/{study_id}/unassign",
+    responses(
+        (status = 200, description = "Study 할당 해제 성공", body = UnassignStudyFromProjectResponse),
+        (status = 404, description = "프로젝트 또는 Study를 찾을 수 없음"),
+        (status = 500, description = "서버 오류")
+    ),
+    params(
+        ("project_id" = i32, Path, description = "프로젝트 ID"),
+        ("study_id" = i32, Path, description = "Study ID")
+    ),
+    tag = "project-data-assignment"
+)]
+pub async fn unassign_study_from_project(
+    path: web::Path<(i32, i32)>,
+    use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let (project_id, study_id) = path.into_inner();
+
+    match use_case
+        .unassign_study_from_project(project_id, study_id)
+        .await
+    {
+        Ok(response) => Ok(HttpResponse::Ok().json(response)),
+        Err(e) => Ok(handle_service_error(e)),
+    }
+}
+
 /// 라우트 설정
 pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataAccessUseCase>) {
     cfg.app_data(web::Data::new(use_case))
@@ -588,6 +648,15 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataA
         .route(
             "/projects/{project_id}/studies/assign",
             web::post().to(assign_study_to_project),
+        )
+        // 데이터 할당 해제 API
+        .route(
+            "/projects/{project_id}/series/{series_id}/unassign",
+            web::delete().to(unassign_series_from_project),
+        )
+        .route(
+            "/projects/{project_id}/studies/{study_id}/unassign",
+            web::delete().to(unassign_study_from_project),
         )
         .service(
             web::scope("/data-access")

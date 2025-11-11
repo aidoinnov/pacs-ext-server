@@ -164,9 +164,33 @@ const ApiHealthCheck: React.FC = () => {
           indentLevel: 2,
         },
         {
-          name: '데이터 테스트 프로젝트 삭제',
+          name: 'Series 할당 해제 (첫 번째)',
           status: 'pending',
           dependencies: ['다른 프로젝트 데이터 조회 (빈 목록)'],
+          indentLevel: 1,
+        },
+        {
+          name: 'Series 목록 재조회 (2개 확인)',
+          status: 'pending',
+          dependencies: ['Series 할당 해제 (첫 번째)'],
+          indentLevel: 2,
+        },
+        {
+          name: 'Study 할당 해제',
+          status: 'pending',
+          dependencies: ['Series 목록 재조회 (2개 확인)'],
+          indentLevel: 1,
+        },
+        {
+          name: 'Study 목록 재조회 (빈 목록 확인)',
+          status: 'pending',
+          dependencies: ['Study 할당 해제'],
+          indentLevel: 2,
+        },
+        {
+          name: '데이터 테스트 프로젝트 삭제',
+          status: 'pending',
+          dependencies: ['Study 목록 재조회 (빈 목록 확인)'],
           cleanup: true,
           isSequential: true,
           indentLevel: 1,
@@ -977,6 +1001,143 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 9) {
+      // Series 할당 해제 (첫 번째)
+      const projectId = createdProjectIdRef.current;
+      const studyId = createdStudyIdRef.current;
+      const seriesIds = createdSeriesIdsRef.current;
+
+      if (!projectId || !studyId || seriesIds.length === 0) {
+        throw new Error('프로젝트, Study 또는 Series가 할당되지 않았습니다.');
+      }
+
+      const firstSeriesId = seriesIds[0];
+
+      try {
+        const response = await axios.delete(
+          `${apiUrl}/api/projects/${projectId}/series/${firstSeriesId}/unassign`
+        );
+
+        console.log(`  ✅ Series ${firstSeriesId} 할당 해제 성공:`, response.data);
+
+        return {
+          request: {
+            method: 'DELETE',
+            url: `/api/projects/${projectId}/series/${firstSeriesId}/unassign`,
+          },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'delete',
+            url: `${apiUrl}/api/projects/${projectId}/series/${firstSeriesId}/unassign`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 10) {
+      // Series 목록 재조회 (2개 확인)
+      const projectId = createdProjectIdRef.current;
+      const studyId = createdStudyIdRef.current;
+
+      if (!projectId || !studyId) {
+        throw new Error('프로젝트 또는 Study가 할당되지 않았습니다.');
+      }
+
+      try {
+        const response = await axios.get(
+          `${apiUrl}/api/project-data/${projectId}/studies/${studyId}/series`
+        );
+
+        console.log(`  ✅ Series 목록 재조회:`, response.data);
+
+        if (!response.data.series || response.data.series.length !== 2) {
+          throw new Error(
+            `할당 해제 후 2개의 Series가 남아있어야 하는데 ${response.data.series?.length || 0}개가 조회되었습니다.`
+          );
+        }
+
+        return {
+          request: {
+            method: 'GET',
+            url: `/api/project-data/${projectId}/studies/${studyId}/series`,
+          },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/studies/${studyId}/series`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 11) {
+      // Study 할당 해제
+      const projectId = createdProjectIdRef.current;
+      const studyId = createdStudyIdRef.current;
+
+      if (!projectId || !studyId) {
+        throw new Error('프로젝트 또는 Study가 할당되지 않았습니다.');
+      }
+
+      try {
+        const response = await axios.delete(
+          `${apiUrl}/api/projects/${projectId}/studies/${studyId}/unassign`
+        );
+
+        console.log(`  ✅ Study ${studyId} 할당 해제 성공:`, response.data);
+
+        return {
+          request: {
+            method: 'DELETE',
+            url: `/api/projects/${projectId}/studies/${studyId}/unassign`,
+          },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'delete',
+            url: `${apiUrl}/api/projects/${projectId}/studies/${studyId}/unassign`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 12) {
+      // Study 목록 재조회 (빈 목록 확인)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/studies`);
+
+        console.log(`  ✅ Study 목록 재조회:`, response.data);
+
+        if (!response.data.studies || response.data.studies.length !== 0) {
+          throw new Error(
+            `Study 할당 해제 후 빈 목록이어야 하는데 ${response.data.studies?.length || 0}개가 조회되었습니다.`
+          );
+        }
+
+        return {
+          request: { method: 'GET', url: `/api/project-data/${projectId}/studies` },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/studies`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 13) {
       // 데이터 테스트 프로젝트 삭제 (cleanup)
       const projectId = createdProjectIdRef.current;
 

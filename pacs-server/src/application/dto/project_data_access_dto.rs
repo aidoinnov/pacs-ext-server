@@ -535,3 +535,23 @@ pub struct AssignStudyToProjectResponse {
     /// 생성된 Study ID
     pub study_id: i32,
 }
+
+// ========== Series/Study 할당 해제 API DTO ==========
+
+/// 프로젝트에서 Series 할당 해제 응답
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct UnassignSeriesFromProjectResponse {
+    /// 성공 여부
+    pub success: bool,
+    /// 메시지
+    pub message: String,
+}
+
+/// 프로젝트에서 Study 할당 해제 응답
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct UnassignStudyFromProjectResponse {
+    /// 성공 여부
+    pub success: bool,
+    /// 메시지
+    pub message: String,
+}

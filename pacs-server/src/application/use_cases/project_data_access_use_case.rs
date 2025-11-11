@@ -550,4 +550,74 @@ impl ProjectDataAccessUseCase {
             study_id: study.id,
         })
     }
+
+    /// 프로젝트에서 Series 할당 해제
+    pub async fn unassign_series_from_project(
+        &self,
+        project_id: i32,
+        series_id: i32,
+    ) -> Result<UnassignSeriesFromProjectResponse, ServiceError> {
+        // 1. 프로젝트 존재 확인
+        self.project_service.get_project(project_id).await?;
+
+        // 2. project_data에서 Series 매핑 삭제
+        let pool = self.project_data_service.pool();
+        let result = sqlx::query(
+            "DELETE FROM project_data
+             WHERE project_id = $1
+               AND resource_level = 'SERIES'::resource_level_enum
+               AND series_id = $2",
+        )
+        .bind(project_id)
+        .bind(series_id)
+        .execute(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+        if result.rows_affected() == 0 {
+            return Err(ServiceError::NotFound(
+                "Series not assigned to this project".to_string(),
+            ));
+        }
+
+        Ok(UnassignSeriesFromProjectResponse {
+            success: true,
+            message: format!("Series {} unassigned from project successfully", series_id),
+        })
+    }
+
+    /// 프로젝트에서 Study 할당 해제
+    pub async fn unassign_study_from_project(
+        &self,
+        project_id: i32,
+        study_id: i32,
+    ) -> Result<UnassignStudyFromProjectResponse, ServiceError> {
+        // 1. 프로젝트 존재 확인
+        self.project_service.get_project(project_id).await?;
+
+        // 2. project_data에서 Study 매핑 삭제
+        let pool = self.project_data_service.pool();
+        let result = sqlx::query(
+            "DELETE FROM project_data
+             WHERE project_id = $1
+               AND resource_level = 'STUDY'::resource_level_enum
+               AND study_id = $2",
+        )
+        .bind(project_id)
+        .bind(study_id)
+        .execute(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+        if result.rows_affected() == 0 {
+            return Err(ServiceError::NotFound(
+                "Study not assigned to this project".to_string(),
+            ));
+        }
+
+        Ok(UnassignStudyFromProjectResponse {
+            success: true,
+            message: format!("Study {} unassigned from project successfully", study_id),
+        })
+    }
 }
