@@ -1,68 +1,89 @@
-.dashboard-container {
+/* 전체 레이아웃 */
+.dashboard-layout {
+  display: flex;
   min-height: 100vh;
   background: #f5f7fa;
-  padding: 20px;
+}
+
+/* 메인 컨텐츠 영역 */
+.dashboard-main {
+  flex: 1;
+  margin-left: 280px; /* 사이드바 너비 */
+  min-height: 100vh;
 }
 
 .dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
-  padding: 20px;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 24px 40px;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .dashboard-header h1 {
   margin: 0;
-  color: #333;
+  color: #1e293b;
   font-size: 28px;
+  font-weight: 700;
 }
 
 .logout-button {
   padding: 10px 24px;
-  background: #dc3545;
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
   color: white;
   border: none;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.3s;
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
 }
 
 .logout-button:hover {
-  background: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
 }
 
 .dashboard-content {
+  padding: 30px 40px;
   display: grid;
-  gap: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+  gap: 24px;
+  max-width: 1400px;
 }
 
 .card {
   background: white;
   border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 28px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  transition: all 0.3s;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .card h2 {
-  margin: 0 0 20px 0;
-  color: #333;
+  margin: 0 0 24px 0;
+  color: #1e293b;
   font-size: 20px;
+  font-weight: 700;
   border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
 }
 
 .card h3 {
-  margin: 0 0 12px 0;
-  color: #555;
+  margin: 0 0 16px 0;
+  color: #475569;
   font-size: 16px;
+  font-weight: 600;
 }
 
 /* User Info */
@@ -278,10 +299,29 @@
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+  .dashboard-main {
+    margin-left: 240px;
+  }
+
+  .dashboard-content {
+    padding: 24px 30px;
+  }
+}
+
 @media (max-width: 768px) {
+  .dashboard-main {
+    margin-left: 0;
+  }
+
   .dashboard-header {
     flex-direction: column;
     gap: 16px;
+    padding: 20px;
+  }
+
+  .dashboard-content {
+    padding: 20px;
   }
 
   .endpoint-item {
@@ -300,6 +340,10 @@
 
   .copy-button {
     width: 100%;
+  }
+
+  .card {
+    padding: 20px;
   }
 }
 

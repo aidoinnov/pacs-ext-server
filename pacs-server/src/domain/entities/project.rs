@@ -15,6 +15,16 @@ use sqlx::{FromRow, Type};
 ///
 /// 프로젝트의 생명주기 상태를 나타내며, 데이터베이스의 `project_status` ENUM과 매핑됩니다.
 ///
+/// # Database Mapping
+/// `rename_all = "SCREAMING_SNAKE_CASE"` 속성에 의해 모든 variant가 자동으로 변환됩니다:
+/// - `Preparing` → `PREPARING`
+/// - `InProgress` → `IN_PROGRESS` (카멜케이스 → 언더스코어)
+/// - `Completed` → `COMPLETED`
+/// - `OnHold` → `ON_HOLD` (카멜케이스 → 언더스코어)
+/// - `Cancelled` → `CANCELLED`
+///
+/// 개별 `#[sqlx(rename = "...")]` 속성은 불필요하며, 자동 변환 규칙을 오버라이드할 때만 사용합니다.
+///
 /// # Variants
 /// - `Preparing`: 준비중 - 프로젝트가 준비 단계
 /// - `InProgress`: 진행중 - 프로젝트가 활발히 진행 중
@@ -24,14 +34,66 @@ use sqlx::{FromRow, Type};
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Type, PartialEq, Eq)]
 #[sqlx(type_name = "project_status", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ProjectStatus {
-    #[sqlx(rename = "PREPARING")]
+    // #[sqlx(rename = "PREPARING")] // 불필요: rename_all이 자동으로 PREPARING으로 변환
     Preparing,
-    #[sqlx(rename = "IN_PROGRESS")]
+
+    // #[sqlx(rename = "IN_PROGRESS")] // 불필요: rename_all이 자동으로 IN_PROGRESS로 변환
     InProgress,
+
+    // #[sqlx(rename = "COMPLETED")] // 불필요: rename_all이 자동으로 COMPLETED로 변환
     Completed,
-    #[sqlx(rename = "ON_HOLD")]
+
+    // #[sqlx(rename = "ON_HOLD")] // 불필요: rename_all이 자동으로 ON_HOLD로 변환
     OnHold,
+
+    // #[sqlx(rename = "CANCELLED")] // 불필요: rename_all이 자동으로 CANCELLED로 변환
     Cancelled,
+}
+
+impl ProjectStatus {
+    /// 모든 프로젝트 상태를 배열로 반환
+    pub const fn all() -> [ProjectStatus; 5] {
+        [
+            ProjectStatus::Preparing,
+            ProjectStatus::InProgress,
+            ProjectStatus::Completed,
+            ProjectStatus::OnHold,
+            ProjectStatus::Cancelled,
+        ]
+    }
+
+    /// 데이터베이스 저장 값 반환 (SCREAMING_SNAKE_CASE)
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            ProjectStatus::Preparing => "PREPARING",
+            ProjectStatus::InProgress => "IN_PROGRESS",
+            ProjectStatus::Completed => "COMPLETED",
+            ProjectStatus::OnHold => "ON_HOLD",
+            ProjectStatus::Cancelled => "CANCELLED",
+        }
+    }
+
+    /// 한글 라벨 반환
+    pub const fn label(&self) -> &'static str {
+        match self {
+            ProjectStatus::Preparing => "준비중",
+            ProjectStatus::InProgress => "진행중",
+            ProjectStatus::Completed => "완료",
+            ProjectStatus::OnHold => "보류",
+            ProjectStatus::Cancelled => "취소",
+        }
+    }
+
+    /// 상태 설명 반환
+    pub const fn description(&self) -> &'static str {
+        match self {
+            ProjectStatus::Preparing => "프로젝트가 생성되었지만 아직 시작되지 않음",
+            ProjectStatus::InProgress => "프로젝트가 활발히 진행 중",
+            ProjectStatus::Completed => "프로젝트가 성공적으로 완료됨",
+            ProjectStatus::OnHold => "프로젝트가 일시적으로 중단됨",
+            ProjectStatus::Cancelled => "프로젝트가 취소됨",
+        }
+    }
 }
 
 /// 시스템 프로젝트를 나타내는 엔티티

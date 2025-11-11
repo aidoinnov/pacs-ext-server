@@ -6,6 +6,145 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed - 2025-11-11
+
+#### **API Health Check 테스트 구조 재구성** 🔄
+- **브랜치**: `feature/clarify-project-state-enum`
+- **목표**: 테스트 구조를 논리적으로 재구성하여 프로젝트 생명주기 중심으로 통합
+- **주요 변경사항**:
+  1. **테스트 섹션 단순화**
+     - 에러 처리 섹션을 프로젝트 생명주기 섹션으로 통합
+     - 섹션 수: 3개 → 2개 (메타데이터, 프로젝트 생명주기)
+     - 프로젝트 생명주기 테스트: 6개 → 9개
+
+  2. **에러 처리 테스트 이동**
+     - "잘못된 상태 값 처리" → 프로젝트 생명주기 섹션 (testIndex 6)
+     - "존재하지 않는 프로젝트 조회" → 프로젝트 생명주기 섹션 (testIndex 7)
+     - 의존성 트리: 생성 → 조회 → 상태변경 → 에러처리 → 삭제
+
+  3. **코드 정리**
+     - `runErrorTest` 함수 제거
+     - `runLifecycleTest` 함수 확장 (testIndex 0-8 처리)
+     - `runTest` 함수 단순화 (sectionIndex 2 처리 제거)
+
+  4. **최종 테스트 구조**
+     - 📊 프로젝트 메타데이터 (3개 테스트, 병렬 실행)
+     - 🔄 프로젝트 생명주기 (9개 테스트, 순차 실행)
+       1. 프로젝트 생성 (PREPARING)
+       2. 프로젝트 조회
+       3. PREPARING → IN_PROGRESS
+       4. IN_PROGRESS → ON_HOLD
+       5. ON_HOLD → IN_PROGRESS
+       6. IN_PROGRESS → COMPLETED
+       7. 잘못된 상태 값 처리 (에러 케이스)
+       8. 존재하지 않는 프로젝트 조회 (에러 케이스)
+       9. 테스트 프로젝트 삭제 (정리)
+
+- **수정된 파일**:
+  - `auth-dashboard/src/components/ApiHealthCheck.tsx` - 테스트 구조 재구성
+
+- **새로 생성된 파일**:
+  - `docs/feature-api-health-check-test-reorganization/작업계획.md`
+  - `docs/feature-api-health-check-test-reorganization/작업내용.md`
+  - `docs/feature-api-health-check-test-reorganization/기술문서.md`
+
+- **개선 효과**:
+  - 논리적 흐름 개선: 프로젝트 생성부터 삭제까지 하나의 섹션에서 완료
+  - 코드 간결화: `runErrorTest` 함수 제거로 코드 라인 수 감소
+  - 유지보수성 향상: 테스트 추가/수정 시 하나의 함수만 수정
+  - 사용자 경험 개선: 테스트 실행 순서가 직관적이고 의존성 트리가 명확
+
+---
+
+### Added - 2025-11-11
+
+#### **프로젝트 상태 메타데이터 API 및 E2E 테스트** ✨
+- **브랜치**: `feature/clarify-project-state-enum`
+- **목표**: 프로젝트 상태 관리 API의 안정성과 프론트엔드 개발 편의성 향상
+- **주요 변경사항**:
+  1. **ProjectStatus Enum 리팩토링**
+     - `all()` 메서드 추가 - 모든 상태를 배열로 반환
+     - `as_str()` 메서드 추가 - DB 저장 값 반환 (SCREAMING_SNAKE_CASE)
+     - `label()` 메서드 추가 - 한글 라벨 반환
+     - `description()` 메서드 추가 - 상태 설명 반환
+     - 모든 메서드를 `const fn`으로 구현하여 컴파일 타임 최적화
+     - 불필요한 `#[sqlx(rename)]` 속성 제거 및 주석 추가
+     - `rename_all = "SCREAMING_SNAKE_CASE"` 동작 방식 문서화
+
+  2. **메타데이터 API 구현** (`GET /api/projects/meta`)
+     - `ProjectStatusMeta` DTO 추가 (value, label, description)
+     - `ProjectMetaResponse` DTO 추가 (available_statuses)
+     - `get_project_metadata()` UseCase 메서드 추가
+     - 하드코딩된 메타데이터 생성 로직을 반복문으로 리팩토링
+     - 프론트엔드가 서버에서 제공하는 정확한 상태 목록 사용 가능
+
+  3. **라우팅 순서 수정**
+     - 구체적 경로(`/projects/meta`, `/projects/active`)를 동적 경로(`/projects/{project_id}`)보다 먼저 등록
+     - "can not parse \"meta\" to a i32" 에러 해결
+     - 라우팅 순서 중요성에 대한 주석 추가
+
+  4. **통합 테스트 작성** (총 16개)
+     - 프로젝트 상태 업데이트 통합 테스트 (9개)
+     - 메타데이터 API 통합 테스트 (4개)
+     - E2E 테스트 (3개)
+
+  5. **API 점검 대시보드 추가**
+     - `ApiHealthCheck` 컴포넌트 생성 (400+ 라인)
+     - 통계 대시보드 (전체/성공/실패/진행중/대기)
+     - 일괄 테스트 실행 기능
+     - 개별 테스트 실행 기능
+     - 요청/응답 상세 보기 기능
+     - 3개 섹션, 11개 테스트 포함
+
+- **수정된 파일 (백엔드)**:
+  - `pacs-server/src/domain/entities/project.rs` - ProjectStatus enum 메서드 추가
+  - `pacs-server/src/application/dto/project_dto.rs` - 메타데이터 DTO 추가
+  - `pacs-server/src/application/use_cases/project_use_case.rs` - UseCase 메서드 추가
+  - `pacs-server/src/presentation/controllers/project_controller.rs` - 엔드포인트 및 라우팅 수정
+
+- **추가된 파일 (백엔드)**:
+  - `pacs-server/tests/project_status_update_integration_test.rs` (445 라인)
+    - 프로젝트 생성 시 PREPARING 상태 확인
+    - 모든 유효한 상태 전환 테스트 (PREPARING → IN_PROGRESS, IN_PROGRESS → ON_HOLD 등)
+    - 잘못된 상태 값 처리 테스트
+    - 대소문자 구분 없음 테스트
+    - 여러 필드 동시 업데이트 테스트
+  - `pacs-server/tests/project_metadata_integration_test.rs` (245 라인)
+    - 메타데이터 조회 및 5개 상태 확인
+    - 응답 구조 검증 (value, label, description)
+    - 한글 라벨 및 설명 검증
+    - 인증 없이 접근 가능 확인
+  - `pacs-server/tests/project_status_e2e_test.rs` (400+ 라인)
+    - 전체 프로젝트 생명주기 테스트
+    - 메타데이터 기반 동적 상태 변경 테스트
+    - 잘못된 상태 값 처리 테스트
+
+- **수정된 파일 (프론트엔드)**:
+  - `auth-dashboard/src/components/Dashboard.tsx` - 탭 네비게이션 추가
+  - `auth-dashboard/src/components/Dashboard.css` - 탭 스타일 추가
+
+- **추가된 파일 (프론트엔드)**:
+  - `auth-dashboard/src/components/ApiHealthCheck.tsx` (400+ 라인)
+  - `auth-dashboard/src/components/ApiHealthCheck.css` (280+ 라인)
+
+- **테스트 결과**:
+  - ✅ 통합 테스트 16개 모두 통과
+  - ✅ E2E 테스트 3개 모두 통과
+  - ✅ 대시보드에서 모든 테스트 실행 가능
+  - ✅ `/api/projects/meta` 엔드포인트 정상 작동
+
+- **기술적 개선사항**:
+  - 단일 진실 공급원 (Single Source of Truth) - ProjectStatus enum
+  - 타입 안정성 (`const fn`, `&'static str`)
+  - 확장 가능성 (새로운 상태 추가 용이)
+  - 코드 라인 수 감소 (38줄 → 21줄, UseCase 메서드)
+  - 컴파일 타임 최적화 및 힙 할당 제거
+
+- **문서화**:
+  - `docs/feature-project-status-metadata-api/01-작업계획.md`
+  - `docs/feature-project-status-metadata-api/02-작업내용.md`
+  - `docs/feature-project-status-metadata-api/03-기술문서.md`
+
 ### Fixed - 2025-11-10
 
 #### **RBAC Unassigned Role 버그 수정** 🔧

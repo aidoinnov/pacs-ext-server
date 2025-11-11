@@ -4,8 +4,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::application::dto::project_dto::{
-    CreateProjectRequest, ProjectListQuery, ProjectListResponse, ProjectResponse,
-    UpdateProjectRequest,
+    CreateProjectRequest, ProjectListQuery, ProjectListResponse, ProjectMetaResponse,
+    ProjectResponse, UpdateProjectRequest,
 };
 use crate::application::use_cases::project_use_case::ProjectUseCase;
 use crate::domain::services::project_service::ProjectService;
@@ -187,6 +187,21 @@ pub async fn delete_project<P: ProjectService>(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/projects/meta",
+    tag = "projects",
+    responses(
+        (status = 200, description = "Project metadata retrieved successfully", body = ProjectMetaResponse),
+    )
+)]
+pub async fn get_project_metadata<P: ProjectService>(
+    project_use_case: web::Data<Arc<ProjectUseCase<P>>>,
+) -> impl Responder {
+    let metadata = project_use_case.get_project_metadata();
+    HttpResponse::Ok().json(metadata)
+}
+
 pub fn configure_routes<P: ProjectService + 'static>(
     cfg: &mut web::ServiceConfig,
     project_use_case: Arc<ProjectUseCase<P>>,
@@ -194,7 +209,10 @@ pub fn configure_routes<P: ProjectService + 'static>(
     cfg.app_data(web::Data::new(project_use_case))
         .route("/projects", web::post().to(create_project::<P>))
         .route("/projects", web::get().to(list_projects::<P>))
+        // 중요: 구체적인 경로(/meta, /active)를 먼저 등록해야 {project_id}와 충돌하지 않음
+        .route("/projects/meta", web::get().to(get_project_metadata::<P>))
         .route("/projects/active", web::get().to(get_active_projects::<P>))
+        // 동적 경로({project_id})는 마지막에 등록
         .route("/projects/{project_id}", web::get().to(get_project::<P>))
         .route("/projects/{project_id}", web::put().to(update_project::<P>))
         .route(

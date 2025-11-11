@@ -171,3 +171,24 @@ pub struct ProjectListQuery {
     /// 정렬 순서 (asc, desc)
     pub sort_order: Option<String>,
 }
+/// 프로젝트 상태 메타데이터
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ProjectStatusMeta {
+    /// 상태 값 (DB 저장 값)
+    #[schema(example = "IN_PROGRESS")]
+    pub value: String,
+    /// 한글 라벨
+    #[schema(example = "진행중")]
+    pub label: String,
+    /// 상태 설명
+    #[schema(example = "프로젝트가 활발히 진행 중")]
+    pub description: String,
+}
+
+/// 프로젝트 메타데이터 응답
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ProjectMetaResponse {
+    /// 설정 가능한 프로젝트 상태 목록
+    pub available_statuses: Vec<ProjectStatusMeta>,
+}
+
