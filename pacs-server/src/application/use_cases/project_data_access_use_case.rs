@@ -350,6 +350,17 @@ impl ProjectDataAccessUseCase {
             .await
     }
 
+    /// 프로젝트에 할당된 Series 목록 조회 (Study별)
+    pub async fn get_series_by_project_and_study(
+        &self,
+        project_id: i32,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, ServiceError> {
+        self.project_data_service
+            .get_series_by_project_and_study(project_id, study_id)
+            .await
+    }
+
     /// Instance 조회 (by ID)
     pub async fn get_instance(
         &self,

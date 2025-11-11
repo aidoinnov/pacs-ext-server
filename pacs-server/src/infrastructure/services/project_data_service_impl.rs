@@ -401,6 +401,17 @@ where
             .map_err(|e| ServiceError::DatabaseError(e.to_string()))
     }
 
+    async fn get_series_by_project_and_study(
+        &self,
+        project_id: i32,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, ServiceError> {
+        self.project_data_repository
+            .find_series_by_project_and_study_id(project_id, study_id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))
+    }
+
     async fn get_instance_by_id(&self, id: i32) -> Result<ProjectDataInstance, ServiceError> {
         self.project_data_repository
             .find_instance_by_id(id)

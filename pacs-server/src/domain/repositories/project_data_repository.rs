@@ -94,6 +94,13 @@ pub trait ProjectDataRepository: Send + Sync {
     /// Study별 Series 총 개수
     async fn count_series_by_study_id(&self, study_id: i32) -> Result<i64, sqlx::Error>;
 
+    /// 프로젝트에 할당된 Series 목록 조회 (Study별)
+    async fn find_series_by_project_and_study_id(
+        &self,
+        project_id: i32,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, sqlx::Error>;
+
     /// Instance 조회 (by ID)
     async fn find_instance_by_id(
         &self,

@@ -438,9 +438,11 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         &self,
         study_id: i32,
     ) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
+        // NOTE: 이 메서드는 project_data 테이블과 무관하게 모든 Series를 반환합니다.
+        // 프로젝트에 할당된 Series만 조회하려면 find_series_by_project_and_study_id()를 사용하세요.
         let results = sqlx::query_as::<_, ProjectDataSeries>(
             "SELECT id, study_id, series_uid, series_description, modality, series_number, created_at
-             FROM project_data_series 
+             FROM project_data_series
              WHERE study_id = $1
              ORDER BY series_number ASC NULLS LAST, created_at ASC"
         )
@@ -460,6 +462,29 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .await?;
 
         Ok(count)
+    }
+
+    async fn find_series_by_project_and_study_id(
+        &self,
+        project_id: i32,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
+        // project_data 테이블과 JOIN하여 프로젝트에 할당된 Series만 조회
+        let results = sqlx::query_as::<_, ProjectDataSeries>(
+            "SELECT pds.id, pds.study_id, pds.series_uid, pds.series_description, pds.modality, pds.series_number, pds.created_at
+             FROM project_data_series pds
+             INNER JOIN project_data pd ON pd.series_id = pds.id
+             WHERE pd.project_id = $1
+               AND pds.study_id = $2
+               AND pd.resource_level = 'SERIES'::resource_level_enum
+             ORDER BY pds.series_number ASC NULLS LAST, pds.created_at ASC"
+        )
+        .bind(project_id)
+        .bind(study_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(results)
     }
 
     async fn find_instance_by_id(

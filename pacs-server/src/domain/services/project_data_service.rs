@@ -147,6 +147,13 @@ pub trait ProjectDataService: Send + Sync {
         study_id: i32,
     ) -> Result<Vec<ProjectDataSeries>, ServiceError>;
 
+    /// 프로젝트에 할당된 Series 목록 조회 (Study별)
+    async fn get_series_by_project_and_study(
+        &self,
+        project_id: i32,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, ServiceError>;
+
     /// Instance 조회 (by ID)
     async fn get_instance_by_id(&self, id: i32) -> Result<ProjectDataInstance, ServiceError>;
 

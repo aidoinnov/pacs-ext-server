@@ -363,8 +363,11 @@ pub async fn get_study_series(
         Err(e) => return Ok(handle_service_error(e)),
     };
 
-    // Series 목록 조회
-    match use_case.get_series_by_study(study_id).await {
+    // Series 목록 조회 (프로젝트에 할당된 Series만)
+    match use_case
+        .get_series_by_project_and_study(project_id, study_id)
+        .await
+    {
         Ok(series_list) => {
             let series_with_study: Vec<SeriesWithStudyInfo> = series_list
                 .into_iter()
