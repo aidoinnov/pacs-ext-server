@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import './LoginForm.css';
+import { DEFAULT_API_URL, LOGIN_PAGE } from '../constants/app.constants';
 
 interface User {
   user_id: number;
@@ -23,7 +24,7 @@ interface LoginFormProps {
 const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [apiUrl, setApiUrl] = useState('http://localhost:8080');
+  const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,41 +55,41 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>🔐 Auth API Dashboard</h1>
-        <p className="subtitle">Test Authentication & Token Management</p>
+        <h1>{LOGIN_PAGE.TITLE}</h1>
+        <p className="subtitle">{LOGIN_PAGE.SUBTITLE}</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="apiUrl">API URL</label>
+            <label htmlFor="apiUrl">{LOGIN_PAGE.LABEL_API_URL}</label>
             <input
               id="apiUrl"
               type="text"
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="http://localhost:8080"
+              placeholder={LOGIN_PAGE.PLACEHOLDER_API_URL}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="username">{LOGIN_PAGE.LABEL_USERNAME}</label>
             <input
               id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
+              placeholder={LOGIN_PAGE.PLACEHOLDER_USERNAME}
               required
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">{LOGIN_PAGE.LABEL_PASSWORD}</label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
+              placeholder={LOGIN_PAGE.PLACEHOLDER_PASSWORD}
               required
             />
           </div>
@@ -96,14 +97,14 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
           {error && <div className="error-message">{error}</div>}
 
           <button type="submit" disabled={loading} className="login-button">
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? LOGIN_PAGE.BUTTON_LOGGING_IN : LOGIN_PAGE.BUTTON_LOGIN}
           </button>
         </form>
 
         <div className="info-box">
-          <h3>ℹ️ Test Credentials</h3>
-          <p>Use your Keycloak credentials to test the authentication flow.</p>
-          <p className="note">This dashboard tests the new username/password authentication API.</p>
+          <h3>{LOGIN_PAGE.INFO_TITLE}</h3>
+          <p>{LOGIN_PAGE.INFO_DESCRIPTION}</p>
+          <p className="note">{LOGIN_PAGE.INFO_NOTE}</p>
         </div>
       </div>
     </div>

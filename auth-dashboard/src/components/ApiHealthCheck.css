@@ -1,0 +1,355 @@
+.api-health-check {
+  padding: 20px;
+}
+
+.health-check-header {
+  margin-bottom: 30px;
+}
+
+.health-check-header h2 {
+  font-size: 28px;
+  margin-bottom: 8px;
+  color: #1a1a1a;
+}
+
+.health-check-header .subtitle {
+  color: #666;
+  font-size: 14px;
+}
+
+/* 통계 바 */
+.stats-bar {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 25px;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  transition: transform 0.2s;
+}
+
+.stat-item:hover {
+  transform: translateY(-2px);
+}
+
+.stat-label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.stat-value {
+  display: block;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.stat-item.total .stat-value {
+  color: #333;
+}
+
+.stat-item.success .stat-value {
+  color: #10b981;
+}
+
+.stat-item.failure .stat-value {
+  color: #ef4444;
+}
+
+.stat-item.running .stat-value {
+  color: #f59e0b;
+}
+
+.stat-item.pending .stat-value {
+  color: #9ca3af;
+}
+
+.stat-item.skipped .stat-value {
+  color: #6b7280;
+}
+
+/* 일괄 액션 */
+.bulk-actions {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.run-all-button {
+  padding: 15px 40px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+}
+
+.run-all-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+}
+
+.run-all-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 테스트 섹션 */
+.test-section {
+  margin-bottom: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.section-header h3 {
+  font-size: 20px;
+  margin-bottom: 5px;
+  color: #1a1a1a;
+}
+
+.section-description {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+/* 테스트 리스트 */
+.test-list {
+  padding: 10px;
+}
+
+.test-item {
+  margin: 10px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  background: white;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.test-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 들여쓰기된 테스트 항목 스타일 */
+.test-item[style*="margin-left"] {
+  background: linear-gradient(to right, #f9fafb 0%, white 20px);
+}
+
+.test-item[style*="margin-left"]:hover {
+  background: linear-gradient(to right, #f3f4f6 0%, white 20px);
+}
+
+.test-item.success {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.test-item.failure {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.test-item.running {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.test-item.skipped {
+  border-color: #9ca3af;
+  background: #f9fafb;
+  opacity: 0.7;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+}
+
+.test-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.test-icon {
+  font-size: 20px;
+}
+
+.test-name-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.test-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.test-dependencies,
+.test-sequential,
+.test-cleanup,
+.test-delay {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+.test-dependencies {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.test-sequential {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.test-cleanup {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.test-delay {
+  background: #fce7f3;
+  color: #9f1239;
+}
+
+.indent-connector {
+  color: #9ca3af;
+  font-size: 14px;
+  margin-right: 8px;
+  font-family: monospace;
+}
+
+.test-duration {
+  font-size: 12px;
+  color: #666;
+  background: #f3f4f6;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.test-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.run-test-button,
+.toggle-details-button {
+  padding: 6px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.run-test-button:hover:not(:disabled),
+.toggle-details-button:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.run-test-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 테스트 상세 */
+.test-details {
+  padding: 15px;
+  border-top: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.detail-section {
+  margin-bottom: 15px;
+}
+
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.detail-section h4 {
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.detail-section pre {
+  background: #1f2937;
+  color: #f3f4f6;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.detail-section.error pre {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .stats-bar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .test-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .test-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+

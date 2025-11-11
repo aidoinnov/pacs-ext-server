@@ -1,5 +1,6 @@
 use crate::application::dto::project_dto::{
-    PaginationInfo, ProjectListQuery, ProjectMembersResponse, RoleInfo,
+    PaginationInfo, ProjectListQuery, ProjectMembersResponse, ProjectMetaResponse,
+    ProjectStatusMeta, RoleInfo,
 };
 use crate::application::dto::{
     CreateProjectRequest, MemberInfo, ProjectAssignRoleRequest, ProjectListResponse,
@@ -255,5 +256,27 @@ impl<P: ProjectService> ProjectUseCase<P> {
             project_id,
             roles: role_infos,
         })
+    }
+
+    /// 프로젝트 메타데이터 조회
+    ///
+    /// 프론트엔드에서 사용할 수 있는 프로젝트 관련 메타데이터를 반환합니다.
+    /// 현재는 설정 가능한 프로젝트 상태 목록을 제공합니다.
+    ///
+    /// ProjectStatus enum의 all() 메서드를 사용하여 모든 상태를 순회하고,
+    /// 각 상태의 메타데이터를 동적으로 생성합니다.
+    pub fn get_project_metadata(&self) -> ProjectMetaResponse {
+        let available_statuses = ProjectStatus::all()
+            .iter()
+            .map(|status| ProjectStatusMeta {
+                value: status.as_str().to_string(),
+                label: status.label().to_string(),
+                description: status.description().to_string(),
+            })
+            .collect();
+
+        ProjectMetaResponse {
+            available_statuses,
+        }
     }
 }
