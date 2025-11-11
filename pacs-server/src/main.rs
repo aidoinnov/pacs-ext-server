@@ -551,6 +551,7 @@ async fn main() -> std::io::Result<()> {
                                 },
                             ),
                             Arc::new(user_repo.clone()),
+                            project_data_repo.clone(),
                         )
                     })
                     // Sync API (only in Full/SyncOnly)

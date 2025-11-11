@@ -29,6 +29,7 @@ pub fn configure_routes(
     jwt_service: Arc<JwtService>,
     access_condition_repo: Arc<AccessConditionRepositoryImpl>,
     user_repo: Arc<UserRepositoryImpl>,
+    project_data_repo: Arc<ProjectDataRepositoryImpl>,
 ) {
     cfg.service(
         web::scope("/dicom")
@@ -37,6 +38,7 @@ pub fn configure_routes(
             .app_data(web::Data::new(jwt_service))
             .app_data(web::Data::new(access_condition_repo))
             .app_data(web::Data::new(user_repo))
+            .app_data(web::Data::new(project_data_repo))
             .route(
                 "/ping",
                 web::get().to(|| async { HttpResponse::Ok().finish() }),
