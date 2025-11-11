@@ -566,7 +566,16 @@ async fn main() -> std::io::Result<()> {
                         }
                     })
                     // ========================================
-                    // 🏗️ 프로젝트 관리 API (구체적인 경로 우선)
+                    // 📊 프로젝트 데이터 접근 관리 API (구체적인 경로 우선 - /projects/{id}/studies/assign 등)
+                    // ========================================
+                    .configure(|cfg| {
+                        project_data_access_controller::configure_routes(
+                            cfg,
+                            project_data_access_use_case.clone(),
+                        )
+                    })
+                    // ========================================
+                    // 🏗️ 프로젝트 관리 API (덜 구체적인 경로 - /projects/{id})
                     // ========================================
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
@@ -588,15 +597,6 @@ async fn main() -> std::io::Result<()> {
                         project_user_controller::configure_routes(
                             cfg,
                             project_user_use_case.clone(),
-                            project_data_access_use_case.clone(),
-                        )
-                    })
-                    // ========================================
-                    // 📊 프로젝트 데이터 접근 관리 API
-                    // ========================================
-                    .configure(|cfg| {
-                        project_data_access_controller::configure_routes(
-                            cfg,
                             project_data_access_use_case.clone(),
                         )
                     })

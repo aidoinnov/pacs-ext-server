@@ -580,17 +580,14 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig, use_case: Arc<ProjectDataA
                     web::get().to(get_series_instances),
                 ),
         )
-        .service(
-            // 새로운 /projects scope (데이터 할당용)
-            web::scope("/projects")
-                .route(
-                    "/{project_id}/series/assign",
-                    web::post().to(assign_series_to_project),
-                )
-                .route(
-                    "/{project_id}/studies/assign",
-                    web::post().to(assign_study_to_project),
-                ),
+        // 데이터 할당 API - scope 없이 직접 등록 (project_controller와 충돌 방지)
+        .route(
+            "/projects/{project_id}/series/assign",
+            web::post().to(assign_series_to_project),
+        )
+        .route(
+            "/projects/{project_id}/studies/assign",
+            web::post().to(assign_study_to_project),
         )
         .service(
             web::scope("/data-access")
