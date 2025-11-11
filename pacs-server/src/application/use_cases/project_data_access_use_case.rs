@@ -441,25 +441,38 @@ impl ProjectDataAccessUseCase {
         .await
         .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
-        // 4. project_data에 Series 매핑 추가
-        let result = sqlx::query(
-            "INSERT INTO project_data (project_id, resource_level, study_id, series_id)
-             VALUES ($1, 'SERIES'::resource_level_enum, $2, $3)
-             ON CONFLICT DO NOTHING
-             RETURNING id",
+        // 4. 이미 할당되어 있는지 확인
+        let already_assigned: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM project_data
+                WHERE project_id = $1
+                  AND resource_level = 'SERIES'::resource_level_enum
+                  AND series_id = $2
+            )",
         )
         .bind(project_id)
-        .bind(study.id)
         .bind(series.id)
-        .fetch_optional(pool)
+        .fetch_one(pool)
         .await
         .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
-        if result.is_none() {
+        if already_assigned {
             return Err(ServiceError::AlreadyExists(
                 "Series already assigned to this project".to_string(),
             ));
         }
+
+        // 5. project_data에 Series 매핑 추가
+        sqlx::query(
+            "INSERT INTO project_data (project_id, resource_level, study_id, series_id)
+             VALUES ($1, 'SERIES'::resource_level_enum, $2, $3)",
+        )
+        .bind(project_id)
+        .bind(study.id)
+        .bind(series.id)
+        .execute(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
         Ok(AssignSeriesToProjectResponse {
             success: true,
@@ -499,24 +512,37 @@ impl ProjectDataAccessUseCase {
         .await
         .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
-        // 3. project_data에 Study 매핑 추가
-        let result = sqlx::query(
-            "INSERT INTO project_data (project_id, resource_level, study_id)
-             VALUES ($1, 'STUDY'::resource_level_enum, $2)
-             ON CONFLICT DO NOTHING
-             RETURNING id",
+        // 3. 이미 할당되어 있는지 확인
+        let already_assigned: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM project_data
+                WHERE project_id = $1
+                  AND resource_level = 'STUDY'::resource_level_enum
+                  AND study_id = $2
+            )",
         )
         .bind(project_id)
         .bind(study.id)
-        .fetch_optional(pool)
+        .fetch_one(pool)
         .await
         .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
-        if result.is_none() {
+        if already_assigned {
             return Err(ServiceError::AlreadyExists(
                 "Study already assigned to this project".to_string(),
             ));
         }
+
+        // 4. project_data에 Study 매핑 추가
+        sqlx::query(
+            "INSERT INTO project_data (project_id, resource_level, study_id)
+             VALUES ($1, 'STUDY'::resource_level_enum, $2)",
+        )
+        .bind(project_id)
+        .bind(study.id)
+        .execute(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
         Ok(AssignStudyToProjectResponse {
             success: true,
