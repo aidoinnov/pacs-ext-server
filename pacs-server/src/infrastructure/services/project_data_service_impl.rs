@@ -418,4 +418,8 @@ where
             .await
             .map_err(|e| ServiceError::DatabaseError(e.to_string()))
     }
+
+    fn pool(&self) -> &sqlx::PgPool {
+        self.project_data_repository.pool()
+    }
 }

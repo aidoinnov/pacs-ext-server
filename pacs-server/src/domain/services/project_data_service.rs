@@ -155,4 +155,7 @@ pub trait ProjectDataService: Send + Sync {
         &self,
         series_id: i32,
     ) -> Result<Vec<ProjectDataInstance>, ServiceError>;
+
+    /// 데이터베이스 연결 풀 반환 (Series/Study 할당 API용)
+    fn pool(&self) -> &sqlx::PgPool;
 }

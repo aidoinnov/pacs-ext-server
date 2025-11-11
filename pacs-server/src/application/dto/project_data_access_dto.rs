@@ -479,3 +479,59 @@ pub struct GetProjectInstancesResponse {
     /// 페이지네이션 정보
     pub pagination: PaginationInfo,
 }
+
+// ========== Series/Study 할당 API DTO ==========
+
+/// 프로젝트에 Series 할당 요청
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct AssignSeriesToProjectRequest {
+    /// Study UID (부모 Study)
+    pub study_uid: String,
+    /// Series UID
+    pub series_uid: String,
+    /// Series 설명
+    pub series_description: Option<String>,
+    /// 모달리티
+    pub modality: Option<String>,
+    /// Series 번호
+    pub series_number: Option<i32>,
+}
+
+/// 프로젝트에 Series 할당 응답
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct AssignSeriesToProjectResponse {
+    /// 성공 여부
+    pub success: bool,
+    /// 메시지
+    pub message: String,
+    /// 생성된 Series ID
+    pub series_id: i32,
+}
+
+/// 프로젝트에 Study 할당 요청
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct AssignStudyToProjectRequest {
+    /// Study UID
+    pub study_uid: String,
+    /// Study 설명
+    pub study_description: Option<String>,
+    /// 환자 ID
+    pub patient_id: Option<String>,
+    /// 환자 이름
+    pub patient_name: Option<String>,
+    /// Study 날짜
+    pub study_date: Option<String>,
+    /// 모달리티
+    pub modality: Option<String>,
+}
+
+/// 프로젝트에 Study 할당 응답
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct AssignStudyToProjectResponse {
+    /// 성공 여부
+    pub success: bool,
+    /// 메시지
+    pub message: String,
+    /// 생성된 Study ID
+    pub study_id: i32,
+}
