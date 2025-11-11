@@ -333,9 +333,26 @@ const ApiHealthCheck: React.FC = () => {
   };
 
   // axios 요청에 토큰 추가
-  const getAxiosConfig = () => {
+  const getAxiosConfig = async (accountType?: 'SUPER_ADMIN' | 'ADMIN' | 'USER') => {
+    // accountType이 지정되면 해당 계정의 토큰을 자동 획득
+    if (accountType) {
+      const account = TEST_ACCOUNTS[accountType];
+      try {
+        const token = await getTestToken(account);
+        return {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        };
+      } catch (error) {
+        console.error(`토큰 획득 실패 (${accountType}):`, error);
+        throw new Error(`${accountType} 토큰 획득 실패`);
+      }
+    }
+
+    // accountType이 없으면 현재 토큰 사용
     if (!testToken) {
-      return {};
+      throw new Error('토큰이 없습니다. 먼저 토큰을 획득하거나 accountType을 지정하세요.');
     }
     return {
       headers: {
@@ -1312,11 +1329,12 @@ const ApiHealthCheck: React.FC = () => {
   // DICOM 전체 조회 + 할당 여부 확인 테스트
   const runDicomTest = async (testIndex: number) => {
     if (testIndex === 0) {
-      // DICOM Studies 전체 조회 (project_id 없음)
+      // DICOM Studies 전체 조회 (project_id 없음) - SUPER_ADMIN 권한 필요
       const requestInfo = { method: 'GET', url: '/api/dicom/studies' };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/studies`, getAxiosConfig());
+        const config = await getAxiosConfig('SUPER_ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/studies`, config);
 
         console.log(`  ✅ DICOM Studies 전체 조회 성공:`, response.data);
 
@@ -1334,12 +1352,13 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 1) {
-      // DICOM Studies 프로젝트별 조회 (project_id 있음)
+      // DICOM Studies 프로젝트별 조회 (project_id 있음) - USER 권한으로 테스트
       const projectId = createdProjectIdRef.current || 150; // 기본값 150
       const requestInfo = { method: 'GET', url: `/api/dicom/studies?project_id=${projectId}` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/studies?project_id=${projectId}`, getAxiosConfig());
+        const config = await getAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?project_id=${projectId}`, config);
 
         console.log(`  ✅ DICOM Studies 프로젝트별 조회 성공 (project_id=${projectId}):`, response.data);
 
@@ -1357,11 +1376,12 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 2) {
-      // DICOM Series 전체 조회 (project_id 없음)
+      // DICOM Series 전체 조회 (project_id 없음) - SUPER_ADMIN 권한 필요
       const requestInfo = { method: 'GET', url: '/api/dicom/series' };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/series`, getAxiosConfig());
+        const config = await getAxiosConfig('SUPER_ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/series`, config);
 
         console.log(`  ✅ DICOM Series 전체 조회 성공:`, response.data);
 
@@ -1379,11 +1399,12 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 3) {
-      // DICOM Instances 전체 조회 (project_id 없음)
+      // DICOM Instances 전체 조회 (project_id 없음) - SUPER_ADMIN 권한 필요
       const requestInfo = { method: 'GET', url: '/api/dicom/instances' };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/instances`, getAxiosConfig());
+        const config = await getAxiosConfig('SUPER_ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/instances`, config);
 
         console.log(`  ✅ DICOM Instances 전체 조회 성공:`, response.data);
 
@@ -1401,12 +1422,13 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 4) {
-      // 할당 여부 확인 (check_assignment_for_project)
+      // 할당 여부 확인 (check_assignment_for_project) - ADMIN 권한으로 테스트
       const projectId = createdProjectIdRef.current || 150;
       const requestInfo = { method: 'GET', url: `/api/dicom/studies?check_assignment_for_project=${projectId}` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`, getAxiosConfig());
+        const config = await getAxiosConfig('ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`, config);
 
         console.log(`  ✅ 할당 여부 확인 성공 (project_id=${projectId}):`, response.data);
 
@@ -1435,12 +1457,13 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 5) {
-      // 전체 조회 + 할당 여부 확인 (통합)
+      // 전체 조회 + 할당 여부 확인 (통합) - ADMIN 권한으로 테스트
       const projectId = createdProjectIdRef.current || 150;
       const requestInfo = { method: 'GET', url: `/api/dicom/studies?check_assignment_for_project=${projectId}` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`, getAxiosConfig());
+        const config = await getAxiosConfig('ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`, config);
 
         console.log(`  ✅ 전체 조회 + 할당 여부 확인 성공:`, response.data);
 
@@ -1458,7 +1481,7 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 6) {
-      // 프로젝트별 조회 + 할당 여부 확인
+      // 프로젝트별 조회 + 할당 여부 확인 - USER 권한으로 테스트
       const projectId = createdProjectIdRef.current || 150;
       const requestInfo = {
         method: 'GET',
@@ -1466,9 +1489,10 @@ const ApiHealthCheck: React.FC = () => {
       };
 
       try {
+        const config = await getAxiosConfig('USER');
         const response = await axios.get(
           `${apiUrl}/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`,
-          getAxiosConfig()
+          config
         );
 
         console.log(`  ✅ 프로젝트별 조회 + 할당 여부 확인 성공:`, response.data);
@@ -1487,7 +1511,7 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 7) {
-      // 다른 프로젝트 할당 여부 확인
+      // 다른 프로젝트 할당 여부 확인 - ADMIN 권한으로 테스트
       const filterProjectId = createdProjectIdRef.current || 150;
       const checkProjectId = 200; // 다른 프로젝트
       const requestInfo = {
@@ -1496,9 +1520,10 @@ const ApiHealthCheck: React.FC = () => {
       };
 
       try {
+        const config = await getAxiosConfig('ADMIN');
         const response = await axios.get(
           `${apiUrl}/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`,
-          getAxiosConfig()
+          config
         );
 
         console.log(`  ✅ 다른 프로젝트 할당 여부 확인 성공:`, response.data);
@@ -1517,11 +1542,12 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 8) {
-      // 잘못된 project_id (0) 에러 처리
+      // 잘못된 project_id (0) 에러 처리 - USER 권한으로 테스트
       const requestInfo = { method: 'GET', url: '/api/dicom/studies?project_id=0' };
 
       try {
-        await axios.get(`${apiUrl}/api/dicom/studies?project_id=0`, getAxiosConfig());
+        const config = await getAxiosConfig('USER');
+        await axios.get(`${apiUrl}/api/dicom/studies?project_id=0`, config);
         throw new Error('400 에러가 발생해야 하는데 성공했습니다');
       } catch (error: any) {
         if (error.response?.status === 400) {
@@ -1541,11 +1567,12 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 9) {
-      // 잘못된 project_id (음수) 에러 처리
+      // 잘못된 project_id (음수) 에러 처리 - USER 권한으로 테스트
       const requestInfo = { method: 'GET', url: '/api/dicom/studies?project_id=-1' };
 
       try {
-        await axios.get(`${apiUrl}/api/dicom/studies?project_id=-1`, getAxiosConfig());
+        const config = await getAxiosConfig('USER');
+        await axios.get(`${apiUrl}/api/dicom/studies?project_id=-1`, config);
         throw new Error('400 에러가 발생해야 하는데 성공했습니다');
       } catch (error: any) {
         if (error.response?.status === 400) {
@@ -1565,6 +1592,35 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     }
+  };
+
+  // 섹션별 테스트 실행
+  const runSectionTests = async (sectionIndex: number) => {
+    const section = sections[sectionIndex];
+
+    console.log(`🚀 섹션 테스트 시작: ${section.title}`);
+
+    // 해당 섹션의 테스트들을 pending으로 초기화
+    const newSections = [...sections];
+    newSections[sectionIndex] = {
+      ...section,
+      tests: section.tests.map(test => ({
+        ...test,
+        status: 'pending' as const,
+        request: undefined,
+        response: undefined,
+        error: undefined,
+        duration: undefined,
+      })),
+    };
+    setSections(newSections);
+
+    // 섹션의 모든 테스트 실행
+    for (let testIndex = 0; testIndex < section.tests.length; testIndex++) {
+      await runTest(sectionIndex, testIndex);
+    }
+
+    console.log(`✅ 섹션 테스트 완료: ${section.title}`);
   };
 
   // 모든 테스트 실행 (의존성 및 순차 실행 고려)
@@ -1742,9 +1798,29 @@ const ApiHealthCheck: React.FC = () => {
       {/* 테스트 섹션 */}
       {sections.map((section, sectionIndex) => (
         <div key={sectionIndex} className="test-section">
-          <div className="section-header">
-            <h3>{section.title}</h3>
-            <p className="section-description">{section.description}</p>
+          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3>{section.title}</h3>
+              <p className="section-description">{section.description}</p>
+            </div>
+            <button
+              onClick={() => runSectionTests(sectionIndex)}
+              disabled={isRunningAll}
+              className="run-section-button"
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: isRunningAll ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                opacity: isRunningAll ? 0.5 : 1,
+              }}
+            >
+              🚀 이 섹션 모두 실행
+            </button>
           </div>
 
           <div className="test-list">
