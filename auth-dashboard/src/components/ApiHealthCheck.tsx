@@ -282,6 +282,70 @@ const ApiHealthCheck: React.FC = () => {
         },
       ],
     },
+    {
+      title: '🔒 Project Data Access 접근 제어',
+      description: '다기관 공동 연구 프로젝트 시나리오 - 사용자별 데이터 접근 제어 테스트',
+      isSequential: true,
+      tests: [
+        {
+          name: '시나리오 구성 (프로젝트 + 사용자 + Study + 접근 제어)',
+          status: 'pending',
+          isSequential: true,
+          indentLevel: 0,
+          delayAfter: 1500,
+        },
+        {
+          name: '접근 제어 매트릭스 조회',
+          status: 'pending',
+          dependencies: ['시나리오 구성 (프로젝트 + 사용자 + Study + 접근 제어)'],
+          indentLevel: 1,
+        },
+        {
+          name: '매트릭스 구조 검증 (4명 사용자)',
+          status: 'pending',
+          dependencies: ['접근 제어 매트릭스 조회'],
+          indentLevel: 2,
+        },
+        {
+          name: '매트릭스 구조 검증 (7개 Study)',
+          status: 'pending',
+          dependencies: ['접근 제어 매트릭스 조회'],
+          indentLevel: 2,
+        },
+        {
+          name: 'Dr. Kim 전체 접근 확인 (7/7)',
+          status: 'pending',
+          dependencies: ['매트릭스 구조 검증 (7개 Study)'],
+          indentLevel: 2,
+        },
+        {
+          name: 'Dr. Lee A병원만 접근 확인 (3/7)',
+          status: 'pending',
+          dependencies: ['매트릭스 구조 검증 (7개 Study)'],
+          indentLevel: 2,
+        },
+        {
+          name: 'Dr. Park B병원만 접근 확인 (3/7)',
+          status: 'pending',
+          dependencies: ['매트릭스 구조 검증 (7개 Study)'],
+          indentLevel: 2,
+        },
+        {
+          name: 'Dr. Choi 읽기 전용 확인 (1/7)',
+          status: 'pending',
+          dependencies: ['매트릭스 구조 검증 (7개 Study)'],
+          indentLevel: 2,
+        },
+        {
+          name: '시나리오 초기화',
+          status: 'pending',
+          dependencies: ['Dr. Choi 읽기 전용 확인 (1/7)'],
+          cleanup: true,
+          isSequential: true,
+          indentLevel: 1,
+        },
+      ],
+    },
   ]);
 
   const [expandedTest, setExpandedTest] = useState<string | null>(null);
@@ -437,6 +501,9 @@ const ApiHealthCheck: React.FC = () => {
       } else if (sectionIndex === 3) {
         // DICOM 전체 조회 + 할당 여부 확인 섹션
         result = await runDicomTest(testIndex);
+      } else if (sectionIndex === 4) {
+        // Project Data Access 접근 제어 섹션
+        result = await runProjectDataAccessTest(testIndex);
       }
 
       test.status = 'success';
@@ -1638,6 +1705,348 @@ const ApiHealthCheck: React.FC = () => {
           error.config = {
             method: 'get',
             url: `${apiUrl}/api/dicom/studies?project_id=-1`,
+          };
+        }
+        throw error;
+      }
+    }
+  };
+
+  // Project Data Access 접근 제어 테스트
+  const runProjectDataAccessTest = async (testIndex: number) => {
+    if (testIndex === 0) {
+      // 시나리오 구성
+      const requestInfo = { method: 'POST', url: '/api/test/project-data-access/setup' };
+
+      try {
+        const response = await axios.post(`${apiUrl}/api/test/project-data-access/setup`, {}, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        // 생성된 프로젝트 ID 저장
+        createdProjectIdRef.current = response.data.project_id;
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/test/project-data-access/setup`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
+      // 접근 제어 매트릭스 조회
+      const projectId = createdProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다. 먼저 시나리오를 구성하세요.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 2) {
+      // 매트릭스 구조 검증 (4명 사용자)
+      const projectId = createdProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const matrix = response.data;
+        if (!Array.isArray(matrix) || matrix.length !== 4) {
+          throw new Error(`4명의 사용자가 있어야 하는데 ${matrix.length}명이 있습니다`);
+        }
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 3) {
+      // 매트릭스 구조 검증 (7개 Study)
+      const projectId = createdProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const matrix = response.data;
+        const firstUser = matrix[0];
+        if (!firstUser.studies || firstUser.studies.length !== 7) {
+          throw new Error(`7개의 Study가 있어야 하는데 ${firstUser.studies.length}개가 있습니다`);
+        }
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 4) {
+      // Dr. Kim 전체 접근 확인 (7/7)
+      const projectId = createdProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const matrix = response.data;
+        const drKim = matrix.find((u: any) => u.username === 'dr_kim');
+        if (!drKim) {
+          throw new Error('Dr. Kim을 찾을 수 없습니다');
+        }
+
+        const accessibleCount = drKim.studies.filter((s: any) => s.can_access).length;
+        if (accessibleCount !== 7) {
+          throw new Error(`Dr. Kim은 7개 모두 접근 가능해야 하는데 ${accessibleCount}개만 접근 가능합니다`);
+        }
+
+        return {
+          request: requestInfo,
+          response: { user: drKim.username, accessible: accessibleCount, total: 7 },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 5) {
+      // Dr. Lee A병원만 접근 확인 (3/7)
+      const projectId = createdProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const matrix = response.data;
+        const drLee = matrix.find((u: any) => u.username === 'dr_lee');
+        if (!drLee) {
+          throw new Error('Dr. Lee를 찾을 수 없습니다');
+        }
+
+        const accessibleCount = drLee.studies.filter((s: any) => s.can_access).length;
+        if (accessibleCount !== 3) {
+          throw new Error(`Dr. Lee는 3개만 접근 가능해야 하는데 ${accessibleCount}개 접근 가능합니다`);
+        }
+
+        // A병원 Study만 접근 가능한지 확인
+        const accessibleStudies = drLee.studies.filter((s: any) => s.can_access);
+        const allAHospital = accessibleStudies.every((s: any) => s.study_uid.includes('.A.'));
+        if (!allAHospital) {
+          throw new Error('Dr. Lee는 A병원 Study만 접근 가능해야 합니다');
+        }
+
+        return {
+          request: requestInfo,
+          response: { user: drLee.username, accessible: accessibleCount, total: 7 },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 6) {
+      // Dr. Park B병원만 접근 확인 (3/7)
+      const projectId = createdProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const matrix = response.data;
+        const drPark = matrix.find((u: any) => u.username === 'dr_park');
+        if (!drPark) {
+          throw new Error('Dr. Park을 찾을 수 없습니다');
+        }
+
+        const accessibleCount = drPark.studies.filter((s: any) => s.can_access).length;
+        if (accessibleCount !== 3) {
+          throw new Error(`Dr. Park은 3개만 접근 가능해야 하는데 ${accessibleCount}개 접근 가능합니다`);
+        }
+
+        // B병원 Study만 접근 가능한지 확인
+        const accessibleStudies = drPark.studies.filter((s: any) => s.can_access);
+        const allBHospital = accessibleStudies.every((s: any) => s.study_uid.includes('.B.'));
+        if (!allBHospital) {
+          throw new Error('Dr. Park은 B병원 Study만 접근 가능해야 합니다');
+        }
+
+        return {
+          request: requestInfo,
+          response: { user: drPark.username, accessible: accessibleCount, total: 7 },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 7) {
+      // Dr. Choi 읽기 전용 확인 (1/7)
+      const projectId = createdProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const matrix = response.data;
+        const drChoi = matrix.find((u: any) => u.username === 'dr_choi');
+        if (!drChoi) {
+          throw new Error('Dr. Choi를 찾을 수 없습니다');
+        }
+
+        const accessibleCount = drChoi.studies.filter((s: any) => s.can_access).length;
+        if (accessibleCount !== 1) {
+          throw new Error(`Dr. Choi는 1개만 접근 가능해야 하는데 ${accessibleCount}개 접근 가능합니다`);
+        }
+
+        // 읽기 전용인지 확인
+        const accessibleStudy = drChoi.studies.find((s: any) => s.can_access);
+        if (accessibleStudy.access_scope !== 'READ_ONLY') {
+          throw new Error(`Dr. Choi는 읽기 전용이어야 하는데 ${accessibleStudy.access_scope}입니다`);
+        }
+
+        return {
+          request: requestInfo,
+          response: { user: drChoi.username, accessible: accessibleCount, total: 7, scope: accessibleStudy.access_scope },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 8) {
+      // 시나리오 초기화
+      const projectId = createdProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'DELETE', url: `/api/test/project-data-access/cleanup/${projectId}` };
+
+      try {
+        const response = await axios.delete(`${apiUrl}/api/test/project-data-access/cleanup/${projectId}`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        // 프로젝트 ID 초기화
+        createdProjectIdRef.current = null;
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'delete',
+            url: `${apiUrl}/api/test/project-data-access/cleanup/${projectId}`,
           };
         }
         throw error;
