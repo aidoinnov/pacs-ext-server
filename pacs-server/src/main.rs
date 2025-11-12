@@ -505,6 +505,8 @@ async fn main() -> std::io::Result<()> {
             // Shared app data for DICOM gateway dependencies
             .app_data(web::Data::new(dicom_evaluator.clone()))
             .app_data(web::Data::new(Arc::new(JwtService::new(&settings.jwt))))
+            // Database pool for test controller
+            .app_data(web::Data::new(Arc::new(pool.clone())))
             .app_data(web::Data::new(Arc::new(
                 infrastructure::repositories::AccessConditionRepositoryImpl { pool: pool.clone() },
             )))

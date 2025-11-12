@@ -41,8 +41,8 @@ pub async fn setup_project_data_access_scenario(
     // 1. 프로젝트 생성
     let project_id = match sqlx::query_scalar::<_, i32>(
         "INSERT INTO security_project (name, description, status, is_active)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (name) DO UPDATE SET 
+         VALUES ($1, $2, $3::project_status, $4)
+         ON CONFLICT (name) DO UPDATE SET
             description = EXCLUDED.description,
             status = EXCLUDED.status
          RETURNING id"
@@ -78,8 +78,8 @@ pub async fn setup_project_data_access_scenario(
         
         match sqlx::query_scalar::<_, i32>(
             "INSERT INTO security_user (username, email, full_name, keycloak_id, account_status)
-             VALUES ($1, $2, $3, $4, 'ACTIVE')
-             ON CONFLICT (username) DO UPDATE SET 
+             VALUES ($1, $2, $3, $4, 'ACTIVE'::user_account_status_enum)
+             ON CONFLICT (username) DO UPDATE SET
                 email = EXCLUDED.email,
                 full_name = EXCLUDED.full_name
              RETURNING id"
@@ -110,12 +110,12 @@ pub async fn setup_project_data_access_scenario(
     // 3. 프로젝트에 사용자 할당
     for user_id in &user_ids {
         if let Err(e) = sqlx::query(
-            "INSERT INTO security_project_user (project_id, user_id)
+            "INSERT INTO security_user_project (user_id, project_id)
              VALUES ($1, $2)
-             ON CONFLICT (project_id, user_id) DO NOTHING"
+             ON CONFLICT (user_id, project_id) DO NOTHING"
         )
-        .bind(project_id)
         .bind(user_id)
+        .bind(project_id)
         .execute(pool.as_ref().as_ref())
         .await
         {
@@ -142,8 +142,8 @@ pub async fn setup_project_data_access_scenario(
     for (study_uid, study_description, patient_id, patient_name, study_date) in studies {
         match sqlx::query_scalar::<_, i32>(
             "INSERT INTO project_data_study (study_uid, study_description, patient_id, patient_name, study_date)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (study_uid) DO UPDATE SET 
+             VALUES ($1, $2, $3, $4, $5::date)
+             ON CONFLICT (study_uid) DO UPDATE SET
                 study_description = EXCLUDED.study_description
              RETURNING id"
         )
@@ -175,7 +175,7 @@ pub async fn setup_project_data_access_scenario(
     for study_id in &study_ids {
         if let Err(e) = sqlx::query(
             "INSERT INTO project_data (project_id, resource_level, study_id)
-             VALUES ($1, 'STUDY', $2)
+             VALUES ($1, 'STUDY'::resource_level_enum, $2)
              ON CONFLICT (project_id, study_id, series_id, instance_id) DO NOTHING"
         )
         .bind(project_id)
@@ -201,7 +201,7 @@ pub async fn setup_project_data_access_scenario(
     for i in 0..3 {
         if let Err(e) = sqlx::query(
             "INSERT INTO project_data_access (user_id, project_id, resource_level, study_id, status, access_scope)
-             VALUES ($1, $2, 'STUDY', $3, 'APPROVED', 'FULL')
+             VALUES ($1, $2, 'STUDY'::resource_level_enum, $3, 'APPROVED'::data_access_status_enum, 'FULL')
              ON CONFLICT (project_id, user_id, study_id, series_id, instance_id) DO NOTHING"
         )
         .bind(user_ids[1])
@@ -221,7 +221,7 @@ pub async fn setup_project_data_access_scenario(
     for i in 3..6 {
         if let Err(e) = sqlx::query(
             "INSERT INTO project_data_access (user_id, project_id, resource_level, study_id, status, access_scope)
-             VALUES ($1, $2, 'STUDY', $3, 'APPROVED', 'FULL')
+             VALUES ($1, $2, 'STUDY'::resource_level_enum, $3, 'APPROVED'::data_access_status_enum, 'FULL')
              ON CONFLICT (project_id, user_id, study_id, series_id, instance_id) DO NOTHING"
         )
         .bind(user_ids[2])
@@ -240,7 +240,7 @@ pub async fn setup_project_data_access_scenario(
     // Dr. Choi: Study 1개만 7일간 읽기 전용
     if let Err(e) = sqlx::query(
         "INSERT INTO project_data_access (user_id, project_id, resource_level, study_id, status, access_scope, expires_at)
-         VALUES ($1, $2, 'STUDY', $3, 'APPROVED', 'READ_ONLY', NOW() + INTERVAL '7 days')
+         VALUES ($1, $2, 'STUDY'::resource_level_enum, $3, 'APPROVED'::data_access_status_enum, 'READ_ONLY', NOW() + INTERVAL '7 days')
          ON CONFLICT (project_id, user_id, study_id, series_id, instance_id) DO NOTHING"
     )
     .bind(user_ids[3])
