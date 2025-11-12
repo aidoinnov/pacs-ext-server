@@ -210,6 +210,9 @@ CREATE TABLE annotation_annotation (
     description TEXT,
     data JSONB NOT NULL,
     is_shared BOOLEAN NOT NULL DEFAULT false,
+    measurement_values JSONB,
+    label TEXT DEFAULT '',
+    version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

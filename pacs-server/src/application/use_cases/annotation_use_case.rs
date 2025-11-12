@@ -106,6 +106,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             viewer_software: annotation.viewer_software,
             description: annotation.description,
             measurement_values: annotation.measurement_values,
+            label: annotation.label,
             version: annotation.version,
             created_at: annotation.created_at,
             updated_at: annotation.updated_at,
@@ -173,6 +174,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
                     viewer_software: annotation.viewer_software,
                     description: annotation.description,
                     measurement_values: annotation.measurement_values,
+                    label: annotation.label,
                     version: annotation.version,
                     created_at: annotation.created_at,
                     updated_at: annotation.updated_at,
@@ -251,6 +253,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             viewer_software: request.viewer_software,
             description: request.description,
             measurement_values: request.measurement_values,
+            label: request.label,
             data: request.annotation_data,
             is_shared: false, // 기본값은 비공유
         };
@@ -630,6 +633,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         let measurement_values = request
             .measurement_values
             .or(current_annotation.measurement_values);
+        let label = request.label.or(current_annotation.label);
 
         let updated_annotation = self
             .annotation_service
@@ -638,6 +642,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
                 new_data,
                 is_shared,
                 measurement_values,
+                label,
             )
             .await?;
 

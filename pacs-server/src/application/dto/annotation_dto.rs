@@ -59,6 +59,11 @@ pub struct CreateAnnotationRequest {
         {"id": "m2", "type": "mean", "values": [30.5], "unit": "mm"}
     ]))]
     pub measurement_values: Option<serde_json::Value>,
+
+    /// 어노테이션 라벨
+    /// 어노테이션의 분류나 카테고리를 나타내는 라벨
+    #[schema(example = "Tumor")]
+    pub label: Option<String>,
 }
 
 /// Annotation 업데이트 요청 DTO
@@ -101,6 +106,11 @@ pub struct UpdateAnnotationRequest {
         {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"}
     ]))]
     pub measurement_values: Option<serde_json::Value>,
+
+    /// 어노테이션 라벨
+    /// 어노테이션의 분류나 카테고리를 나타내는 라벨
+    #[schema(example = "Lesion")]
+    pub label: Option<String>,
 }
 
 /// Annotation 응답 DTO
@@ -157,6 +167,11 @@ pub struct AnnotationResponse {
 
     /// 측정값
     pub measurement_values: Option<serde_json::Value>,
+
+    /// 어노테이션 라벨
+    /// 어노테이션의 분류나 카테고리를 나타내는 라벨
+    #[schema(example = "Tumor")]
+    pub label: Option<String>,
 
     /// 버전 번호 (Optimistic Locking)
     /// 낙관적 잠금을 위한 버전 번호
