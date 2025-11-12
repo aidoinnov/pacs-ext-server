@@ -80,7 +80,8 @@ use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
     mask_group_controller, project_controller, project_data_access_controller,
     project_user_controller, project_user_matrix_controller, role_controller,
-    role_permission_matrix_controller, user_controller, user_project_matrix_controller,
+    role_permission_matrix_controller, test_controller, user_controller,
+    user_project_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -659,6 +660,12 @@ async fn main() -> std::io::Result<()> {
                                 mask_group_use_case.clone(),
                             )
                         }
+                    })
+                    // ========================================
+                    // 🧪 테스트 API
+                    // ========================================
+                    .configure(|cfg| {
+                        test_controller::configure_routes(cfg)
                     }),
             )
     })

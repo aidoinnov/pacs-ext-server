@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './Dashboard.css';
 import ApiHealthCheck from './ApiHealthCheck';
+import ProjectDataAccess from './ProjectDataAccess';
 import Sidebar from './Sidebar';
 import {
   DEFAULT_API_URL,
@@ -244,6 +245,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tokens: initialTokens, onLo
 
           {activeMenu === SIDEBAR_MENU.API_HEALTH.id && (
             <ApiHealthCheck />
+          )}
+
+          {activeMenu === SIDEBAR_MENU.PROJECT_DATA_ACCESS.id && (
+            <ProjectDataAccess apiUrl={apiUrl} token={tokens.token} />
           )}
         </div>
       </div>
