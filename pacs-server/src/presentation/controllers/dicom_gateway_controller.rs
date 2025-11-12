@@ -120,6 +120,98 @@ async fn has_global_dicom_access(user_id: i32, pool: &sqlx::PgPool) -> bool {
     .unwrap_or(false)
 }
 
+/// 사용자가 특정 Study에 접근 가능한지 확인 (project_data_access 테이블 기반)
+///
+/// 로직:
+/// 1. project_data_access 테이블에 레코드가 없으면 → 전체 접근 가능 (기본)
+/// 2. 레코드가 있으면 → 해당 레코드의 status와 expires_at 확인
+///    - status = 'APPROVED' AND (expires_at IS NULL OR expires_at > NOW()) → 접근 가능
+///    - 그 외 → 접근 불가
+async fn can_access_study(
+    user_id: i32,
+    project_id: i32,
+    study_uid: &str,
+    pool: &sqlx::PgPool,
+) -> bool {
+    // 1. project_data_access 테이블에 레코드가 있는지 확인
+    let has_access_record: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM project_data_access
+            WHERE user_id = $1 AND project_id = $2
+        )",
+    )
+    .bind(user_id)
+    .bind(project_id)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(false);
+
+    // 2. 레코드가 없으면 → 전체 접근 가능 (기본)
+    if !has_access_record {
+        tracing::debug!(
+            "No access restrictions for user {} in project {} → Full access granted",
+            user_id,
+            project_id
+        );
+        return true;
+    }
+
+    // 3. 레코드가 있으면 → 해당 Study에 대한 접근 권한 확인
+    let is_approved: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM project_data_access pda
+            INNER JOIN project_data_study pds ON pda.study_id = pds.id
+            WHERE pda.user_id = $1
+              AND pda.project_id = $2
+              AND pds.study_uid = $3
+              AND pda.status = 'APPROVED'
+              AND (pda.expires_at IS NULL OR pda.expires_at > NOW())
+        )",
+    )
+    .bind(user_id)
+    .bind(project_id)
+    .bind(study_uid)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(false);
+
+    if is_approved {
+        tracing::debug!(
+            "User {} has approved access to study {} in project {}",
+            user_id,
+            study_uid,
+            project_id
+        );
+    } else {
+        tracing::debug!(
+            "User {} does NOT have access to study {} in project {} (restricted)",
+            user_id,
+            study_uid,
+            project_id
+        );
+    }
+
+    is_approved
+}
+
+/// Study가 특정 프로젝트에 할당되어 있는지 확인
+async fn check_study_assignment(study_uid: &str, project_id: i32, pool: &sqlx::PgPool) -> bool {
+    sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(
+            SELECT 1
+            FROM project_data pd
+            INNER JOIN project_data_study pds ON pd.study_id = pds.id
+            WHERE pd.project_id = $1
+              AND pds.study_uid = $2
+        )"
+    )
+    .bind(project_id)
+    .bind(study_uid)
+    .fetch_one(pool)
+    .await
+    .unwrap_or(false)
+}
+
 pub async fn get_studies(
     qido: web::Data<Dcm4cheeQidoClient>,
     evaluator: web::Data<Arc<DicomRbacEvaluatorImpl>>,
@@ -147,6 +239,22 @@ pub async fn get_studies(
     // 프로젝트 ID 검증
     let project_id_opt = query.project_id;
 
+    // check_assignment_for_project 파라미터 추출 (숫자 또는 문자열로 전달될 수 있음)
+    let check_assignment_project_id = query.extra.get("check_assignment_for_project")
+        .and_then(|v| {
+            // 숫자로 전달된 경우
+            if let Some(num) = v.as_i64() {
+                return Some(num as i32);
+            }
+            // 문자열로 전달된 경우
+            if let Some(s) = v.as_str() {
+                return s.parse::<i32>().ok();
+            }
+            None
+        });
+
+    tracing::debug!("Gateway: check_assignment_project_id = {:?}", check_assignment_project_id);
+
     // 전체 데이터 조회 권한이 없으면 project_id 필수
     if !has_global_access && project_id_opt.is_none() {
         return HttpResponse::BadRequest().json(serde_json::json!({
@@ -159,6 +267,15 @@ pub async fn get_studies(
         if id <= 0 {
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "project_id must be greater than 0"
+            }));
+        }
+    }
+
+    // check_assignment_for_project가 있으면 검증
+    if let Some(id) = check_assignment_project_id {
+        if id <= 0 {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "check_assignment_for_project must be greater than 0"
             }));
         }
     }
@@ -231,7 +348,7 @@ pub async fn get_studies(
         }
     };
 
-    // 3. RBAC 필터링 적용
+    // 3. RBAC 필터링 적용 (기존 RBAC + project_data_access 테이블 확인)
     let filtered = if has_global_access && project_id_opt.is_none() {
         // 전체 데이터 조회 권한이 있고 project_id가 없으면 필터링 안 함
         tracing::debug!("Gateway: Global access granted, skipping RBAC filtering");
@@ -242,11 +359,28 @@ pub async fn get_studies(
             let mut allowed_items = Vec::new();
             for item in array.iter() {
                 if let Some(study_uid) = extract_study_uid(item) {
+                    // 기존 RBAC 평가
                     let result = evaluator
                         .evaluate_study_uid(user_id, pid, &study_uid)
                         .await;
-                    if result.allowed {
+
+                    // project_data_access 테이블 확인 (추가 제약)
+                    let has_data_access = can_access_study(
+                        user_id,
+                        pid,
+                        &study_uid,
+                        project_data_repo.pool(),
+                    )
+                    .await;
+
+                    // 두 조건 모두 만족해야 접근 가능
+                    if result.allowed && has_data_access {
                         allowed_items.push(item.clone());
+                    } else if !has_data_access {
+                        tracing::debug!(
+                            "Gateway: Study {} filtered out by project_data_access restrictions",
+                            study_uid
+                        );
                     }
                 }
             }
@@ -259,7 +393,49 @@ pub async fn get_studies(
         qido_response
     };
 
-    HttpResponse::Ok().json(filtered)
+    // 4. check_assignment_for_project 파라미터가 있으면 할당 여부 확인
+    let final_response = if let Some(check_pid) = check_assignment_project_id {
+        tracing::debug!("Gateway: Checking assignment for project_id={}", check_pid);
+        if let Some(array) = filtered.as_array() {
+            tracing::debug!("Gateway: Processing {} studies for assignment check", array.len());
+            let mut enriched_items = Vec::new();
+            for item in array.iter() {
+                if let Some(study_uid) = extract_study_uid(item) {
+                    // DB에서 해당 Study가 프로젝트에 할당되어 있는지 확인
+                    let is_assigned = check_study_assignment(
+                        &study_uid,
+                        check_pid,
+                        project_data_repo.pool()
+                    ).await;
+
+                    tracing::debug!("Gateway: Study {} is_assigned={}", study_uid, is_assigned);
+
+                    // 기존 item에 is_assigned와 checked_project_id 필드 추가
+                    let mut enriched_item = item.clone();
+                    if let Some(obj) = enriched_item.as_object_mut() {
+                        obj.insert("is_assigned".to_string(), serde_json::json!(is_assigned));
+                        obj.insert("checked_project_id".to_string(), serde_json::json!(check_pid));
+                        tracing::debug!("Gateway: Added is_assigned and checked_project_id fields");
+                    }
+                    enriched_items.push(enriched_item);
+                } else {
+                    // Study UID를 추출할 수 없으면 그대로 추가
+                    tracing::warn!("Gateway: Could not extract study_uid from item");
+                    enriched_items.push(item.clone());
+                }
+            }
+            tracing::debug!("Gateway: Returning {} enriched studies", enriched_items.len());
+            serde_json::Value::Array(enriched_items)
+        } else {
+            tracing::warn!("Gateway: filtered response is not an array");
+            filtered
+        }
+    } else {
+        tracing::debug!("Gateway: No check_assignment_project_id, skipping assignment check");
+        filtered
+    };
+
+    HttpResponse::Ok().json(final_response)
 }
 
 pub async fn get_series(
@@ -304,6 +480,29 @@ pub async fn get_series(
         if id <= 0 {
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "project_id must be greater than 0"
+            }));
+        }
+    }
+
+    // 0. project_id가 있으면 Study 접근 권한 확인 (project_data_access)
+    if let Some(pid) = project_id_opt {
+        let has_study_access = can_access_study(
+            user_id,
+            pid,
+            &study_uid,
+            project_data_repo.pool(),
+        )
+        .await;
+
+        if !has_study_access {
+            tracing::warn!(
+                "Gateway: User {} does not have access to study {} in project {}",
+                user_id,
+                study_uid,
+                pid
+            );
+            return HttpResponse::Forbidden().json(serde_json::json!({
+                "error": "Access denied to this study"
             }));
         }
     }
@@ -418,6 +617,29 @@ pub async fn get_instances(
         if id <= 0 {
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "project_id must be greater than 0"
+            }));
+        }
+    }
+
+    // 0. project_id가 있으면 Study 접근 권한 확인 (project_data_access)
+    if let Some(pid) = project_id_opt {
+        let has_study_access = can_access_study(
+            user_id,
+            pid,
+            &study_uid,
+            project_data_repo.pool(),
+        )
+        .await;
+
+        if !has_study_access {
+            tracing::warn!(
+                "Gateway: User {} does not have access to study {} in project {}",
+                user_id,
+                study_uid,
+                pid
+            );
+            return HttpResponse::Forbidden().json(serde_json::json!({
+                "error": "Access denied to this study"
             }));
         }
     }
@@ -643,8 +865,8 @@ fn build_qido_params_from_user_query(
 
     // DICOMweb 네이티브 파라미터 패스스루: 알려진 필드 외 문자열/숫자/불리언은 그대로 전달
     for (k, v) in extra.iter() {
-        // 내부 파라미터는 전달하지 않음
-        if matches!(k.as_str(), "project_id" | "page" | "page_size") {
+        // 내부 파라미터는 전달하지 않음 (check_assignment_for_project 추가)
+        if matches!(k.as_str(), "project_id" | "page" | "page_size" | "check_assignment_for_project") {
             continue;
         }
         // 소문자 사용자 별칭은 이미 위에서 변환 처리됨(modality/patient_id/study_date/accession_number/patient_name)

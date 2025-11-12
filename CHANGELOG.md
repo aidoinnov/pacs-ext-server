@@ -47,9 +47,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Repository 코드가 오래된 스키마 사용 (향후 수정 필요)
   - 데이터 생성 API는 추가 수정 필요
 
+- **DICOM API 통합** (2025-11-12 추가):
+  - DICOM QIDO API에 `project_data_access` 접근 제어 적용
+  - Studies, Series, Instances 조회 시 접근 권한 확인
+  - 기존 RBAC + project_data_access 이중 확인
+  - 접근 거부 시 403 Forbidden 반환
+
 - **문서**:
   - [작업 계획](docs/work/project-data-access-rbac/01-작업계획.md)
   - [작업 내용](docs/work/project-data-access-rbac/02-작업내용.md)
+  - [DICOM API 통합](docs/work/project-data-access-rbac/04-dicom-api-integration.md)
 
 #### **Role Capability Matrix API - Scope 필터링 개선** 🎯
 - **브랜치**: `feature/dicom-global-access`

@@ -18,12 +18,19 @@ impl ProjectDataRepositoryImpl {
 #[async_trait::async_trait]
 impl ProjectDataRepository for ProjectDataRepositoryImpl {
     async fn create(&self, new_data: &NewProjectData) -> Result<ProjectData, sqlx::Error> {
-        let result = sqlx::query_as::<_, ProjectData>(
-            "INSERT INTO project_data (project_id, study_uid, study_description, patient_id, patient_name, study_date, modality)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             RETURNING id, project_id, study_uid, study_description, patient_id, patient_name, study_date, modality, created_at"
+        // Step 1: Create or get existing study in project_data_study table
+        let study = sqlx::query_as::<_, ProjectDataStudy>(
+            "INSERT INTO project_data_study (study_uid, study_description, patient_id, patient_name, study_date, modality)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (study_uid) DO UPDATE SET
+                study_description = COALESCE(EXCLUDED.study_description, project_data_study.study_description),
+                patient_id = COALESCE(EXCLUDED.patient_id, project_data_study.patient_id),
+                patient_name = COALESCE(EXCLUDED.patient_name, project_data_study.patient_name),
+                study_date = COALESCE(EXCLUDED.study_date, project_data_study.study_date),
+                modality = COALESCE(EXCLUDED.modality, project_data_study.modality),
+                updated_at = CURRENT_TIMESTAMP
+             RETURNING id, study_uid, study_description, patient_id, patient_name, patient_birth_date, study_date, created_at, updated_at"
         )
-        .bind(new_data.project_id)
         .bind(&new_data.study_uid)
         .bind(&new_data.study_description)
         .bind(&new_data.patient_id)
@@ -33,7 +40,30 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(result)
+        // Step 2: Create project_data mapping (project → study)
+        let project_data = sqlx::query!(
+            "INSERT INTO project_data (project_id, resource_level, study_id)
+             VALUES ($1, 'STUDY', $2)
+             ON CONFLICT (project_id, study_id, series_id, instance_id) DO NOTHING
+             RETURNING id, project_id, created_at",
+            new_data.project_id,
+            study.id
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        // Step 3: Return ProjectData with study information
+        Ok(ProjectData {
+            id: project_data.id,
+            project_id: project_data.project_id,
+            study_uid: study.study_uid,
+            study_description: study.study_description,
+            patient_id: study.patient_id,
+            patient_name: study.patient_name,
+            study_date: study.study_date,
+            modality: new_data.modality.clone(),
+            created_at: project_data.created_at,
+        })
     }
 
     async fn find_by_id(&self, id: i32) -> Result<Option<ProjectData>, sqlx::Error> {
