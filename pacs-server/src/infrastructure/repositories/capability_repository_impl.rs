@@ -244,7 +244,7 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
         let offset = (page - 1) * size;
 
         // 검색 조건 구성
-        let mut where_conditions = vec!["scope = 'GLOBAL'".to_string()];
+        let mut where_conditions = vec![];
         let mut search_param = None;
         let mut scope_param = None;
         let mut param_count = 0;
@@ -270,7 +270,11 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
             }
         }
 
-        let where_clause = where_conditions.join(" AND ");
+        let where_clause = if where_conditions.is_empty() {
+            "1=1".to_string()
+        } else {
+            where_conditions.join(" AND ")
+        };
 
         // 성능 최적화: 병렬 쿼리 실행
         let start_time = std::time::Instant::now();
@@ -384,16 +388,29 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
 
     async fn get_global_role_capability_matrix(
         &self,
+        scope: Option<&str>,
     ) -> Result<(Vec<Role>, Vec<Capability>, Vec<(i32, i32)>), sqlx::Error> {
-        // 전역 역할들 조회
-        let roles = sqlx::query_as::<_, Role>(
+        // scope 필터 조건 구성
+        let (roles_where_clause, assignments_where_clause) = if let Some(scope_filter) = scope {
+            (
+                format!("WHERE scope = '{}'", scope_filter),
+                format!("WHERE r.scope = '{}'", scope_filter),
+            )
+        } else {
+            ("".to_string(), "".to_string())
+        };
+
+        // 역할들 조회 (scope 필터링)
+        let roles_query = format!(
             "SELECT id, name, description, scope, created_at
              FROM security_role
-             WHERE scope = 'GLOBAL'
+             {}
              ORDER BY name",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+            roles_where_clause
+        );
+        let roles = sqlx::query_as::<_, Role>(&roles_query)
+            .fetch_all(&self.pool)
+            .await?;
 
         // 모든 활성 Capability 조회
         let capabilities = sqlx::query_as::<_, Capability>(
@@ -405,15 +422,17 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
         .fetch_all(&self.pool)
         .await?;
 
-        // 역할-Capability 할당 조회
-        let assignments = sqlx::query_as::<_, (i32, i32)>(
+        // 역할-Capability 할당 조회 (scope 필터링)
+        let assignments_query = format!(
             "SELECT role_id, capability_id
              FROM security_role_capability
              INNER JOIN security_role r ON security_role_capability.role_id = r.id
-             WHERE r.scope = 'GLOBAL'",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+             {}",
+            assignments_where_clause
+        );
+        let assignments = sqlx::query_as::<_, (i32, i32)>(&assignments_query)
+            .fetch_all(&self.pool)
+            .await?;
 
         Ok((roles, capabilities, assignments))
     }

@@ -115,7 +115,27 @@ GET /api/roles/global/capabilities/matrix
 GET /api/roles/global/capabilities/matrix/all
 ```
 
-이 엔드포인트는 페이지네이션 없이 모든 데이터를 반환합니다. 하위 호환성을 위해 유지됩니다.
+이 엔드포인트는 페이지네이션 없이 모든 데이터를 반환합니다. **scope 필터링을 지원합니다.**
+
+#### 쿼리 파라미터
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|---------|------|------|--------|------|
+| `scope` | string | 아니오 | - | 역할 범위 필터 (GLOBAL, PROJECT) |
+
+#### 사용 예시
+```bash
+# 모든 역할 조회 (GLOBAL + PROJECT)
+GET /api/roles/global/capabilities/matrix/all
+
+# GLOBAL scope 역할만 조회
+GET /api/roles/global/capabilities/matrix/all?scope=GLOBAL
+
+# PROJECT scope 역할만 조회
+GET /api/roles/global/capabilities/matrix/all?scope=PROJECT
+```
+
+#### 응답 형식
+페이지네이션 버전과 동일한 형식이지만 `pagination` 필드가 없습니다.
 
 ### 3. 프로젝트별 Role-Capability 매트릭스 조회
 
@@ -224,9 +244,24 @@ curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix?search=a
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-### 3. 특정 범위의 역할만 조회
+### 3. 특정 범위의 역할만 조회 (페이지네이션)
 ```bash
 curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix?scope=GLOBAL" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### 4. 전체 데이터 조회 (scope 필터링)
+```bash
+# 모든 역할 조회
+curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix/all" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# GLOBAL scope 역할만 조회
+curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix/all?scope=GLOBAL" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# PROJECT scope 역할만 조회
+curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix/all?scope=PROJECT" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

@@ -68,9 +68,10 @@ pub trait CapabilityRepository: Send + Sync {
         scope: Option<&str>,
     ) -> Result<(Vec<Role>, Vec<Capability>, Vec<(i32, i32)>, i64), sqlx::Error>;
 
-    /// 전역 Role-Capability 매트릭스 조회 (기존 - 하위 호환성)
+    /// 전역 Role-Capability 매트릭스 조회 (scope 필터링 지원)
     async fn get_global_role_capability_matrix(
         &self,
+        scope: Option<&str>,
     ) -> Result<(Vec<Role>, Vec<Capability>, Vec<(i32, i32)>), sqlx::Error>;
 
     /// 프로젝트별 Role-Capability 매트릭스 조회

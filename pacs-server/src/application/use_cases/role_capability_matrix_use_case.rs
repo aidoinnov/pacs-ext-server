@@ -105,11 +105,14 @@ impl RoleCapabilityMatrixUseCase {
         })
     }
 
-    /// 전역 Role-Capability 매트릭스 조회 (기존 - 하위 호환성)
-    pub async fn get_global_matrix(&self) -> Result<RoleCapabilityMatrixResponse, ServiceError> {
+    /// 전역 Role-Capability 매트릭스 조회 (scope 필터링 지원)
+    pub async fn get_global_matrix(
+        &self,
+        scope: Option<String>,
+    ) -> Result<RoleCapabilityMatrixResponse, ServiceError> {
         let (roles, capabilities, assignments) = self
             .capability_service
-            .get_global_role_capability_matrix()
+            .get_global_role_capability_matrix(scope.as_deref())
             .await?;
 
         // 역할 정보 변환

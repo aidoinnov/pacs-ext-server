@@ -23,8 +23,35 @@ interface TestSection {
   isSequential?: boolean; // 섹션 전체가 순차 실행되어야 하는지
 }
 
+// 테스트 계정 정보
+interface TestAccount {
+  username: string;
+  keycloak_id: string;
+  role: string;
+}
+
+const TEST_ACCOUNTS: Record<string, TestAccount> = {
+  SUPER_ADMIN: {
+    username: 'test_super_admin',
+    keycloak_id: 'a0000000-0000-0000-0000-000000000001',
+    role: 'SUPER_ADMIN',
+  },
+  ADMIN: {
+    username: 'test_admin',
+    keycloak_id: 'a0000000-0000-0000-0000-000000000002',
+    role: 'ADMIN',
+  },
+  USER: {
+    username: 'test_user',
+    keycloak_id: 'a0000000-0000-0000-0000-000000000003',
+    role: 'USER',
+  },
+};
+
 const ApiHealthCheck: React.FC = () => {
   const [apiUrl] = useState('http://localhost:8080');
+  const [testToken, setTestToken] = useState<string | null>(null);
+  const [currentTestAccount, setCurrentTestAccount] = useState<TestAccount>(TEST_ACCOUNTS.SUPER_ADMIN);
   const [sections, setSections] = useState<TestSection[]>([
     {
       title: '📊 프로젝트 메타데이터',
@@ -198,6 +225,63 @@ const ApiHealthCheck: React.FC = () => {
         },
       ],
     },
+    {
+      title: '🔍 DICOM 전체 조회 + 할당 여부 확인',
+      description: 'project_id 옵셔널화, READ_ALL 권한, check_assignment_for_project 테스트',
+      isSequential: false,
+      tests: [
+        {
+          name: 'DICOM Studies 전체 조회 (project_id 없음)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: 'DICOM Studies 프로젝트별 조회 (project_id 있음)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: 'DICOM Series 전체 조회 (project_id 없음)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: 'DICOM Instances 전체 조회 (project_id 없음)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '할당 여부 확인 (check_assignment_for_project)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '전체 조회 + 할당 여부 확인 (통합)',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '프로젝트별 조회 + 할당 여부 확인',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '다른 프로젝트 할당 여부 확인',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '잘못된 project_id (0) 에러 처리',
+          status: 'pending',
+          indentLevel: 0,
+        },
+        {
+          name: '잘못된 project_id (음수) 에러 처리',
+          status: 'pending',
+          indentLevel: 0,
+        },
+      ],
+    },
   ]);
 
   const [expandedTest, setExpandedTest] = useState<string | null>(null);
@@ -221,6 +305,59 @@ const ApiHealthCheck: React.FC = () => {
       running: allTests.filter(t => t.status === 'running').length,
       pending: allTests.filter(t => t.status === 'pending').length,
       skipped: allTests.filter(t => t.status === 'skipped').length,
+    };
+  };
+
+  // 테스트 계정으로 토큰 획득
+  const getTestToken = async (account: TestAccount): Promise<string> => {
+    try {
+      console.log(`🔑 테스트 토큰 획득 중... (계정: ${account.username}, 역할: ${account.role})`);
+
+      // JWT 서비스를 사용하여 토큰 생성
+      const response = await axios.post(`${apiUrl}/api/auth/test-token`, {
+        keycloak_id: account.keycloak_id,
+        username: account.username,
+      });
+
+      const token = response.data.token;
+      console.log(`✅ 토큰 획득 성공! (계정: ${account.username})`);
+
+      setTestToken(token);
+      setCurrentTestAccount(account);
+
+      return token;
+    } catch (error: any) {
+      console.error(`❌ 토큰 획득 실패:`, error);
+      throw new Error(`토큰 획득 실패: ${error.message}`);
+    }
+  };
+
+  // axios 요청에 토큰 추가
+  const getAxiosConfig = async (accountType?: 'SUPER_ADMIN' | 'ADMIN' | 'USER') => {
+    // accountType이 지정되면 해당 계정의 토큰을 자동 획득
+    if (accountType) {
+      const account = TEST_ACCOUNTS[accountType];
+      try {
+        const token = await getTestToken(account);
+        return {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        };
+      } catch (error) {
+        console.error(`토큰 획득 실패 (${accountType}):`, error);
+        throw new Error(`${accountType} 토큰 획득 실패`);
+      }
+    }
+
+    // accountType이 없으면 현재 토큰 사용
+    if (!testToken) {
+      throw new Error('토큰이 없습니다. 먼저 토큰을 획득하거나 accountType을 지정하세요.');
+    }
+    return {
+      headers: {
+        Authorization: `Bearer ${testToken}`,
+      },
     };
   };
 
@@ -285,6 +422,9 @@ const ApiHealthCheck: React.FC = () => {
       } else if (sectionIndex === 2) {
         // 프로젝트 데이터 할당/제거 섹션
         result = await runDataAssignmentTest(testIndex);
+      } else if (sectionIndex === 3) {
+        // DICOM 전체 조회 + 할당 여부 확인 섹션
+        result = await runDicomTest(testIndex);
       }
 
       test.status = 'success';
@@ -1186,6 +1326,303 @@ const ApiHealthCheck: React.FC = () => {
     }
   };
 
+  // DICOM 전체 조회 + 할당 여부 확인 테스트
+  const runDicomTest = async (testIndex: number) => {
+    if (testIndex === 0) {
+      // DICOM Studies 전체 조회 (project_id 없음) - SUPER_ADMIN 권한 필요
+      const requestInfo = { method: 'GET', url: '/api/dicom/studies' };
+
+      try {
+        const config = await getAxiosConfig('SUPER_ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/studies`, config);
+
+        console.log(`  ✅ DICOM Studies 전체 조회 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
+      // DICOM Studies 프로젝트별 조회 (project_id 있음) - USER 권한으로 테스트
+      const projectId = createdProjectIdRef.current || 150; // 기본값 150
+      const requestInfo = { method: 'GET', url: `/api/dicom/studies?project_id=${projectId}` };
+
+      try {
+        const config = await getAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?project_id=${projectId}`, config);
+
+        console.log(`  ✅ DICOM Studies 프로젝트별 조회 성공 (project_id=${projectId}):`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 2) {
+      // DICOM Series 전체 조회 (project_id 없음) - SUPER_ADMIN 권한 필요
+      const requestInfo = { method: 'GET', url: '/api/dicom/series' };
+
+      try {
+        const config = await getAxiosConfig('SUPER_ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/series`, config);
+
+        console.log(`  ✅ DICOM Series 전체 조회 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/series`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 3) {
+      // DICOM Instances 전체 조회 (project_id 없음) - SUPER_ADMIN 권한 필요
+      const requestInfo = { method: 'GET', url: '/api/dicom/instances' };
+
+      try {
+        const config = await getAxiosConfig('SUPER_ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/instances`, config);
+
+        console.log(`  ✅ DICOM Instances 전체 조회 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/instances`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 4) {
+      // 할당 여부 확인 (check_assignment_for_project) - ADMIN 권한으로 테스트
+      const projectId = createdProjectIdRef.current || 150;
+      const requestInfo = { method: 'GET', url: `/api/dicom/studies?check_assignment_for_project=${projectId}` };
+
+      try {
+        const config = await getAxiosConfig('ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`, config);
+
+        console.log(`  ✅ 할당 여부 확인 성공 (project_id=${projectId}):`, response.data);
+
+        // is_assigned 필드 확인
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          const hasAssignmentField = response.data.every((study: any) =>
+            study.hasOwnProperty('is_assigned') && study.hasOwnProperty('checked_project_id')
+          );
+
+          if (!hasAssignmentField) {
+            throw new Error('응답에 is_assigned 또는 checked_project_id 필드가 없습니다');
+          }
+        }
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 5) {
+      // 전체 조회 + 할당 여부 확인 (통합) - ADMIN 권한으로 테스트
+      const projectId = createdProjectIdRef.current || 150;
+      const requestInfo = { method: 'GET', url: `/api/dicom/studies?check_assignment_for_project=${projectId}` };
+
+      try {
+        const config = await getAxiosConfig('ADMIN');
+        const response = await axios.get(`${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`, config);
+
+        console.log(`  ✅ 전체 조회 + 할당 여부 확인 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?check_assignment_for_project=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 6) {
+      // 프로젝트별 조회 + 할당 여부 확인 - USER 권한으로 테스트
+      const projectId = createdProjectIdRef.current || 150;
+      const requestInfo = {
+        method: 'GET',
+        url: `/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`
+      };
+
+      try {
+        const config = await getAxiosConfig('USER');
+        const response = await axios.get(
+          `${apiUrl}/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`,
+          config
+        );
+
+        console.log(`  ✅ 프로젝트별 조회 + 할당 여부 확인 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=${projectId}&check_assignment_for_project=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 7) {
+      // 다른 프로젝트 할당 여부 확인 - ADMIN 권한으로 테스트
+      const filterProjectId = createdProjectIdRef.current || 150;
+      const checkProjectId = 200; // 다른 프로젝트
+      const requestInfo = {
+        method: 'GET',
+        url: `/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`
+      };
+
+      try {
+        const config = await getAxiosConfig('ADMIN');
+        const response = await axios.get(
+          `${apiUrl}/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`,
+          config
+        );
+
+        console.log(`  ✅ 다른 프로젝트 할당 여부 확인 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=${filterProjectId}&check_assignment_for_project=${checkProjectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 8) {
+      // 잘못된 project_id (0) 에러 처리 - USER 권한으로 테스트
+      const requestInfo = { method: 'GET', url: '/api/dicom/studies?project_id=0' };
+
+      try {
+        const config = await getAxiosConfig('USER');
+        await axios.get(`${apiUrl}/api/dicom/studies?project_id=0`, config);
+        throw new Error('400 에러가 발생해야 하는데 성공했습니다');
+      } catch (error: any) {
+        if (error.response?.status === 400) {
+          console.log(`  ✅ project_id=0 에러 처리 성공:`, error.response.data);
+          return {
+            request: requestInfo,
+            response: error.response.data || { status: 400, message: 'Bad Request' },
+          };
+        }
+
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=0`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 9) {
+      // 잘못된 project_id (음수) 에러 처리 - USER 권한으로 테스트
+      const requestInfo = { method: 'GET', url: '/api/dicom/studies?project_id=-1' };
+
+      try {
+        const config = await getAxiosConfig('USER');
+        await axios.get(`${apiUrl}/api/dicom/studies?project_id=-1`, config);
+        throw new Error('400 에러가 발생해야 하는데 성공했습니다');
+      } catch (error: any) {
+        if (error.response?.status === 400) {
+          console.log(`  ✅ project_id=-1 에러 처리 성공:`, error.response.data);
+          return {
+            request: requestInfo,
+            response: error.response.data || { status: 400, message: 'Bad Request' },
+          };
+        }
+
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/studies?project_id=-1`,
+          };
+        }
+        throw error;
+      }
+    }
+  };
+
+  // 섹션별 테스트 실행
+  const runSectionTests = async (sectionIndex: number) => {
+    const section = sections[sectionIndex];
+
+    console.log(`🚀 섹션 테스트 시작: ${section.title}`);
+
+    // 해당 섹션의 테스트들을 pending으로 초기화
+    const newSections = [...sections];
+    newSections[sectionIndex] = {
+      ...section,
+      tests: section.tests.map(test => ({
+        ...test,
+        status: 'pending' as const,
+        request: undefined,
+        response: undefined,
+        error: undefined,
+        duration: undefined,
+      })),
+    };
+    setSections(newSections);
+
+    // 섹션의 모든 테스트 실행
+    for (let testIndex = 0; testIndex < section.tests.length; testIndex++) {
+      await runTest(sectionIndex, testIndex);
+    }
+
+    console.log(`✅ 섹션 테스트 완료: ${section.title}`);
+  };
+
   // 모든 테스트 실행 (의존성 및 순차 실행 고려)
   const runAllTests = async () => {
     setIsRunningAll(true);
@@ -1315,10 +1752,42 @@ const ApiHealthCheck: React.FC = () => {
         </div>
       </div>
 
+      {/* 테스트 계정 선택 및 토큰 획득 */}
+      <div className="test-account-section">
+        <div className="account-selector">
+          <label>테스트 계정:</label>
+          <select
+            value={currentTestAccount.username}
+            onChange={(e) => {
+              const account = Object.values(TEST_ACCOUNTS).find(a => a.username === e.target.value);
+              if (account) {
+                setCurrentTestAccount(account);
+                setTestToken(null); // 계정 변경 시 토큰 초기화
+              }
+            }}
+          >
+            {Object.values(TEST_ACCOUNTS).map(account => (
+              <option key={account.username} value={account.username}>
+                {account.username} ({account.role})
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => getTestToken(currentTestAccount)}
+            className="get-token-button"
+          >
+            🔑 토큰 획득
+          </button>
+          {testToken && (
+            <span className="token-status">✅ 토큰 획득 완료</span>
+          )}
+        </div>
+      </div>
+
       {/* 일괄 테스트 버튼 */}
       <div className="bulk-actions">
-        <button 
-          onClick={runAllTests} 
+        <button
+          onClick={runAllTests}
           disabled={isRunningAll}
           className="run-all-button"
         >
@@ -1329,9 +1798,29 @@ const ApiHealthCheck: React.FC = () => {
       {/* 테스트 섹션 */}
       {sections.map((section, sectionIndex) => (
         <div key={sectionIndex} className="test-section">
-          <div className="section-header">
-            <h3>{section.title}</h3>
-            <p className="section-description">{section.description}</p>
+          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3>{section.title}</h3>
+              <p className="section-description">{section.description}</p>
+            </div>
+            <button
+              onClick={() => runSectionTests(sectionIndex)}
+              disabled={isRunningAll}
+              className="run-section-button"
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: isRunningAll ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                opacity: isRunningAll ? 0.5 : 1,
+              }}
+            >
+              🚀 이 섹션 모두 실행
+            </button>
           </div>
 
           <div className="test-list">
