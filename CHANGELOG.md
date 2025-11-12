@@ -8,6 +8,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added - 2025-11-12
 
+#### **[RBAC 기능 보완] 프로젝트 데이터 접근 제한 설정** 🔐
+- **브랜치**: `feature/project-data-access-rbac`
+- **목표**: `project_data_access` 테이블 생성 및 데이터 접근 권한 관리 API 오류 해결
+
+- **문제**:
+  - API 호출 시 "relation \"project_data_access\" does not exist" 오류 발생
+  - 데이터베이스에 `project_data_access` 테이블이 존재하지 않음
+
+- **해결**:
+  1. **마이그레이션 파일 생성** (`pacs-server/migrations/028_create_project_data_access.sql`)
+     - `project_data_access` 테이블 생성
+     - 계층적 접근 제어 지원 (Study → Series → Instance)
+     - 접근 권한 상태 관리 (APPROVED, DENIED, PENDING)
+     - 인덱스 9개 생성 (성능 최적화)
+     - 외래 키 제약 조건 10개 설정
+     - 트리거 1개 생성 (updated_at 자동 업데이트)
+
+  2. **테이블 스키마**:
+     - 기본 필드: id, user_id, project_id, status, created_at, updated_at
+     - 계층적 접근 제어: resource_level, study_id, series_id, instance_id
+     - 요청/검토/승인 정보: requested_at/by, reviewed_at/by, granted_at/by
+     - 기관 기반 접근 제어: user_institution_id, data_institution_id
+     - 접근 범위: access_scope (FULL, LIMITED, READ_ONLY)
+     - 만료 시간: expires_at
+
+  3. **API 테스트**:
+     - `GET /api/project-data/{project_id}/data-access/matrix` ✅ 정상 작동
+     - 오류 메시지 해결 완료
+
+- **기술적 특징**:
+  - **계층적 접근 제어**: Study, Series, Instance 레벨별 권한 관리
+  - **UNIQUE 제약**: (project_id, user_id, study_id, series_id, instance_id)
+  - **부분 인덱스**: NULL이 아닌 값만 인덱싱하여 성능 최적화
+  - **하위 호환성**: project_data_id 필드 유지
+
+- **알려진 이슈**:
+  - Repository 코드가 오래된 스키마 사용 (향후 수정 필요)
+  - 데이터 생성 API는 추가 수정 필요
+
+- **문서**:
+  - [작업 계획](docs/work/project-data-access-rbac/01-작업계획.md)
+  - [작업 내용](docs/work/project-data-access-rbac/02-작업내용.md)
+
 #### **Role Capability Matrix API - Scope 필터링 개선** 🎯
 - **브랜치**: `feature/dicom-global-access`
 - **목표**: `/api/roles/global/capabilities/matrix/all` 엔드포인트를 진짜 "전역(global)" 엔드포인트로 변경하고, `scope` 쿼리 파라미터로 필터링하도록 개선
