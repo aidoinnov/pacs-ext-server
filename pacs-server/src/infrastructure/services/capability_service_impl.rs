@@ -193,9 +193,10 @@ where
 
     async fn get_global_role_capability_matrix(
         &self,
+        scope: Option<&str>,
     ) -> Result<(Vec<Role>, Vec<Capability>, Vec<(i32, i32)>), ServiceError> {
         self.capability_repository
-            .get_global_role_capability_matrix()
+            .get_global_role_capability_matrix(scope)
             .await
             .map_err(|e| ServiceError::DatabaseError(e.to_string()))
     }

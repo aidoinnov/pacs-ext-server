@@ -6,6 +6,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added - 2025-11-12
+
+#### **Role Capability Matrix API - Scope 필터링 개선** 🎯
+- **브랜치**: `feature/dicom-global-access`
+- **목표**: `/api/roles/global/capabilities/matrix/all` 엔드포인트를 진짜 "전역(global)" 엔드포인트로 변경하고, `scope` 쿼리 파라미터로 필터링하도록 개선
+
+- **주요 변경사항**:
+  1. **Repository 계층 수정** (`pacs-server/src/infrastructure/repositories/capability_repository_impl.rs`)
+     - `get_global_role_capability_matrix()` 메서드에 `scope: Option<&str>` 파라미터 추가
+     - 동적 WHERE 절 생성으로 scope 필터링 구현
+     - `get_global_role_capability_matrix_paginated()` 메서드에서 하드코딩된 `scope = 'GLOBAL'` 조건 제거
+
+  2. **Domain 계층 수정**
+     - `capability_repository.rs`: trait 메서드 시그니처에 scope 파라미터 추가
+     - `capability_service.rs`: 서비스 인터페이스에 scope 파라미터 추가
+
+  3. **Service 구현체 수정** (`pacs-server/src/infrastructure/services/capability_service_impl.rs`)
+     - scope 파라미터를 repository로 전달
+
+  4. **Use Case 수정** (`pacs-server/src/application/use_cases/role_capability_matrix_use_case.rs`)
+     - `get_global_matrix()` 및 `get_global_matrix_paginated()`에 scope 파라미터 추가
+     - `Option<String>` → `Option<&str>` 변환 처리
+
+  5. **Controller 수정** (`pacs-server/src/presentation/controllers/role_controller.rs`)
+     - `GlobalMatrixQuery` 구조체에 `scope: Option<String>` 필드 추가
+     - 쿼리 파라미터에서 scope 추출하여 use case로 전달
+
+  6. **API 문서 업데이트** (`docs/api/role-capability-matrix-api-korean.md`)
+     - scope 파라미터 설명 및 사용 예시 추가
+
+  7. **통합 테스트 작성** (`pacs-server/tests/role_capability_matrix_scope_filter_integration_test.rs`)
+     - 7개의 테스트 케이스 작성 및 모두 통과
+     - scope 필터링, 페이지네이션, 에러 처리, 응답 구조 검증
+
+- **API 사용법**:
+  ```bash
+  # 모든 역할 조회 (GLOBAL + PROJECT)
+  GET /api/roles/global/capabilities/matrix/all
+
+  # GLOBAL scope 역할만 조회
+  GET /api/roles/global/capabilities/matrix/all?scope=GLOBAL
+
+  # PROJECT scope 역할만 조회
+  GET /api/roles/global/capabilities/matrix/all?scope=PROJECT
+  ```
+
+- **테스트 결과**:
+  - ✅ 7개 통합 테스트 모두 통과
+  - ✅ scope 없음: 8개 역할 반환 (3 GLOBAL + 5 PROJECT)
+  - ✅ scope=GLOBAL: 3개 역할 반환
+  - ✅ scope=PROJECT: 5개 역할 반환
+
+- **기술적 특징**:
+  - **동적 SQL 쿼리 생성**: scope 파라미터에 따라 WHERE 절 동적 생성
+  - **하위 호환성 유지**: 기존 API 엔드포인트 경로 및 응답 구조 유지
+  - **타입 안전성**: `Option<&str>` 사용으로 불필요한 복사 방지
+  - **마이그레이션 불필요**: 데이터베이스 스키마 변경 없음
+
+- **문서**:
+  - [작업 계획](docs/work/role-capability-matrix-scope-filter/01-작업계획.md)
+  - [작업 내용](docs/work/role-capability-matrix-scope-filter/02-작업내용.md)
+  - [기술 문서](docs/work/role-capability-matrix-scope-filter/03-기술문서.md)
+
 ### Added - 2025-11-11
 
 #### **프로젝트 Series/Study 할당 API 구현** 🎯

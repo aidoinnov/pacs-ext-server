@@ -150,11 +150,12 @@ impl<P: PermissionService> RoleController<P> {
         }
     }
 
-    /// 전역 Role-Capability 매트릭스 조회 (전체 데이터, 페이지네이션 없음)
+    /// 전역 Role-Capability 매트릭스 조회 (전체 데이터, 페이지네이션 없음, scope 필터링 지원)
     pub async fn get_global_matrix(
+        query: web::Query<RoleCapabilityMatrixQuery>,
         use_case: web::Data<Arc<RoleCapabilityMatrixUseCase>>,
     ) -> Result<HttpResponse, actix_web::Error> {
-        match use_case.get_global_matrix().await {
+        match use_case.get_global_matrix(query.scope.clone()).await {
             Ok(matrix) => Ok(HttpResponse::Ok().json(matrix)),
             Err(ServiceError::DatabaseError(msg)) => {
                 tracing::error!("Database error in get_global_matrix: {}", msg);
