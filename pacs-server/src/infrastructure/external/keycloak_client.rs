@@ -207,13 +207,15 @@ impl KeycloakClient {
         Ok(user_id)
     }
 
-    /// 3. 사용자 삭제
+    /// 3. 사용자 삭제 (username으로도 삭제 시도)
     pub async fn delete_user(&self, keycloak_user_id: &str) -> Result<(), ServiceError> {
         let token = self.get_admin_token().await?;
         let url = format!(
             "{}/admin/realms/{}/users/{}",
             self.base_url, self.realm, keycloak_user_id
         );
+
+        eprintln!("DEBUG: Deleting Keycloak user: {} from URL: {}", keycloak_user_id, url);
 
         let response = self
             .http_client
@@ -222,21 +224,79 @@ impl KeycloakClient {
             .send()
             .await
             .map_err(|e| {
+                eprintln!("ERROR: Keycloak delete user HTTP request failed: {}", e);
                 ServiceError::ExternalServiceError(format!("Keycloak delete user failed: {}", e))
             })?;
 
-        if response.status() == StatusCode::NOT_FOUND {
+        let status = response.status();
+        eprintln!("DEBUG: Keycloak delete user response status: {}", status);
+
+        if status == StatusCode::NOT_FOUND {
             // 이미 삭제됨 - 성공으로 간주
+            eprintln!("DEBUG: User {} already deleted (404), treating as success", keycloak_user_id);
             return Ok(());
         }
 
-        if !response.status().is_success() {
-            let status = response.status();
+        if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
+            eprintln!("ERROR: Keycloak delete user failed ({}): {}", status, body);
             return Err(ServiceError::ExternalServiceError(format!(
                 "Keycloak delete user failed ({}): {}",
                 status, body
             )));
+        }
+
+        eprintln!("DEBUG: Successfully deleted Keycloak user: {}", keycloak_user_id);
+        Ok(())
+    }
+
+    /// 3-1. username으로 사용자 삭제
+    pub async fn delete_user_by_username(&self, username: &str) -> Result<(), ServiceError> {
+        let token = self.get_admin_token().await?;
+
+        // 1. username으로 사용자 검색
+        let search_url = format!(
+            "{}/admin/realms/{}/users?username={}&exact=true",
+            self.base_url, self.realm, username
+        );
+
+        eprintln!("DEBUG: Searching Keycloak user by username: {}", username);
+
+        let search_response = self
+            .http_client
+            .get(&search_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Keycloak search user failed: {}", e))
+            })?;
+
+        if !search_response.status().is_success() {
+            let status = search_response.status();
+            let body = search_response.text().await.unwrap_or_default();
+            eprintln!("ERROR: Keycloak search user failed ({}): {}", status, body);
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Keycloak search user failed ({}): {}",
+                status, body
+            )));
+        }
+
+        let users: Vec<serde_json::Value> = search_response.json().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("Failed to parse search response: {}", e))
+        })?;
+
+        if users.is_empty() {
+            eprintln!("DEBUG: User {} not found in Keycloak, treating as success", username);
+            return Ok(());
+        }
+
+        // 2. 찾은 사용자 삭제
+        for user in users {
+            if let Some(user_id) = user.get("id").and_then(|v| v.as_str()) {
+                eprintln!("DEBUG: Found user {} with ID: {}, deleting...", username, user_id);
+                self.delete_user(user_id).await?;
+            }
         }
 
         Ok(())
@@ -323,7 +383,156 @@ impl KeycloakClient {
         Ok(())
     }
 
-    /// 6. 사용자 활성화/비활성화
+    /// 6. 사용자를 그룹에 추가
+    pub async fn add_user_to_group(
+        &self,
+        keycloak_user_id: &str,
+        group_name: &str,
+    ) -> Result<(), ServiceError> {
+        let token = self.get_admin_token().await?;
+
+        // 1. 그룹 ID 조회
+        let groups_url = format!(
+            "{}/admin/realms/{}/groups?search={}",
+            self.base_url, self.realm, group_name
+        );
+
+        let groups_response = self
+            .http_client
+            .get(&groups_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Failed to search groups: {}", e))
+            })?;
+
+        if !groups_response.status().is_success() {
+            let status = groups_response.status();
+            let body = groups_response.text().await.unwrap_or_default();
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Failed to search groups ({}): {}",
+                status, body
+            )));
+        }
+
+        let groups: Vec<serde_json::Value> = groups_response.json().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("Failed to parse groups response: {}", e))
+        })?;
+
+        let group = groups
+            .iter()
+            .find(|g| g["name"].as_str() == Some(group_name))
+            .ok_or_else(|| {
+                ServiceError::NotFound(format!("Group '{}' not found", group_name))
+            })?;
+
+        let group_id = group["id"]
+            .as_str()
+            .ok_or_else(|| ServiceError::ExternalServiceError("Group ID not found".into()))?;
+
+        // 2. 사용자를 그룹에 추가
+        let add_url = format!(
+            "{}/admin/realms/{}/users/{}/groups/{}",
+            self.base_url, self.realm, keycloak_user_id, group_id
+        );
+
+        let response = self
+            .http_client
+            .put(&add_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Failed to add user to group: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Failed to add user to group ({}): {}",
+                status, body
+            )));
+        }
+
+        eprintln!("DEBUG: User {} added to group '{}' successfully", keycloak_user_id, group_name);
+        Ok(())
+    }
+
+    /// 7. 사용자에게 Realm Role 할당
+    pub async fn assign_realm_role_to_user(
+        &self,
+        keycloak_user_id: &str,
+        role_name: &str,
+    ) -> Result<(), ServiceError> {
+        let token = self.get_admin_token().await?;
+
+        // 1. Realm Role 조회
+        let roles_url = format!(
+            "{}/admin/realms/{}/roles/{}",
+            self.base_url, self.realm, role_name
+        );
+
+        let role_response = self
+            .http_client
+            .get(&roles_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Failed to get role: {}", e))
+            })?;
+
+        if !role_response.status().is_success() {
+            let status = role_response.status();
+            let body = role_response.text().await.unwrap_or_default();
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Failed to get role '{}' ({}): {}",
+                role_name, status, body
+            )));
+        }
+
+        let role: serde_json::Value = role_response.json().await.map_err(|e| {
+            ServiceError::ExternalServiceError(format!("Failed to parse role response: {}", e))
+        })?;
+
+        // 2. 사용자에게 Role 할당
+        let assign_url = format!(
+            "{}/admin/realms/{}/users/{}/role-mappings/realm",
+            self.base_url, self.realm, keycloak_user_id
+        );
+
+        let role_mapping = vec![serde_json::json!({
+            "id": role["id"],
+            "name": role["name"],
+        })];
+
+        let response = self
+            .http_client
+            .post(&assign_url)
+            .bearer_auth(&token)
+            .json(&role_mapping)
+            .send()
+            .await
+            .map_err(|e| {
+                ServiceError::ExternalServiceError(format!("Failed to assign role: {}", e))
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ServiceError::ExternalServiceError(format!(
+                "Failed to assign role '{}' to user ({}): {}",
+                role_name, status, body
+            )));
+        }
+
+        eprintln!("DEBUG: Role '{}' assigned to user {} successfully", role_name, keycloak_user_id);
+        Ok(())
+    }
+
+    /// 8. 사용자 활성화/비활성화
     pub async fn update_user_enabled(
         &self,
         keycloak_user_id: &str,

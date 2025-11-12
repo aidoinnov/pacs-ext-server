@@ -114,6 +114,7 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
         Ok(AuthResponse {
             user,
             token,
+            keycloak_access_token: keycloak_response.access_token,
             refresh_token: keycloak_response.refresh_token,
             expires_in: keycloak_response.expires_in,
             refresh_expires_in: keycloak_response.refresh_expires_in,
@@ -243,6 +244,7 @@ impl<U: UserRepository> AuthService for AuthServiceImpl<U> {
 pub struct AuthResponse {
     pub user: User,
     pub token: String,
+    pub keycloak_access_token: String, // Keycloak access token (for DICOM server)
     pub refresh_token: String,
     pub expires_in: i64,
     pub refresh_expires_in: i64,

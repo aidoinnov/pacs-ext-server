@@ -87,6 +87,20 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
             }
         };
 
+        // 2-1. Keycloak 사용자에게 "user" Realm Role 할당
+        eprintln!("DEBUG: Assigning 'user' realm role to Keycloak user: {}", keycloak_user_id);
+        self.keycloak_client
+            .assign_realm_role_to_user(&keycloak_user_id, "user")
+            .await
+            .map_err(|e| {
+                eprintln!("ERROR: Failed to assign 'user' role to user {}: {}", keycloak_user_id, e);
+                ServiceError::ExternalServiceError(format!(
+                    "Failed to assign 'user' role to Keycloak user: {}",
+                    e
+                ))
+            })?;
+        eprintln!("DEBUG: Successfully assigned 'user' realm role to user: {}", keycloak_user_id);
+
         // 3. DB에 사용자 생성 (트랜잭션 시작)
         let mut tx = self.pool.begin().await?;
 
@@ -275,14 +289,23 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
         let user = user.ok_or_else(|| ServiceError::NotFound("User not found".into()))?;
 
         // Keycloak에서 사용자 삭제
-        // keycloak_id는 UUID이므로 문자열로 변환
+        // 1. keycloak_id로 삭제 시도
         let keycloak_user_id = user.keycloak_id.to_string();
         eprintln!(
-            "DEBUG: Attempting to delete user from Keycloak: {}",
+            "DEBUG: Attempting to delete user from Keycloak by ID: {}",
             keycloak_user_id
         );
 
-        let keycloak_result = self.keycloak_client.delete_user(&keycloak_user_id).await;
+        let mut keycloak_result = self.keycloak_client.delete_user(&keycloak_user_id).await;
+
+        // 2. ID로 삭제 실패 시 username으로 삭제 시도
+        if keycloak_result.is_err() {
+            eprintln!(
+                "DEBUG: Delete by ID failed, trying by username: {}",
+                user.username
+            );
+            keycloak_result = self.keycloak_client.delete_user_by_username(&user.username).await;
+        }
 
         if let Err(e) = &keycloak_result {
             let _ = tx.rollback().await;

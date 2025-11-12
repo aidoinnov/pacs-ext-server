@@ -21,9 +21,11 @@ impl ProjectDataAccessRepository for ProjectDataAccessRepositoryImpl {
         new_access: &NewProjectDataAccess,
     ) -> Result<ProjectDataAccess, sqlx::Error> {
         let result = sqlx::query_as::<_, ProjectDataAccess>(
-            "INSERT INTO project_data_access (project_data_id, user_id, status, requested_at, requested_by, reviewed_at, reviewed_by, review_note)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-             RETURNING id, project_data_id, user_id, status, requested_at, requested_by, reviewed_at, reviewed_by, review_note, created_at, updated_at"
+            "INSERT INTO project_data_access (project_id, project_data_id, user_id, status, requested_at, requested_by, reviewed_at, reviewed_by, review_note)
+             SELECT pd.project_id, $1, $2, $3, $4, $5, $6, $7, $8
+             FROM project_data pd
+             WHERE pd.id = $1
+             RETURNING id, project_id, project_data_id, user_id, status, requested_at, requested_by, reviewed_at, reviewed_by, review_note, created_at, updated_at"
         )
         .bind(new_access.project_data_id)
         .bind(new_access.user_id)

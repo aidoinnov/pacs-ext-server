@@ -28,6 +28,7 @@ impl<A: AuthService> AuthUseCase<A> {
             username: auth_response.user.username,
             email: auth_response.user.email,
             token: auth_response.token,
+            keycloak_access_token: auth_response.keycloak_access_token,
             refresh_token: auth_response.refresh_token,
             token_type: "Bearer".to_string(),
             expires_in: auth_response.expires_in,

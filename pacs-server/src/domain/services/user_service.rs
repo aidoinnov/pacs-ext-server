@@ -395,9 +395,9 @@ where
                 id
             }
             None => {
-                // 기본 Viewer 역할 ID 조회
+                // 기본 VIEWER 역할 ID 조회 (대문자)
                 let viewer_role_id = sqlx::query_scalar::<_, Option<i32>>(
-                    "SELECT id FROM security_role WHERE name = 'Viewer' AND scope = 'project' LIMIT 1"
+                    "SELECT id FROM security_role WHERE name = 'VIEWER' AND scope = 'PROJECT' LIMIT 1"
                 )
                 .fetch_one(&mut *tx)
                 .await?;
@@ -406,7 +406,7 @@ where
                     Some(id) => id,
                     None => {
                         tx.rollback().await?;
-                        return Err(ServiceError::NotFound("Default Viewer role not found".into()));
+                        return Err(ServiceError::NotFound("Default VIEWER role not found".into()));
                     }
                 }
             }

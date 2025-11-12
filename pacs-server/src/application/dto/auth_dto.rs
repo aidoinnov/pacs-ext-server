@@ -32,6 +32,7 @@ pub struct LoginResponse {
     pub username: String,
     pub email: String,
     pub token: String,
+    pub keycloak_access_token: String, // Keycloak access token (for DICOM server)
     pub refresh_token: String,
     pub token_type: String, // "Bearer"
     pub expires_in: i64,    // seconds

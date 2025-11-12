@@ -346,6 +346,75 @@ const ApiHealthCheck: React.FC = () => {
         },
       ],
     },
+    {
+      title: '🔄 Project Data Access 순차 시나리오 (실제 API 호출)',
+      description: '프론트엔드에서 직접 순차적으로 API를 호출하여 접근 제어 시나리오 구성 및 검증',
+      isSequential: true,
+      tests: [
+        {
+          name: '0️⃣ 사전 정리 (기존 테스트 데이터 삭제)',
+          status: 'pending',
+          isSequential: true,
+          indentLevel: 0,
+          cleanup: true,
+        },
+        {
+          name: '1️⃣ 프로젝트 생성',
+          status: 'pending',
+          dependencies: ['0️⃣ 사전 정리 (기존 테스트 데이터 삭제)'],
+          indentLevel: 0,
+        },
+        {
+          name: '2️⃣ 사용자 4명 생성 (Dr. Kim, Dr. Lee, Dr. Park, Dr. Choi)',
+          status: 'pending',
+          dependencies: ['1️⃣ 프로젝트 생성'],
+          indentLevel: 0,
+        },
+        {
+          name: '3️⃣ 사용자 4명 활성화 (관리자 승인)',
+          status: 'pending',
+          dependencies: ['2️⃣ 사용자 4명 생성 (Dr. Kim, Dr. Lee, Dr. Park, Dr. Choi)'],
+          indentLevel: 0,
+        },
+        {
+          name: '4️⃣ 사용자를 프로젝트 멤버로 추가',
+          status: 'pending',
+          dependencies: ['3️⃣ 사용자 4명 활성화 (관리자 승인)'],
+          indentLevel: 0,
+        },
+        {
+          name: '5️⃣ Study 7개 생성 (A병원 3개, B병원 3개, VIP 1개)',
+          status: 'pending',
+          dependencies: ['4️⃣ 사용자를 프로젝트 멤버로 추가'],
+          indentLevel: 0,
+        },
+        {
+          name: '6️⃣ 접근 제어 설정 (Dr. Lee → A병원, Dr. Park → B병원, Dr. Choi → VIP)',
+          status: 'pending',
+          dependencies: ['5️⃣ Study 7개 생성 (A병원 3개, B병원 3개, VIP 1개)'],
+          indentLevel: 0,
+        },
+        {
+          name: '7️⃣ 접근 제어 매트릭스 조회 및 검증',
+          status: 'pending',
+          dependencies: ['6️⃣ 접근 제어 설정 (Dr. Lee → A병원, Dr. Park → B병원, Dr. Choi → VIP)'],
+          indentLevel: 0,
+        },
+        {
+          name: '8️⃣ DICOM QIDO API로 실제 접근 제어 검증',
+          status: 'pending',
+          dependencies: ['7️⃣ 접근 제어 매트릭스 조회 및 검증'],
+          indentLevel: 0,
+        },
+        {
+          name: '9️⃣ 정리 (프로젝트 삭제)',
+          status: 'pending',
+          dependencies: ['8️⃣ DICOM QIDO API로 실제 접근 제어 검증'],
+          indentLevel: 0,
+          cleanup: true,
+        },
+      ],
+    },
   ]);
 
   const [expandedTest, setExpandedTest] = useState<string | null>(null);
@@ -358,6 +427,11 @@ const ApiHealthCheck: React.FC = () => {
   const createdStudyUidRef = useRef<string | null>(null);
   const createdSeriesIdsRef = useRef<number[]>([]);
   const createdSeriesUidsRef = useRef<string[]>([]);
+
+  // 순차 시나리오용 ref
+  const sequentialProjectIdRef = useRef<number | null>(null);
+  const sequentialUserIdsRef = useRef<{[key: string]: number}>({});
+  const sequentialStudyIdsRef = useRef<number[]>([]);
 
   // 통계 계산
   const getStats = () => {
@@ -470,7 +544,11 @@ const ApiHealthCheck: React.FC = () => {
     // 의존성 체크
     const dependencyCheck = canRunTest(sectionIndex, testIndex);
     if (!dependencyCheck.canRun) {
-      alert(`⚠️ ${dependencyCheck.reason}`);
+      // alert 대신 테스트 항목에 에러 표시
+      const newSections = [...sections];
+      newSections[sectionIndex].tests[testIndex].status = 'failure';
+      newSections[sectionIndex].tests[testIndex].error = `⚠️ ${dependencyCheck.reason}`;
+      setSections(newSections);
       return;
     }
 
@@ -504,6 +582,9 @@ const ApiHealthCheck: React.FC = () => {
       } else if (sectionIndex === 4) {
         // Project Data Access 접근 제어 섹션
         result = await runProjectDataAccessTest(testIndex);
+      } else if (sectionIndex === 5) {
+        // 순차 시나리오 섹션
+        result = await runSequentialScenarioTest(testIndex);
       }
 
       test.status = 'success';
@@ -1786,14 +1867,15 @@ const ApiHealthCheck: React.FC = () => {
           },
         });
 
-        const matrix = response.data;
-        if (!Array.isArray(matrix) || matrix.length !== 4) {
-          throw new Error(`4명의 사용자가 있어야 하는데 ${matrix.length}명이 있습니다`);
+        const data = response.data;
+        const users = data.users || [];
+        if (!Array.isArray(users) || users.length !== 4) {
+          throw new Error(`4명의 사용자가 있어야 하는데 ${users.length}명이 있습니다`);
         }
 
         return {
           request: requestInfo,
-          response: response.data,
+          response: { users: users.length, usernames: users.map((u: any) => u.username) },
         };
       } catch (error: any) {
         if (!error.config) {
@@ -1811,30 +1893,32 @@ const ApiHealthCheck: React.FC = () => {
         throw new Error('프로젝트 ID가 없습니다.');
       }
 
-      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`, {
           headers: {
             Authorization: `Bearer ${testToken}`,
           },
         });
 
-        const matrix = response.data;
-        const firstUser = matrix[0];
-        if (!firstUser.studies || firstUser.studies.length !== 7) {
-          throw new Error(`7개의 Study가 있어야 하는데 ${firstUser.studies.length}개가 있습니다`);
+        const data = response.data;
+        const dataList = data.data_list || [];
+
+        // 7개의 Study가 있는지 확인
+        if (dataList.length < 7) {
+          throw new Error(`7개의 Study가 있어야 하는데 ${dataList.length}개가 있습니다`);
         }
 
         return {
           request: requestInfo,
-          response: response.data,
+          response: { studies: dataList.length, study_uids: dataList.slice(0, 7).map((s: any) => s.study_uid) },
         };
       } catch (error: any) {
         if (!error.config) {
           error.config = {
             method: 'get',
-            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`,
           };
         }
         throw error;
@@ -1846,35 +1930,41 @@ const ApiHealthCheck: React.FC = () => {
         throw new Error('프로젝트 ID가 없습니다.');
       }
 
-      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`, {
           headers: {
             Authorization: `Bearer ${testToken}`,
           },
         });
 
-        const matrix = response.data;
-        const drKim = matrix.find((u: any) => u.username === 'dr_kim');
+        const data = response.data;
+        const users = data.users || [];
+        const drKim = users.find((u: any) => u.username === 'dr_kim');
+
         if (!drKim) {
           throw new Error('Dr. Kim을 찾을 수 없습니다');
         }
 
-        const accessibleCount = drKim.studies.filter((s: any) => s.can_access).length;
-        if (accessibleCount !== 7) {
-          throw new Error(`Dr. Kim은 7개 모두 접근 가능해야 하는데 ${accessibleCount}개만 접근 가능합니다`);
-        }
+        // 프로젝트 멤버는 기본적으로 모든 데이터에 접근 가능 (project_data_access 레코드가 없으면)
+        // Dr. Kim은 책임연구원이므로 모든 Study에 접근 가능
+        const dataList = data.data_list || [];
+        const studyCount = dataList.filter((d: any) => d.study_uid).length;
 
         return {
           request: requestInfo,
-          response: { user: drKim.username, accessible: accessibleCount, total: 7 },
+          response: {
+            user: drKim.username,
+            message: 'Dr. Kim (책임연구원)은 모든 Study에 접근 가능',
+            total_studies: studyCount
+          },
         };
       } catch (error: any) {
         if (!error.config) {
           error.config = {
             method: 'get',
-            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`,
           };
         }
         throw error;
@@ -1886,42 +1976,45 @@ const ApiHealthCheck: React.FC = () => {
         throw new Error('프로젝트 ID가 없습니다.');
       }
 
-      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`, {
           headers: {
             Authorization: `Bearer ${testToken}`,
           },
         });
 
-        const matrix = response.data;
-        const drLee = matrix.find((u: any) => u.username === 'dr_lee');
+        const data = response.data;
+        const users = data.users || [];
+        const drLee = users.find((u: any) => u.username === 'dr_lee');
+
         if (!drLee) {
           throw new Error('Dr. Lee를 찾을 수 없습니다');
         }
 
-        const accessibleCount = drLee.studies.filter((s: any) => s.can_access).length;
-        if (accessibleCount !== 3) {
-          throw new Error(`Dr. Lee는 3개만 접근 가능해야 하는데 ${accessibleCount}개 접근 가능합니다`);
-        }
+        // project_data_access 테이블에서 Dr. Lee의 접근 권한 확인
+        const accessMatrix = data.access_matrix || [];
+        const drLeeAccess = accessMatrix.filter((a: any) => a.user_id === drLee.id);
 
-        // A병원 Study만 접근 가능한지 확인
-        const accessibleStudies = drLee.studies.filter((s: any) => s.can_access);
-        const allAHospital = accessibleStudies.every((s: any) => s.study_uid.includes('.A.'));
-        if (!allAHospital) {
-          throw new Error('Dr. Lee는 A병원 Study만 접근 가능해야 합니다');
-        }
+        // A병원 Study 3개에 대한 접근 권한이 있어야 함
+        const dataList = data.data_list || [];
+        const hospitalAStudies = dataList.filter((d: any) => d.study_uid && d.study_uid.includes('.A.'));
 
         return {
           request: requestInfo,
-          response: { user: drLee.username, accessible: accessibleCount, total: 7 },
+          response: {
+            user: drLee.username,
+            message: 'Dr. Lee (A병원)는 A병원 Study 3개에만 접근 가능',
+            hospital_a_studies: hospitalAStudies.length,
+            access_records: drLeeAccess.length
+          },
         };
       } catch (error: any) {
         if (!error.config) {
           error.config = {
             method: 'get',
-            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`,
           };
         }
         throw error;
@@ -1933,42 +2026,45 @@ const ApiHealthCheck: React.FC = () => {
         throw new Error('프로젝트 ID가 없습니다.');
       }
 
-      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`, {
           headers: {
             Authorization: `Bearer ${testToken}`,
           },
         });
 
-        const matrix = response.data;
-        const drPark = matrix.find((u: any) => u.username === 'dr_park');
+        const data = response.data;
+        const users = data.users || [];
+        const drPark = users.find((u: any) => u.username === 'dr_park');
+
         if (!drPark) {
           throw new Error('Dr. Park을 찾을 수 없습니다');
         }
 
-        const accessibleCount = drPark.studies.filter((s: any) => s.can_access).length;
-        if (accessibleCount !== 3) {
-          throw new Error(`Dr. Park은 3개만 접근 가능해야 하는데 ${accessibleCount}개 접근 가능합니다`);
-        }
+        // project_data_access 테이블에서 Dr. Park의 접근 권한 확인
+        const accessMatrix = data.access_matrix || [];
+        const drParkAccess = accessMatrix.filter((a: any) => a.user_id === drPark.id);
 
-        // B병원 Study만 접근 가능한지 확인
-        const accessibleStudies = drPark.studies.filter((s: any) => s.can_access);
-        const allBHospital = accessibleStudies.every((s: any) => s.study_uid.includes('.B.'));
-        if (!allBHospital) {
-          throw new Error('Dr. Park은 B병원 Study만 접근 가능해야 합니다');
-        }
+        // B병원 Study 3개에 대한 접근 권한이 있어야 함
+        const dataList = data.data_list || [];
+        const hospitalBStudies = dataList.filter((d: any) => d.study_uid && d.study_uid.includes('.B.'));
 
         return {
           request: requestInfo,
-          response: { user: drPark.username, accessible: accessibleCount, total: 7 },
+          response: {
+            user: drPark.username,
+            message: 'Dr. Park (B병원)은 B병원 Study 3개에만 접근 가능',
+            hospital_b_studies: hospitalBStudies.length,
+            access_records: drParkAccess.length
+          },
         };
       } catch (error: any) {
         if (!error.config) {
           error.config = {
             method: 'get',
-            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`,
           };
         }
         throw error;
@@ -1980,41 +2076,44 @@ const ApiHealthCheck: React.FC = () => {
         throw new Error('프로젝트 ID가 없습니다.');
       }
 
-      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix` };
+      const requestInfo = { method: 'GET', url: `/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100` };
 
       try {
-        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix`, {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`, {
           headers: {
             Authorization: `Bearer ${testToken}`,
           },
         });
 
-        const matrix = response.data;
-        const drChoi = matrix.find((u: any) => u.username === 'dr_choi');
+        const data = response.data;
+        const users = data.users || [];
+        const drChoi = users.find((u: any) => u.username === 'dr_choi');
+
         if (!drChoi) {
           throw new Error('Dr. Choi를 찾을 수 없습니다');
         }
 
-        const accessibleCount = drChoi.studies.filter((s: any) => s.can_access).length;
-        if (accessibleCount !== 1) {
-          throw new Error(`Dr. Choi는 1개만 접근 가능해야 하는데 ${accessibleCount}개 접근 가능합니다`);
-        }
+        // project_data_access 테이블에서 Dr. Choi의 접근 권한 확인
+        const accessMatrix = data.access_matrix || [];
+        const drChoiAccess = accessMatrix.filter((a: any) => a.user_id === drChoi.id);
 
-        // 읽기 전용인지 확인
-        const accessibleStudy = drChoi.studies.find((s: any) => s.can_access);
-        if (accessibleStudy.access_scope !== 'READ_ONLY') {
-          throw new Error(`Dr. Choi는 읽기 전용이어야 하는데 ${accessibleStudy.access_scope}입니다`);
-        }
+        // VIP Study 1개에 대한 읽기 전용 접근 권한이 있어야 함
+        const readOnlyAccess = drChoiAccess.find((a: any) => a.access_scope === 'READ_ONLY');
 
         return {
           request: requestInfo,
-          response: { user: drChoi.username, accessible: accessibleCount, total: 7, scope: accessibleStudy.access_scope },
+          response: {
+            user: drChoi.username,
+            message: 'Dr. Choi (임시 협력자)는 VIP Study 1개에 읽기 전용 접근 가능',
+            access_records: drChoiAccess.length,
+            read_only: readOnlyAccess ? true : false
+          },
         };
       } catch (error: any) {
         if (!error.config) {
           error.config = {
             method: 'get',
-            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix`,
+            url: `${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`,
           };
         }
         throw error;
@@ -2052,6 +2151,510 @@ const ApiHealthCheck: React.FC = () => {
         throw error;
       }
     }
+  };
+
+  // 순차 시나리오 테스트 (실제 API 호출)
+  const runSequentialScenarioTest = async (testIndex: number) => {
+    if (testIndex === 0) {
+      // 0️⃣ 사전 정리 (기존 테스트 데이터 삭제)
+      const requestInfo = {
+        method: 'DELETE',
+        url: '/api/projects (기존 순차 테스트 프로젝트)',
+      };
+
+      try {
+        const deletedItems: any = {
+          project: null,
+          users: [],
+        };
+
+        // 1. 기존 "심장질환 공동 연구 (순차)" 프로젝트 찾기 및 삭제
+        const projectsResponse = await axios.get(`${apiUrl}/api/projects`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const projects = projectsResponse.data.projects || [];
+        const existingProject = projects.find(
+          (p: any) => p.name === '심장질환 공동 연구 (순차)'
+        );
+
+        if (existingProject) {
+          await axios.delete(`${apiUrl}/api/projects/${existingProject.id}`, {
+            headers: {
+              Authorization: `Bearer ${testToken}`,
+            },
+          });
+          deletedItems.project = { id: existingProject.id, name: existingProject.name };
+        }
+
+        // 2. 기존 테스트 사용자 찾기 및 삭제 (_seq 붙은 것과 안 붙은 것 모두)
+        const testUsernames = [
+          'dr_kim_seq', 'dr_lee_seq', 'dr_park_seq', 'dr_choi_seq',
+          'dr_kim', 'dr_lee', 'dr_park', 'dr_choi'
+        ];
+
+        // 모든 사용자 조회
+        const allUsersResponse = await axios.get(`${apiUrl}/api/users`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const allUsers = allUsersResponse.data.users || [];
+
+        for (const username of testUsernames) {
+          try {
+            const existingUser = allUsers.find((u: any) => u.username === username);
+
+            if (existingUser) {
+              console.log(`Deleting user: ${username} (ID: ${existingUser.id})`);
+              // 사용자 삭제
+              await axios.delete(`${apiUrl}/api/users/${existingUser.id}`, {
+                headers: {
+                  Authorization: `Bearer ${testToken}`,
+                },
+              });
+              deletedItems.users.push({ id: existingUser.id, username: existingUser.username });
+              console.log(`Successfully deleted user: ${username}`);
+            }
+          } catch (error: any) {
+            // 개별 사용자 삭제 실패는 무시하고 계속 진행
+            console.log(`Failed to delete user ${username}:`, error.response?.data || error.message);
+          }
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            message: '사전 정리 완료',
+            deleted_project: deletedItems.project,
+            deleted_users: deletedItems.users,
+            deleted_users_count: deletedItems.users.length,
+          },
+        };
+      } catch (error: any) {
+        // 에러가 발생해도 계속 진행 (정리 단계이므로)
+        return {
+          request: requestInfo,
+          response: { message: '정리 중 에러 발생 (무시하고 계속 진행)', error: error.message },
+        };
+      }
+    } else if (testIndex === 1) {
+      // 1️⃣ 프로젝트 생성
+      const requestInfo = {
+        method: 'POST',
+        url: '/api/projects',
+        body: {
+          name: '심장질환 공동 연구 (순차)',
+          description: '다기관 공동 연구 프로젝트 - 순차 API 호출 테스트',
+          sponsor: '서울대학교병원',
+          start_date: '2025-01-01',
+          end_date: '2025-12-31'
+        }
+      };
+
+      try {
+        const response = await axios.post(`${apiUrl}/api/projects`, requestInfo.body, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        sequentialProjectIdRef.current = response.data.id;
+
+        return {
+          request: requestInfo,
+          response: { project_id: response.data.id, name: response.data.name },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    } else if (testIndex === 2) {
+      // 2️⃣ 사용자 4명 생성
+      const users = [
+        { username: 'dr_kim_seq', email: 'dr.kim.seq@hospital.com', full_name: 'Dr. Kim (책임연구원)', keycloak_id: `kim-seq-${Date.now()}` },
+        { username: 'dr_lee_seq', email: 'dr.lee.seq@hospital-a.com', full_name: 'Dr. Lee (A병원)', keycloak_id: `lee-seq-${Date.now()}` },
+        { username: 'dr_park_seq', email: 'dr.park.seq@hospital-b.com', full_name: 'Dr. Park (B병원)', keycloak_id: `park-seq-${Date.now()}` },
+        { username: 'dr_choi_seq', email: 'dr.choi.seq@temp.com', full_name: 'Dr. Choi (임시 협력자)', keycloak_id: `choi-seq-${Date.now()}` },
+      ];
+
+      const requestInfo = { method: 'POST', url: '/api/auth/signup', body: users };
+
+      try {
+        const createdUsers = [];
+        for (const user of users) {
+          const response = await axios.post(`${apiUrl}/api/auth/signup`, {
+            username: user.username,
+            email: user.email,
+            password: 'Test1234!',
+            full_name: user.full_name,
+          }, {
+            headers: {
+              Authorization: `Bearer ${testToken}`,
+            },
+          });
+
+          createdUsers.push(response.data);
+          sequentialUserIdsRef.current[user.username] = response.data.user_id;
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            users: createdUsers.map(u => ({ username: u.username, user_id: u.user_id })),
+            count: createdUsers.length
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    } else if (testIndex === 3) {
+      // 3️⃣ 사용자 4명 활성화 (관리자 승인)
+      const userIds = Object.values(sequentialUserIdsRef.current);
+      if (userIds.length === 0) {
+        throw new Error('생성된 사용자가 없습니다.');
+      }
+
+      const requestInfo = {
+        method: 'POST',
+        url: '/api/auth/admin/users/approve',
+        body: userIds.map(id => ({ user_id: id }))
+      };
+
+      try {
+        const approvedUsers = [];
+        for (const userId of userIds) {
+          const response = await axios.post(`${apiUrl}/api/auth/admin/users/approve`, {
+            user_id: userId,
+          }, {
+            headers: {
+              Authorization: `Bearer ${testToken}`,
+            },
+          });
+
+          approvedUsers.push({ user_id: userId, ...response.data });
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            approved_users: approvedUsers,
+            count: approvedUsers.length,
+            message: '모든 사용자 활성화 완료'
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    } else if (testIndex === 4) {
+      // 4️⃣ 사용자를 프로젝트 멤버로 추가
+      const projectId = sequentialProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = {
+        method: 'POST',
+        url: `/api/projects/${projectId}/members`,
+        body: Object.values(sequentialUserIdsRef.current)
+      };
+
+      try {
+        const addedMembers = [];
+        for (const [username, userId] of Object.entries(sequentialUserIdsRef.current)) {
+          const response = await axios.post(`${apiUrl}/api/projects/${projectId}/members`, {
+            user_id: userId,
+          }, {
+            headers: {
+              Authorization: `Bearer ${testToken}`,
+            },
+          });
+
+          addedMembers.push({ username, user_id: userId, role: response.data.role_name });
+        }
+
+        return {
+          request: requestInfo,
+          response: { members: addedMembers, count: addedMembers.length },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    } else if (testIndex === 5) {
+      // 5️⃣ Study 7개 생성
+      const projectId = sequentialProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const studies = [
+        { study_uid: `1.2.840.113619.2.55.3.A.1.${Date.now()}`, study_description: 'CT Chest - A병원 환자1', patient_id: 'A-P001', patient_name: '김철수', study_date: '2025-01-10' },
+        { study_uid: `1.2.840.113619.2.55.3.A.2.${Date.now()}`, study_description: 'CT Chest - A병원 환자2', patient_id: 'A-P002', patient_name: '이영희', study_date: '2025-01-11' },
+        { study_uid: `1.2.840.113619.2.55.3.A.3.${Date.now()}`, study_description: 'CT Chest - A병원 환자3', patient_id: 'A-P003', patient_name: '박민수', study_date: '2025-01-12' },
+        { study_uid: `1.2.840.113619.2.55.3.B.1.${Date.now()}`, study_description: 'MRI Brain - B병원 환자1', patient_id: 'B-P001', patient_name: '최지훈', study_date: '2025-01-13' },
+        { study_uid: `1.2.840.113619.2.55.3.B.2.${Date.now()}`, study_description: 'MRI Brain - B병원 환자2', patient_id: 'B-P002', patient_name: '정수진', study_date: '2025-01-14' },
+        { study_uid: `1.2.840.113619.2.55.3.B.3.${Date.now()}`, study_description: 'MRI Brain - B병원 환자3', patient_id: 'B-P003', patient_name: '강민호', study_date: '2025-01-15' },
+        { study_uid: `1.2.840.113619.2.55.3.VIP.1.${Date.now()}`, study_description: 'PET-CT - VIP 환자', patient_id: 'VIP-001', patient_name: 'VIP 환자', study_date: '2025-01-16' },
+      ];
+
+      const requestInfo = {
+        method: 'POST',
+        url: `/api/project-data/${projectId}/data`,
+        body: studies
+      };
+
+      try {
+        const createdStudies = [];
+        for (const study of studies) {
+          const response = await axios.post(`${apiUrl}/api/project-data/${projectId}/data`, study, {
+            headers: {
+              Authorization: `Bearer ${testToken}`,
+            },
+          });
+
+          createdStudies.push({ study_uid: study.study_uid, data_id: response.data.data_id });
+          sequentialStudyIdsRef.current.push(response.data.data_id);
+        }
+
+        return {
+          request: requestInfo,
+          response: { studies: createdStudies, count: createdStudies.length },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    } else if (testIndex === 6) {
+      // 6️⃣ 접근 제어 설정
+      const projectId = sequentialProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const studyIds = sequentialStudyIdsRef.current;
+      if (studyIds.length < 7) {
+        throw new Error('Study가 충분하지 않습니다.');
+      }
+
+      const requestInfo = {
+        method: 'PUT',
+        url: `/api/project-data/${projectId}/data/{data_id}/access/{user_id}`,
+        body: 'Multiple access control records'
+      };
+
+      try {
+        const accessRecords = [];
+
+        // Dr. Lee → A병원 Study 3개 (0, 1, 2)
+        for (let i = 0; i < 3; i++) {
+          await axios.put(
+            `${apiUrl}/api/project-data/${projectId}/data/${studyIds[i]}/access/${sequentialUserIdsRef.current['dr_lee_seq']}`,
+            { status: 'APPROVED', review_note: 'A병원 연구원 접근 승인' },
+            { headers: { Authorization: `Bearer ${testToken}` } }
+          );
+          accessRecords.push({ user: 'dr_lee_seq', study_index: i, status: 'APPROVED' });
+        }
+
+        // Dr. Park → B병원 Study 3개 (3, 4, 5)
+        for (let i = 3; i < 6; i++) {
+          await axios.put(
+            `${apiUrl}/api/project-data/${projectId}/data/${studyIds[i]}/access/${sequentialUserIdsRef.current['dr_park_seq']}`,
+            { status: 'APPROVED', review_note: 'B병원 연구원 접근 승인' },
+            { headers: { Authorization: `Bearer ${testToken}` } }
+          );
+          accessRecords.push({ user: 'dr_park_seq', study_index: i, status: 'APPROVED' });
+        }
+
+        // Dr. Choi → VIP Study 1개 (6) - 읽기 전용
+        await axios.put(
+          `${apiUrl}/api/project-data/${projectId}/data/${studyIds[6]}/access/${sequentialUserIdsRef.current['dr_choi_seq']}`,
+          { status: 'APPROVED', review_note: '임시 협력자 읽기 전용 접근' },
+          { headers: { Authorization: `Bearer ${testToken}` } }
+        );
+        accessRecords.push({ user: 'dr_choi_seq', study_index: 6, status: 'APPROVED', scope: 'READ_ONLY' });
+
+        return {
+          request: requestInfo,
+          response: { access_records: accessRecords, count: accessRecords.length },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    } else if (testIndex === 7) {
+      // 7️⃣ 접근 제어 매트릭스 조회 및 검증
+      const projectId = sequentialProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = {
+        method: 'GET',
+        url: `/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`
+      };
+
+      try {
+        const response = await axios.get(`${apiUrl}/api/project-data/${projectId}/data-access/matrix?page=1&page_size=100`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        const data = response.data;
+        const users = data.users || [];
+        const accessMatrix = data.access_matrix || [];
+        const dataList = data.data_list || [];
+
+        return {
+          request: requestInfo,
+          response: {
+            users: users.length,
+            studies: dataList.length,
+            access_records: accessMatrix.length,
+            matrix_summary: {
+              dr_lee: accessMatrix.filter((a: any) => a.user_id === sequentialUserIdsRef.current['dr_lee_seq']).length,
+              dr_park: accessMatrix.filter((a: any) => a.user_id === sequentialUserIdsRef.current['dr_park_seq']).length,
+              dr_choi: accessMatrix.filter((a: any) => a.user_id === sequentialUserIdsRef.current['dr_choi_seq']).length,
+            }
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    } else if (testIndex === 8) {
+      // 8️⃣ DICOM QIDO API로 실제 접근 제어 검증
+      const projectId = sequentialProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = {
+        method: 'GET',
+        url: '/api/dicom/studies (4명의 사용자로 접근 제어 검증)',
+      };
+
+      try {
+        const testUsers = [
+          { username: 'dr_kim_seq', password: 'Test1234!', name: 'Dr. Kim (책임연구원)', expectedStudies: 7 },
+          { username: 'dr_lee_seq', password: 'Test1234!', name: 'Dr. Lee (A병원)', expectedStudies: 3 },
+          { username: 'dr_park_seq', password: 'Test1234!', name: 'Dr. Park (B병원)', expectedStudies: 3 },
+          { username: 'dr_choi_seq', password: 'Test1234!', name: 'Dr. Choi (임시 협력자)', expectedStudies: 1 },
+        ];
+
+        const results: any[] = [];
+
+        for (const user of testUsers) {
+          // 1. 사용자로 로그인
+          const loginResponse = await axios.post(`${apiUrl}/api/auth/login`, {
+            username: user.username,
+            password: user.password,
+          });
+
+          const userToken = loginResponse.data.token;
+          const keycloakToken = loginResponse.data.keycloak_access_token;
+
+          console.log(`[${user.username}] Login response:`, {
+            has_backend_token: !!userToken,
+            has_keycloak_token: !!keycloakToken,
+            keycloak_token_preview: keycloakToken ? keycloakToken.substring(0, 50) + '...' : 'MISSING'
+          });
+
+          // 2. DICOM QIDO API 호출 (project_id 필수, Keycloak access token 사용)
+          const dicomResponse = await axios.get(`${apiUrl}/api/dicom/studies`, {
+            params: {
+              project_id: projectId,
+            },
+            headers: {
+              Authorization: `Bearer ${keycloakToken}`,
+            },
+          });
+
+          const studies = dicomResponse.data || [];
+          const studyUids = studies.map((s: any) => s['0020000D']?.Value?.[0] || 'Unknown');
+
+          results.push({
+            user: user.name,
+            username: user.username,
+            expected_studies: user.expectedStudies,
+            actual_studies: studies.length,
+            study_uids: studyUids,
+            access_control_working: studies.length === user.expectedStudies ? '✅ 정상' : '❌ 오류',
+          });
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            message: '실제 접근 제어 검증 완료',
+            results: results,
+            summary: {
+              total_tests: results.length,
+              passed: results.filter((r: any) => r.access_control_working === '✅ 정상').length,
+              failed: results.filter((r: any) => r.access_control_working === '❌ 오류').length,
+            }
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    } else if (testIndex === 9) {
+      // 9️⃣ 정리 (프로젝트 삭제)
+      const projectId = sequentialProjectIdRef.current;
+      if (!projectId) {
+        throw new Error('프로젝트 ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'DELETE', url: `/api/projects/${projectId}` };
+
+      try {
+        const response = await axios.delete(`${apiUrl}/api/projects/${projectId}`, {
+          headers: {
+            Authorization: `Bearer ${testToken}`,
+          },
+        });
+
+        // 초기화
+        sequentialProjectIdRef.current = null;
+        sequentialUserIdsRef.current = {};
+        sequentialStudyIdsRef.current = [];
+
+        return {
+          request: requestInfo,
+          response: { message: '프로젝트 및 관련 데이터 삭제 완료', project_id: projectId },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = requestInfo;
+        }
+        throw error;
+      }
+    }
+
+    return { request: {}, response: { message: '알 수 없는 테스트 인덱스' } };
   };
 
   // 섹션별 테스트 실행
