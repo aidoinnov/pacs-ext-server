@@ -283,6 +283,68 @@ const ApiHealthCheck: React.FC = () => {
       ],
     },
     {
+      title: '🏷️ Annotation Label 기능',
+      description: 'Annotation Label 생성, 수정, 조회 테스트 (순차 실행)',
+      isSequential: true,
+      tests: [
+        {
+          name: '1️⃣ Label 없이 Annotation 생성',
+          status: 'pending',
+          isSequential: true,
+          indentLevel: 0,
+        },
+        {
+          name: '2️⃣ Label과 함께 Annotation 생성 (Tumor)',
+          status: 'pending',
+          dependencies: ['1️⃣ Label 없이 Annotation 생성'],
+          indentLevel: 0,
+        },
+        {
+          name: '3️⃣ 생성된 Annotation 조회 (Label 확인)',
+          status: 'pending',
+          dependencies: ['2️⃣ Label과 함께 Annotation 생성 (Tumor)'],
+          indentLevel: 1,
+        },
+        {
+          name: '4️⃣ Label 수정 (Tumor → Lesion)',
+          status: 'pending',
+          dependencies: ['3️⃣ 생성된 Annotation 조회 (Label 확인)'],
+          indentLevel: 1,
+        },
+        {
+          name: '5️⃣ 수정된 Label 확인',
+          status: 'pending',
+          dependencies: ['4️⃣ Label 수정 (Tumor → Lesion)'],
+          indentLevel: 2,
+        },
+        {
+          name: '6️⃣ 다양한 Label로 Annotation 생성 (Normal, Abnormal, Suspicious)',
+          status: 'pending',
+          dependencies: ['5️⃣ 수정된 Label 확인'],
+          indentLevel: 0,
+        },
+        {
+          name: '7️⃣ 모든 Annotation 조회 (Label 포함)',
+          status: 'pending',
+          dependencies: ['6️⃣ 다양한 Label로 Annotation 생성 (Normal, Abnormal, Suspicious)'],
+          indentLevel: 1,
+        },
+        {
+          name: '8️⃣ Label 빈 문자열로 수정',
+          status: 'pending',
+          dependencies: ['7️⃣ 모든 Annotation 조회 (Label 포함)'],
+          indentLevel: 1,
+        },
+        {
+          name: '9️⃣ 정리 (생성된 Annotation 삭제)',
+          status: 'pending',
+          dependencies: ['8️⃣ Label 빈 문자열로 수정'],
+          indentLevel: 0,
+          cleanup: true,
+        },
+      ],
+    },
+    {
       title: '🔒 Project Data Access 접근 제어',
       description: '다기관 공동 연구 프로젝트 시나리오 - 사용자별 데이터 접근 제어 테스트',
       isSequential: true,
@@ -427,6 +489,9 @@ const ApiHealthCheck: React.FC = () => {
   const createdStudyUidRef = useRef<string | null>(null);
   const createdSeriesIdsRef = useRef<number[]>([]);
   const createdSeriesUidsRef = useRef<string[]>([]);
+
+  // Annotation 테스트용 ref
+  const createdAnnotationIdsRef = useRef<number[]>([]);
 
   // 순차 시나리오용 ref
   const sequentialProjectIdRef = useRef<number | null>(null);
@@ -580,9 +645,12 @@ const ApiHealthCheck: React.FC = () => {
         // DICOM 전체 조회 + 할당 여부 확인 섹션
         result = await runDicomTest(testIndex);
       } else if (sectionIndex === 4) {
+        // Annotation Label 기능 섹션
+        result = await runAnnotationLabelTest(testIndex);
+      } else if (sectionIndex === 5) {
         // Project Data Access 접근 제어 섹션
         result = await runProjectDataAccessTest(testIndex);
-      } else if (sectionIndex === 5) {
+      } else if (sectionIndex === 6) {
         // 순차 시나리오 섹션
         result = await runSequentialScenarioTest(testIndex);
       }
@@ -1786,6 +1854,411 @@ const ApiHealthCheck: React.FC = () => {
           error.config = {
             method: 'get',
             url: `${apiUrl}/api/dicom/studies?project_id=-1`,
+          };
+        }
+        throw error;
+      }
+    }
+  };
+
+  // Annotation Label 기능 테스트
+  const runAnnotationLabelTest = async (testIndex: number) => {
+    // 테스트용 데이터
+    const testStudyUid = '1.2.840.113619.2.55.3.604688119.868.1234567890.1';
+    const testSeriesUid = '1.2.840.113619.2.55.3.604688119.868.1234567890.2';
+    const testSopUid = '1.2.840.113619.2.55.3.604688119.868.1234567890.3';
+
+    if (testIndex === 0) {
+      // 1️⃣ Label 없이 Annotation 생성
+      const requestBody = {
+        study_instance_uid: testStudyUid,
+        series_instance_uid: testSeriesUid,
+        sop_instance_uid: testSopUid,
+        annotation_data: {
+          type: 'rectangle',
+          x: 100,
+          y: 100,
+          width: 200,
+          height: 150,
+          color: '#FF0000',
+        },
+        tool_name: 'Rectangle Tool',
+        description: 'Test annotation without label',
+      };
+
+      const requestInfo = { method: 'POST', url: '/api/annotations', body: requestBody };
+
+      try {
+        const config = await getAxiosConfig();
+        const response = await axios.post(`${apiUrl}/api/annotations`, requestBody, config);
+
+        // 생성된 annotation ID 저장
+        createdAnnotationIdsRef.current = [response.data.id];
+
+        console.log(`  ✅ Label 없이 Annotation 생성 성공:`, response.data);
+
+        return {
+          request: requestInfo,
+          response: {
+            id: response.data.id,
+            label: response.data.label,
+            message: 'Label이 null 또는 빈 문자열이어야 함',
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/annotations`,
+            data: requestBody,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
+      // 2️⃣ Label과 함께 Annotation 생성 (Tumor)
+      const requestBody = {
+        study_instance_uid: testStudyUid,
+        series_instance_uid: testSeriesUid,
+        sop_instance_uid: testSopUid,
+        annotation_data: {
+          type: 'circle',
+          x: 300,
+          y: 300,
+          radius: 50,
+          color: '#00FF00',
+        },
+        tool_name: 'Circle Tool',
+        label: 'Tumor',
+        description: 'Test annotation with Tumor label',
+      };
+
+      const requestInfo = { method: 'POST', url: '/api/annotations', body: requestBody };
+
+      try {
+        const config = await getAxiosConfig();
+        const response = await axios.post(`${apiUrl}/api/annotations`, requestBody, config);
+
+        // 생성된 annotation ID 추가
+        createdAnnotationIdsRef.current.push(response.data.id);
+
+        console.log(`  ✅ Label과 함께 Annotation 생성 성공:`, response.data);
+
+        if (response.data.label !== 'Tumor') {
+          throw new Error(`Label이 'Tumor'여야 하는데 '${response.data.label}'입니다.`);
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            id: response.data.id,
+            label: response.data.label,
+            message: 'Label이 Tumor로 설정됨',
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/annotations`,
+            data: requestBody,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 2) {
+      // 3️⃣ 생성된 Annotation 조회 (Label 확인)
+      const annotationId = createdAnnotationIdsRef.current[1]; // Tumor label이 있는 annotation
+
+      if (!annotationId) {
+        throw new Error('조회할 Annotation ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/annotations/${annotationId}` };
+
+      try {
+        const config = await getAxiosConfig();
+        const response = await axios.get(`${apiUrl}/api/annotations/${annotationId}`, config);
+
+        console.log(`  ✅ Annotation 조회 성공:`, response.data);
+
+        if (response.data.label !== 'Tumor') {
+          throw new Error(`Label이 'Tumor'여야 하는데 '${response.data.label}'입니다.`);
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            id: response.data.id,
+            label: response.data.label,
+            message: 'Label이 Tumor로 확인됨',
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/annotations/${annotationId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 3) {
+      // 4️⃣ Label 수정 (Tumor → Lesion)
+      const annotationId = createdAnnotationIdsRef.current[1];
+
+      if (!annotationId) {
+        throw new Error('수정할 Annotation ID가 없습니다.');
+      }
+
+      const requestBody = {
+        label: 'Lesion',
+      };
+
+      const requestInfo = { method: 'PUT', url: `/api/annotations/${annotationId}`, body: requestBody };
+
+      try {
+        const config = await getAxiosConfig();
+        const response = await axios.put(`${apiUrl}/api/annotations/${annotationId}`, requestBody, config);
+
+        console.log(`  ✅ Label 수정 성공:`, response.data);
+
+        if (response.data.label !== 'Lesion') {
+          throw new Error(`Label이 'Lesion'으로 수정되어야 하는데 '${response.data.label}'입니다.`);
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            id: response.data.id,
+            label: response.data.label,
+            version: response.data.version,
+            message: 'Label이 Tumor에서 Lesion으로 수정됨',
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'put',
+            url: `${apiUrl}/api/annotations/${annotationId}`,
+            data: requestBody,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 4) {
+      // 5️⃣ 수정된 Label 확인
+      const annotationId = createdAnnotationIdsRef.current[1];
+
+      if (!annotationId) {
+        throw new Error('조회할 Annotation ID가 없습니다.');
+      }
+
+      const requestInfo = { method: 'GET', url: `/api/annotations/${annotationId}` };
+
+      try {
+        const config = await getAxiosConfig();
+        const response = await axios.get(`${apiUrl}/api/annotations/${annotationId}`, config);
+
+        console.log(`  ✅ 수정된 Annotation 조회 성공:`, response.data);
+
+        if (response.data.label !== 'Lesion') {
+          throw new Error(`Label이 'Lesion'이어야 하는데 '${response.data.label}'입니다.`);
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            id: response.data.id,
+            label: response.data.label,
+            version: response.data.version,
+            message: 'Label이 Lesion으로 확인됨',
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/annotations/${annotationId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 5) {
+      // 6️⃣ 다양한 Label로 Annotation 생성 (Normal, Abnormal, Suspicious)
+      const labels = ['Normal', 'Abnormal', 'Suspicious'];
+      const createdIds: number[] = [];
+
+      const requestInfo = { method: 'POST', url: '/api/annotations (x3)', body: { labels } };
+
+      try {
+        const config = await getAxiosConfig();
+
+        for (const label of labels) {
+          const requestBody = {
+            study_instance_uid: testStudyUid,
+            series_instance_uid: testSeriesUid,
+            sop_instance_uid: testSopUid,
+            annotation_data: {
+              type: 'point',
+              x: Math.random() * 500,
+              y: Math.random() * 500,
+              color: '#0000FF',
+            },
+            tool_name: 'Point Tool',
+            label: label,
+            description: `Test annotation with ${label} label`,
+          };
+
+          const response = await axios.post(`${apiUrl}/api/annotations`, requestBody, config);
+          createdIds.push(response.data.id);
+
+          console.log(`  ✅ ${label} Label로 Annotation 생성 성공:`, response.data.id);
+        }
+
+        // 생성된 annotation ID들 추가
+        createdAnnotationIdsRef.current.push(...createdIds);
+
+        return {
+          request: requestInfo,
+          response: {
+            created_ids: createdIds,
+            labels: labels,
+            message: `${labels.length}개의 다양한 Label로 Annotation 생성됨`,
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/annotations`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 6) {
+      // 7️⃣ 모든 Annotation 조회 (Label 포함)
+      const requestInfo = { method: 'GET', url: '/api/annotations' };
+
+      try {
+        const config = await getAxiosConfig();
+        const response = await axios.get(`${apiUrl}/api/annotations`, {
+          ...config,
+          params: {
+            series_instance_uid: testSeriesUid,
+          },
+        });
+
+        console.log(`  ✅ Annotation 목록 조회 성공:`, response.data);
+
+        const annotations = response.data.annotations || response.data;
+        const labelCounts: { [key: string]: number } = {};
+
+        annotations.forEach((ann: any) => {
+          const label = ann.label || '(empty)';
+          labelCounts[label] = (labelCounts[label] || 0) + 1;
+        });
+
+        return {
+          request: requestInfo,
+          response: {
+            total: annotations.length,
+            label_counts: labelCounts,
+            message: 'Label별 Annotation 개수 확인',
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/annotations`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 7) {
+      // 8️⃣ Label 빈 문자열로 수정
+      const annotationId = createdAnnotationIdsRef.current[1]; // Lesion label이 있는 annotation
+
+      if (!annotationId) {
+        throw new Error('수정할 Annotation ID가 없습니다.');
+      }
+
+      const requestBody = {
+        label: '',
+      };
+
+      const requestInfo = { method: 'PUT', url: `/api/annotations/${annotationId}`, body: requestBody };
+
+      try {
+        const config = await getAxiosConfig();
+        const response = await axios.put(`${apiUrl}/api/annotations/${annotationId}`, requestBody, config);
+
+        console.log(`  ✅ Label 빈 문자열로 수정 성공:`, response.data);
+
+        if (response.data.label !== '' && response.data.label !== null) {
+          throw new Error(`Label이 빈 문자열이어야 하는데 '${response.data.label}'입니다.`);
+        }
+
+        return {
+          request: requestInfo,
+          response: {
+            id: response.data.id,
+            label: response.data.label,
+            version: response.data.version,
+            message: 'Label이 빈 문자열로 수정됨',
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'put',
+            url: `${apiUrl}/api/annotations/${annotationId}`,
+            data: requestBody,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 8) {
+      // 9️⃣ 정리 (생성된 Annotation 삭제)
+      const annotationIds = [...createdAnnotationIdsRef.current];
+
+      if (annotationIds.length === 0) {
+        throw new Error('삭제할 Annotation이 없습니다.');
+      }
+
+      const requestInfo = { method: 'DELETE', url: `/api/annotations (x${annotationIds.length})` };
+
+      try {
+        const config = await getAxiosConfig();
+        const deletedIds: number[] = [];
+
+        for (const id of annotationIds) {
+          try {
+            await axios.delete(`${apiUrl}/api/annotations/${id}`, config);
+            deletedIds.push(id);
+            console.log(`  ✅ Annotation ${id} 삭제 성공`);
+          } catch (error: any) {
+            console.warn(`  ⚠️ Annotation ${id} 삭제 실패:`, error.message);
+          }
+        }
+
+        // 삭제 후 ID 목록 초기화
+        createdAnnotationIdsRef.current = [];
+
+        return {
+          request: requestInfo,
+          response: {
+            deleted_count: deletedIds.length,
+            deleted_ids: deletedIds,
+            message: `${deletedIds.length}개의 Annotation 삭제 완료`,
+          },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'delete',
+            url: `${apiUrl}/api/annotations`,
           };
         }
         throw error;
