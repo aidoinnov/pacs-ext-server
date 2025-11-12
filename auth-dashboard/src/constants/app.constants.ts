@@ -59,12 +59,19 @@ export const SIDEBAR_MENU = {
     label: '사용자 관리',
     description: '사용자 및 권한',
   },
+  PROJECT_DATA_ACCESS: {
+    id: 'project-data-access',
+    icon: '🔒',
+    label: 'Data Access 테스트',
+    description: '프로젝트 데이터 접근 제어',
+  },
 } as const;
 
 // 사이드바 메뉴 순서
 export const SIDEBAR_MENU_ORDER = [
   SIDEBAR_MENU.AUTH_TEST,
   SIDEBAR_MENU.API_HEALTH,
+  SIDEBAR_MENU.PROJECT_DATA_ACCESS,
   // SIDEBAR_MENU.PROJECT_MANAGEMENT,  // 향후 추가
   // SIDEBAR_MENU.USER_MANAGEMENT,     // 향후 추가
 ] as const;

@@ -33,17 +33,17 @@ interface TestAccount {
 const TEST_ACCOUNTS: Record<string, TestAccount> = {
   SUPER_ADMIN: {
     username: 'test_super_admin',
-    keycloak_id: 'a0000000-0000-0000-0000-000000000001',
+    keycloak_id: '7287ed27-59a5-4803-9984-9f5ddf241737',
     role: 'SUPER_ADMIN',
   },
   ADMIN: {
     username: 'test_admin',
-    keycloak_id: 'a0000000-0000-0000-0000-000000000002',
+    keycloak_id: 'e4199467-7fcf-4830-8543-728693d4ec7f',
     role: 'ADMIN',
   },
   USER: {
     username: 'test_user',
-    keycloak_id: 'a0000000-0000-0000-0000-000000000003',
+    keycloak_id: 'e8db9533-76c2-451a-8232-8711a661360e',
     role: 'USER',
   },
 };
@@ -308,27 +308,39 @@ const ApiHealthCheck: React.FC = () => {
     };
   };
 
-  // 테스트 계정으로 토큰 획득
+  // 테스트 계정으로 토큰 획득 (백엔드 프록시를 통해 Keycloak 토큰 획득)
   const getTestToken = async (account: TestAccount): Promise<string> => {
     try {
-      console.log(`🔑 테스트 토큰 획득 중... (계정: ${account.username}, 역할: ${account.role})`);
+      console.log(`🔑 Keycloak 토큰 획득 중... (계정: ${account.username}, 역할: ${account.role})`);
 
-      // JWT 서비스를 사용하여 토큰 생성
-      const response = await axios.post(`${apiUrl}/api/auth/test-token`, {
-        keycloak_id: account.keycloak_id,
+      // 비밀번호 매핑
+      const passwords: Record<string, string> = {
+        'test_super_admin': 'TestAdmin123!',
+        'test_admin': 'TestAdmin123!',
+        'test_user': 'TestUser123!',
+      };
+
+      // 백엔드 프록시를 통해 Keycloak 토큰 획득 (CORS 우회)
+      const response = await axios.post(`${apiUrl}/api/auth/keycloak-token`, {
         username: account.username,
+        password: passwords[account.username] || 'TestAdmin123!',
       });
 
-      const token = response.data.token;
-      console.log(`✅ 토큰 획득 성공! (계정: ${account.username})`);
+      const token = response.data.access_token;
+      console.log(`✅ Keycloak 토큰 획득 성공! (계정: ${account.username})`);
+      console.log(`   토큰 길이: ${token.length}, 미리보기: ${token.substring(0, 50)}...`);
 
       setTestToken(token);
       setCurrentTestAccount(account);
 
       return token;
     } catch (error: any) {
-      console.error(`❌ 토큰 획득 실패:`, error);
-      throw new Error(`토큰 획득 실패: ${error.message}`);
+      console.error(`❌ Keycloak 토큰 획득 실패:`, error);
+      if (error.response) {
+        console.error(`   응답 상태: ${error.response.status}`);
+        console.error(`   응답 데이터:`, error.response.data);
+      }
+      throw new Error(`Keycloak 토큰 획득 실패: ${error.message}`);
     }
   };
 
@@ -1377,13 +1389,26 @@ const ApiHealthCheck: React.FC = () => {
       }
     } else if (testIndex === 2) {
       // DICOM Series 전체 조회 (project_id 없음) - SUPER_ADMIN 권한 필요
-      const requestInfo = { method: 'GET', url: '/api/dicom/series' };
-
       try {
         const config = await getAxiosConfig('SUPER_ADMIN');
-        const response = await axios.get(`${apiUrl}/api/dicom/series`, config);
 
-        console.log(`  ✅ DICOM Series 전체 조회 성공:`, response.data);
+        // 먼저 Study를 조회해서 Study UID를 얻음
+        const studiesResponse = await axios.get(`${apiUrl}/api/dicom/studies?limit=1`, config);
+
+        if (!Array.isArray(studiesResponse.data) || studiesResponse.data.length === 0) {
+          throw new Error('No studies found to test series retrieval');
+        }
+
+        // Study UID 추출 (0020000D 태그)
+        const studyUid = studiesResponse.data[0]['0020000D']?.Value?.[0];
+        if (!studyUid) {
+          throw new Error('Study UID not found in response');
+        }
+
+        const requestInfo = { method: 'GET', url: `/api/dicom/studies/${studyUid}/series` };
+        const response = await axios.get(`${apiUrl}/api/dicom/studies/${studyUid}/series`, config);
+
+        console.log(`  ✅ DICOM Series 전체 조회 성공 (Study UID: ${studyUid}):`, response.data);
 
         return {
           request: requestInfo,
@@ -1393,20 +1418,46 @@ const ApiHealthCheck: React.FC = () => {
         if (!error.config) {
           error.config = {
             method: 'get',
-            url: `${apiUrl}/api/dicom/series`,
+            url: '/api/dicom/studies/{studyUid}/series',
           };
         }
         throw error;
       }
     } else if (testIndex === 3) {
       // DICOM Instances 전체 조회 (project_id 없음) - SUPER_ADMIN 권한 필요
-      const requestInfo = { method: 'GET', url: '/api/dicom/instances' };
-
       try {
         const config = await getAxiosConfig('SUPER_ADMIN');
-        const response = await axios.get(`${apiUrl}/api/dicom/instances`, config);
 
-        console.log(`  ✅ DICOM Instances 전체 조회 성공:`, response.data);
+        // 먼저 Study를 조회해서 Study UID를 얻음
+        const studiesResponse = await axios.get(`${apiUrl}/api/dicom/studies?limit=1`, config);
+
+        if (!Array.isArray(studiesResponse.data) || studiesResponse.data.length === 0) {
+          throw new Error('No studies found to test instances retrieval');
+        }
+
+        // Study UID 추출 (0020000D 태그)
+        const studyUid = studiesResponse.data[0]['0020000D']?.Value?.[0];
+        if (!studyUid) {
+          throw new Error('Study UID not found in response');
+        }
+
+        // Series 조회해서 Series UID를 얻음
+        const seriesResponse = await axios.get(`${apiUrl}/api/dicom/studies/${studyUid}/series?limit=1`, config);
+
+        if (!Array.isArray(seriesResponse.data) || seriesResponse.data.length === 0) {
+          throw new Error('No series found to test instances retrieval');
+        }
+
+        // Series UID 추출 (0020000E 태그)
+        const seriesUid = seriesResponse.data[0]['0020000E']?.Value?.[0];
+        if (!seriesUid) {
+          throw new Error('Series UID not found in response');
+        }
+
+        const requestInfo = { method: 'GET', url: `/api/dicom/studies/${studyUid}/series/${seriesUid}/instances` };
+        const response = await axios.get(`${apiUrl}/api/dicom/studies/${studyUid}/series/${seriesUid}/instances`, config);
+
+        console.log(`  ✅ DICOM Instances 전체 조회 성공 (Study UID: ${studyUid}, Series UID: ${seriesUid}):`, response.data);
 
         return {
           request: requestInfo,
@@ -1416,7 +1467,7 @@ const ApiHealthCheck: React.FC = () => {
         if (!error.config) {
           error.config = {
             method: 'get',
-            url: `${apiUrl}/api/dicom/instances`,
+            url: '/api/dicom/studies/{studyUid}/series/{seriesUid}/instances',
           };
         }
         throw error;

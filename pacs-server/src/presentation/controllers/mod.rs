@@ -12,6 +12,7 @@ pub mod project_user_matrix_controller;
 pub mod role_controller;
 pub mod role_permission_matrix_controller;
 pub mod sync_controller;
+pub mod test_controller;
 pub mod user_controller;
 pub mod user_project_matrix_controller;
 pub mod user_registration_controller;

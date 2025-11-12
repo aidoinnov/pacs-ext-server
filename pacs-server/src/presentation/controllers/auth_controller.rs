@@ -28,6 +28,21 @@ pub struct TestTokenResponse {
     pub email: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct KeycloakTokenRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct KeycloakTokenResponse {
+    pub access_token: String,
+    pub expires_in: i32,
+    pub refresh_expires_in: i32,
+    pub refresh_token: String,
+    pub token_type: String,
+}
+
 pub struct AuthController<A: AuthService> {
     auth_use_case: Arc<AuthUseCase<A>>,
 }
@@ -222,6 +237,47 @@ impl<A: AuthService> AuthController<A> {
             })),
         }
     }
+
+    /// Keycloak 토큰 획득 프록시 (CORS 우회용)
+    pub async fn get_keycloak_token(
+        req: web::Json<KeycloakTokenRequest>,
+    ) -> impl Responder {
+        let keycloak_url = "https://keycloak.pacs.ai-do.kr/realms/dcm4che/protocol/openid-connect/token";
+
+        let client = reqwest::Client::new();
+        let params = [
+            ("grant_type", "password"),
+            ("client_id", "pacs-extension-server"),
+            ("client_secret", "85TSWxK8ruF750z0Qzh0tQZ8xH5h3y99"),
+            ("username", req.username.as_str()),
+            ("password", req.password.as_str()),
+        ];
+
+        match client.post(keycloak_url)
+            .form(&params)
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status();
+                match response.json::<serde_json::Value>().await {
+                    Ok(data) => {
+                        if status.is_success() {
+                            HttpResponse::Ok().json(data)
+                        } else {
+                            HttpResponse::build(status).json(data)
+                        }
+                    }
+                    Err(e) => HttpResponse::InternalServerError().json(json!({
+                        "error": format!("Failed to parse Keycloak response: {}", e)
+                    })),
+                }
+            }
+            Err(e) => HttpResponse::BadGateway().json(json!({
+                "error": format!("Failed to connect to Keycloak: {}", e)
+            })),
+        }
+    }
 }
 
 pub fn configure_routes<A: AuthService + 'static, U: UserRepository + 'static>(
@@ -262,6 +318,10 @@ pub fn configure_routes<A: AuthService + 'static, U: UserRepository + 'static>(
                 .route(
                     "/test-token",
                     web::post().to(AuthController::<A>::create_test_token::<U>),
+                )
+                .route(
+                    "/keycloak-token",
+                    web::post().to(AuthController::<A>::get_keycloak_token),
                 )
                 .route(
                     "/admin/users/approve",
