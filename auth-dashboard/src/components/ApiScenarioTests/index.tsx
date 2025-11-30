@@ -881,21 +881,24 @@ const ApiScenarioTests: React.FC = () => {
         // DICOM 전체 조회 + 할당 여부 확인 섹션
         result = await runDicomTest(testIndex);
       } else if (sectionIndex === 4) {
+        // DICOM Patient API 섹션
+        result = await runPatientTest(testIndex);
+      } else if (sectionIndex === 5) {
         // Annotation Label 기능 섹션
         result = await runAnnotationLabelTest(testIndex);
-      } else if (sectionIndex === 5) {
+      } else if (sectionIndex === 6) {
         // Project Data Access 접근 제어 섹션
         result = await runProjectDataAccessTest(testIndex);
-      } else if (sectionIndex === 6) {
+      } else if (sectionIndex === 7) {
         // 순차 시나리오 섹션
         result = await runSequentialScenarioTest(testIndex);
-      } else if (sectionIndex === 7) {
+      } else if (sectionIndex === 8) {
         // Annotation 권한 관리 섹션
         result = await runAnnotationPermissionTest(testIndex);
-      } else if (sectionIndex === 8) {
+      } else if (sectionIndex === 9) {
         // 권한 기반 Annotation 조회 (READ_ALL) 섹션
         result = await runReadAllPermissionTest(testIndex);
-      } else if (sectionIndex === 9) {
+      } else if (sectionIndex === 10) {
         // Annotation 권한 조회 API 개선 섹션
         result = await runAnnotationPermissionsApiTest(testIndex);
       }
@@ -2129,6 +2132,236 @@ const ApiScenarioTests: React.FC = () => {
           error.config = {
             method: 'get',
             url: `${apiUrl}/api/dicom/studies?project_id=-1`,
+          };
+        }
+        throw error;
+      }
+    }
+  };
+
+  // DICOM Patient API 테스트 (QIDO-RS 프록시)
+  const runPatientTest = async (testIndex: number) => {
+    const projectId = createdProjectIdRef.current || 2; // 기본값 2
+
+    if (testIndex === 0) {
+      // Patient 전체 조회 (project_id 있음)
+      const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}` };
+
+      try {
+        const config = await handleGetAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/patients?project_id=${projectId}`, config);
+
+        console.log(`  ✅ Patient 전체 조회 성공 (project_id=${projectId}):`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/patients?project_id=${projectId}`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
+      // Patient 페이지네이션 (limit=1)
+      const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}&limit=1` };
+
+      try {
+        const config = await handleGetAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/patients?project_id=${projectId}&limit=1`, config);
+
+        console.log(`  ✅ Patient 페이지네이션 성공 (limit=1):`, response.data);
+
+        // 최대 1개만 반환되는지 확인
+        if (Array.isArray(response.data) && response.data.length > 1) {
+          throw new Error(`Expected at most 1 patient, got ${response.data.length}`);
+        }
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/patients?project_id=${projectId}&limit=1`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 2) {
+      // Patient 필터링 (PatientName)
+      const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}&PatientName=*` };
+
+      try {
+        const config = await handleGetAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/patients?project_id=${projectId}&PatientName=*`, config);
+
+        console.log(`  ✅ Patient 필터링 성공 (PatientName=*):`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/patients?project_id=${projectId}&PatientName=*`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 3) {
+      // Patient 필터링 (PatientID)
+      const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}&PatientID=*` };
+
+      try {
+        const config = await handleGetAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/patients?project_id=${projectId}&PatientID=*`, config);
+
+        console.log(`  ✅ Patient 필터링 성공 (PatientID=*):`, response.data);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/patients?project_id=${projectId}&PatientID=*`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 4) {
+      // Patient DICOM JSON 구조 검증
+      const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}&limit=1` };
+
+      try {
+        const config = await handleGetAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/patients?project_id=${projectId}&limit=1`, config);
+
+        console.log(`  ✅ Patient DICOM JSON 구조 검증:`, response.data);
+
+        // DICOM JSON 구조 검증
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          const patient = response.data[0];
+
+          // 필수 DICOM 태그 확인
+          const requiredTags = ['00100020']; // PatientID
+          const missingTags = requiredTags.filter(tag => !patient[tag]);
+
+          if (missingTags.length > 0) {
+            throw new Error(`Missing required DICOM tags: ${missingTags.join(', ')}`);
+          }
+
+          // DICOM JSON 형식 확인 (vr, Value 필드)
+          const patientId = patient['00100020'];
+          if (!patientId.vr || !patientId.Value) {
+            throw new Error('Invalid DICOM JSON format: missing vr or Value field');
+          }
+        }
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/patients?project_id=${projectId}&limit=1`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 5) {
+      // project_id 없이 조회 (400 에러)
+      const requestInfo = { method: 'GET', url: '/api/dicom/patients' };
+
+      try {
+        const config = await handleGetAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/patients`, config);
+
+        // 에러가 발생하지 않으면 실패
+        throw new Error('Expected 400 error, but request succeeded');
+      } catch (error: any) {
+        if (error.response && error.response.status === 400) {
+          console.log(`  ✅ project_id 없이 조회 시 400 에러 발생 (예상된 동작)`);
+
+          return {
+            request: requestInfo,
+            response: { error: error.response.data, status: 400 },
+          };
+        }
+
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/patients`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 6) {
+      // 잘못된 project_id (0) 에러 처리
+      const requestInfo = { method: 'GET', url: '/api/dicom/patients?project_id=0' };
+
+      try {
+        const config = await handleGetAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/patients?project_id=0`, config);
+
+        // 에러가 발생하지 않으면 실패
+        throw new Error('Expected 400 error, but request succeeded');
+      } catch (error: any) {
+        if (error.response && error.response.status === 400) {
+          console.log(`  ✅ project_id=0 시 400 에러 발생 (예상된 동작)`);
+
+          return {
+            request: requestInfo,
+            response: { error: error.response.data, status: 400 },
+          };
+        }
+
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/patients?project_id=0`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 7) {
+      // 잘못된 project_id (음수) 에러 처리
+      const requestInfo = { method: 'GET', url: '/api/dicom/patients?project_id=-1' };
+
+      try {
+        const config = await handleGetAxiosConfig('USER');
+        const response = await axios.get(`${apiUrl}/api/dicom/patients?project_id=-1`, config);
+
+        // 에러가 발생하지 않으면 실패
+        throw new Error('Expected 400 error, but request succeeded');
+      } catch (error: any) {
+        if (error.response && error.response.status === 400) {
+          console.log(`  ✅ project_id=-1 시 400 에러 발생 (예상된 동작)`);
+
+          return {
+            request: requestInfo,
+            response: { error: error.response.data, status: 400 },
+          };
+        }
+
+        if (!error.config) {
+          error.config = {
+            method: 'get',
+            url: `${apiUrl}/api/dicom/patients?project_id=-1`,
           };
         }
         throw error;

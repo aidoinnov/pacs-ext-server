@@ -714,11 +714,11 @@ pub async fn get_instances(
     HttpResponse::Ok().json(filtered)
 }
 
-/// GET /api/dicom/patients - Patient 레벨 QIDO-RS 프록시 (하이브리드 방식)
-/// 1. DB에서 프로젝트에 할당된 Patient 목록 조회 (사전 필터링)
-/// 2. Dcm4chee QIDO-RS /patients 호출
-/// 3. 응답 결과를 허용 목록과 재검증 (사후 검증)
+/// GET /api/dicom/patients - Patient 레벨 QIDO-RS 프록시
+/// 1. Dcm4chee QIDO-RS /patients 호출 (사용자 파라미터 전달)
+/// 2. RBAC 필터링 (프로젝트에 할당된 환자만)
 pub async fn get_patients(
+    qido: web::Data<Dcm4cheeQidoClient>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
     project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
@@ -756,131 +756,94 @@ pub async fn get_patients(
         }
     }
 
-    // 페이지네이션 파라미터 추출
-    let limit = query
-        .extra
-        .get("limit")
-        .and_then(|v| match v {
-            serde_json::Value::Number(n) => n.as_i64(),
-            serde_json::Value::String(s) => s.parse::<i64>().ok(),
-            _ => None,
-        })
-        .unwrap_or(20)
-        .min(100);
-    let offset = query
-        .extra
-        .get("offset")
-        .and_then(|v| match v {
-            serde_json::Value::Number(n) => n.as_i64(),
-            serde_json::Value::String(s) => s.parse::<i64>().ok(),
-            _ => None,
-        })
-        .unwrap_or(0);
-
-    // Patient 필터 파라미터 추출
-    let patient_id_filter = query
-        .extra
-        .get("PatientID")
-        .and_then(|v| v.as_str())
-        .map(|s| s.replace('*', "%")); // DICOM wildcard → SQL LIKE
-    let patient_name_filter = query
-        .extra
-        .get("PatientName")
-        .and_then(|v| v.as_str())
-        .map(|s| s.replace('*', "%"));
-
-    tracing::debug!(
-        "Gateway /patients: project_id={:?}, limit={}, offset={}, PatientID={:?}, PatientName={:?}",
-        project_id_opt, limit, offset, patient_id_filter, patient_name_filter
-    );
-
-    // 1. DB 사전 필터링: 프로젝트에 할당된 Patient 목록 조회
-    let db_patients = if let Some(pid) = project_id_opt {
-        match project_data_repo
-            .find_patients_by_project(
-                pid,
-                patient_id_filter.as_deref(),
-                patient_name_filter.as_deref(),
-                limit,
-                offset,
-            )
-            .await
-        {
-            Ok(patients) => patients,
-            Err(e) => {
-                tracing::error!("Gateway /patients: DB query failed: {}", e);
-                return HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": "Failed to query patients from database"
-                }));
-            }
+    // 1. 사용자 필터/페이지네이션 파라미터 파싱
+    let user_params = match build_qido_params_from_user_query(&query.extra) {
+        Ok(p) => p,
+        Err(msg) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
         }
-    } else {
-        // 전체 데이터 조회 권한이 있으면 DB 필터링 스킵
-        vec![]
     };
 
-    tracing::info!(
-        "Gateway /patients: Found {} patients from DB (project_id={:?})",
-        db_patients.len(),
-        project_id_opt
-    );
+    tracing::debug!("Gateway /patients: User params: {:?}", user_params);
 
-    // 2. DB 데이터를 DICOM JSON 형식으로 변환
+    // 2. Dcm4chee QIDO 호출
+    let bearer_opt = req
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.strip_prefix("Bearer "))
+        .map(|s| s.to_string());
 
-    let dicom_patients: Vec<serde_json::Value> = db_patients
-        .iter()
-        .map(|p| {
-            let mut patient = serde_json::json!({});
+    let qido_response = match qido
+        .qido_patients_with_bearer(bearer_opt.as_deref(), user_params)
+        .await
+    {
+        Ok(json) => json,
+        Err(e) => {
+            tracing::error!("Gateway /patients: QIDO call failed: {}", e);
+            return HttpResponse::BadGateway().json(serde_json::json!({"error": e.to_string()}));
+        }
+    };
 
-            // PatientID (00100020)
-            if let Some(ref patient_id) = p.patient_id {
-                patient["00100020"] = serde_json::json!({
-                    "vr": "LO",
-                    "Value": [patient_id]
-                });
+    // 3. RBAC 필터링 (프로젝트에 할당된 환자만)
+    let filtered_response = if let Some(project_id) = project_id_opt {
+        // DB에서 허용된 환자 ID 목록 조회
+        let allowed_patient_ids = match get_allowed_patient_ids(project_id, project_data_repo.pool()).await {
+            Ok(ids) => ids,
+            Err(e) => {
+                tracing::error!("Gateway /patients: Failed to get allowed patient IDs: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to query allowed patients"
+                }));
             }
+        };
 
-            // PatientName (00100010)
-            if let Some(ref patient_name) = p.patient_name {
-                patient["00100010"] = serde_json::json!({
-                    "vr": "PN",
-                    "Value": [{
-                        "Alphabetic": patient_name
-                    }]
-                });
-            }
+        tracing::debug!("Gateway /patients: Found {} allowed patient IDs for project {}", allowed_patient_ids.len(), project_id);
 
-            // PatientBirthDate (00100030)
-            if let Some(ref birth_date) = p.patient_birth_date {
-                let formatted_date = birth_date.format("%Y%m%d").to_string();
-                patient["00100030"] = serde_json::json!({
-                    "vr": "DA",
-                    "Value": [formatted_date]
-                });
-            }
+        // QIDO 응답 필터링
+        if let Some(patients) = qido_response.as_array() {
+            let filtered: Vec<serde_json::Value> = patients
+                .iter()
+                .filter(|patient| {
+                    if let Some(patient_id) = extract_patient_id(patient) {
+                        allowed_patient_ids.contains(&patient_id)
+                    } else {
+                        false
+                    }
+                })
+                .cloned()
+                .collect();
 
-            // PatientSex (00100040)
-            if let Some(ref sex) = p.patient_sex {
-                patient["00100040"] = serde_json::json!({
-                    "vr": "CS",
-                    "Value": [sex]
-                });
-            }
+            tracing::debug!("Gateway /patients: Filtered {} patients from {} QIDO results", filtered.len(), patients.len());
+            serde_json::json!(filtered)
+        } else {
+            qido_response
+        }
+    } else {
+        // 전체 접근 권한이 있는 경우 - 필터링 없이 반환
+        qido_response
+    };
 
-            // NumberOfPatientRelatedStudies (00201200) - Study 개수
-            patient["00201200"] = serde_json::json!({
-                "vr": "IS",
-                "Value": [p.study_count.to_string()]
-            });
-
-            patient
-        })
-        .collect();
-
-    HttpResponse::Ok().json(dicom_patients)
+    HttpResponse::Ok().json(filtered_response)
 }
 
 // 토큰 파싱/추출 유틸은 `infrastructure::auth::token_extractor`로 분리
+
+/// 프로젝트에 할당된 Patient ID 목록 조회
+async fn get_allowed_patient_ids(project_id: i32, pool: &sqlx::PgPool) -> Result<std::collections::HashSet<String>, sqlx::Error> {
+    let rows: Vec<(Option<String>,)> = sqlx::query_as(
+        "SELECT DISTINCT pds.patient_id
+         FROM project_data pd
+         INNER JOIN project_data_study pds ON pd.study_id = pds.id
+         WHERE pd.project_id = $1
+           AND pds.patient_id IS NOT NULL"
+    )
+    .bind(project_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().filter_map(|(id,)| id).collect())
+}
 
 /// QIDO-RS JSON에서 StudyInstanceUID 추출 (0020000D)
 fn extract_study_uid(item: &serde_json::Value) -> Option<String> {

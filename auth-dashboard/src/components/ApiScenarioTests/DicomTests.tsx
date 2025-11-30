@@ -58,5 +58,51 @@ export const getDicomSections = (): TestSection[] => [
       },
     ],
   },
+  {
+    title: '👤 DICOM Patient API (QIDO-RS 프록시)',
+    description: 'Patient 레벨 QIDO-RS 프록시 + RBAC 필터링 + 페이지네이션 테스트',
+    isSequential: false,
+    tests: [
+      {
+        name: 'Patient 전체 조회 (project_id 있음)',
+        status: 'pending',
+        indentLevel: 0,
+      },
+      {
+        name: 'Patient 페이지네이션 (limit=1)',
+        status: 'pending',
+        indentLevel: 0,
+      },
+      {
+        name: 'Patient 필터링 (PatientName)',
+        status: 'pending',
+        indentLevel: 0,
+      },
+      {
+        name: 'Patient 필터링 (PatientID)',
+        status: 'pending',
+        indentLevel: 0,
+      },
+      {
+        name: 'Patient DICOM JSON 구조 검증',
+        status: 'pending',
+        indentLevel: 0,
+      },
+      {
+        name: 'project_id 없이 조회 (400 에러)',
+        status: 'pending',
+        indentLevel: 0,
+      },
+      {
+        name: '잘못된 project_id (0) 에러 처리',
+        status: 'pending',
+        indentLevel: 0,
+      },
+      {
+        name: '잘못된 project_id (음수) 에러 처리',
+        status: 'pending',
+        indentLevel: 0,
+      },
+    ],
+  },
 ];
-
