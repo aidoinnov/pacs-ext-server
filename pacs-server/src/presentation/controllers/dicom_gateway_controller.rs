@@ -8,6 +8,7 @@ use crate::domain::entities::access_condition::AccessCondition;
 use crate::domain::repositories::{AccessConditionRepository, ProjectDataRepository, UserRepository};
 use crate::domain::services::DicomRbacEvaluator;
 use crate::infrastructure::auth::{JwtService, extract_user_id_from_request, decode_keycloak_token_sub};
+use crate::presentation::controllers::annotation_controller::AnnotationController;
 use crate::infrastructure::external::Dcm4cheeQidoClient;
 use crate::infrastructure::repositories::{AccessConditionRepositoryImpl, ProjectDataRepositoryImpl, UserRepositoryImpl};
 use crate::infrastructure::services::DicomRbacEvaluatorImpl;
@@ -45,6 +46,7 @@ pub fn configure_routes(
             )
             .route("/studies_raw", web::get().to(get_studies_raw))
             .route("/deps", web::get().to(debug_deps))
+            .route("/patients", web::get().to(get_patients))
             .route("/studies", web::get().to(get_studies))
             .route("/studies/{study_uid}/series", web::get().to(get_series))
             .route(
@@ -712,6 +714,172 @@ pub async fn get_instances(
     HttpResponse::Ok().json(filtered)
 }
 
+/// GET /api/dicom/patients - Patient 레벨 QIDO-RS 프록시 (하이브리드 방식)
+/// 1. DB에서 프로젝트에 할당된 Patient 목록 조회 (사전 필터링)
+/// 2. Dcm4chee QIDO-RS /patients 호출
+/// 3. 응답 결과를 허용 목록과 재검증 (사후 검증)
+pub async fn get_patients(
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
+    query: web::Query<GatewayQuery>,
+    req: HttpRequest,
+) -> HttpResponse {
+    // 사용자 ID 추출 (개발 모드 지원)
+    let user_id = match AnnotationController::extract_user_id_with_auth(&req, &jwt, &user_repo).await {
+        Ok(id) => id,
+        Err(err_response) => {
+            tracing::warn!("Gateway /patients: Unauthorized - failed to extract user_id");
+            return err_response;
+        }
+    };
+
+    // 전체 데이터 조회 권한 확인
+    let has_global_access = has_global_dicom_access(user_id, project_data_repo.pool()).await;
+
+    // 프로젝트 ID 검증
+    let project_id_opt = query.project_id;
+
+    // 전체 데이터 조회 권한이 없으면 project_id 필수
+    if !has_global_access && project_id_opt.is_none() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "project_id is required (no global access permission)"
+        }));
+    }
+
+    // project_id가 있으면 검증
+    if let Some(id) = project_id_opt {
+        if id <= 0 {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "project_id must be greater than 0"
+            }));
+        }
+    }
+
+    // 페이지네이션 파라미터 추출
+    let limit = query
+        .extra
+        .get("limit")
+        .and_then(|v| match v {
+            serde_json::Value::Number(n) => n.as_i64(),
+            serde_json::Value::String(s) => s.parse::<i64>().ok(),
+            _ => None,
+        })
+        .unwrap_or(20)
+        .min(100);
+    let offset = query
+        .extra
+        .get("offset")
+        .and_then(|v| match v {
+            serde_json::Value::Number(n) => n.as_i64(),
+            serde_json::Value::String(s) => s.parse::<i64>().ok(),
+            _ => None,
+        })
+        .unwrap_or(0);
+
+    // Patient 필터 파라미터 추출
+    let patient_id_filter = query
+        .extra
+        .get("PatientID")
+        .and_then(|v| v.as_str())
+        .map(|s| s.replace('*', "%")); // DICOM wildcard → SQL LIKE
+    let patient_name_filter = query
+        .extra
+        .get("PatientName")
+        .and_then(|v| v.as_str())
+        .map(|s| s.replace('*', "%"));
+
+    tracing::debug!(
+        "Gateway /patients: project_id={:?}, limit={}, offset={}, PatientID={:?}, PatientName={:?}",
+        project_id_opt, limit, offset, patient_id_filter, patient_name_filter
+    );
+
+    // 1. DB 사전 필터링: 프로젝트에 할당된 Patient 목록 조회
+    let db_patients = if let Some(pid) = project_id_opt {
+        match project_data_repo
+            .find_patients_by_project(
+                pid,
+                patient_id_filter.as_deref(),
+                patient_name_filter.as_deref(),
+                limit,
+                offset,
+            )
+            .await
+        {
+            Ok(patients) => patients,
+            Err(e) => {
+                tracing::error!("Gateway /patients: DB query failed: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to query patients from database"
+                }));
+            }
+        }
+    } else {
+        // 전체 데이터 조회 권한이 있으면 DB 필터링 스킵
+        vec![]
+    };
+
+    tracing::info!(
+        "Gateway /patients: Found {} patients from DB (project_id={:?})",
+        db_patients.len(),
+        project_id_opt
+    );
+
+    // 2. DB 데이터를 DICOM JSON 형식으로 변환
+
+    let dicom_patients: Vec<serde_json::Value> = db_patients
+        .iter()
+        .map(|p| {
+            let mut patient = serde_json::json!({});
+
+            // PatientID (00100020)
+            if let Some(ref patient_id) = p.patient_id {
+                patient["00100020"] = serde_json::json!({
+                    "vr": "LO",
+                    "Value": [patient_id]
+                });
+            }
+
+            // PatientName (00100010)
+            if let Some(ref patient_name) = p.patient_name {
+                patient["00100010"] = serde_json::json!({
+                    "vr": "PN",
+                    "Value": [{
+                        "Alphabetic": patient_name
+                    }]
+                });
+            }
+
+            // PatientBirthDate (00100030)
+            if let Some(ref birth_date) = p.patient_birth_date {
+                let formatted_date = birth_date.format("%Y%m%d").to_string();
+                patient["00100030"] = serde_json::json!({
+                    "vr": "DA",
+                    "Value": [formatted_date]
+                });
+            }
+
+            // PatientSex (00100040)
+            if let Some(ref sex) = p.patient_sex {
+                patient["00100040"] = serde_json::json!({
+                    "vr": "CS",
+                    "Value": [sex]
+                });
+            }
+
+            // NumberOfPatientRelatedStudies (00201200) - Study 개수
+            patient["00201200"] = serde_json::json!({
+                "vr": "IS",
+                "Value": [p.study_count.to_string()]
+            });
+
+            patient
+        })
+        .collect();
+
+    HttpResponse::Ok().json(dicom_patients)
+}
+
 // 토큰 파싱/추출 유틸은 `infrastructure::auth::token_extractor`로 분리
 
 /// QIDO-RS JSON에서 StudyInstanceUID 추출 (0020000D)
@@ -737,6 +905,16 @@ fn extract_series_uid(item: &serde_json::Value) -> Option<String> {
 /// QIDO-RS JSON에서 SOPInstanceUID 추출 (00080018)
 fn extract_instance_uid(item: &serde_json::Value) -> Option<String> {
     item.get("00080018")
+        .and_then(|v| v.get("Value"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.get(0))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+/// QIDO-RS JSON에서 PatientID 추출 (00100020)
+fn extract_patient_id(item: &serde_json::Value) -> Option<String> {
+    item.get("00100020")
         .and_then(|v| v.get("Value"))
         .and_then(|v| v.as_array())
         .and_then(|arr| arr.get(0))

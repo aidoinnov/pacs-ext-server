@@ -1,6 +1,6 @@
 use crate::domain::entities::project_data::{
-    NewProjectData, ProjectData, ProjectDataInstance, ProjectDataSeries, ProjectDataStudy,
-    UpdateProjectData,
+    NewProjectData, ProjectData, ProjectDataInstance, ProjectDataPatient, ProjectDataSeries,
+    ProjectDataStudy, UpdateProjectData,
 };
 use crate::domain::repositories::ProjectDataRepository;
 use sqlx::PgPool;
@@ -582,6 +582,66 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
             "SELECT COUNT(*) FROM project_data_instance WHERE series_id = $1",
         )
         .bind(series_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(count)
+    }
+
+    /// 프로젝트에 할당된 Patient 목록 조회 (필터링, 페이지네이션)
+    async fn find_patients_by_project(
+        &self,
+        project_id: i32,
+        patient_id_filter: Option<&str>,
+        patient_name_filter: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<ProjectDataPatient>, sqlx::Error> {
+        let results = sqlx::query_as::<_, ProjectDataPatient>(
+            "SELECT DISTINCT
+                pds.patient_id,
+                pds.patient_name,
+                pds.patient_birth_date,
+                CAST(pds.patient_sex AS TEXT) as patient_sex,
+                COUNT(DISTINCT pds.id) as study_count
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             WHERE pd.project_id = $1
+               AND ($2::text IS NULL OR pds.patient_id ILIKE $2)
+               AND ($3::text IS NULL OR pds.patient_name ILIKE $3)
+             GROUP BY pds.patient_id, pds.patient_name, pds.patient_birth_date, pds.patient_sex
+             ORDER BY pds.patient_id ASC NULLS LAST, pds.patient_name ASC NULLS LAST
+             LIMIT $4 OFFSET $5"
+        )
+        .bind(project_id)
+        .bind(patient_id_filter)
+        .bind(patient_name_filter)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(results)
+    }
+
+    /// 프로젝트에 할당된 Patient 총 개수
+    async fn count_patients_by_project(
+        &self,
+        project_id: i32,
+        patient_id_filter: Option<&str>,
+        patient_name_filter: Option<&str>,
+    ) -> Result<i64, sqlx::Error> {
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(DISTINCT (pds.patient_id, pds.patient_name, pds.patient_birth_date, pds.patient_sex))
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             WHERE pd.project_id = $1
+               AND ($2::text IS NULL OR pds.patient_id ILIKE $2)
+               AND ($3::text IS NULL OR pds.patient_name ILIKE $3)"
+        )
+        .bind(project_id)
+        .bind(patient_id_filter)
+        .bind(patient_name_filter)
         .fetch_one(&self.pool)
         .await?;
 

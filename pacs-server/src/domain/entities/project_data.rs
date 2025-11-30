@@ -22,6 +22,16 @@ impl std::fmt::Display for ResourceLevel {
     }
 }
 
+/// 프로젝트 데이터 (DICOM Patient) - 프로젝트에 할당된 환자 정보
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ProjectDataPatient {
+    pub patient_id: Option<String>,
+    pub patient_name: Option<String>,
+    pub patient_birth_date: Option<NaiveDate>,
+    pub patient_sex: Option<String>,
+    pub study_count: i64, // 해당 환자의 Study 개수
+}
+
 /// 프로젝트 데이터 (DICOM Study) - 전역 엔티티 (프로젝트 독립적)
 /// 프로젝트와의 연결은 project_data 테이블을 통해 이루어짐
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

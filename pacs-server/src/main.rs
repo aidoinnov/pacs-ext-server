@@ -206,6 +206,11 @@ async fn main() -> std::io::Result<()> {
 
     // Dcm4chee QIDO client
     print!("🏥 Initializing Dcm4chee QIDO client... ");
+    println!("\n   🔍 Dcm4chee config:");
+    println!("      base_url: {}", settings.dcm4chee.base_url);
+    println!("      qido_path: {}", settings.dcm4chee.qido_path);
+    println!("      username: {:?}", settings.dcm4chee.username);
+    println!("      password: {:?}", settings.dcm4chee.password.as_ref().map(|p| format!("{}...{}", &p[..4.min(p.len())], &p[p.len().saturating_sub(4)..])));
     let qido_client = Arc::new(Dcm4cheeQidoClient::new(settings.dcm4chee.clone()));
     println!("✅ Done");
 
