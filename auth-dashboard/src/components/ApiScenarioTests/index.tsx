@@ -2688,19 +2688,19 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
         response: response.data,
       };
-    } else if (testIndex === 4) {
+    } else if (testIndex === 5) {
       // Series 필터링 (Modality=CT)
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId) {
+      if (!projectId || !patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=CT`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data)) {
@@ -2713,19 +2713,19 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=CT` },
         response: response.data,
       };
-    } else if (testIndex === 5) {
+    } else if (testIndex === 6) {
       // Series 필터링 (Modality=MR)
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId) {
+      if (!projectId || !patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=MR`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data)) {
@@ -2738,19 +2738,19 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=MR` },
         response: response.data,
       };
-    } else if (testIndex === 6) {
+    } else if (testIndex === 7) {
       // Series DICOM JSON 구조 검증
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId) {
+      if (!projectId || !patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data) || response.data.length === 0) {
@@ -2776,19 +2776,19 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
         response: { validated_tags: requiredTags },
       };
-    } else if (testIndex === 7) {
+    } else if (testIndex === 8) {
       // Series thumbnail_url 필드 검증
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId) {
+      if (!projectId || !patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data) || response.data.length === 0) {
@@ -2811,19 +2811,19 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
         response: { thumbnail_url: series.thumbnail_url },
       };
-    } else if (testIndex === 8) {
+    } else if (testIndex === 9) {
       // thumbnail_url 형식 검증 (WADO-RS 표준)
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId) {
+      if (!projectId || !patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data) || response.data.length === 0) {
@@ -2845,12 +2845,18 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
         response: { thumbnail_url: thumbnailUrl, format: 'WADO-RS compliant' },
       };
-    } else if (testIndex === 9) {
+    } else if (testIndex === 10) {
       // project_id 없이 조회 (400 에러)
-      const config = await handleGetAxiosConfig('USER');
+      const token = seriesApiTokenRef.current;
+
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
+      }
 
       try {
-        await axios.get(`${apiUrl}/api/dicom/series?PatientID=TEST`, config);
+        await axios.get(`${apiUrl}/api/dicom/series?PatientID=TEST`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         throw new Error('400 에러가 발생해야 하는데 성공했습니다.');
       } catch (error: any) {
         if (error.response?.status === 400) {
@@ -2862,12 +2868,18 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 10) {
+    } else if (testIndex === 11) {
       // 잘못된 project_id (0) 에러 처리
-      const config = await handleGetAxiosConfig('USER');
+      const token = seriesApiTokenRef.current;
+
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
+      }
 
       try {
-        await axios.get(`${apiUrl}/api/dicom/series?project_id=0&PatientID=TEST`, config);
+        await axios.get(`${apiUrl}/api/dicom/series?project_id=0&PatientID=TEST`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         throw new Error('400 에러가 발생해야 하는데 성공했습니다.');
       } catch (error: any) {
         if (error.response?.status === 400) {
@@ -2879,12 +2891,18 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 11) {
+    } else if (testIndex === 12) {
       // 잘못된 project_id (음수) 에러 처리
-      const config = await handleGetAxiosConfig('USER');
+      const token = seriesApiTokenRef.current;
+
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
+      }
 
       try {
-        await axios.get(`${apiUrl}/api/dicom/series?project_id=-1&PatientID=TEST`, config);
+        await axios.get(`${apiUrl}/api/dicom/series?project_id=-1&PatientID=TEST`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         throw new Error('400 에러가 발생해야 하는데 성공했습니다.');
       } catch (error: any) {
         if (error.response?.status === 400) {
@@ -2896,18 +2914,18 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 12) {
+    } else if (testIndex === 13) {
       // 존재하지 않는 PatientID 조회 (빈 배열)
       const projectId = createdProjectIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId) {
+      if (!projectId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT_12345`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data)) {
@@ -2924,19 +2942,19 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT_12345` },
         response: response.data,
       };
-    } else if (testIndex === 13) {
+    } else if (testIndex === 14) {
       // 존재하지 않는 Modality 조회 (빈 배열)
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId) {
+      if (!projectId || !patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=NONEXISTENT`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data)) {
@@ -2953,21 +2971,21 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=NONEXISTENT` },
         response: response.data,
       };
-    } else if (testIndex === 14) {
+    } else if (testIndex === 15) {
       // 다른 프로젝트로 조회 (빈 배열 - RBAC 필터링)
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!patientId) {
+      if (!patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
       // 다른 프로젝트 ID 사용 (999 - 존재하지 않는 프로젝트)
       const otherProjectId = 999;
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${otherProjectId}&PatientID=${patientId}`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data)) {
