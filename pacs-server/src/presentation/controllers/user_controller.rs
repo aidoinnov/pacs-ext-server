@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::application::dto::permission_dto::PaginationQuery;
 use crate::application::dto::user_dto::{
-    CreateUserRequest, PaginationInfo, UpdateUserRequest, UserListQuery, UserListResponse,
-    UserResponse,
+    CreateUserRequest, MeQuery, PaginationInfo, UpdateUserRequest, UserListQuery,
+    UserListResponse, UserProjectQuery, UserQuery, UserResponse,
 };
 use crate::application::use_cases::user_use_case::UserUseCase;
 use crate::domain::services::user_service::UserService;
@@ -17,30 +17,58 @@ pub struct UserController<U: UserService> {
     user_use_case: Arc<UserUseCase<U>>,
 }
 
-/// 내 프로필 조회 (토큰 기반)
+/// 내 프로필 조회 (토큰 기반 또는 쿼리 파라미터)
+/// 
+/// user_id 추출 우선순위:
+/// 1. JWT 토큰에서 추출 (Authorization: Bearer ...)
+/// 2. 쿼리 파라미터에서 추출 (?user_id=xxx)
 #[utoipa::path(
     get,
     path = "/api/users/me",
     tag = "users",
+    params(
+        ("user_id" = Option<i32>, Query, description = "User ID (optional, used if JWT token is not available)"),
+        ("project_id" = Option<i32>, Query, description = "Project ID (optional, returns role_name if provided)")
+    ),
     responses(
         (status = 200, description = "Current user profile", body = UserResponse),
-        (status = 401, description = "Unauthorized"),
+        (status = 401, description = "Unauthorized - user_id could not be determined"),
         (status = 404, description = "User not found")
     )
 )]
-pub async fn get_me(
+pub async fn get_me<U: UserService + 'static>(
     req: HttpRequest,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    user_use_case: web::Data<Arc<UserUseCase<U>>>,
+    query: web::Query<MeQuery>,
 ) -> impl Responder {
-    match extract_user_id_from_request(&req, &jwt, &user_repo).await {
-        Some(user_id) if user_id > 0 => match user_repo.find_by_id(user_id).await {
-            Ok(Some(user)) => HttpResponse::Ok().json(UserResponse::from(user)),
-            Ok(None) => HttpResponse::NotFound().json(json!({"error":"User not found"})),
-            Err(e) => HttpResponse::InternalServerError().json(json!({"error": e.to_string()})),
-        },
-        _ => HttpResponse::Unauthorized().json(json!({
-            "error": "Invalid or missing authorization token"
+    // 1순위: JWT 토큰에서 user_id 추출
+    let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
+        Some(id) if id > 0 => Some(id),
+        _ => None,
+    };
+
+    // 2순위: 쿼리 파라미터에서 user_id 추출
+    let user_id = user_id.or_else(|| {
+        query.user_id.filter(|&id| id > 0)
+    });
+
+    match user_id {
+        Some(user_id) => {
+            match user_use_case
+                .get_user_by_id_with_project_role(user_id, query.project_id)
+                .await
+            {
+                Ok(user) => HttpResponse::Ok().json(user),
+                Err(e) => HttpResponse::NotFound().json(json!({
+                    "error": format!("User not found: {}", e)
+                })),
+            }
+        }
+        None => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": "User ID is required. Provide JWT token or user_id query parameter."
         })),
     }
 }
@@ -58,18 +86,6 @@ impl<U: UserService> UserController<U> {
             Ok(user) => HttpResponse::Created().json(user),
             Err(e) => HttpResponse::BadRequest().json(json!({
                 "error": format!("Failed to create user: {}", e)
-            })),
-        }
-    }
-
-    pub async fn get_user(
-        user_use_case: web::Data<Arc<UserUseCase<U>>>,
-        user_id: web::Path<i32>,
-    ) -> impl Responder {
-        match user_use_case.get_user_by_id(*user_id).await {
-            Ok(user) => HttpResponse::Ok().json(user),
-            Err(e) => HttpResponse::NotFound().json(json!({
-                "error": format!("User not found: {}", e)
             })),
         }
     }
@@ -121,6 +137,74 @@ impl<U: UserService> UserController<U> {
                 "error": format!("Failed to list users: {}", e)
             })),
         }
+    }
+}
+
+/// 사용자 조회 (Path parameter)
+#[utoipa::path(
+    get,
+    path = "/api/users/{user_id}",
+    tag = "users",
+    params(
+        ("user_id" = i32, Path, description = "User ID"),
+        ("project_id" = Option<i32>, Query, description = "Project ID (optional, returns role_name if provided)")
+    ),
+    responses(
+        (status = 200, description = "User retrieved successfully", body = UserResponse),
+        (status = 404, description = "User not found")
+    )
+)]
+pub async fn get_user<U: UserService + 'static>(
+    user_use_case: web::Data<Arc<UserUseCase<U>>>,
+    user_id: web::Path<i32>,
+    query: web::Query<UserProjectQuery>,
+) -> impl Responder {
+    match user_use_case
+        .get_user_by_id_with_project_role(*user_id, query.project_id)
+        .await
+    {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(e) => HttpResponse::NotFound().json(json!({
+            "error": format!("User not found: {}", e)
+        })),
+    }
+}
+
+/// 사용자 조회 (Query parameter)
+#[utoipa::path(
+    get,
+    path = "/api/users/info",
+    tag = "users",
+    params(
+        ("user_id" = i32, Query, description = "User ID (required)"),
+        ("project_id" = Option<i32>, Query, description = "Project ID (optional, returns role_name if provided)")
+    ),
+    responses(
+        (status = 200, description = "User retrieved successfully", body = UserResponse),
+        (status = 400, description = "Bad Request - user_id is required"),
+        (status = 404, description = "User not found")
+    )
+)]
+pub async fn get_user_by_query<U: UserService + 'static>(
+    user_use_case: web::Data<Arc<UserUseCase<U>>>,
+    query: web::Query<UserQuery>,
+) -> impl Responder {
+    // user_id 필수 검증
+    if query.user_id <= 0 {
+        return HttpResponse::BadRequest().json(json!({
+            "error": "Bad Request",
+            "message": "user_id is required and must be greater than 0"
+        }));
+    }
+
+    match user_use_case
+        .get_user_by_id_with_project_role(query.user_id, query.project_id)
+        .await
+    {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(e) => HttpResponse::NotFound().json(json!({
+            "error": format!("User not found: {}", e)
+        })),
     }
 }
 
@@ -220,13 +304,14 @@ pub fn configure_routes<U: UserService + 'static>(
             web::scope("/users")
                 .route("", web::get().to(UserController::<U>::list_users))
                 .route("", web::post().to(UserController::<U>::create_user))
-                .route("/me", web::get().to(get_me))
+                .route("/me", web::get().to(get_me::<U>))
+                .route("/info", web::get().to(get_user_by_query::<U>))
                 .route(
                     "/username/{username}",
                     web::get().to(UserController::<U>::get_user_by_username),
                 )
-                .route("/{user_id}", web::get().to(UserController::<U>::get_user))
-                .route("/{user_id}", web::put().to(update_user::<U>))
-                .route("/{user_id}/projects", web::get().to(get_user_projects::<U>)),
+                .route("/{user_id}/projects", web::get().to(get_user_projects::<U>))
+                .route("/{user_id}", web::get().to(get_user::<U>))
+                .route("/{user_id}", web::put().to(update_user::<U>)),
         );
 }

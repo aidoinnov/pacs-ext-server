@@ -89,6 +89,9 @@ pub struct Annotation {
     pub description: Option<String>,
     /// 측정값 (JSON 배열 형태의 측정 객체들)
     pub measurement_values: Option<serde_json::Value>,
+    /// 어노테이션 라벨 (선택사항)
+    /// 어노테이션의 분류나 카테고리를 나타내는 라벨 (예: "Tumor", "Lesion", "Normal")
+    pub label: Option<String>,
 }
 
 /// 어노테이션 변경 이력을 나타내는 엔티티
@@ -192,6 +195,9 @@ pub struct NewAnnotation {
     pub description: Option<String>,
     /// 측정값 (JSON 배열 형태의 측정 객체들)
     pub measurement_values: Option<serde_json::Value>,
+    /// 어노테이션 라벨 (선택사항)
+    /// 어노테이션의 분류나 카테고리를 나타내는 라벨 (예: "Tumor", "Lesion", "Normal")
+    pub label: Option<String>,
     /// 어노테이션의 실제 데이터 (JSON 형태)
     pub data: serde_json::Value,
     /// 다른 사용자와 공유 여부

@@ -16,7 +16,7 @@
 
 // 애플리케이션 레이어의 DTO 모듈들
 use crate::application::dto::{
-    AnnotationListResponse, AnnotationResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
+    AnnotationListResponse, AnnotationPermissionsResponse, AnnotationResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
 };
 // 도메인 레이어의 서비스 인터페이스
 use crate::domain::services::{AnnotationService, AccessControlService};
@@ -28,6 +28,10 @@ use crate::domain::entities::{Annotation, NewAnnotation};
 use crate::domain::repositories::UserRepository;
 // 표준 라이브러리
 use std::collections::HashMap;
+// SQL 쿼리 실행을 위한 sqlx
+use sqlx;
+// 로깅을 위한 tracing
+use tracing;
 
 /// 어노테이션 관리를 위한 Use Case
 ///
@@ -93,10 +97,25 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
             .and_then(|user| user.full_name);
 
+        // role 정보 조회 (프로젝트 내 역할)
+        let user_role_name = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT r.name
+             FROM security_user_project up
+             LEFT JOIN security_role r ON up.role_id = r.id
+             WHERE up.user_id = $1 AND up.project_id = $2"
+        )
+        .bind(annotation.user_id)
+        .bind(annotation.project_id)
+        .fetch_optional(self.user_repository.pool())
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
+        .flatten();
+
         Ok(AnnotationResponse {
             id: annotation.id,
             user_id: annotation.user_id,
             user_name,
+            user_role_name,
             study_instance_uid: annotation.study_uid,
             series_instance_uid: annotation.series_uid.unwrap_or_default(),
             sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
@@ -106,6 +125,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             viewer_software: annotation.viewer_software,
             description: annotation.description,
             measurement_values: annotation.measurement_values,
+            label: annotation.label,
             version: annotation.version,
             created_at: annotation.created_at,
             updated_at: annotation.updated_at,
@@ -114,7 +134,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
 
     /// Annotation 엔티티 목록을 AnnotationResponse DTO 목록으로 변환합니다 (배치 최적화)
     ///
-    /// 이 메서드는 N+1 문제를 방지하기 위해 모든 사용자 ID를 한 번에 조회합니다.
+    /// 이 메서드는 N+1 문제를 방지하기 위해 모든 사용자 ID와 역할 정보를 한 번에 조회합니다.
     ///
     /// # 매개변수
     /// - `annotations`: 변환할 Annotation 엔티티 목록
@@ -151,7 +171,47 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             .map(|user| (user.id, user.full_name))
             .collect();
 
-        // 4. Annotation -> AnnotationResponse 변환
+        // 4. 고유한 (user_id, project_id) 쌍 수집
+        let user_project_pairs: Vec<(i32, i32)> = annotations
+            .iter()
+            .map(|a| (a.user_id, a.project_id))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        // 5. 배치 쿼리로 role 정보 조회
+        let role_map: HashMap<(i32, i32), Option<String>> = if !user_project_pairs.is_empty() {
+            let (user_ids_for_role, project_ids): (Vec<i32>, Vec<i32>) = 
+                user_project_pairs.iter().cloned().unzip();
+
+            // role 조회 실패 시에도 어노테이션 응답은 반환 (role_name만 None)
+            match sqlx::query_as::<_, (i32, i32, Option<String>)>(
+                "SELECT up.user_id, up.project_id, r.name as role_name
+                 FROM security_user_project up
+                 LEFT JOIN security_role r ON up.role_id = r.id
+                 WHERE up.user_id = ANY($1) AND up.project_id = ANY($2)"
+            )
+            .bind(&user_ids_for_role)
+            .bind(&project_ids)
+            .fetch_all(self.user_repository.pool())
+            .await
+            {
+                Ok(memberships) => {
+                    memberships
+                        .into_iter()
+                        .map(|(uid, pid, role_name)| ((uid, pid), role_name))
+                        .collect()
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to fetch role information: {}", e);
+                    HashMap::new()  // 빈 맵으로 계속 진행
+                }
+            }
+        } else {
+            HashMap::new()
+        };
+
+        // 6. Annotation -> AnnotationResponse 변환
         let responses = annotations
             .into_iter()
             .map(|annotation| {
@@ -160,10 +220,16 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
                     .cloned()
                     .flatten();
 
+                let user_role_name = role_map
+                    .get(&(annotation.user_id, annotation.project_id))
+                    .cloned()
+                    .flatten();
+
                 AnnotationResponse {
                     id: annotation.id,
                     user_id: annotation.user_id,
                     user_name,
+                    user_role_name,
                     study_instance_uid: annotation.study_uid,
                     series_instance_uid: annotation.series_uid.unwrap_or_default(),
                     sop_instance_uid: annotation.instance_uid.unwrap_or_default(),
@@ -173,6 +239,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
                     viewer_software: annotation.viewer_software,
                     description: annotation.description,
                     measurement_values: annotation.measurement_values,
+                    label: annotation.label,
                     version: annotation.version,
                     created_at: annotation.created_at,
                     updated_at: annotation.updated_at,
@@ -223,6 +290,26 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         user_id: i32,
         project_id: i32,
     ) -> Result<AnnotationResponse, ServiceError> {
+        // 권한 체크: ANNOTATION:CREATE 또는 ANNOTATION_WRITE 권한 확인
+        let has_permission = self
+            .access_control_service
+            .check_permission(user_id, project_id, "ANNOTATION", "CREATE")
+            .await?;
+
+        if !has_permission {
+            // ANNOTATION_WRITE capability도 확인
+            let has_write = self
+                .access_control_service
+                .check_permission(user_id, project_id, "ANNOTATION", "WRITE")
+                .await?;
+            
+            if !has_write {
+                return Err(ServiceError::Unauthorized(
+                    "Insufficient permissions to create annotation".to_string(),
+                ));
+            }
+        }
+
         // Validation
         if request.study_instance_uid.trim().is_empty() {
             return Err(ServiceError::ValidationError(
@@ -251,6 +338,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             viewer_software: request.viewer_software,
             description: request.description,
             measurement_values: request.measurement_values,
+            label: request.label,
             data: request.annotation_data,
             is_shared: false, // 기본값은 비공유
         };
@@ -263,32 +351,62 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         self.to_response(annotation).await
     }
 
-    /// ID로 어노테이션을 조회합니다.
+    /// ID로 어노테이션을 조회합니다 (권한 체크 포함).
     ///
     /// 이 메서드는 지정된 ID를 가진 어노테이션을 조회합니다.
+    /// 사용자는 소유자이거나 READ_ALL 권한이 있어야 조회할 수 있습니다.
     /// 어노테이션이 존재하지 않으면 NotFound 에러를 반환합니다.
     ///
     /// # 매개변수
+    /// - `user_id`: 요청하는 사용자의 ID
     /// - `annotation_id`: 조회할 어노테이션의 ID
     ///
     /// # 반환값
     /// - `Ok(AnnotationResponse)`: 조회된 어노테이션 정보
-    /// - `Err(ServiceError)`: 어노테이션을 찾을 수 없거나 서비스 오류
+    /// - `Err(ServiceError)`: 어노테이션을 찾을 수 없거나 권한이 없거나 서비스 오류
     ///
     /// # 예시
     /// ```ignore
-    /// let annotation = annotation_use_case.get_annotation_by_id(123).await?;
+    /// let annotation = annotation_use_case.get_annotation_by_id(1, 123).await?;
     /// println!("어노테이션 ID: {}", annotation.id);
     /// ```
     pub async fn get_annotation_by_id(
         &self,
+        user_id: i32,
         annotation_id: i32,
     ) -> Result<AnnotationResponse, ServiceError> {
+        // 1. Annotation 조회
         let annotation = self
             .annotation_service
             .get_annotation_by_id(annotation_id)
             .await?;
 
+        // 2. 프로젝트 멤버 확인
+        let is_member = self
+            .access_control_service
+            .is_project_member(user_id, annotation.project_id)
+            .await?;
+
+        if !is_member {
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
+        }
+
+        // 3. 소유자 확인 또는 READ_ALL 권한 확인
+        let is_owner = annotation.user_id == user_id;
+        let has_read_all = self
+            .access_control_service
+            .check_permission(user_id, annotation.project_id, "ANNOTATION", "READ_ALL")
+            .await?;
+
+        if !is_owner && !has_read_all {
+            return Err(ServiceError::Unauthorized(
+                "User does not have permission to read this annotation".into(),
+            ));
+        }
+
+        // 4. 권한이 있으면 Annotation 반환
         self.to_response(annotation).await
     }
 
@@ -589,6 +707,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
     /// # 매개변수
     /// - `annotation_id`: 업데이트할 어노테이션의 ID
     /// - `request`: 업데이트 요청 데이터
+    /// - `user_id`: 요청하는 사용자의 ID
     ///
     /// # 반환값
     /// - `Ok(AnnotationResponse)`: 업데이트된 어노테이션 정보
@@ -599,19 +718,45 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
     /// let request = UpdateAnnotationRequest {
     ///     annotation_data: Some(serde_json::json!({"type": "polygon", "points": [[0, 0], [100, 100]]})),
     /// };
-    /// let updated = annotation_use_case.update_annotation(123, request).await?;
+    /// let updated = annotation_use_case.update_annotation(123, request, 1).await?;
     /// println!("업데이트된 어노테이션 ID: {}", updated.id);
     /// ```
     pub async fn update_annotation(
         &self,
         annotation_id: i32,
         request: UpdateAnnotationRequest,
+        user_id: i32,
     ) -> Result<AnnotationResponse, ServiceError> {
         // 현재 annotation 조회
         let current_annotation = self
             .annotation_service
             .get_annotation_by_id(annotation_id)
             .await?;
+
+        // 권한 체크: 소유자 확인 또는 ANNOTATION:UPDATE/ANNOTATION_WRITE 권한 확인
+        let is_owner = current_annotation.user_id == user_id;
+        
+        if !is_owner {
+            // 소유자가 아니면 권한 확인
+            let has_update = self
+                .access_control_service
+                .check_permission(user_id, current_annotation.project_id, "ANNOTATION", "UPDATE")
+                .await?;
+            
+            if !has_update {
+                // ANNOTATION_WRITE capability도 확인
+                let has_write = self
+                    .access_control_service
+                    .check_permission(user_id, current_annotation.project_id, "ANNOTATION", "WRITE")
+                    .await?;
+                
+                if !has_write {
+                    return Err(ServiceError::Unauthorized(
+                        "Insufficient permissions to update annotation".to_string(),
+                    ));
+                }
+            }
+        }
 
         // 버전 검증 (Optimistic Locking)
         // base_version이 제공된 경우, 현재 버전과 일치하는지 확인
@@ -630,6 +775,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         let measurement_values = request
             .measurement_values
             .or(current_annotation.measurement_values);
+        let label = request.label.or(current_annotation.label);
 
         let updated_annotation = self
             .annotation_service
@@ -638,6 +784,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
                 new_data,
                 is_shared,
                 measurement_values,
+                label,
             )
             .await?;
 
@@ -651,6 +798,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
     ///
     /// # 매개변수
     /// - `annotation_id`: 삭제할 어노테이션의 ID
+    /// - `user_id`: 요청하는 사용자의 ID
     ///
     /// # 반환값
     /// - `Ok(())`: 삭제 성공
@@ -658,10 +806,33 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
     ///
     /// # 예시
     /// ```ignore
-    /// annotation_use_case.delete_annotation(123).await?;
+    /// annotation_use_case.delete_annotation(123, 1).await?;
     /// println!("어노테이션이 삭제되었습니다.");
     /// ```
-    pub async fn delete_annotation(&self, annotation_id: i32) -> Result<(), ServiceError> {
+    pub async fn delete_annotation(&self, annotation_id: i32, user_id: i32) -> Result<(), ServiceError> {
+        // 현재 annotation 조회
+        let current_annotation = self
+            .annotation_service
+            .get_annotation_by_id(annotation_id)
+            .await?;
+
+        // 권한 체크: 소유자 확인 또는 ANNOTATION:DELETE 권한 확인
+        let is_owner = current_annotation.user_id == user_id;
+        
+        if !is_owner {
+            // 소유자가 아니면 권한 확인
+            let has_delete = self
+                .access_control_service
+                .check_permission(user_id, current_annotation.project_id, "ANNOTATION", "DELETE")
+                .await?;
+            
+            if !has_delete {
+                return Err(ServiceError::Unauthorized(
+                    "Insufficient permissions to delete annotation".to_string(),
+                ));
+            }
+        }
+
         self.annotation_service
             .delete_annotation(annotation_id)
             .await
@@ -988,6 +1159,69 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         })
     }
 
+    /// SOP Instance UID와 프로젝트 ID로 어노테이션 목록을 조회합니다 (권한 기반 필터링).
+    ///
+    /// 이 메서드는 지정된 SOP Instance UID와 프로젝트에 해당하는 어노테이션을 조회합니다.
+    /// READ_ALL 권한이 있으면 모든 어노테이션을 반환하고, 없으면 사용자 본인의 어노테이션만 반환합니다.
+    pub async fn get_annotations_by_project_and_instance_with_user(
+        &self,
+        requesting_user_id: i32,
+        project_id: i32,
+        instance_uid: &str,
+    ) -> Result<AnnotationListResponse, ServiceError> {
+        // 1. 사용자가 프로젝트 멤버인지 확인
+        let is_member = self
+            .access_control_service
+            .is_project_member(requesting_user_id, project_id)
+            .await?;
+
+        if !is_member {
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
+        }
+
+        // 2. READ_ALL 권한 확인
+        let has_read_all = self
+            .access_control_service
+            .check_permission(requesting_user_id, project_id, "ANNOTATION", "READ_ALL")
+            .await?;
+
+        // 3. SOP Instance UID로 어노테이션 조회
+        let annotations = self
+            .annotation_service
+            .get_annotations_by_instance(instance_uid)
+            .await?;
+
+        // 4. 권한에 따라 필터링 (프로젝트 ID도 함께 필터링)
+        let filtered_annotations: Vec<_> = if has_read_all {
+            // READ_ALL 권한 있음: 해당 프로젝트의 모든 어노테이션 반환
+            annotations
+                .into_iter()
+                .filter(|ann| ann.project_id == project_id)
+                .collect()
+        } else {
+            // READ_ALL 권한 없음: 해당 프로젝트의 본인 어노테이션만 반환
+            annotations
+                .into_iter()
+                .filter(|ann| ann.user_id == requesting_user_id && ann.project_id == project_id)
+                .collect()
+        };
+
+        let total = filtered_annotations.len();
+        let annotation_responses = self.to_responses(filtered_annotations).await?;
+
+        Ok(AnnotationListResponse {
+            annotations: annotation_responses,
+            total,
+            page: 1,
+            limit: total as i32,
+            total_pages: 1,
+            has_next: false,
+            list_version: None,
+        })
+    }
+
     /// 프로젝트와 Series UID로 어노테이션 목록을 조회합니다 (권한 체크 없음).
     ///
     /// 이 메서드는 권한 체크 없이 지정된 Series UID와 프로젝트에 해당하는 모든 어노테이션을 반환합니다.
@@ -1067,5 +1301,98 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             has_next,
             list_version,
         })
+    }
+
+    /// 사용자의 Annotation 권한을 조회합니다.
+    ///
+    /// 이 메서드는 지정된 사용자가 특정 프로젝트에서 가진 Annotation 관련 권한을 확인합니다.
+    ///
+    /// # 매개변수
+    /// - `user_id`: 권한을 확인할 사용자의 ID
+    /// - `project_id`: 프로젝트의 ID
+    ///
+    /// # 반환값
+    /// - `Ok(AnnotationPermissionsResponse)`: 사용자의 권한 정보
+    /// - `Err(ServiceError)`: 서비스 오류
+    ///
+    /// # 예시
+    /// ```ignore
+    /// let permissions = annotation_use_case.get_user_annotation_permissions(1, 299).await?;
+    /// println!("쓰기 권한: {}", permissions.can_write);
+    /// ```
+    pub async fn get_user_annotation_permissions(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<AnnotationPermissionsResponse, ServiceError> {
+        // READ_OWN 권한 체크 (ANNOTATION:READ 권한)
+        let can_read_own = self
+            .access_control_service
+            .check_permission(user_id, project_id, "ANNOTATION", "READ")
+            .await?;
+
+        // READ_ALL 권한 체크
+        let can_read_all = self
+            .access_control_service
+            .check_permission(user_id, project_id, "ANNOTATION", "READ_ALL")
+            .await?;
+
+        // WRITE 권한 체크: CREATE 또는 UPDATE 권한 중 하나라도 있으면 true
+        // ANNOTATION_WRITE capability는 CREATE와 UPDATE 권한에 매핑됨
+        let has_create = self
+            .access_control_service
+            .check_permission(user_id, project_id, "ANNOTATION", "CREATE")
+            .await
+            .unwrap_or(false);
+        
+        let has_update = self
+            .access_control_service
+            .check_permission(user_id, project_id, "ANNOTATION", "UPDATE")
+            .await
+            .unwrap_or(false);
+        
+        let can_write = has_create || has_update;
+
+        // DELETE 권한 체크
+        let can_delete = self
+            .access_control_service
+            .check_permission(user_id, project_id, "ANNOTATION", "DELETE")
+            .await?;
+
+        // SHARE 권한 체크 (선택적 권한, 에러 없이 false 반환)
+        let can_share = self
+            .access_control_service
+            .check_permission(user_id, project_id, "ANNOTATION", "SHARE")
+            .await
+            .unwrap_or(false);
+
+        Ok(AnnotationPermissionsResponse {
+            can_read_own,
+            can_read_all,
+            can_write,
+            can_delete,
+            can_share,
+        })
+    }
+
+    /// 사용자가 프로젝트의 멤버인지 확인합니다.
+    ///
+    /// 이 메서드는 다른 사용자의 권한을 조회하기 전에 권한 체크를 위해 사용됩니다.
+    ///
+    /// # 매개변수
+    /// - `user_id`: 확인할 사용자의 ID
+    /// - `project_id`: 프로젝트의 ID
+    ///
+    /// # 반환값
+    /// - `Ok(bool)`: 멤버 여부
+    /// - `Err(ServiceError)`: 서비스 오류
+    pub async fn is_project_member(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<bool, ServiceError> {
+        self.access_control_service
+            .is_project_member(user_id, project_id)
+            .await
     }
 }

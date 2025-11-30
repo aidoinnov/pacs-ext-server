@@ -59,6 +59,11 @@ pub struct CreateAnnotationRequest {
         {"id": "m2", "type": "mean", "values": [30.5], "unit": "mm"}
     ]))]
     pub measurement_values: Option<serde_json::Value>,
+
+    /// 어노테이션 라벨
+    /// 어노테이션의 분류나 카테고리를 나타내는 라벨
+    #[schema(example = "Tumor")]
+    pub label: Option<String>,
 }
 
 /// Annotation 업데이트 요청 DTO
@@ -101,6 +106,11 @@ pub struct UpdateAnnotationRequest {
         {"id": "m1", "type": "raw", "values": [42.3, 18.7], "unit": "mm"}
     ]))]
     pub measurement_values: Option<serde_json::Value>,
+
+    /// 어노테이션 라벨
+    /// 어노테이션의 분류나 카테고리를 나타내는 라벨
+    #[schema(example = "Lesion")]
+    pub label: Option<String>,
 }
 
 /// Annotation 응답 DTO
@@ -118,6 +128,11 @@ pub struct AnnotationResponse {
     /// 어노테이션을 생성한 사용자의 이름
     #[schema(example = "홍길동")]
     pub user_name: Option<String>,
+
+    /// 사용자 역할 이름
+    /// 어노테이션을 생성한 사용자의 프로젝트 내 역할 이름
+    #[schema(example = "ADJUDICATOR")]
+    pub user_role_name: Option<String>,
 
     /// Study Instance UID
     /// DICOM Study의 고유 식별자
@@ -157,6 +172,11 @@ pub struct AnnotationResponse {
 
     /// 측정값
     pub measurement_values: Option<serde_json::Value>,
+
+    /// 어노테이션 라벨
+    /// 어노테이션의 분류나 카테고리를 나타내는 라벨
+    #[schema(example = "Tumor")]
+    pub label: Option<String>,
 
     /// 버전 번호 (Optimistic Locking)
     /// 낙관적 잠금을 위한 버전 번호
@@ -208,3 +228,27 @@ pub struct AnnotationListResponse {
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
     pub list_version: Option<DateTime<Utc>>,
 }
+/// Annotation 권한 조회 응답 DTO
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+pub struct AnnotationPermissionsResponse {
+    /// 본인 어노테이션 읽기 권한
+    #[schema(example = true)]
+    pub can_read_own: bool,
+
+    /// 모든 어노테이션 읽기 권한
+    #[schema(example = false)]
+    pub can_read_all: bool,
+
+    /// 어노테이션 쓰기 권한
+    #[schema(example = true)]
+    pub can_write: bool,
+
+    /// 어노테이션 삭제 권한
+    #[schema(example = true)]
+    pub can_delete: bool,
+
+    /// 어노테이션 공유 권한 (선택사항)
+    #[schema(example = false)]
+    pub can_share: bool,
+}
+

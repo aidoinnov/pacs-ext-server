@@ -93,13 +93,14 @@ pub trait AnnotationService: Send + Sync {
         is_shared: bool,
     ) -> Result<Annotation, ServiceError>;
 
-    /// Annotation 업데이트 (measurement_values 포함)
+    /// Annotation 업데이트 (measurement_values, label 포함)
     async fn update_annotation_with_measurements(
         &self,
         id: i32,
         data: serde_json::Value,
         is_shared: bool,
         measurement_values: Option<serde_json::Value>,
+        label: Option<String>,
     ) -> Result<Annotation, ServiceError>;
 
     /// Annotation 삭제
@@ -393,14 +394,15 @@ where
         data: serde_json::Value,
         is_shared: bool,
         measurement_values: Option<serde_json::Value>,
+        label: Option<String>,
     ) -> Result<Annotation, ServiceError> {
         // 현재 annotation 조회
         let annotation = self.get_annotation_by_id(id).await?;
 
-        // 업데이트 실행 (measurement_values 포함)
+        // 업데이트 실행 (measurement_values, label 포함)
         match self
             .annotation_repository
-            .update_with_measurements(id, data, is_shared, measurement_values)
+            .update_with_measurements(id, data, is_shared, measurement_values, label)
             .await?
         {
             Some(updated_annotation) => {

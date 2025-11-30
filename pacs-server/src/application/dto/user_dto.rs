@@ -69,6 +69,10 @@ pub struct UserResponse {
     /// 이메일 인증 여부
     #[schema(example = true)]
     pub email_verified: bool,
+    /// 프로젝트별 역할 이름 (project_id 제공 시)
+    /// 어노테이션을 생성한 사용자의 프로젝트 내 역할 이름
+    #[schema(example = "ADJUDICATOR")]
+    pub role_name: Option<String>,
     #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
     pub created_at: DateTime<Utc>,
     #[schema(value_type = String, example = "2024-01-02T00:00:00Z")]
@@ -88,6 +92,7 @@ impl From<crate::domain::entities::user::User> for UserResponse {
             phone: user.phone,
             account_status: format!("{:?}", user.account_status),
             email_verified: user.email_verified,
+            role_name: None, // 기본값은 None, Use Case에서 설정
             created_at: user.created_at,
             updated_at: user.updated_at,
         }
@@ -170,4 +175,34 @@ pub struct ProjectSummary {
     pub name: String,
     pub description: Option<String>,
     pub is_active: bool,
+}
+
+/// 사용자 조회 쿼리 DTO (쿼리 파라미터용)
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UserQuery {
+    /// 사용자 ID (필수)
+    #[schema(example = 5)]
+    pub user_id: i32,
+    /// 프로젝트 ID (선택적, 제공 시 해당 프로젝트에서의 역할 이름 반환)
+    #[schema(example = 2)]
+    pub project_id: Option<i32>,
+}
+
+/// 사용자 조회 쿼리 DTO (Path parameter와 함께 사용)
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct UserProjectQuery {
+    /// 프로젝트 ID (선택적, 제공 시 해당 프로젝트에서의 역할 이름 반환)
+    #[schema(example = 2)]
+    pub project_id: Option<i32>,
+}
+
+/// /me API용 쿼리 DTO (user_id와 project_id 모두 선택적)
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct MeQuery {
+    /// 사용자 ID (선택적, JWT 토큰이 없을 때 사용)
+    #[schema(example = 5)]
+    pub user_id: Option<i32>,
+    /// 프로젝트 ID (선택적, 제공 시 해당 프로젝트에서의 역할 이름 반환)
+    #[schema(example = 2)]
+    pub project_id: Option<i32>,
 }

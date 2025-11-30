@@ -27,6 +27,7 @@ mod annotation_dto_tests {
             tool_version: Some("2.1.0".to_string()),
             description: Some("Test annotation with new fields".to_string()),
             measurement_values: None,
+            label: Some("Tumor".to_string()),
         };
 
         // Test serialization
@@ -35,6 +36,8 @@ mod annotation_dto_tests {
         assert!(json_str.contains("tool_name"));
         assert!(json_str.contains("tool_version"));
         assert!(json_str.contains("description"));
+        assert!(json_str.contains("label"));
+        assert!(json_str.contains("Tumor"));
 
         // Test deserialization
         let deserialized: CreateAnnotationRequest =
@@ -49,6 +52,7 @@ mod annotation_dto_tests {
             deserialized.description,
             Some("Test annotation with new fields".to_string())
         );
+        assert_eq!(deserialized.label, Some("Tumor".to_string()));
     }
 
     #[test]
@@ -65,6 +69,7 @@ mod annotation_dto_tests {
             tool_version: None,
             description: None,
             measurement_values: None,
+            label: None,
         };
 
         // Test serialization with None values
@@ -73,6 +78,7 @@ mod annotation_dto_tests {
         assert!(json_str.contains("tool_name"));
         assert!(json_str.contains("tool_version"));
         assert!(json_str.contains("description"));
+        assert!(json_str.contains("label"));
 
         // Test deserialization
         let deserialized: CreateAnnotationRequest =
@@ -81,6 +87,7 @@ mod annotation_dto_tests {
         assert_eq!(deserialized.tool_name, None);
         assert_eq!(deserialized.tool_version, None);
         assert_eq!(deserialized.description, None);
+        assert_eq!(deserialized.label, None);
     }
 
     #[test]
@@ -99,6 +106,8 @@ mod annotation_dto_tests {
             tool_version: Some("3.0.0".to_string()),
             description: Some("Updated description".to_string()),
             measurement_values: None,
+            base_version: Some(1),
+            label: Some("Lesion".to_string()),
         };
 
         // Test serialization
@@ -107,6 +116,8 @@ mod annotation_dto_tests {
         assert!(json_str.contains("tool_name"));
         assert!(json_str.contains("tool_version"));
         assert!(json_str.contains("description"));
+        assert!(json_str.contains("label"));
+        assert!(json_str.contains("Lesion"));
 
         // Test deserialization
         let deserialized: UpdateAnnotationRequest =
@@ -124,6 +135,7 @@ mod annotation_dto_tests {
             deserialized.description,
             Some("Updated description".to_string())
         );
+        assert_eq!(deserialized.label, Some("Lesion".to_string()));
     }
 
     #[test]
@@ -132,6 +144,7 @@ mod annotation_dto_tests {
             id: 123,
             user_id: 456,
             user_name: Some("홍길동".to_string()),
+            user_role_name: Some("ADJUDICATOR".to_string()),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -145,6 +158,8 @@ mod annotation_dto_tests {
             tool_version: Some("2.5.0".to_string()),
             description: Some("Polygon annotation".to_string()),
             measurement_values: None,
+            label: Some("Normal".to_string()),
+            version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
         };
@@ -153,10 +168,14 @@ mod annotation_dto_tests {
         let json_str = serde_json::to_string(&response).expect("Failed to serialize");
         assert!(json_str.contains("user_name"));
         assert!(json_str.contains("홍길동"));
+        assert!(json_str.contains("user_role_name"));
+        assert!(json_str.contains("ADJUDICATOR"));
         assert!(json_str.contains("viewer_software"));
         assert!(json_str.contains("tool_name"));
         assert!(json_str.contains("tool_version"));
         assert!(json_str.contains("description"));
+        assert!(json_str.contains("label"));
+        assert!(json_str.contains("Normal"));
         assert!(json_str.contains("created_at"));
         assert!(json_str.contains("updated_at"));
 
@@ -166,6 +185,7 @@ mod annotation_dto_tests {
         assert_eq!(deserialized.id, 123);
         assert_eq!(deserialized.user_id, 456);
         assert_eq!(deserialized.user_name, Some("홍길동".to_string()));
+        assert_eq!(deserialized.user_role_name, Some("ADJUDICATOR".to_string()));
         assert_eq!(
             deserialized.viewer_software,
             Some("OHIF Viewer".to_string())
@@ -176,6 +196,7 @@ mod annotation_dto_tests {
             deserialized.description,
             Some("Polygon annotation".to_string())
         );
+        assert_eq!(deserialized.label, Some("Normal".to_string()));
     }
 
     #[test]
@@ -184,6 +205,7 @@ mod annotation_dto_tests {
             id: 789,
             user_id: 101,
             user_name: None,
+            user_role_name: None,
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
             series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
             sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
@@ -193,6 +215,8 @@ mod annotation_dto_tests {
             tool_version: None,
             description: None,
             measurement_values: None,
+            label: None,
+            version: 1,
             created_at: Utc.timestamp_opt(1704196800, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704197700, 0).unwrap(),
         };
@@ -200,10 +224,12 @@ mod annotation_dto_tests {
         // Test serialization with None values
         let json_str = serde_json::to_string(&response).expect("Failed to serialize");
         assert!(json_str.contains("user_name"));
+        assert!(json_str.contains("user_role_name"));
         assert!(json_str.contains("viewer_software"));
         assert!(json_str.contains("tool_name"));
         assert!(json_str.contains("tool_version"));
         assert!(json_str.contains("description"));
+        assert!(json_str.contains("label"));
 
         // Test deserialization
         let deserialized: AnnotationResponse =
@@ -211,10 +237,12 @@ mod annotation_dto_tests {
         assert_eq!(deserialized.id, 789);
         assert_eq!(deserialized.user_id, 101);
         assert_eq!(deserialized.user_name, None);
+        assert_eq!(deserialized.user_role_name, None);
         assert_eq!(deserialized.viewer_software, None);
         assert_eq!(deserialized.tool_name, None);
         assert_eq!(deserialized.tool_version, None);
         assert_eq!(deserialized.description, None);
+        assert_eq!(deserialized.label, None);
     }
 
     #[test]
@@ -241,6 +269,7 @@ mod annotation_dto_tests {
             tool_version: Some("2.1.0".to_string()),
             description: Some("Circle annotation test".to_string()),
             measurement_values: None,
+            label: Some("Tumor".to_string()),
         };
 
         let circle_json =
@@ -271,6 +300,7 @@ mod annotation_dto_tests {
             tool_version: Some("1.8.0".to_string()),
             description: Some("Rectangle annotation test".to_string()),
             measurement_values: None,
+            label: Some("Lesion".to_string()),
         };
 
         let rectangle_json =
@@ -300,6 +330,7 @@ mod annotation_dto_tests {
             tool_version: Some("3.2.1".to_string()),
             description: Some("Point annotation test".to_string()),
             measurement_values: None,
+            label: Some("Normal".to_string()),
         };
 
         let point_json = serde_json::to_string(&point_request).expect("Failed to serialize point");
@@ -314,6 +345,7 @@ mod annotation_dto_tests {
             id: 1,
             user_id: 5,
             user_name: Some("김철수".to_string()),
+            user_role_name: Some("PROJECT_MEMBER".to_string()),
             study_instance_uid: "1.2.3.4.5".to_string(),
             series_instance_uid: "1.2.3.4.5.6".to_string(),
             sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
@@ -323,6 +355,8 @@ mod annotation_dto_tests {
             tool_version: Some("1.0.0".to_string()),
             description: Some("Test".to_string()),
             measurement_values: None,
+            label: Some("Tumor".to_string()),
+            version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
         };
@@ -330,16 +364,22 @@ mod annotation_dto_tests {
         let json_str = serde_json::to_string(&response_with_name).expect("Failed to serialize");
         assert!(json_str.contains("user_name"));
         assert!(json_str.contains("김철수"));
+        assert!(json_str.contains("user_role_name"));
+        assert!(json_str.contains("label"));
+        assert!(json_str.contains("Tumor"));
 
         let deserialized: AnnotationResponse =
             serde_json::from_str(&json_str).expect("Failed to deserialize");
         assert_eq!(deserialized.user_name, Some("김철수".to_string()));
+        assert_eq!(deserialized.user_role_name, Some("PROJECT_MEMBER".to_string()));
+        assert_eq!(deserialized.label, Some("Tumor".to_string()));
 
         // Test with user_name as None
         let response_without_name = AnnotationResponse {
             id: 2,
             user_id: 10,
             user_name: None,
+            user_role_name: None,
             study_instance_uid: "1.2.3.4.5".to_string(),
             series_instance_uid: "1.2.3.4.5.6".to_string(),
             sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
@@ -349,16 +389,22 @@ mod annotation_dto_tests {
             tool_version: None,
             description: None,
             measurement_values: None,
+            label: None,
+            version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
         };
 
         let json_str2 = serde_json::to_string(&response_without_name).expect("Failed to serialize");
         assert!(json_str2.contains("user_name"));
+        assert!(json_str2.contains("user_role_name"));
+        assert!(json_str2.contains("label"));
 
         let deserialized2: AnnotationResponse =
             serde_json::from_str(&json_str2).expect("Failed to deserialize");
         assert_eq!(deserialized2.user_name, None);
+        assert_eq!(deserialized2.user_role_name, None);
+        assert_eq!(deserialized2.label, None);
     }
 
     #[test]
@@ -368,6 +414,7 @@ mod annotation_dto_tests {
             id: 1,
             user_id: 1,
             user_name: Some("Test User".to_string()),
+            user_role_name: Some("VIEWER".to_string()),
             study_instance_uid: "1.2.3.4.5".to_string(),
             series_instance_uid: "".to_string(),
             sop_instance_uid: "".to_string(),
@@ -377,6 +424,8 @@ mod annotation_dto_tests {
             tool_version: Some("1.0.0".to_string()),
             description: Some("Study level".to_string()),
             measurement_values: None,
+            label: Some("Study Annotation".to_string()),
+            version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
         };
@@ -389,6 +438,7 @@ mod annotation_dto_tests {
             id: 2,
             user_id: 1,
             user_name: Some("Test User".to_string()),
+            user_role_name: Some("PROJECT_MEMBER".to_string()),
             study_instance_uid: "1.2.3.4.5".to_string(),
             series_instance_uid: "1.2.3.4.5.6".to_string(),
             sop_instance_uid: "".to_string(),
@@ -398,6 +448,8 @@ mod annotation_dto_tests {
             tool_version: Some("1.0.0".to_string()),
             description: Some("Series level".to_string()),
             measurement_values: None,
+            label: Some("Series Annotation".to_string()),
+            version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
         };
@@ -410,6 +462,7 @@ mod annotation_dto_tests {
             id: 3,
             user_id: 1,
             user_name: Some("Test User".to_string()),
+            user_role_name: Some("ADJUDICATOR".to_string()),
             study_instance_uid: "1.2.3.4.5".to_string(),
             series_instance_uid: "1.2.3.4.5.6".to_string(),
             sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
@@ -419,11 +472,110 @@ mod annotation_dto_tests {
             tool_version: Some("1.0.0".to_string()),
             description: Some("Instance level".to_string()),
             measurement_values: None,
+            label: Some("Instance".to_string()),
+            version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
         };
 
         assert!(!instance_level.series_instance_uid.is_empty());
         assert!(!instance_level.sop_instance_uid.is_empty());
+    }
+
+    #[test]
+    fn test_annotation_response_with_user_role_name() {
+        // Test with user_role_name present
+        let response_with_role = AnnotationResponse {
+            id: 1,
+            user_id: 5,
+            user_name: Some("김철수".to_string()),
+            user_role_name: Some("ADJUDICATOR".to_string()),
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.5.6".to_string(),
+            sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
+            annotation_data: json!({"type": "point", "x": 100, "y": 100}),
+            viewer_software: Some("TI-DicomViewer".to_string()),
+            tool_name: Some("Point Tool".to_string()),
+            tool_version: Some("1.0.0".to_string()),
+            description: Some("Test".to_string()),
+            measurement_values: None,
+            label: Some("Tumor".to_string()),
+            version: 1,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+        };
+
+        let json_str = serde_json::to_string(&response_with_role).expect("Failed to serialize");
+        assert!(json_str.contains("user_role_name"));
+        assert!(json_str.contains("ADJUDICATOR"));
+        assert!(json_str.contains("user_name"));
+        assert!(json_str.contains("김철수"));
+
+        let deserialized: AnnotationResponse =
+            serde_json::from_str(&json_str).expect("Failed to deserialize");
+        assert_eq!(deserialized.user_role_name, Some("ADJUDICATOR".to_string()));
+        assert_eq!(deserialized.user_name, Some("김철수".to_string()));
+
+        // Test with user_role_name as None (role이 없는 경우)
+        let response_without_role = AnnotationResponse {
+            id: 2,
+            user_id: 10,
+            user_name: Some("이영희".to_string()),
+            user_role_name: None,
+            study_instance_uid: "1.2.3.4.5".to_string(),
+            series_instance_uid: "1.2.3.4.5.6".to_string(),
+            sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
+            annotation_data: json!({"type": "point", "x": 100, "y": 100}),
+            viewer_software: None,
+            tool_name: None,
+            tool_version: None,
+            description: None,
+            measurement_values: None,
+            label: None,
+            version: 1,
+            created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+        };
+
+        let json_str2 = serde_json::to_string(&response_without_role).expect("Failed to serialize");
+        assert!(json_str2.contains("user_role_name"));
+        assert!(json_str2.contains("user_name"));
+        assert!(json_str2.contains("이영희"));
+
+        let deserialized2: AnnotationResponse =
+            serde_json::from_str(&json_str2).expect("Failed to deserialize");
+        assert_eq!(deserialized2.user_role_name, None);
+        assert_eq!(deserialized2.user_name, Some("이영희".to_string()));
+
+        // Test with various role names
+        let roles = vec!["ADJUDICATOR", "PROJECT_ADMIN", "PROJECT_MEMBER", "VIEWER"];
+        for role in roles {
+            let response = AnnotationResponse {
+                id: 3,
+                user_id: 15,
+                user_name: Some("박민수".to_string()),
+                user_role_name: Some(role.to_string()),
+                study_instance_uid: "1.2.3.4.5".to_string(),
+                series_instance_uid: "1.2.3.4.5.6".to_string(),
+                sop_instance_uid: "1.2.3.4.5.6.7".to_string(),
+                annotation_data: json!({"type": "circle", "x": 100, "y": 100, "radius": 50}),
+                viewer_software: None,
+                tool_name: None,
+                tool_version: None,
+                description: None,
+                measurement_values: None,
+                label: None,
+                version: 1,
+                created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
+                updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            };
+
+            let json_str = serde_json::to_string(&response).expect("Failed to serialize");
+            assert!(json_str.contains(role));
+
+            let deserialized: AnnotationResponse =
+                serde_json::from_str(&json_str).expect("Failed to deserialize");
+            assert_eq!(deserialized.user_role_name, Some(role.to_string()));
+        }
     }
 }

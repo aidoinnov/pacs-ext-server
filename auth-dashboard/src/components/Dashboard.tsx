@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './Dashboard.css';
 import ApiHealthCheck from './ApiHealthCheck';
+import ApiScenarioTests from './ApiScenarioTests';
 import Sidebar from './Sidebar';
 import {
   DEFAULT_API_URL,
@@ -243,7 +244,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tokens: initialTokens, onLo
           )}
 
           {activeMenu === SIDEBAR_MENU.API_HEALTH.id && (
-            <ApiHealthCheck />
+            <>
+              <ApiHealthCheck />
+              <ApiScenarioTests />
+            </>
           )}
         </div>
       </div>

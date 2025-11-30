@@ -263,6 +263,7 @@ where
         action: &str,
     ) -> Result<bool, ServiceError> {
         // 단일 쿼리로 통합 - 성능 향상 및 일관성 보장
+        // 중요: 사용자가 프로젝트 멤버인지 먼저 확인하고, 멤버인 경우에만 권한 체크
         let has_permission = sqlx::query_scalar::<_, bool>(
             "WITH permission_id AS (
                 SELECT id FROM security_permission
@@ -287,24 +288,25 @@ where
 
                     UNION ALL
 
-                    -- 프로젝트-롤 관계를 통한 권한
+                    -- 프로젝트 직접 권한 (사용자가 프로젝트 멤버인 경우에만)
                     SELECT 1
-                    FROM security_role_permission rp
-                    INNER JOIN security_project_role pr ON rp.role_id = pr.role_id
-                    INNER JOIN security_user_project up ON pr.project_id = up.project_id
-                    WHERE up.user_id = $1
-                      AND up.project_id = $2
-                      AND rp.permission_id = (SELECT id FROM permission_id)
+                    FROM security_project_permission pp
+                    INNER JOIN security_user_project up 
+                        ON pp.project_id = up.project_id 
+                        AND up.user_id = $1
+                    WHERE pp.project_id = $2
+                      AND pp.permission_id = (SELECT id FROM permission_id)
 
                     UNION ALL
 
-                    -- 프로젝트 직접 권한
+                    -- 사용자-프로젝트에 할당된 롤의 capability를 통한 권한
                     SELECT 1
-                    FROM security_project_permission pp
-                    INNER JOIN security_user_project up ON pp.project_id = up.project_id
+                    FROM security_user_project up
+                    INNER JOIN security_role_capability rc ON up.role_id = rc.role_id
+                    INNER JOIN security_capability_mapping cm ON rc.capability_id = cm.capability_id
                     WHERE up.user_id = $1
-                      AND pp.project_id = $2
-                      AND pp.permission_id = (SELECT id FROM permission_id)
+                      AND up.project_id = $2
+                      AND cm.permission_id = (SELECT id FROM permission_id)
 
                     LIMIT 1
                 )
@@ -355,12 +357,6 @@ where
                  -- 사용자-프로젝트에 직접 할당된 롤의 권한
                  SELECT rp.permission_id FROM security_user_project up
                  INNER JOIN security_role_permission rp ON up.role_id = rp.role_id
-                 WHERE up.user_id = $1 AND up.project_id = $2
-                 UNION
-                 -- 프로젝트-롤 관계를 통한 권한
-                 SELECT rp.permission_id FROM security_user_project up
-                 INNER JOIN security_project_role pr ON up.project_id = pr.project_id
-                 INNER JOIN security_role_permission rp ON pr.role_id = rp.role_id
                  WHERE up.user_id = $1 AND up.project_id = $2
                  UNION
                  -- 프로젝트 직접 권한
