@@ -2141,17 +2141,115 @@ const ApiScenarioTests: React.FC = () => {
 
   // DICOM Patient API 테스트 (QIDO-RS 프록시)
   const runPatientTest = async (testIndex: number) => {
-    const projectId = createdProjectIdRef.current || 2; // 기본값 2
-
     if (testIndex === 0) {
+      // 🔧 Setup: 테스트용 프로젝트 생성
+      const projectData = {
+        name: `Patient API Test ${Date.now()}`,
+        description: 'Patient API Test with QIDO-RS Proxy',
+        sponsor: 'Test Sponsor',
+        start_date: '2025-01-01',
+        end_date: '2025-12-31',
+        auto_complete: false,
+      };
+
+      try {
+        const response = await axios.post(`${apiUrl}/api/projects`, projectData);
+
+        console.log(`  ✅ 테스트용 프로젝트 생성 성공:`, response.data);
+        console.log(`  📝 생성된 프로젝트 ID: ${response.data.id}`);
+
+        // 상태와 ref 모두 업데이트
+        const projectId = response.data.id;
+        setCreatedProjectId(projectId);
+        createdProjectIdRef.current = projectId;
+        console.log(`  💾 createdProjectId 저장 완료: ${projectId} (state + ref)`);
+
+        return {
+          request: { method: 'POST', url: '/api/projects', body: projectData },
+          response: response.data,
+          createdId: projectId,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/projects`,
+            data: projectData,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
+      // 🔧 Setup: Study 할당 (Patient 데이터 생성)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다. 먼저 프로젝트 생성 테스트를 실행하세요.');
+      }
+
+      const studyUid = `1.2.840.113619.2.1.1.${Date.now()}`;
+      const studyData = {
+        study_uid: studyUid,
+        study_description: 'Patient API Test Study',
+        patient_id: 'PAT_TEST_001',
+        patient_name: 'Patient^Test^API',
+        patient_birth_date: '19900101',
+        patient_sex: 'M',
+        study_date: '2025-01-15',
+      };
+
+      try {
+        const response = await axios.post(
+          `${apiUrl}/api/projects/${projectId}/studies/assign`,
+          studyData
+        );
+
+        console.log(`  ✅ Study 할당 성공 (Patient 데이터 생성됨):`, response.data);
+        console.log(`  📝 Patient ID: ${studyData.patient_id}`);
+        console.log(`  📝 Patient Name: ${studyData.patient_name}`);
+
+        // Study ID 및 UID 저장
+        createdStudyIdRef.current = response.data.study_id;
+        createdStudyUidRef.current = studyUid;
+
+        return {
+          request: { method: 'POST', url: `/api/projects/${projectId}/studies/assign`, body: studyData },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/projects/${projectId}/studies/assign`,
+            data: studyData,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 2) {
       // Patient 전체 조회 (project_id 있음)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
       const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}` };
 
       try {
         const config = await handleGetAxiosConfig('USER');
         const response = await axios.get(`${apiUrl}/api/dicom/patients?project_id=${projectId}`, config);
 
-        console.log(`  ✅ Patient 전체 조회 성공 (project_id=${projectId}):`, response.data);
+        // 응답 구조 검증 (배열이어야 함)
+        if (!Array.isArray(response.data)) {
+          throw new Error(`Expected array response, got ${typeof response.data}`);
+        }
+
+        const count = response.data.length;
+        console.log(`  ✅ Patient 전체 조회 성공 (project_id=${projectId}): ${count}개 반환`);
+
+        if (count === 0) {
+          console.log(`  ℹ️  할당된 Patient 데이터가 없습니다 (정상)`);
+        }
 
         return {
           request: requestInfo,
@@ -2166,8 +2264,14 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 1) {
+    } else if (testIndex === 3) {
       // Patient 페이지네이션 (limit=1)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
+
       const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}&limit=1` };
 
       try {
@@ -2194,8 +2298,14 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 2) {
+    } else if (testIndex === 4) {
       // Patient 필터링 (PatientName)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
+
       const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}&PatientName=*` };
 
       try {
@@ -2217,8 +2327,14 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 3) {
+    } else if (testIndex === 5) {
       // Patient 필터링 (PatientID)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
+
       const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}&PatientID=*` };
 
       try {
@@ -2240,8 +2356,14 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 4) {
+    } else if (testIndex === 6) {
       // Patient DICOM JSON 구조 검증
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('프로젝트가 생성되지 않았습니다.');
+      }
+
       const requestInfo = { method: 'GET', url: `/api/dicom/patients?project_id=${projectId}&limit=1` };
 
       try {
@@ -2282,7 +2404,7 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 5) {
+    } else if (testIndex === 7) {
       // project_id 없이 조회 (400 에러)
       const requestInfo = { method: 'GET', url: '/api/dicom/patients' };
 
@@ -2310,7 +2432,7 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 6) {
+    } else if (testIndex === 8) {
       // 잘못된 project_id (0) 에러 처리
       const requestInfo = { method: 'GET', url: '/api/dicom/patients?project_id=0' };
 
@@ -2338,7 +2460,7 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 7) {
+    } else if (testIndex === 9) {
       // 잘못된 project_id (음수) 에러 처리
       const requestInfo = { method: 'GET', url: '/api/dicom/patients?project_id=-1' };
 
@@ -2362,6 +2484,42 @@ const ApiScenarioTests: React.FC = () => {
           error.config = {
             method: 'get',
             url: `${apiUrl}/api/dicom/patients?project_id=-1`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 10) {
+      // 🧹 Cleanup: 테스트 프로젝트 삭제
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        console.log(`  ⚠️  삭제할 프로젝트가 없습니다 (이미 삭제되었거나 생성되지 않음)`);
+        return {
+          request: { method: 'DELETE', url: '/api/projects/:id' },
+          response: { message: 'No project to delete' },
+        };
+      }
+
+      const requestInfo = { method: 'DELETE', url: `/api/projects/${projectId}` };
+
+      try {
+        const response = await axios.delete(`${apiUrl}/api/projects/${projectId}`);
+
+        console.log(`  ✅ 테스트 프로젝트 삭제 성공 (ID: ${projectId})`);
+
+        // ref 초기화
+        createdProjectIdRef.current = null;
+        setCreatedProjectId(null);
+
+        return {
+          request: requestInfo,
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'delete',
+            url: `${apiUrl}/api/projects/${projectId}`,
           };
         }
         throw error;
