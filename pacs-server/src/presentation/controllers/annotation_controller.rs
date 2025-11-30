@@ -10,6 +10,7 @@ use crate::infrastructure::repositories::{
     AnnotationRepositoryImpl, ProjectRepositoryImpl, UserRepositoryImpl,
     AccessLogRepositoryImpl, RoleRepositoryImpl, PermissionRepositoryImpl,
 };
+use crate::infrastructure::auth::{extract_user_id_from_request, JwtService};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
@@ -152,6 +153,35 @@ impl AnnotationController {
 
         None
     }
+
+    /// user_id를 추출하는 통합 헬퍼 함수 (개발 모드 + JWT 인증)
+    ///
+    /// 우선순위:
+    /// 1. 개발 모드 (`APP_ENV=development`): 쿼리 파라미터 또는 헤더에서 user_id 추출
+    /// 2. 프로덕션 모드: JWT 토큰 검증 및 user_id 추출
+    ///
+    /// # 반환값
+    /// - `Ok(user_id)`: user_id 추출 성공
+    /// - `Err(HttpResponse)`: 인증 실패 (401 Unauthorized)
+    pub async fn extract_user_id_with_auth(
+        req: &HttpRequest,
+        jwt: &Arc<JwtService>,
+        user_repo: &Arc<UserRepositoryImpl>,
+    ) -> Result<i32, HttpResponse> {
+        // 1. 개발 모드 확인 (쿼리 파라미터/헤더)
+        if let Some(dev_user_id) = Self::extract_user_id_for_dev_mode_impl(req) {
+            return Ok(dev_user_id);
+        }
+
+        // 2. 프로덕션 모드: JWT 인증
+        match extract_user_id_from_request(req, jwt, user_repo).await {
+            Some(id) if id > 0 => Ok(id),
+            _ => Err(HttpResponse::Unauthorized().json(json!({
+                "error": "Unauthorized",
+                "message": "Authentication required. Please provide valid credentials."
+            }))),
+        }
+    }
 }
 
 #[utoipa::path(
@@ -168,6 +198,9 @@ impl AnnotationController {
 )]
 pub async fn create_annotation(
     req: web::Json<CreateAnnotationRequest>,
+    http_req: HttpRequest,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
     use_case: web::Data<
         Arc<
             AnnotationUseCase<
@@ -187,10 +220,9 @@ pub async fn create_annotation(
             >,
         >,
     >,
-    http_req: HttpRequest,
 ) -> impl Responder {
-    // user_id 추출
-    let user_id = match AnnotationController::extract_user_id_or_unauthorized(&http_req) {
+    // user_id 추출 (개발 모드 또는 JWT 인증)
+    let user_id = match AnnotationController::extract_user_id_with_auth(&http_req, &jwt, &user_repo).await {
         Ok(id) => id,
         Err(response) => return response,
     };
@@ -223,6 +255,8 @@ pub async fn create_annotation(
 pub async fn get_annotation(
     annotation_id: web::Path<i32>,
     req: HttpRequest,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
     use_case: web::Data<
         Arc<
             AnnotationUseCase<
@@ -243,15 +277,10 @@ pub async fn get_annotation(
         >,
     >,
 ) -> impl Responder {
-    // user_id 추출 (개발 모드)
-    let user_id = match AnnotationController::extract_user_id_for_dev_mode_impl(&req) {
-        Some(id) => id,
-        None => {
-            return HttpResponse::Unauthorized().json(json!({
-                "error": "Unauthorized",
-                "message": "User ID is required"
-            }));
-        }
+    // user_id 추출 (개발 모드 또는 JWT 인증)
+    let user_id = match AnnotationController::extract_user_id_with_auth(&req, &jwt, &user_repo).await {
+        Ok(id) => id,
+        Err(response) => return response,
     };
 
     match use_case.get_annotation_by_id(user_id, *annotation_id).await {
@@ -1206,6 +1235,9 @@ pub async fn list_annotations(
 pub async fn update_annotation(
     annotation_id: web::Path<i32>,
     req: web::Json<UpdateAnnotationRequest>,
+    http_req: HttpRequest,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
     use_case: web::Data<
         Arc<
             AnnotationUseCase<
@@ -1225,10 +1257,9 @@ pub async fn update_annotation(
             >,
         >,
     >,
-    http_req: HttpRequest,
 ) -> impl Responder {
-    // user_id 추출
-    let user_id = match AnnotationController::extract_user_id_or_unauthorized(&http_req) {
+    // user_id 추출 (개발 모드 또는 JWT 인증)
+    let user_id = match AnnotationController::extract_user_id_with_auth(&http_req, &jwt, &user_repo).await {
         Ok(id) => id,
         Err(response) => return response,
     };
@@ -1257,6 +1288,9 @@ pub async fn update_annotation(
 )]
 pub async fn delete_annotation(
     annotation_id: web::Path<i32>,
+    http_req: HttpRequest,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
     use_case: web::Data<
         Arc<
             AnnotationUseCase<
@@ -1276,10 +1310,9 @@ pub async fn delete_annotation(
             >,
         >,
     >,
-    http_req: HttpRequest,
 ) -> impl Responder {
-    // user_id 추출
-    let user_id = match AnnotationController::extract_user_id_or_unauthorized(&http_req) {
+    // user_id 추출 (개발 모드 또는 JWT 인증)
+    let user_id = match AnnotationController::extract_user_id_with_auth(&http_req, &jwt, &user_repo).await {
         Ok(id) => id,
         Err(response) => return response,
     };

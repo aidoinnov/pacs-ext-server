@@ -290,24 +290,28 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
         user_id: i32,
         project_id: i32,
     ) -> Result<AnnotationResponse, ServiceError> {
-        // 권한 체크: ANNOTATION:CREATE 또는 ANNOTATION_WRITE 권한 확인
-        let has_permission = self
+        // 1. 프로젝트 멤버십 확인
+        let is_member = self
+            .access_control_service
+            .is_project_member(user_id, project_id)
+            .await?;
+
+        if !is_member {
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
+        }
+
+        // 2. ANNOTATION:CREATE 권한 확인
+        let has_create_permission = self
             .access_control_service
             .check_permission(user_id, project_id, "ANNOTATION", "CREATE")
             .await?;
 
-        if !has_permission {
-            // ANNOTATION_WRITE capability도 확인
-            let has_write = self
-                .access_control_service
-                .check_permission(user_id, project_id, "ANNOTATION", "WRITE")
-                .await?;
-            
-            if !has_write {
-                return Err(ServiceError::Unauthorized(
-                    "Insufficient permissions to create annotation".to_string(),
-                ));
-            }
+        if !has_create_permission {
+            return Err(ServiceError::Unauthorized(
+                "User does not have ANNOTATION:CREATE permission".into(),
+            ));
         }
 
         // Validation
@@ -733,29 +737,23 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             .get_annotation_by_id(annotation_id)
             .await?;
 
-        // 권한 체크: 소유자 확인 또는 ANNOTATION:UPDATE/ANNOTATION_WRITE 권한 확인
-        let is_owner = current_annotation.user_id == user_id;
-        
-        if !is_owner {
-            // 소유자가 아니면 권한 확인
-            let has_update = self
-                .access_control_service
-                .check_permission(user_id, current_annotation.project_id, "ANNOTATION", "UPDATE")
-                .await?;
-            
-            if !has_update {
-                // ANNOTATION_WRITE capability도 확인
-                let has_write = self
-                    .access_control_service
-                    .check_permission(user_id, current_annotation.project_id, "ANNOTATION", "WRITE")
-                    .await?;
-                
-                if !has_write {
-                    return Err(ServiceError::Unauthorized(
-                        "Insufficient permissions to update annotation".to_string(),
-                    ));
-                }
-            }
+        // 1. 프로젝트 멤버십 확인
+        let is_member = self
+            .access_control_service
+            .is_project_member(user_id, current_annotation.project_id)
+            .await?;
+
+        if !is_member {
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
+        }
+
+        // 2. 본인 annotation인지 확인
+        if current_annotation.user_id != user_id {
+            return Err(ServiceError::Unauthorized(
+                "User can only update own annotations".into(),
+            ));
         }
 
         // 버전 검증 (Optimistic Locking)
@@ -811,26 +809,28 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
     /// ```
     pub async fn delete_annotation(&self, annotation_id: i32, user_id: i32) -> Result<(), ServiceError> {
         // 현재 annotation 조회
-        let current_annotation = self
+        let annotation = self
             .annotation_service
             .get_annotation_by_id(annotation_id)
             .await?;
 
-        // 권한 체크: 소유자 확인 또는 ANNOTATION:DELETE 권한 확인
-        let is_owner = current_annotation.user_id == user_id;
-        
-        if !is_owner {
-            // 소유자가 아니면 권한 확인
-            let has_delete = self
-                .access_control_service
-                .check_permission(user_id, current_annotation.project_id, "ANNOTATION", "DELETE")
-                .await?;
-            
-            if !has_delete {
-                return Err(ServiceError::Unauthorized(
-                    "Insufficient permissions to delete annotation".to_string(),
-                ));
-            }
+        // 1. 프로젝트 멤버십 확인
+        let is_member = self
+            .access_control_service
+            .is_project_member(user_id, annotation.project_id)
+            .await?;
+
+        if !is_member {
+            return Err(ServiceError::Unauthorized(
+                "User is not a member of this project".into(),
+            ));
+        }
+
+        // 2. 본인 annotation인지 확인
+        if annotation.user_id != user_id {
+            return Err(ServiceError::Unauthorized(
+                "User can only delete own annotations".into(),
+            ));
         }
 
         self.annotation_service
