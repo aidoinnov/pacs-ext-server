@@ -129,6 +129,11 @@ pub struct AnnotationResponse {
     #[schema(example = "홍길동")]
     pub user_name: Option<String>,
 
+    /// 사용자 역할 이름
+    /// 어노테이션을 생성한 사용자의 프로젝트 내 역할 이름
+    #[schema(example = "ADJUDICATOR")]
+    pub user_role_name: Option<String>,
+
     /// Study Instance UID
     /// DICOM Study의 고유 식별자
     pub study_instance_uid: String,
@@ -223,3 +228,27 @@ pub struct AnnotationListResponse {
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
     pub list_version: Option<DateTime<Utc>>,
 }
+/// Annotation 권한 조회 응답 DTO
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+pub struct AnnotationPermissionsResponse {
+    /// 본인 어노테이션 읽기 권한
+    #[schema(example = true)]
+    pub can_read_own: bool,
+
+    /// 모든 어노테이션 읽기 권한
+    #[schema(example = false)]
+    pub can_read_all: bool,
+
+    /// 어노테이션 쓰기 권한
+    #[schema(example = true)]
+    pub can_write: bool,
+
+    /// 어노테이션 삭제 권한
+    #[schema(example = true)]
+    pub can_delete: bool,
+
+    /// 어노테이션 공유 권한 (선택사항)
+    #[schema(example = false)]
+    pub can_share: bool,
+}
+

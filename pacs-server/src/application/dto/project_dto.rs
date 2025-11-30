@@ -10,7 +10,7 @@ pub struct CreateProjectRequest {
     #[schema(example = "서울대학교병원")]
     pub sponsor: String,
     #[schema(value_type = String, example = "2025-01-01")]
-    pub start_date: NaiveDate,
+    pub start_date: Option<NaiveDate>,
     #[schema(value_type = String, example = "2025-12-31")]
     pub end_date: Option<NaiveDate>,
     #[schema(example = false)]

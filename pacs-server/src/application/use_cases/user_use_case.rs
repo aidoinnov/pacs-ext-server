@@ -43,6 +43,29 @@ impl<U: UserService> UserUseCase<U> {
         Ok(UserResponse::from(user))
     }
 
+    /// 사용자 조회 (ID + 프로젝트별 역할 정보)
+    pub async fn get_user_by_id_with_project_role(
+        &self,
+        user_id: i32,
+        project_id: Option<i32>,
+    ) -> Result<UserResponse, ServiceError> {
+        let user = self.user_service.get_user_by_id(user_id).await?;
+        let mut response = UserResponse::from(user);
+
+        // project_id가 제공되면 역할 정보 조회
+        if let Some(pid) = project_id {
+            if let Ok(Some(membership)) = self
+                .user_service
+                .get_project_membership(user_id, pid)
+                .await
+            {
+                response.role_name = membership.role_name;
+            }
+        }
+
+        Ok(response)
+    }
+
     /// 사용자 조회 (Username)
     pub async fn get_user_by_username(&self, username: &str) -> Result<UserResponse, ServiceError> {
         let user = self.user_service.get_user_by_username(username).await?;

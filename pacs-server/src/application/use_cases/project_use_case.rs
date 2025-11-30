@@ -31,7 +31,9 @@ impl<P: ProjectService> ProjectUseCase<P> {
             name: request.name,
             description: request.description,
             sponsor: request.sponsor,
-            start_date: request.start_date,
+            start_date: request.start_date.unwrap_or_else(|| {
+                chrono::Utc::now().date_naive()
+            }),
             end_date: request.end_date,
             auto_complete: request.auto_complete.unwrap_or(false),
         };

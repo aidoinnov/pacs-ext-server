@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 use crate::application::dto::annotation_dto::{
-    AnnotationListResponse, AnnotationResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
+    AnnotationListResponse, AnnotationPermissionsResponse, AnnotationResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
 };
 use crate::application::use_cases::AnnotationUseCase;
 use crate::domain::services::annotation_service::AnnotationService;
@@ -19,6 +19,138 @@ pub struct AnnotationController;
 impl AnnotationController {
     pub fn new() -> Self {
         Self
+    }
+
+    /// ServiceError를 HttpResponse로 변환하는 헬퍼 함수
+    fn handle_service_error(error: ServiceError) -> HttpResponse {
+        match error {
+            ServiceError::NotFound(msg) => HttpResponse::NotFound().json(json!({
+                "error": "Not Found",
+                "message": msg
+            })),
+            ServiceError::ValidationError(msg) => HttpResponse::BadRequest().json(json!({
+                "error": "Validation Error",
+                "message": msg
+            })),
+            ServiceError::Unauthorized(msg) => HttpResponse::Unauthorized().json(json!({
+                "error": "Unauthorized",
+                "message": msg
+            })),
+            ServiceError::AlreadyExists(msg) => HttpResponse::Conflict().json(json!({
+                "error": "Already Exists",
+                "message": msg
+            })),
+            ServiceError::DatabaseError(msg) => HttpResponse::InternalServerError().json(json!({
+                "error": "Database Error",
+                "message": msg
+            })),
+            ServiceError::VersionConflict { current_version, client_version } => {
+                HttpResponse::Conflict().json(json!({
+                    "error": "Version Conflict",
+                    "message": "Annotation has been modified by another user",
+                    "current_version": current_version,
+                    "client_version": client_version
+                }))
+            }
+            _ => HttpResponse::InternalServerError().json(json!({
+                "error": "Internal Server Error",
+                "message": "An unexpected error occurred"
+            })),
+        }
+    }
+
+    /// 개발 모드에서 user_id를 추출하고, 없으면 Unauthorized 응답을 반환
+    fn extract_user_id_or_unauthorized(req: &HttpRequest) -> Result<i32, HttpResponse> {
+        match Self::extract_user_id_for_dev_mode_impl(req) {
+            Some(id) => Ok(id),
+            None => Err(HttpResponse::Unauthorized().json(json!({
+                "error": "Unauthorized",
+                "message": "User ID is required"
+            }))),
+        }
+    }
+
+    /// 쿼리 파라미터에서 project_id를 추출하고 검증
+    fn validate_project_id(
+        query: &std::collections::HashMap<String, String>,
+    ) -> Result<i32, HttpResponse> {
+        match query
+            .get("project_id")
+            .and_then(|v| v.parse::<i32>().ok())
+        {
+            Some(id) if id > 0 => Ok(id),
+            _ => Err(HttpResponse::BadRequest().json(json!({
+                "error": "Bad Request",
+                "message": "project_id is required and must be greater than 0"
+            }))),
+        }
+    }
+
+    /// 쿼리 파라미터에서 target_user_id를 추출하고 기본값 설정
+    fn extract_target_user_id(
+        query: &std::collections::HashMap<String, String>,
+        default_user_id: i32,
+    ) -> i32 {
+        query
+            .get("user_id")
+            .and_then(|v| v.parse::<i32>().ok())
+            .unwrap_or(default_user_id)
+    }
+
+    /// 개발 모드에서 user_id를 추출하는 헬퍼 함수
+    ///
+    /// 개발 모드(`APP_ENV=development` 또는 `RUN_ENV=development`)에서만 동작합니다.
+    /// 쿼리 파라미터 `?user_id=xxx` 또는 헤더 `X-User-ID: xxx`에서 `user_id`를 추출합니다.
+    /// 프로덕션 모드에서는 `None`을 반환합니다.
+    ///
+    /// # 우선순위
+    /// 1. 쿼리 파라미터 `user_id`
+    /// 2. 헤더 `X-User-ID`
+    ///
+    /// # 반환값
+    /// - `Some(user_id)`: 개발 모드이고 user_id를 추출한 경우
+    /// - `None`: 프로덕션 모드이거나 user_id를 추출할 수 없는 경우
+    #[cfg(test)]
+    pub fn extract_user_id_for_dev_mode(req: &HttpRequest) -> Option<i32> {
+        Self::extract_user_id_for_dev_mode_impl(req)
+    }
+
+    /// 개발 모드에서 user_id를 추출하는 헬퍼 함수 (내부 구현)
+    pub(crate) fn extract_user_id_for_dev_mode_impl(req: &HttpRequest) -> Option<i32> {
+        // 개발 모드 확인
+        let is_dev_mode = std::env::var("APP_ENV")
+            .or_else(|_| std::env::var("RUN_ENV"))
+            .map(|env| env == "development")
+            .unwrap_or(false);
+
+        if !is_dev_mode {
+            return None;
+        }
+
+        // 1. 쿼리 파라미터에서 추출 시도
+        if let Some(query) = req.uri().query() {
+            for pair in query.split('&') {
+                let mut parts = pair.splitn(2, '=');
+                if let (Some(key), Some(value)) = (parts.next(), parts.next()) {
+                    if key == "user_id" {
+                        if let Ok(user_id) = value.parse::<i32>() {
+                            return Some(user_id);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 헤더에서 추출 시도
+        if let Some(header_value) = req.headers().get("X-User-ID") {
+            if let Ok(header_str) = header_value.to_str() {
+                if let Ok(user_id) = header_str.parse::<i32>() {
+                    return Some(user_id);
+                }
+            }
+        }
+
+        None
     }
 }
 
@@ -55,34 +187,23 @@ pub async fn create_annotation(
             >,
         >,
     >,
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
 ) -> impl Responder {
-    // TODO: 실제 인증에서 user_id와 project_id를 가져와야 함
-    // 현재는 요청 body에서 가져오거나 기본값 사용
-    let user_id = req.user_id.unwrap_or(1);
-    let project_id = req.project_id.unwrap_or(299); // 또는 적절한 기본값
+    // user_id 추출
+    let user_id = match AnnotationController::extract_user_id_or_unauthorized(&http_req) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
+    let request = req.into_inner();
+    let project_id = request.project_id.unwrap_or(299); // 또는 적절한 기본값
 
     match use_case
-        .create_annotation(req.into_inner(), user_id, project_id)
+        .create_annotation(request, user_id, project_id)
         .await
     {
         Ok(annotation) => HttpResponse::Created().json(annotation),
-        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
-            "error": "Not Found",
-            "message": msg
-        })),
-        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
-            "error": "Unauthorized",
-            "message": msg
-        })),
-        Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
-            "error": "Validation Error",
-            "message": msg
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": "Internal Server Error",
-            "message": e.to_string()
-        })),
+        Err(e) => AnnotationController::handle_service_error(e),
     }
 }
 
@@ -95,11 +216,13 @@ pub async fn create_annotation(
     ),
     responses(
         (status = 200, description = "Get annotation successfully", body = AnnotationResponse),
+        (status = 401, description = "Unauthorized - User does not have permission to read this annotation"),
         (status = 404, description = "Annotation not found"),
     )
 )]
 pub async fn get_annotation(
     annotation_id: web::Path<i32>,
+    req: HttpRequest,
     use_case: web::Data<
         Arc<
             AnnotationUseCase<
@@ -120,7 +243,18 @@ pub async fn get_annotation(
         >,
     >,
 ) -> impl Responder {
-    match use_case.get_annotation_by_id(*annotation_id).await {
+    // user_id 추출 (개발 모드)
+    let user_id = match AnnotationController::extract_user_id_for_dev_mode_impl(&req) {
+        Some(id) => id,
+        None => {
+            return HttpResponse::Unauthorized().json(json!({
+                "error": "Unauthorized",
+                "message": "User ID is required"
+            }));
+        }
+    };
+
+    match use_case.get_annotation_by_id(user_id, *annotation_id).await {
         Ok(annotation) => HttpResponse::Ok()
             .insert_header(("Cache-Control", "public, max-age=5"))
             .insert_header(("ETag", format!("\"{}\"", annotation.version)))
@@ -128,6 +262,10 @@ pub async fn get_annotation(
             .json(annotation),
         Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
             "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
             "message": msg
         })),
         Err(e) => HttpResponse::InternalServerError().json(json!({
@@ -169,7 +307,13 @@ pub async fn head_annotation(
         >,
     >,
 ) -> impl Responder {
-    match use_case.get_annotation_by_id(*annotation_id).await {
+    // user_id 추출
+    let user_id = match AnnotationController::extract_user_id_or_unauthorized(&req) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
+    match use_case.get_annotation_by_id(user_id, *annotation_id).await {
         Ok(annotation) => {
             let etag = format!("\"{}\"", annotation.version);
             let last_modified = annotation.updated_at.to_rfc2822();
@@ -210,8 +354,7 @@ pub async fn head_annotation(
                 .insert_header(("Cache-Control", "public, max-age=5"))
                 .finish()
         }
-        Err(ServiceError::NotFound(_)) => HttpResponse::NotFound().finish(),
-        Err(_) => HttpResponse::InternalServerError().finish(),
+        Err(e) => AnnotationController::handle_service_error(e),
     }
 }
 
@@ -495,18 +638,51 @@ pub async fn get_annotation_summary(
     };
 
     // 선택적 파라미터 추출
-    let _user_id = query.get("user_id").and_then(|s| s.parse::<i32>().ok());
+    let user_id = query.get("user_id").and_then(|s| s.parse::<i32>().ok());
     let page = query.get("page").and_then(|s| s.parse::<i32>().ok()).unwrap_or(1);
     let limit = query.get("limit").and_then(|s| s.parse::<i32>().ok()).unwrap_or(20);
 
-    // 어노테이션 조회 (페이지네이션 포함)
-    match use_case
-        .get_annotations_by_project_and_series_paginated(project_id, &series_instance_uid, page, limit)
-        .await
-    {
+    // user_id가 제공되면 권한 기반 필터링, 없으면 모든 annotation 반환
+    let result = if let Some(uid) = user_id {
+        // 권한 기반 조회: READ_ALL 권한 확인 후 필터링
+        use_case
+            .get_annotations_by_series_and_project_with_user(uid, &series_instance_uid, project_id)
+            .await
+            .map(|mut response| {
+                // 페이지네이션 적용
+                let total = response.annotations.len();
+                let start = ((page - 1) * limit) as usize;
+                let end = (start + limit as usize).min(total);
+
+                if start < total {
+                    response.annotations = response.annotations[start..end].to_vec();
+                } else {
+                    response.annotations = vec![];
+                }
+
+                response.total = total;
+                response.page = page;
+                response.limit = limit;
+                response.total_pages = ((total as f64) / (limit as f64)).ceil() as i32;
+                response.has_next = end < total;
+
+                response
+            })
+    } else {
+        // user_id 없으면 권한 체크 없이 모든 annotation 반환 (기존 동작)
+        use_case
+            .get_annotations_by_project_and_series_paginated(project_id, &series_instance_uid, page, limit)
+            .await
+    };
+
+    match result {
         Ok(response) => HttpResponse::Ok()
             .insert_header(("Cache-Control", "public, max-age=30"))
             .json(response),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": "Internal Server Error",
             "message": e.to_string()
@@ -577,54 +753,96 @@ pub async fn list_annotations(
     // 주의: user_id 파라미터가 있으면 권한 기반 필터링을 수행합니다
     let result = if let Some(sop_instance_uid) = query.get("sop_instance_uid") {
         // SOP Instance UID (가장 구체적인 필터)
-        use_case
-            .get_annotations_by_instance(sop_instance_uid)
-            .await
-            .map(|mut response| {
-                // level로 필터링
-                if let Some(lvl) = level {
-                    match lvl {
-                        "study" => {
-                            // Study 레벨: series_uid와 instance_uid가 모두 비어있음
-                            response.annotations.retain(|ann| {
-                                ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
-                            });
+        // project_id와 user_id가 모두 있으면 권한 기반 필터링 수행
+        if let (Some(proj_id), Some(_)) = (project_id, user_id_param) {
+            // 권한 기반 조회 (UseCase에서 권한 체크 수행)
+            use_case
+                .get_annotations_by_project_and_instance_with_user(user_id, proj_id, sop_instance_uid)
+                .await
+                .map(|mut response| {
+                    // level로 필터링
+                    if let Some(lvl) = level {
+                        match lvl {
+                            "study" => {
+                                response.annotations.retain(|ann| {
+                                    ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            "series" => {
+                                response.annotations.retain(|ann| {
+                                    !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            "instance" => {
+                                response.annotations.retain(|ann| {
+                                    !ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            _ => {}
                         }
-                        "series" => {
-                            // Series 레벨: series_uid는 있고 instance_uid는 비어있음
-                            response.annotations.retain(|ann| {
-                                !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
-                            });
-                        }
-                        "instance" => {
-                            // Instance 레벨: instance_uid가 있음
-                            response.annotations.retain(|ann| {
-                                !ann.sop_instance_uid.is_empty()
-                            });
-                        }
-                        _ => {} // 잘못된 level 값은 무시
+                        response.total = response.annotations.len();
                     }
-                    response.total = response.annotations.len();
-                }
 
-                // viewer_software로 추가 필터링
-                if let Some(viewer) = viewer_software {
-                    response.annotations.retain(|ann| {
-                        ann.viewer_software.as_ref()
-                            .map(|v| v.as_str() == viewer)
-                            .unwrap_or(false)
-                    });
-                    response.total = response.annotations.len();
-                }
+                    // viewer_software로 추가 필터링
+                    if let Some(viewer) = viewer_software {
+                        response.annotations.retain(|ann| {
+                            ann.viewer_software.as_ref()
+                                .map(|v| v.as_str() == viewer)
+                                .unwrap_or(false)
+                        });
+                        response.total = response.annotations.len();
+                    }
 
-                // user_id로 추가 필터링 (쿼리 파라미터에 명시된 경우)
-                if query.get("user_id").is_some() {
-                    response.annotations.retain(|ann| ann.user_id == user_id);
-                    response.total = response.annotations.len();
-                }
+                    response
+                })
+        } else {
+            // project_id나 user_id가 없으면 권한 체크 없이 조회
+            use_case
+                .get_annotations_by_instance(sop_instance_uid)
+                .await
+                .map(|mut response| {
+                    // level로 필터링
+                    if let Some(lvl) = level {
+                        match lvl {
+                            "study" => {
+                                response.annotations.retain(|ann| {
+                                    ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            "series" => {
+                                response.annotations.retain(|ann| {
+                                    !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            "instance" => {
+                                response.annotations.retain(|ann| {
+                                    !ann.sop_instance_uid.is_empty()
+                                });
+                            }
+                            _ => {}
+                        }
+                        response.total = response.annotations.len();
+                    }
 
-                response
-            })
+                    // viewer_software로 추가 필터링
+                    if let Some(viewer) = viewer_software {
+                        response.annotations.retain(|ann| {
+                            ann.viewer_software.as_ref()
+                                .map(|v| v.as_str() == viewer)
+                                .unwrap_or(false)
+                        });
+                        response.total = response.annotations.len();
+                    }
+
+                    // user_id로 추가 필터링 (쿼리 파라미터에 명시된 경우, 권한 체크 없음)
+                    if query.get("user_id").is_some() {
+                        response.annotations.retain(|ann| ann.user_id == user_id);
+                        response.total = response.annotations.len();
+                    }
+
+                    response
+                })
+        }
     } else if let Some(series_instance_uid) = query.get("series_instance_uid") {
         // Series Instance UID 처리
         if let Some(proj_id) = project_id {
@@ -980,6 +1198,7 @@ pub async fn list_annotations(
     ),
     responses(
         (status = 200, description = "Annotation updated successfully", body = AnnotationResponse),
+        (status = 401, description = "Unauthorized"),
         (status = 404, description = "Annotation not found"),
         (status = 400, description = "Invalid request"),
     )
@@ -1006,24 +1225,20 @@ pub async fn update_annotation(
             >,
         >,
     >,
+    http_req: HttpRequest,
 ) -> impl Responder {
+    // user_id 추출
+    let user_id = match AnnotationController::extract_user_id_or_unauthorized(&http_req) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
     match use_case
-        .update_annotation(*annotation_id, req.into_inner())
+        .update_annotation(*annotation_id, req.into_inner(), user_id)
         .await
     {
         Ok(annotation) => HttpResponse::Ok().json(annotation),
-        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
-            "error": "Not Found",
-            "message": msg
-        })),
-        Err(ServiceError::ValidationError(msg)) => HttpResponse::BadRequest().json(json!({
-            "error": "Validation Error",
-            "message": msg
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": "Internal Server Error",
-            "message": e.to_string()
-        })),
+        Err(e) => AnnotationController::handle_service_error(e),
     }
 }
 
@@ -1035,7 +1250,8 @@ pub async fn update_annotation(
         ("annotation_id" = i32, Path, description = "Annotation ID")
     ),
     responses(
-        (status = 200, description = "Annotation deleted successfully"),
+        (status = 204, description = "Annotation deleted successfully"),
+        (status = 401, description = "Unauthorized"),
         (status = 404, description = "Annotation not found"),
     )
 )]
@@ -1060,19 +1276,103 @@ pub async fn delete_annotation(
             >,
         >,
     >,
+    http_req: HttpRequest,
 ) -> impl Responder {
-    match use_case.delete_annotation(*annotation_id).await {
-        Ok(_) => HttpResponse::Ok().json(json!({
+    // user_id 추출
+    let user_id = match AnnotationController::extract_user_id_or_unauthorized(&http_req) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
+    match use_case.delete_annotation(*annotation_id, user_id).await {
+        Ok(_) => HttpResponse::NoContent().json(json!({
             "message": "Annotation deleted successfully"
         })),
-        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
-            "error": "Not Found",
-            "message": msg
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": "Internal Server Error",
-            "message": e.to_string()
-        })),
+        Err(e) => AnnotationController::handle_service_error(e),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/annotations/permissions",
+    tag = "annotations",
+    params(
+        ("project_id" = i32, Query, description = "Project ID (required)"),
+        ("user_id" = Option<i32>, Query, description = "Target User ID (optional, defaults to requesting user)")
+    ),
+    responses(
+        (status = 200, description = "Get annotation permissions successfully", body = AnnotationPermissionsResponse),
+        (status = 400, description = "Bad Request - project_id is required"),
+        (status = 401, description = "Unauthorized - User ID is required"),
+        (status = 403, description = "Forbidden - Insufficient permissions to view other user's permissions"),
+    )
+)]
+pub async fn get_annotation_permissions(
+    query: web::Query<std::collections::HashMap<String, String>>,
+    use_case: web::Data<
+        Arc<
+            AnnotationUseCase<
+                AnnotationServiceImpl<
+                    AnnotationRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                >,
+                UserRepositoryImpl,
+                AccessControlServiceImpl<
+                    AccessLogRepositoryImpl,
+                    UserRepositoryImpl,
+                    ProjectRepositoryImpl,
+                    RoleRepositoryImpl,
+                    PermissionRepositoryImpl,
+                >,
+            >,
+        >,
+    >,
+    http_req: HttpRequest,
+) -> impl Responder {
+    // 요청한 사용자의 user_id 추출
+    let requesting_user_id = match AnnotationController::extract_user_id_or_unauthorized(&http_req) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
+    // project_id 추출 및 검증
+    let project_id = match AnnotationController::validate_project_id(&query) {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
+    // target_user_id 추출 (기본값은 요청한 사용자)
+    let target_user_id = AnnotationController::extract_target_user_id(&query, requesting_user_id);
+
+    // 다른 사용자의 권한을 조회하려는 경우 프로젝트 멤버 확인
+    if target_user_id != requesting_user_id {
+        match use_case
+            .is_project_member(requesting_user_id, project_id)
+            .await
+        {
+            Ok(true) => {
+                // 프로젝트 멤버이면 다른 사용자의 권한 조회 허용
+            }
+            Ok(false) => {
+                return HttpResponse::Forbidden().json(json!({
+                    "error": "Forbidden",
+                    "message": "You must be a member of this project to view other user's permissions"
+                }));
+            }
+            Err(e) => {
+                return AnnotationController::handle_service_error(e);
+            }
+        }
+    }
+
+    // 권한 조회
+    match use_case
+        .get_user_annotation_permissions(target_user_id, project_id)
+        .await
+    {
+        Ok(permissions) => HttpResponse::Ok().json(permissions),
+        Err(e) => AnnotationController::handle_service_error(e),
     }
 }
 
@@ -1115,6 +1415,7 @@ pub fn configure_routes(
                 .route("", web::post().to(create_annotation))
                 .route("", web::get().to(list_annotations))
                 .route("", web::head().to(head_annotations))
+                .route("/permissions", web::get().to(get_annotation_permissions))
                 .route("/{annotation_id}", web::get().to(get_annotation))
                 .route("/{annotation_id}", web::head().to(head_annotation))
                 .route("/{annotation_id}", web::put().to(update_annotation))
