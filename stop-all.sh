@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # PACS Extension Server - 전체 시스템 종료 스크립트
-# 백엔드(Rust) + 프론트엔드(React) 동시 종료
+# DB 터널 + 백엔드(Rust) + 프론트엔드(React) 동시 종료
 
 set -e
 
@@ -33,6 +33,7 @@ log_error() {
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # PID 파일
+DB_TUNNEL_PID_FILE="$PROJECT_ROOT/.db-tunnel.pid"
 BACKEND_PID_FILE="$PROJECT_ROOT/.backend.pid"
 FRONTEND_PID_FILE="$PROJECT_ROOT/.frontend.pid"
 
@@ -42,7 +43,39 @@ echo "==========================================================================
 
 STOPPED=0
 
-# 1. 백엔드 종료
+# 1. DB 터널 종료
+if [ -f "$DB_TUNNEL_PID_FILE" ]; then
+    DB_TUNNEL_PID=$(cat "$DB_TUNNEL_PID_FILE")
+    if ps -p "$DB_TUNNEL_PID" > /dev/null 2>&1; then
+        log_info "DB 터널 종료 중... (PID: $DB_TUNNEL_PID)"
+        kill "$DB_TUNNEL_PID" 2>/dev/null || true
+
+        # 종료 대기
+        for i in {1..5}; do
+            if ! ps -p "$DB_TUNNEL_PID" > /dev/null 2>&1; then
+                log_success "DB 터널 종료 완료"
+                STOPPED=$((STOPPED + 1))
+                break
+            fi
+            sleep 1
+        done
+
+        # 강제 종료
+        if ps -p "$DB_TUNNEL_PID" > /dev/null 2>&1; then
+            log_warning "DB 터널 강제 종료 중..."
+            kill -9 "$DB_TUNNEL_PID" 2>/dev/null || true
+            log_success "DB 터널 강제 종료 완료"
+            STOPPED=$((STOPPED + 1))
+        fi
+    else
+        log_warning "DB 터널이 실행 중이 아닙니다 (PID: $DB_TUNNEL_PID)"
+    fi
+    rm -f "$DB_TUNNEL_PID_FILE"
+else
+    log_warning "DB 터널 PID 파일이 없습니다"
+fi
+
+# 2. 백엔드 종료
 if [ -f "$BACKEND_PID_FILE" ]; then
     BACKEND_PID=$(cat "$BACKEND_PID_FILE")
     if ps -p "$BACKEND_PID" > /dev/null 2>&1; then
@@ -106,18 +139,20 @@ else
     log_warning "프론트엔드 PID 파일이 없습니다"
 fi
 
-# 3. 포트 정리 (추가 안전장치)
-log_info "포트 8080, 3000 정리 중..."
+# 4. 포트 정리 (추가 안전장치)
+log_info "포트 5456, 5457, 8080, 3000 정리 중..."
+lsof -ti:5456 | xargs kill -9 2>/dev/null || true
+lsof -ti:5457 | xargs kill -9 2>/dev/null || true
 lsof -ti:8080 | xargs kill -9 2>/dev/null || true
 lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 
-# 4. 완료 메시지
+# 5. 완료 메시지
 echo ""
 echo "================================================================================"
 if [ $STOPPED -gt 0 ]; then
-    log_success "전체 시스템 종료 완료! (종료된 서버: $STOPPED개)"
+    log_success "전체 시스템 종료 완료! (종료된 서비스: $STOPPED개)"
 else
-    log_warning "실행 중인 서버가 없었습니다"
+    log_warning "실행 중인 서비스가 없었습니다"
 fi
 echo "================================================================================"
 echo ""

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # PACS Extension Server - 전체 시스템 시작 스크립트
-# 백엔드(Rust) + 프론트엔드(React) 동시 실행
+# DB 터널 + 백엔드(Rust) + 프론트엔드(React) 동시 실행
 
 set -e
 
@@ -33,18 +33,58 @@ log_error() {
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/pacs-server"
 FRONTEND_DIR="$PROJECT_ROOT/auth-dashboard"
+SCRIPTS_DIR="$PROJECT_ROOT/scripts"
 
 # PID 파일
+DB_TUNNEL_PID_FILE="$PROJECT_ROOT/.db-tunnel.pid"
 BACKEND_PID_FILE="$PROJECT_ROOT/.backend.pid"
 FRONTEND_PID_FILE="$PROJECT_ROOT/.frontend.pid"
 
 # 로그 파일
+DB_TUNNEL_LOG="$PROJECT_ROOT/db-tunnel.log"
 BACKEND_LOG="$PROJECT_ROOT/backend.log"
 FRONTEND_LOG="$PROJECT_ROOT/frontend.log"
 
 echo "================================================================================"
 echo "🚀 PACS Extension Server - 전체 시스템 시작"
 echo "================================================================================"
+
+# 0. DB 터널 시작
+log_info "DB 터널 시작 중..."
+
+# 기존 터널 확인
+if [ -f "$DB_TUNNEL_PID_FILE" ]; then
+    DB_TUNNEL_PID=$(cat "$DB_TUNNEL_PID_FILE")
+    if ps -p "$DB_TUNNEL_PID" > /dev/null 2>&1; then
+        log_warning "기존 DB 터널 종료 중... (PID: $DB_TUNNEL_PID)"
+        kill "$DB_TUNNEL_PID" 2>/dev/null || true
+        sleep 2
+    fi
+    rm -f "$DB_TUNNEL_PID_FILE"
+fi
+
+# DB 터널 시작
+cd "$SCRIPTS_DIR"
+nohup ./db-tunnel.sh > "$DB_TUNNEL_LOG" 2>&1 &
+DB_TUNNEL_PID=$!
+echo "$DB_TUNNEL_PID" > "$DB_TUNNEL_PID_FILE"
+
+# DB 터널 연결 대기
+log_info "DB 터널 연결 대기 중..."
+for i in {1..10}; do
+    if lsof -ti:5456 > /dev/null 2>&1; then
+        log_success "DB 터널 연결 완료! (PID: $DB_TUNNEL_PID, Port: 5456)"
+        break
+    fi
+    if [ $i -eq 10 ]; then
+        log_error "DB 터널 연결 타임아웃!"
+        log_info "로그 확인: tail -f $DB_TUNNEL_LOG"
+        exit 1
+    fi
+    sleep 1
+done
+
+cd "$PROJECT_ROOT"
 
 # 1. 기존 프로세스 확인 및 종료
 log_info "기존 프로세스 확인 중..."
@@ -153,6 +193,12 @@ echo ""
 echo "================================================================================"
 echo "✨ 전체 시스템 시작 완료!"
 echo "================================================================================"
+echo ""
+echo "🔌 DB 터널:"
+echo "   - PID: $DB_TUNNEL_PID"
+echo "   - Local Port: 5456 (extension), 5457 (postgres)"
+echo "   - Remote: pacs-extension.ciyua2gsk8ke.ap-northeast-2.rds.amazonaws.com"
+echo "   - 로그: tail -f $DB_TUNNEL_LOG"
 echo ""
 echo "📦 백엔드 서버:"
 echo "   - PID: $BACKEND_PID"

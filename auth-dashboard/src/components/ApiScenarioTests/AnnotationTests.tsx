@@ -373,5 +373,54 @@ export const getAnnotationSections = (): TestSection[] => [
       },
     ],
   },
+  {
+    title: '🔒 Annotation 보안 강화 (멤버십 + 소유권)',
+    description: '프로젝트 멤버십 검증 및 소유권 기반 수정/삭제 제한 테스트 (순차 실행)',
+    isSequential: true,
+    tests: [
+      {
+        name: '1️⃣ 프로젝트 멤버가 아닌 사용자 생성 시도 (401 에러)',
+        status: 'pending',
+        isSequential: true,
+        indentLevel: 0,
+      },
+      {
+        name: '2️⃣ 프로젝트 멤버로 Annotation 생성 (쿼리 파라미터)',
+        status: 'pending',
+        dependencies: ['1️⃣ 프로젝트 멤버가 아닌 사용자 생성 시도 (401 에러)'],
+        indentLevel: 0,
+      },
+      {
+        name: '3️⃣ 프로젝트 멤버로 Annotation 생성 (헤더)',
+        status: 'pending',
+        dependencies: ['2️⃣ 프로젝트 멤버로 Annotation 생성 (쿼리 파라미터)'],
+        indentLevel: 0,
+      },
+      {
+        name: '4️⃣ 다른 사용자가 Annotation 수정 시도 (401 에러)',
+        status: 'pending',
+        dependencies: ['3️⃣ 프로젝트 멤버로 Annotation 생성 (헤더)'],
+        indentLevel: 1,
+      },
+      {
+        name: '5️⃣ 본인이 Annotation 수정 (성공)',
+        status: 'pending',
+        dependencies: ['4️⃣ 다른 사용자가 Annotation 수정 시도 (401 에러)'],
+        indentLevel: 1,
+      },
+      {
+        name: '6️⃣ 다른 사용자가 Annotation 삭제 시도 (401 에러)',
+        status: 'pending',
+        dependencies: ['5️⃣ 본인이 Annotation 수정 (성공)'],
+        indentLevel: 1,
+      },
+      {
+        name: '7️⃣ 본인이 Annotation 삭제 (성공)',
+        status: 'pending',
+        dependencies: ['6️⃣ 다른 사용자가 Annotation 삭제 시도 (401 에러)'],
+        indentLevel: 1,
+      },
+    ],
+  },
 ];
 
