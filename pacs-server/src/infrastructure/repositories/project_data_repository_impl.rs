@@ -499,19 +499,36 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         project_id: i32,
         study_id: i32,
     ) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
-        // project_data 테이블과 JOIN하여 프로젝트에 할당된 Series만 조회
+        // 프로젝트에 할당된 Series 조회
+        // 1. Study 전체가 할당된 경우 (resource_level = 'STUDY') → 해당 Study의 모든 Series 반환
+        // 2. 개별 Series만 할당된 경우 (resource_level = 'SERIES') → 할당된 Series만 반환
         println!(
             "🔍 [DEBUG] find_series_by_project_and_study_id: project_id={}, study_id={}",
             project_id, study_id
         );
 
         let results = sqlx::query_as::<_, ProjectDataSeries>(
-            "SELECT pds.id, pds.study_id, pds.series_uid, pds.series_description, pds.modality, pds.series_number, pds.created_at
+            "SELECT DISTINCT pds.id, pds.study_id, pds.series_uid, pds.series_description,
+                    pds.modality, pds.series_number, pds.created_at
              FROM project_data_series pds
-             INNER JOIN project_data pd ON pd.series_id = pds.id
-             WHERE pd.project_id = $1
-               AND pds.study_id = $2
-               AND pd.resource_level = 'SERIES'::resource_level_enum
+             WHERE pds.study_id = $2
+               AND (
+                   -- Case 1: Study 전체가 프로젝트에 할당된 경우
+                   EXISTS (
+                       SELECT 1 FROM project_data pd
+                       WHERE pd.project_id = $1
+                         AND pd.study_id = $2
+                         AND pd.resource_level = 'STUDY'::resource_level_enum
+                   )
+                   OR
+                   -- Case 2: 개별 Series가 프로젝트에 할당된 경우
+                   EXISTS (
+                       SELECT 1 FROM project_data pd
+                       WHERE pd.project_id = $1
+                         AND pd.series_id = pds.id
+                         AND pd.resource_level = 'SERIES'::resource_level_enum
+                   )
+               )
              ORDER BY pds.series_number ASC NULLS LAST, pds.created_at ASC"
         )
         .bind(project_id)
