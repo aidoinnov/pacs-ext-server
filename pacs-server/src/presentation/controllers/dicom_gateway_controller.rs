@@ -48,6 +48,7 @@ pub fn configure_routes(
             .route("/deps", web::get().to(debug_deps))
             .route("/patients", web::get().to(get_patients))
             .route("/studies", web::get().to(get_studies))
+            .route("/series", web::get().to(get_series_all))
             .route("/studies/{study_uid}/series", web::get().to(get_series))
             .route(
                 "/studies/{study_uid}/series/{series_uid}/instances",
@@ -827,6 +828,127 @@ pub async fn get_patients(
     HttpResponse::Ok().json(filtered_response)
 }
 
+/// GET /api/dicom/series - Series 레벨 QIDO-RS 프록시
+/// 1. Dcm4chee QIDO-RS /series 호출 (사용자 파라미터 전달)
+/// 2. RBAC 필터링 (프로젝트에 할당된 Series만)
+/// 3. 각 Series에 thumbnail_url 필드 추가
+pub async fn get_series_all(
+    qido: web::Data<Dcm4cheeQidoClient>,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
+    query: web::Query<GatewayQuery>,
+    req: HttpRequest,
+) -> HttpResponse {
+    // 사용자 ID 추출 (개발 모드 지원)
+    let user_id = match AnnotationController::extract_user_id_with_auth(&req, &jwt, &user_repo).await {
+        Ok(id) => id,
+        Err(err_response) => {
+            tracing::warn!("Gateway /series: Unauthorized - failed to extract user_id");
+            return err_response;
+        }
+    };
+
+    // 전체 데이터 조회 권한 확인
+    let has_global_access = has_global_dicom_access(user_id, project_data_repo.pool()).await;
+
+    // 프로젝트 ID 검증
+    let project_id_opt = query.project_id;
+
+    // 전체 데이터 조회 권한이 없으면 project_id 필수
+    if !has_global_access && project_id_opt.is_none() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "project_id is required (no global access permission)"
+        }));
+    }
+
+    // project_id가 있으면 검증
+    if let Some(id) = project_id_opt {
+        if id <= 0 {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "project_id must be greater than 0"
+            }));
+        }
+    }
+
+    tracing::debug!("Gateway /series: user_id={}, project_id={:?}", user_id, project_id_opt);
+
+    // 1. 사용자 필터/페이지네이션 파라미터 파싱
+    let user_params = match build_qido_params_from_user_query(&query.extra) {
+        Ok(p) => p,
+        Err(msg) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
+        }
+    };
+
+    tracing::debug!("Gateway /series: User params: {:?}", user_params);
+
+    // 2. Dcm4chee QIDO 호출
+    let bearer_opt = req
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.strip_prefix("Bearer "))
+        .map(|s| s.to_string());
+
+    let qido_response = match qido
+        .qido_series_all_with_bearer(bearer_opt.as_deref(), user_params)
+        .await
+    {
+        Ok(json) => json,
+        Err(e) => {
+            tracing::error!("Gateway /series: QIDO call failed: {}", e);
+            return HttpResponse::BadGateway().json(serde_json::json!({"error": e.to_string()}));
+        }
+    };
+
+    tracing::debug!("Gateway /series: QIDO response received");
+
+    // 3. RBAC 필터링 (프로젝트에 할당된 Series만)
+    let filtered_response = if let Some(project_id) = project_id_opt {
+        // DB에서 허용된 Series UID 목록 조회
+        let allowed_series_uids = match get_allowed_series_uids(project_id, project_data_repo.pool()).await {
+            Ok(uids) => uids,
+            Err(e) => {
+                tracing::error!("Gateway /series: Failed to get allowed series UIDs: {}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to query allowed series"
+                }));
+            }
+        };
+
+        tracing::debug!("Gateway /series: Found {} allowed series UIDs for project {}", allowed_series_uids.len(), project_id);
+
+        // QIDO 응답 필터링
+        if let Some(series_list) = qido_response.as_array() {
+            let filtered: Vec<serde_json::Value> = series_list
+                .iter()
+                .filter(|series| {
+                    if let Some(series_uid) = extract_series_uid(series) {
+                        allowed_series_uids.contains(&series_uid)
+                    } else {
+                        false
+                    }
+                })
+                .cloned()
+                .collect();
+
+            tracing::debug!("Gateway /series: Filtered {} series from {} QIDO results", filtered.len(), series_list.len());
+            serde_json::json!(filtered)
+        } else {
+            qido_response
+        }
+    } else {
+        // 전체 접근 권한이 있는 경우 - 필터링 없이 반환
+        qido_response
+    };
+
+    // 4. 각 Series에 thumbnail_url 필드 추가
+    let final_response = add_thumbnail_urls(filtered_response, qido.base_url());
+
+    HttpResponse::Ok().json(final_response)
+}
+
 // 토큰 파싱/추출 유틸은 `infrastructure::auth::token_extractor`로 분리
 
 /// 프로젝트에 할당된 Patient ID 목록 조회
@@ -843,6 +965,55 @@ async fn get_allowed_patient_ids(project_id: i32, pool: &sqlx::PgPool) -> Result
     .await?;
 
     Ok(rows.into_iter().filter_map(|(id,)| id).collect())
+}
+
+/// 프로젝트에 할당된 Series UID 목록 조회
+async fn get_allowed_series_uids(project_id: i32, pool: &sqlx::PgPool) -> Result<std::collections::HashSet<String>, sqlx::Error> {
+    let rows: Vec<(Option<String>,)> = sqlx::query_as(
+        "SELECT DISTINCT pdser.series_uid
+         FROM project_data pd
+         INNER JOIN project_data_study pds ON pd.study_id = pds.id
+         INNER JOIN project_data_series pdser ON pds.id = pdser.study_id
+         WHERE pd.project_id = $1
+           AND pdser.series_uid IS NOT NULL"
+    )
+    .bind(project_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().filter_map(|(uid,)| uid).collect())
+}
+
+/// 각 Series에 thumbnail_url 필드 추가
+fn add_thumbnail_urls(series_array: serde_json::Value, base_url: &str) -> serde_json::Value {
+    if let Some(array) = series_array.as_array() {
+        let mut result = Vec::new();
+        for item in array.iter() {
+            let mut item_clone = item.clone();
+
+            // StudyInstanceUID와 SeriesInstanceUID 추출
+            if let (Some(study_uid), Some(series_uid)) = (
+                extract_study_uid(item),
+                extract_series_uid(item),
+            ) {
+                let thumbnail_url = format!(
+                    "{}/rs/studies/{}/series/{}/thumbnail",
+                    base_url,
+                    study_uid,
+                    series_uid
+                );
+
+                if let Some(obj) = item_clone.as_object_mut() {
+                    obj.insert("thumbnail_url".to_string(), serde_json::json!(thumbnail_url));
+                }
+            }
+
+            result.push(item_clone);
+        }
+        serde_json::Value::Array(result)
+    } else {
+        series_array
+    }
 }
 
 /// QIDO-RS JSON에서 StudyInstanceUID 추출 (0020000D)

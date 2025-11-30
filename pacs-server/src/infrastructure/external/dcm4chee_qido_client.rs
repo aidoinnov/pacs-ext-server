@@ -462,4 +462,94 @@ impl Dcm4cheeQidoClient {
 
         Ok(json)
     }
+
+    /// QIDO-RS Series 레벨 쿼리 (Bearer token 지원)
+    /// Study UID 없이 Series를 직접 조회 (PatientID 등으로 필터링)
+    /// 엔드포인트: /rs/series?PatientID=xxx&limit=10&offset=0
+    pub async fn qido_series_all_with_bearer(
+        &self,
+        bearer_token: Option<&str>,
+        params: Vec<(String, String)>,
+    ) -> Result<Value, ServiceError> {
+        tracing::debug!("QIDO /series: base_url={}, qido_path={}", self.base_url, self.qido_path);
+
+        let series_path = if self.qido_path.ends_with("/rs") {
+            format!("{}/series", self.qido_path)
+        } else {
+            format!("{}/rs/series", self.qido_path)
+        };
+
+        tracing::debug!("QIDO /series: series_path={}", series_path);
+
+        let url = self.build_url(&series_path, &[])?;
+        tracing::info!("🔍 QIDO /series request URL: {}", url);
+
+        let mut req = self
+            .http_client
+            .get(url)
+            .timeout(std::time::Duration::from_millis(self.timeout_ms))
+            .header("Accept", "application/json");
+
+        // Bearer token 우선, 없으면 Basic Auth
+        if let Some(token) = bearer_token {
+            tracing::debug!("  🔑 Using Bearer token (length: {})", token.len());
+            req = req.header("Authorization", format!("Bearer {}", token));
+        } else if let (Some(u), Some(p)) = (&self.username, &self.password) {
+            tracing::debug!("  🔑 Using Basic Auth (username: {})", u);
+            req = req.basic_auth(u, Some(p));
+        } else {
+            tracing::warn!("  ⚠️ No authentication provided");
+        }
+
+        if !params.is_empty() {
+            tracing::debug!("  📊 Query params: {:?}", params);
+            let qp: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            req = req.query(&qp);
+        }
+
+        tracing::info!("  🚀 Sending QIDO /series request...");
+        let resp = req.send().await.map_err(|e| {
+            tracing::error!("  ❌ QIDO /series request failed: {}", e);
+            ServiceError::ExternalServiceError(format!("QIDO /series failed: {}", e))
+        })?;
+
+        let status = resp.status();
+        tracing::info!("  📥 Response status: {}", status);
+
+        let body = resp.text().await.unwrap_or_default();
+        tracing::debug!("  📄 Response body length: {} bytes", body.len());
+
+        if body.len() < 500 {
+            tracing::debug!("  📄 Response body: {}", body);
+        } else {
+            tracing::debug!("  📄 Response body (first 500 chars): {}", &body[..500]);
+        }
+
+        if !status.is_success() {
+            tracing::error!("  ❌ QIDO /series failed with status {}: {}", status, body);
+            return Err(ServiceError::ExternalServiceError(format!(
+                "QIDO /series failed ({}): {}",
+                status, body
+            )));
+        }
+
+        let json: Value = serde_json::from_str(&body).map_err(|e| {
+            tracing::error!("  ❌ Failed to parse JSON: {}", e);
+            ServiceError::ExternalServiceError(format!("QIDO /series parse error: {}", e))
+        })?;
+
+        if let Some(arr) = json.as_array() {
+            tracing::info!("  ✅ Parsed {} series from QIDO response", arr.len());
+        }
+
+        Ok(json)
+    }
+
+    /// base_url getter
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
 }

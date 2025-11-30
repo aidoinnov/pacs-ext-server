@@ -744,6 +744,7 @@ const ApiScenarioTests: React.FC = () => {
   const createdStudyUidRef = useRef<string | null>(null);
   const createdSeriesIdsRef = useRef<number[]>([]);
   const createdSeriesUidsRef = useRef<string[]>([]);
+  const createdPatientIdRef = useRef<string | null>(null);
 
   // Annotation 테스트용 ref
   const createdAnnotationIdsRef = useRef<number[]>([]);
@@ -884,21 +885,24 @@ const ApiScenarioTests: React.FC = () => {
         // DICOM Patient API 섹션
         result = await runPatientTest(testIndex);
       } else if (sectionIndex === 5) {
+        // DICOM Series API 섹션
+        result = await runSeriesTest(testIndex);
+      } else if (sectionIndex === 6) {
         // Annotation Label 기능 섹션
         result = await runAnnotationLabelTest(testIndex);
-      } else if (sectionIndex === 6) {
+      } else if (sectionIndex === 7) {
         // Project Data Access 접근 제어 섹션
         result = await runProjectDataAccessTest(testIndex);
-      } else if (sectionIndex === 7) {
+      } else if (sectionIndex === 8) {
         // 순차 시나리오 섹션
         result = await runSequentialScenarioTest(testIndex);
-      } else if (sectionIndex === 8) {
+      } else if (sectionIndex === 9) {
         // Annotation 권한 관리 섹션
         result = await runAnnotationPermissionTest(testIndex);
-      } else if (sectionIndex === 9) {
+      } else if (sectionIndex === 10) {
         // 권한 기반 Annotation 조회 (READ_ALL) 섹션
         result = await runReadAllPermissionTest(testIndex);
-      } else if (sectionIndex === 10) {
+      } else if (sectionIndex === 11) {
         // Annotation 권한 조회 API 개선 섹션
         result = await runAnnotationPermissionsApiTest(testIndex);
       }
@@ -2520,6 +2524,377 @@ const ApiScenarioTests: React.FC = () => {
           error.config = {
             method: 'delete',
             url: `${apiUrl}/api/projects/${projectId}`,
+          };
+        }
+        throw error;
+      }
+    }
+  };
+
+  // DICOM Series API 테스트 (QIDO-RS 프록시 + 테스트 API)
+  const runSeriesTest = async (testIndex: number) => {
+    if (testIndex === 0) {
+      // 🔧 Setup: 테스트 데이터 생성 (프로젝트 + Study + Series 3개)
+      try {
+        const response = await axios.post(`${apiUrl}/api/test/series-api/setup`);
+
+        const projectId = response.data.project_id;
+        const patientId = response.data.patient_id;
+        const seriesCount = response.data.series_count;
+
+        setCreatedProjectId(projectId);
+        createdProjectIdRef.current = projectId;
+        createdPatientIdRef.current = patientId;
+
+        console.log(`  ✅ 테스트 데이터 생성 성공`);
+        console.log(`     - 프로젝트 ID: ${projectId}`);
+        console.log(`     - Patient ID: ${patientId}`);
+        console.log(`     - Series 개수: ${seriesCount}`);
+
+        return {
+          request: { method: 'POST', url: '/api/test/series-api/setup' },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/test/series-api/setup`,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
+      // Series 전체 조회 (project_id + PatientID)
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}`,
+        config
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      console.log(`  ✅ Series 전체 조회 성공: ${response.data.length}개`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}` },
+        response: response.data,
+      };
+    } else if (testIndex === 2) {
+      // Series 개수 검증 (3개 예상)
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}`,
+        config
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      if (response.data.length !== 3) {
+        throw new Error(`3개가 예상되는데 ${response.data.length}개 반환됨`);
+      }
+
+      console.log(`  ✅ Series 개수 검증 성공: 3개`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}` },
+        response: { count: response.data.length, expected: 3 },
+      };
+    } else if (testIndex === 3) {
+      // Series 페이지네이션 (limit=1)
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1`,
+        config
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      if (response.data.length > 1) {
+        throw new Error(`limit=1인데 ${response.data.length}개 반환됨`);
+      }
+
+      console.log(`  ✅ 페이지네이션 성공: ${response.data.length}개 반환`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
+        response: response.data,
+      };
+    } else if (testIndex === 4) {
+      // Series 필터링 (Modality=CT)
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=CT`,
+        config
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      console.log(`  ✅ Modality=CT 필터링 성공: ${response.data.length}개`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=CT` },
+        response: response.data,
+      };
+    } else if (testIndex === 5) {
+      // Series 필터링 (Modality=MR)
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=MR`,
+        config
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      console.log(`  ✅ Modality=MR 필터링 성공: ${response.data.length}개`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=MR` },
+        response: response.data,
+      };
+    } else if (testIndex === 6) {
+      // Series DICOM JSON 구조 검증
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1`,
+        config
+      );
+
+      if (!Array.isArray(response.data) || response.data.length === 0) {
+        throw new Error('Series 데이터가 없습니다.');
+      }
+
+      const series = response.data[0];
+
+      // 필수 DICOM 태그 검증
+      const requiredTags = ['0020000E', '00080060', '0020000D'];
+      for (const tag of requiredTags) {
+        if (!series[tag]) {
+          throw new Error(`필수 태그 ${tag}가 없습니다.`);
+        }
+        if (!series[tag].vr || !series[tag].Value) {
+          throw new Error(`태그 ${tag}의 vr 또는 Value 필드가 없습니다.`);
+        }
+      }
+
+      console.log(`  ✅ DICOM JSON 구조 검증 성공`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
+        response: { validated_tags: requiredTags },
+      };
+    } else if (testIndex === 7) {
+      // Series thumbnail_url 필드 검증
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1`,
+        config
+      );
+
+      if (!Array.isArray(response.data) || response.data.length === 0) {
+        throw new Error('Series 데이터가 없습니다.');
+      }
+
+      const series = response.data[0];
+
+      if (!series.thumbnail_url) {
+        throw new Error('thumbnail_url 필드가 없습니다.');
+      }
+
+      if (!series.thumbnail_url.includes('/thumbnail')) {
+        throw new Error('thumbnail_url이 올바르지 않습니다.');
+      }
+
+      console.log(`  ✅ thumbnail_url 검증 성공: ${series.thumbnail_url}`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
+        response: { thumbnail_url: series.thumbnail_url },
+      };
+    } else if (testIndex === 8) {
+      // thumbnail_url 형식 검증 (WADO-RS 표준)
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1`,
+        config
+      );
+
+      if (!Array.isArray(response.data) || response.data.length === 0) {
+        throw new Error('Series 데이터가 없습니다.');
+      }
+
+      const series = response.data[0];
+      const thumbnailUrl = series.thumbnail_url;
+
+      // WADO-RS 표준 형식 검증: /rs/studies/{study_uid}/series/{series_uid}/thumbnail
+      const wadoRsPattern = /\/rs\/studies\/[^\/]+\/series\/[^\/]+\/thumbnail$/;
+      if (!wadoRsPattern.test(thumbnailUrl)) {
+        throw new Error(`thumbnail_url이 WADO-RS 표준 형식이 아닙니다: ${thumbnailUrl}`);
+      }
+
+      console.log(`  ✅ WADO-RS 표준 형식 검증 성공`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
+        response: { thumbnail_url: thumbnailUrl, format: 'WADO-RS compliant' },
+      };
+    } else if (testIndex === 9) {
+      // project_id 없이 조회 (400 에러)
+      const config = await handleGetAxiosConfig('USER');
+
+      try {
+        await axios.get(`${apiUrl}/api/dicom/series?PatientID=TEST`, config);
+        throw new Error('400 에러가 발생해야 하는데 성공했습니다.');
+      } catch (error: any) {
+        if (error.response?.status === 400) {
+          console.log(`  ✅ 400 에러 발생 (예상대로)`);
+          return {
+            request: { method: 'GET', url: '/api/dicom/series?PatientID=TEST' },
+            response: error.response.data,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 10) {
+      // 잘못된 project_id (0) 에러 처리
+      const config = await handleGetAxiosConfig('USER');
+
+      try {
+        await axios.get(`${apiUrl}/api/dicom/series?project_id=0&PatientID=TEST`, config);
+        throw new Error('400 에러가 발생해야 하는데 성공했습니다.');
+      } catch (error: any) {
+        if (error.response?.status === 400) {
+          console.log(`  ✅ 400 에러 발생 (예상대로)`);
+          return {
+            request: { method: 'GET', url: '/api/dicom/series?project_id=0&PatientID=TEST' },
+            response: error.response.data,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 11) {
+      // 존재하지 않는 PatientID 조회 (빈 배열)
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT`,
+        config
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      if (response.data.length !== 0) {
+        throw new Error(`빈 배열이 예상되는데 ${response.data.length}개 반환됨`);
+      }
+
+      console.log(`  ✅ 존재하지 않는 PatientID 조회 성공: 빈 배열 반환`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT` },
+        response: response.data,
+      };
+    } else if (testIndex === 12) {
+      // 🧹 Cleanup: 테스트 데이터 삭제
+      const projectId = createdProjectIdRef.current;
+
+      if (!projectId) {
+        console.log(`  ⚠️  삭제할 프로젝트가 없습니다.`);
+        return {
+          request: { method: 'DELETE', url: '/api/test/series-api/cleanup/:id' },
+          response: { message: 'No project to delete' },
+        };
+      }
+
+      try {
+        const response = await axios.delete(`${apiUrl}/api/test/series-api/cleanup/${projectId}`);
+        console.log(`  ✅ 테스트 데이터 삭제 성공 (프로젝트 ID: ${projectId})`);
+
+        createdProjectIdRef.current = null;
+        createdPatientIdRef.current = null;
+        setCreatedProjectId(null);
+
+        return {
+          request: { method: 'DELETE', url: `/api/test/series-api/cleanup/${projectId}` },
+          response: response.data,
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'delete',
+            url: `${apiUrl}/api/test/series-api/cleanup/${projectId}`,
           };
         }
         throw error;
