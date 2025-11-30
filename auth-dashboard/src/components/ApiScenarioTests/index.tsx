@@ -2839,6 +2839,23 @@ const ApiScenarioTests: React.FC = () => {
         throw error;
       }
     } else if (testIndex === 11) {
+      // 잘못된 project_id (음수) 에러 처리
+      const config = await handleGetAxiosConfig('USER');
+
+      try {
+        await axios.get(`${apiUrl}/api/dicom/series?project_id=-1&PatientID=TEST`, config);
+        throw new Error('400 에러가 발생해야 하는데 성공했습니다.');
+      } catch (error: any) {
+        if (error.response?.status === 400) {
+          console.log(`  ✅ 400 에러 발생 (예상대로)`);
+          return {
+            request: { method: 'GET', url: '/api/dicom/series?project_id=-1&PatientID=TEST' },
+            response: error.response.data,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 12) {
       // 존재하지 않는 PatientID 조회 (빈 배열)
       const projectId = createdProjectIdRef.current;
 
@@ -2848,7 +2865,7 @@ const ApiScenarioTests: React.FC = () => {
 
       const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
-        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT`,
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT_12345`,
         config
       );
 
@@ -2863,10 +2880,70 @@ const ApiScenarioTests: React.FC = () => {
       console.log(`  ✅ 존재하지 않는 PatientID 조회 성공: 빈 배열 반환`);
 
       return {
-        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT` },
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT_12345` },
         response: response.data,
       };
-    } else if (testIndex === 12) {
+    } else if (testIndex === 13) {
+      // 존재하지 않는 Modality 조회 (빈 배열)
+      const projectId = createdProjectIdRef.current;
+      const patientId = createdPatientIdRef.current;
+
+      if (!projectId || !patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=NONEXISTENT`,
+        config
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      if (response.data.length !== 0) {
+        throw new Error(`빈 배열이 예상되는데 ${response.data.length}개 반환됨`);
+      }
+
+      console.log(`  ✅ 존재하지 않는 Modality 조회 성공: 빈 배열 반환`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=NONEXISTENT` },
+        response: response.data,
+      };
+    } else if (testIndex === 14) {
+      // 다른 프로젝트로 조회 (빈 배열 - RBAC 필터링)
+      const patientId = createdPatientIdRef.current;
+
+      if (!patientId) {
+        throw new Error('Setup이 완료되지 않았습니다.');
+      }
+
+      // 다른 프로젝트 ID 사용 (999 - 존재하지 않는 프로젝트)
+      const otherProjectId = 999;
+
+      const config = await handleGetAxiosConfig('USER');
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${otherProjectId}&PatientID=${patientId}`,
+        config
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      if (response.data.length !== 0) {
+        throw new Error(`빈 배열이 예상되는데 ${response.data.length}개 반환됨 (RBAC 필터링 실패)`);
+      }
+
+      console.log(`  ✅ 다른 프로젝트로 조회 성공: 빈 배열 반환 (RBAC 필터링)`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${otherProjectId}&PatientID=${patientId}` },
+        response: response.data,
+      };
+    } else if (testIndex === 16) {
       // 🧹 Cleanup: 테스트 데이터 삭제
       const projectId = createdProjectIdRef.current;
 
