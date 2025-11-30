@@ -749,6 +749,9 @@ const ApiScenarioTests: React.FC = () => {
   // Annotation 테스트용 ref
   const createdAnnotationIdsRef = useRef<number[]>([]);
 
+  // Series API 테스트용 Bearer 토큰
+  const seriesApiTokenRef = useRef<string | null>(null);
+
   // 순차 시나리오용 ref
   const sequentialProjectIdRef = useRef<number | null>(null);
   const sequentialUserIdsRef = useRef<{[key: string]: number}>({});
@@ -2534,6 +2537,36 @@ const ApiScenarioTests: React.FC = () => {
   // DICOM Series API 테스트 (QIDO-RS 프록시 + 테스트 API)
   const runSeriesTest = async (testIndex: number) => {
     if (testIndex === 0) {
+      // 🔐 Login: Keycloak 로그인 (Bearer 토큰 획득)
+      try {
+        const response = await axios.post(`${apiUrl}/api/test/login`, {
+          username: 'pacsadmin',
+          password: 'HhL}qb(tl}?zJ4}(',
+        });
+
+        const accessToken = response.data.access_token;
+        seriesApiTokenRef.current = accessToken;
+
+        console.log(`  ✅ Keycloak 로그인 성공`);
+        console.log(`     - Token Type: ${response.data.token_type}`);
+        console.log(`     - Expires In: ${response.data.expires_in}s`);
+        console.log(`     - Token Length: ${accessToken.length}`);
+
+        return {
+          request: { method: 'POST', url: '/api/test/login', body: { username: 'pacsadmin' } },
+          response: { token_type: response.data.token_type, expires_in: response.data.expires_in },
+        };
+      } catch (error: any) {
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/test/login`,
+            data: { username: 'pacsadmin' },
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 1) {
       // 🔧 Setup: 테스트 데이터 생성 (프로젝트 + Study + Series 3개)
       try {
         const response = await axios.post(`${apiUrl}/api/test/series-api/setup`);
@@ -2564,19 +2597,27 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 1) {
+    } else if (testIndex === 2) {
       // Series 전체 조회 (project_id + PatientID)
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
       if (!projectId || !patientId) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다. 먼저 로그인하세요.');
+      }
+
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}`,
-        config
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
       );
 
       if (!Array.isArray(response.data)) {
@@ -2589,19 +2630,19 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}` },
         response: response.data,
       };
-    } else if (testIndex === 2) {
+    } else if (testIndex === 3) {
       // Series 개수 검증 (3개 예상)
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId) {
+      if (!projectId || !patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data)) {
@@ -2618,19 +2659,19 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}` },
         response: { count: response.data.length, expected: 3 },
       };
-    } else if (testIndex === 3) {
+    } else if (testIndex === 4) {
       // Series 페이지네이션 (limit=1)
       const projectId = createdProjectIdRef.current;
       const patientId = createdPatientIdRef.current;
+      const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId) {
+      if (!projectId || !patientId || !token) {
         throw new Error('Setup이 완료되지 않았습니다.');
       }
 
-      const config = await handleGetAxiosConfig('USER');
       const response = await axios.get(
         `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1`,
-        config
+        { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!Array.isArray(response.data)) {

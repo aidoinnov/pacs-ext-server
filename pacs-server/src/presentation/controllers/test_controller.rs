@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::infrastructure::external::KeycloakClient;
 
 #[derive(Debug, Serialize)]
 pub struct SetupResponse {
@@ -481,9 +482,52 @@ pub async fn cleanup_series_api_scenario(
     }))
 }
 
+/// Keycloak 로그인 요청
+#[derive(Debug, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+/// Keycloak 로그인 응답
+#[derive(Debug, Serialize)]
+pub struct LoginResponse {
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_in: i64,
+}
+
+/// 테스트용 Keycloak 로그인
+///
+/// 테스트 시나리오에서 사용할 Bearer 토큰 획득
+pub async fn test_login(
+    keycloak: web::Data<Arc<KeycloakClient>>,
+    body: web::Json<LoginRequest>,
+) -> impl Responder {
+    match keycloak.get_user_token(&body.username, &body.password).await {
+        Ok(token_response) => {
+            HttpResponse::Ok().json(LoginResponse {
+                access_token: token_response.access_token,
+                token_type: "Bearer".to_string(),
+                expires_in: token_response.expires_in,
+            })
+        }
+        Err(e) => {
+            HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "Login failed",
+                "details": e.to_string()
+            }))
+        }
+    }
+}
+
 /// 라우트 설정
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
+        web::scope("/test")
+            .route("/login", web::post().to(test_login))
+    )
+    .service(
         web::scope("/test/project-data-access")
             .route("/setup", web::post().to(setup_project_data_access_scenario))
             .route("/cleanup/{project_id}", web::delete().to(cleanup_project_data_access_scenario)),

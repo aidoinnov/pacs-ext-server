@@ -142,8 +142,15 @@ export const getDicomSections = (): TestSection[] => [
     isSequential: true,
     tests: [
       {
+        name: '🔐 Login: Keycloak 로그인 (Bearer 토큰 획득)',
+        status: 'pending',
+        isSequential: true,
+        indentLevel: 0,
+      },
+      {
         name: '🔧 Setup: 테스트 데이터 생성 (프로젝트 + Study + Series 3개)',
         status: 'pending',
+        dependencies: ['🔐 Login: Keycloak 로그인 (Bearer 토큰 획득)'],
         isSequential: true,
         indentLevel: 0,
         delayAfter: 1500,
