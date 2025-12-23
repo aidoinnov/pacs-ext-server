@@ -26,7 +26,7 @@ pub fn configure_routes(
 }
 
 async fn get_status(
-    state: web::Data<Arc<RwLock<SyncState>>>,
+    state: web::Data<RwLock<SyncState>>,
     svc: web::Data<SyncServiceImpl>,
 ) -> HttpResponse {
     let st = svc.get_status().await;
@@ -39,13 +39,41 @@ async fn get_status(
 }
 
 async fn run_once(svc: web::Data<SyncServiceImpl>) -> HttpResponse {
-    let res = svc.run_once().await;
-    HttpResponse::Ok().json(serde_json::json!({
-        "success": res.success,
-        "processed": res.processed,
-        "duration_ms": res.duration_ms,
-        "error": res.error,
-    }))
+    eprintln!("🔄 [Controller] run_once called - svc extracted successfully");
+    eprintln!("🔄 [Controller] About to call svc.run_once()...");
+
+    // Spawn a task to call run_once with timeout
+    let handle = tokio::spawn(async move {
+        eprintln!("🔄 [Task] Starting run_once...");
+        let result = svc.run_once().await;
+        eprintln!("🔄 [Task] run_once completed!");
+        result
+    });
+
+    eprintln!("🔄 [Controller] Waiting for task with 5 second timeout...");
+    match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
+        Ok(Ok(res)) => {
+            eprintln!("🔄 [Controller] Task completed successfully");
+            HttpResponse::Ok().json(serde_json::json!({
+                "success": res.success,
+                "processed": res.processed,
+                "duration_ms": res.duration_ms,
+                "error": res.error,
+            }))
+        }
+        Ok(Err(e)) => {
+            eprintln!("❌ [Controller] Task panicked: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Task panicked: {:?}", e)
+            }))
+        }
+        Err(_) => {
+            eprintln!("⏱️ [Controller] Task timed out after 5 seconds");
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Sync operation timed out"
+            }))
+        }
+    }
 }
 
 async fn pause(svc: web::Data<SyncServiceImpl>) -> HttpResponse {
@@ -84,7 +112,14 @@ async fn deps_check(req: actix_web::HttpRequest) -> HttpResponse {
     let has_state_lock = req.app_data::<web::Data<RwLock<SyncState>>>().is_some();
     let has_state = has_state_arc || has_state_lock;
 
+    let has_svc_arc = req.app_data::<web::Data<Arc<SyncServiceImpl>>>().is_some();
     let has_svc = req.app_data::<web::Data<SyncServiceImpl>>().is_some();
+    let has_svc_any = has_svc_arc || has_svc;
 
-    HttpResponse::Ok().json(serde_json::json!({"state": has_state, "svc": has_svc}))
+    HttpResponse::Ok().json(serde_json::json!({
+        "state": has_state,
+        "svc": has_svc_any,
+        "svc_arc": has_svc_arc,
+        "svc_direct": has_svc
+    }))
 }

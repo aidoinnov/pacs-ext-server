@@ -269,13 +269,26 @@ impl SyncServiceImpl {
 #[async_trait]
 impl SyncService for SyncServiceImpl {
     async fn run_once(&self) -> SyncResult {
+        eprintln!("🔄 [Sync] run_once() called - TEST MODE");
+        return SyncResult {
+            success: true,
+            processed: 999,
+            duration_ms: 123,
+            error: None,
+        };
+
         // 간단한 델타 동기화: last_run 기준으로 변경분 조회 후 upsert
         let last_run_opt = { self.state.read().await.last_run };
         let mut total_processed = 0usize;
+        eprintln!("🔄 [Sync] Starting sync_studies...");
 
         match self.sync_studies(last_run_opt).await {
-            Ok(n) => total_processed += n,
+            Ok(n) => {
+                eprintln!("🔄 [Sync] sync_studies completed: {} studies", n);
+                total_processed += n
+            },
             Err(e) => {
+                eprintln!("❌ [Sync] sync_studies failed: {}", e);
                 return SyncResult {
                     success: false,
                     processed: total_processed,

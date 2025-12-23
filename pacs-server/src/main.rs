@@ -416,6 +416,57 @@ async fn main() -> std::io::Result<()> {
     openapi = presentation::openapi_extensions::extend_openapi(openapi);
     println!("✅ Done");
 
+    // Sync components (optional by mode)
+    use crate::domain::services::SyncService;
+    use crate::infrastructure::services::{
+        sync_scheduler::run_scheduler, sync_state::SyncState, sync_worker::SyncServiceImpl,
+    };
+    print!("🔄 Initializing Sync service... ");
+    let sync_interval = settings.sync.as_ref().map(|s| s.interval_sec).unwrap_or(30);
+    let sync_state = SyncState::new(sync_interval);
+    let sync_service_result =
+        SyncServiceImpl::new(&settings, pool.clone(), sync_state.clone()).await;
+    let sync_service: Arc<SyncServiceImpl> = match sync_service_result {
+        Ok(svc) => {
+            println!("✅ Done (Interval: {}s)", sync_interval);
+            Arc::new(svc)
+        }
+        Err(e) => {
+            if settings.server.mode == ServerMode::Full
+                || settings.server.mode == ServerMode::SyncOnly
+            {
+                println!("⚠️  Warning: {}", e);
+                println!("⚠️  Sync features will be disabled");
+            } else {
+                println!("⏭️  Skipped (Mode: {:?})", settings.server.mode);
+            }
+            // Create a dummy that returns errors but doesn't crash
+            Arc::new(SyncServiceImpl {
+                rbac_pool: pool.clone(),
+                dcm4chee_pool: pool.clone(),
+                state: sync_state.clone(),
+                default_project_id: settings
+                    .sync
+                    .as_ref()
+                    .and_then(|s| s.default_project_id)
+                    .unwrap_or(1),
+            })
+        }
+    };
+
+    // Start scheduler in Full/SyncOnly mode
+    if settings.server.mode == ServerMode::Full || settings.server.mode == ServerMode::SyncOnly {
+        let st = sync_state.clone();
+        let svc = sync_service.clone();
+        tokio::spawn(async move {
+            run_scheduler(st, svc).await;
+        });
+        println!("🔄 Sync scheduler started (Mode: {:?})", settings.server.mode);
+    }
+
+    // Prepare trait-object handle for DI
+    let sync_service_trait: Arc<dyn SyncService> = sync_service.clone();
+
     println!("\n{}", "=".repeat(80));
     println!("✨ Server Ready!");
     println!("{}", "=".repeat(80));
@@ -452,50 +503,6 @@ async fn main() -> std::io::Result<()> {
         pool_for_shutdown.close().await;
         println!("✅ Database connections closed");
     };
-
-    // Sync components (optional by mode)
-    use crate::domain::services::SyncService;
-    use crate::infrastructure::services::{
-        sync_scheduler::run_scheduler, sync_state::SyncState, sync_worker::SyncServiceImpl,
-    };
-    let sync_interval = settings.sync.as_ref().map(|s| s.interval_sec).unwrap_or(30);
-    let sync_state = SyncState::new(sync_interval);
-    let sync_service_result =
-        SyncServiceImpl::new(&settings, pool.clone(), sync_state.clone()).await;
-    let sync_service: Arc<SyncServiceImpl> = match sync_service_result {
-        Ok(svc) => Arc::new(svc),
-        Err(e) => {
-            if settings.server.mode == ServerMode::Full
-                || settings.server.mode == ServerMode::SyncOnly
-            {
-                eprintln!("⚠️  Warning: Failed to initialize sync service: {}", e);
-                eprintln!("⚠️  Sync features will be disabled");
-            }
-            // Create a dummy that returns errors but doesn't crash
-            Arc::new(SyncServiceImpl {
-                rbac_pool: pool.clone(),
-                dcm4chee_pool: pool.clone(),
-                state: sync_state.clone(),
-                default_project_id: settings
-                    .sync
-                    .as_ref()
-                    .and_then(|s| s.default_project_id)
-                    .unwrap_or(1),
-            })
-        }
-    };
-
-    // Start scheduler in Full/SyncOnly mode
-    if settings.server.mode == ServerMode::Full || settings.server.mode == ServerMode::SyncOnly {
-        let st = sync_state.clone();
-        let svc = sync_service.clone();
-        tokio::spawn(async move {
-            run_scheduler(st, svc).await;
-        });
-    }
-
-    // Prepare trait-object handle for DI
-    let sync_service_trait: Arc<dyn SyncService> = sync_service.clone();
 
     HttpServer::new(move || {
         App::new()
@@ -672,7 +679,7 @@ async fn main() -> std::io::Result<()> {
                     // 🧪 테스트 API
                     // ========================================
                     .configure(|cfg| {
-                        test_controller::configure_routes(cfg)
+                        test_controller::configure_routes(cfg, keycloak_client.clone())
                     }),
             )
     })
