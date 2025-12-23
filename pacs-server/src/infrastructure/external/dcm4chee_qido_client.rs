@@ -536,8 +536,15 @@ impl Dcm4cheeQidoClient {
             )));
         }
 
+        // 빈 응답 처리 (Dcm4chee가 결과가 없을 때 빈 문자열 반환)
+        if body.is_empty() || body.trim().is_empty() {
+            tracing::info!("  ✅ Empty response from QIDO (no matching series)");
+            return Ok(serde_json::json!([]));
+        }
+
         let json: Value = serde_json::from_str(&body).map_err(|e| {
             tracing::error!("  ❌ Failed to parse JSON: {}", e);
+            tracing::error!("  📄 Response body: {}", body);
             ServiceError::ExternalServiceError(format!("QIDO /series parse error: {}", e))
         })?;
 
@@ -551,5 +558,10 @@ impl Dcm4cheeQidoClient {
     /// base_url getter
     pub fn base_url(&self) -> &str {
         &self.base_url
+    }
+
+    /// qido_path getter
+    pub fn qido_path(&self) -> &str {
+        &self.qido_path
     }
 }

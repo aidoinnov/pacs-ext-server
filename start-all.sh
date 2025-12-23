@@ -63,26 +63,37 @@ if [ -f "$DB_TUNNEL_PID_FILE" ]; then
     rm -f "$DB_TUNNEL_PID_FILE"
 fi
 
-# DB 터널 시작
-cd "$SCRIPTS_DIR"
-nohup ./db-tunnel.sh > "$DB_TUNNEL_LOG" 2>&1 &
-DB_TUNNEL_PID=$!
-echo "$DB_TUNNEL_PID" > "$DB_TUNNEL_PID_FILE"
+# DB 터널 시작 (올바른 경로 사용)
+if [ -f "$BACKEND_DIR/db-tunnel.sh" ]; then
+    cd "$BACKEND_DIR"
+    nohup ./db-tunnel.sh -t extension > "$DB_TUNNEL_LOG" 2>&1 &
+    DB_TUNNEL_PID=$!
+    echo "$DB_TUNNEL_PID" > "$DB_TUNNEL_PID_FILE"
 
-# DB 터널 연결 대기
-log_info "DB 터널 연결 대기 중..."
-for i in {1..10}; do
+    # DB 터널 연결 대기
+    log_info "DB 터널 연결 대기 중..."
+    for i in {1..15}; do
+        if lsof -ti:5456 > /dev/null 2>&1; then
+            log_success "DB 터널 연결 완료! (PID: $DB_TUNNEL_PID, Port: 5456)"
+            break
+        fi
+        if [ $i -eq 15 ]; then
+            log_error "DB 터널 연결 타임아웃!"
+            log_info "로그 확인: tail -f $DB_TUNNEL_LOG"
+            exit 1
+        fi
+        sleep 1
+    done
+else
+    # DB 터널이 이미 실행 중인지 확인
     if lsof -ti:5456 > /dev/null 2>&1; then
-        log_success "DB 터널 연결 완료! (PID: $DB_TUNNEL_PID, Port: 5456)"
-        break
+        log_success "DB 터널이 이미 실행 중입니다 (Port: 5456)"
+    else
+        log_error "DB 터널 스크립트를 찾을 수 없습니다: $BACKEND_DIR/db-tunnel.sh"
+        log_warning "수동으로 DB 터널을 시작하거나 계속 진행하려면 Enter를 누르세요..."
+        read -r
     fi
-    if [ $i -eq 10 ]; then
-        log_error "DB 터널 연결 타임아웃!"
-        log_info "로그 확인: tail -f $DB_TUNNEL_LOG"
-        exit 1
-    fi
-    sleep 1
-done
+fi
 
 cd "$PROJECT_ROOT"
 
@@ -124,39 +135,60 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
-# 백엔드 빌드 및 실행
+# 백엔드 빌드
 log_info "Rust 백엔드 빌드 중..."
-cargo build --bin pacs_server 2>&1 | tee "$BACKEND_LOG" &
-BUILD_PID=$!
-wait $BUILD_PID
+cargo build --bin pacs_server 2>&1 | tee -a "$BACKEND_LOG"
 
-if [ $? -ne 0 ]; then
+if [ ${PIPESTATUS[0]} -ne 0 ]; then
     log_error "백엔드 빌드 실패!"
+    log_info "로그 확인: tail -f $BACKEND_LOG"
     exit 1
 fi
 
 log_success "백엔드 빌드 완료"
 
-# 백엔드 실행
+# 백엔드 실행 (빌드된 바이너리 직접 실행)
 log_info "백엔드 서버 실행 중..."
-nohup cargo run --bin pacs_server > "$BACKEND_LOG" 2>&1 &
+nohup ./target/debug/pacs_server >> "$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
 
-# 백엔드 시작 대기
+# 백엔드 시작 대기 (60초로 증가)
 log_info "백엔드 서버 시작 대기 중..."
-for i in {1..30}; do
-    if curl -s http://localhost:8080/health > /dev/null 2>&1; then
-        log_success "백엔드 서버 시작 완료! (PID: $BACKEND_PID)"
-        break
-    fi
-    if [ $i -eq 30 ]; then
-        log_error "백엔드 서버 시작 타임아웃!"
-        log_info "로그 확인: tail -f $BACKEND_LOG"
+BACKEND_STARTED=false
+for i in {1..60}; do
+    # 프로세스가 살아있는지 확인
+    if ! ps -p "$BACKEND_PID" > /dev/null 2>&1; then
+        log_error "백엔드 프로세스가 종료되었습니다!"
+        log_info "로그 확인: tail -50 $BACKEND_LOG"
+        tail -50 "$BACKEND_LOG"
         exit 1
     fi
+
+    # Health check
+    if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+        log_success "백엔드 서버 시작 완료! (PID: $BACKEND_PID)"
+        BACKEND_STARTED=true
+        break
+    fi
+
+    # 진행 상황 표시
+    if [ $((i % 10)) -eq 0 ]; then
+        log_info "대기 중... ($i/60초)"
+    fi
+
     sleep 1
 done
+
+if [ "$BACKEND_STARTED" = false ]; then
+    log_error "백엔드 서버 시작 타임아웃! (60초 초과)"
+    log_info "서버가 아직 시작 중일 수 있습니다. 로그를 확인하세요:"
+    log_info "  tail -f $BACKEND_LOG"
+    log_info ""
+    log_info "프로세스 상태:"
+    ps -p "$BACKEND_PID" -o pid,ppid,stat,time,command || echo "  프로세스가 종료되었습니다"
+    exit 1
+fi
 
 # 3. 프론트엔드 시작
 log_info "프론트엔드 서버 시작 중..."
@@ -173,20 +205,42 @@ nohup npm start > "$FRONTEND_LOG" 2>&1 &
 FRONTEND_PID=$!
 echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
 
-# 프론트엔드 시작 대기
+# 프론트엔드 시작 대기 (90초로 증가 - React 빌드 시간 고려)
 log_info "프론트엔드 서버 시작 대기 중..."
-for i in {1..60}; do
-    if curl -s http://localhost:3000 > /dev/null 2>&1; then
-        log_success "프론트엔드 서버 시작 완료! (PID: $FRONTEND_PID)"
-        break
-    fi
-    if [ $i -eq 60 ]; then
-        log_error "프론트엔드 서버 시작 타임아웃!"
-        log_info "로그 확인: tail -f $FRONTEND_LOG"
+FRONTEND_STARTED=false
+for i in {1..90}; do
+    # 프로세스가 살아있는지 확인
+    if ! ps -p "$FRONTEND_PID" > /dev/null 2>&1; then
+        log_error "프론트엔드 프로세스가 종료되었습니다!"
+        log_info "로그 확인: tail -50 $FRONTEND_LOG"
+        tail -50 "$FRONTEND_LOG"
         exit 1
     fi
+
+    # Health check
+    if curl -s http://localhost:3000 > /dev/null 2>&1; then
+        log_success "프론트엔드 서버 시작 완료! (PID: $FRONTEND_PID)"
+        FRONTEND_STARTED=true
+        break
+    fi
+
+    # 진행 상황 표시
+    if [ $((i % 15)) -eq 0 ]; then
+        log_info "대기 중... ($i/90초)"
+    fi
+
     sleep 1
 done
+
+if [ "$FRONTEND_STARTED" = false ]; then
+    log_error "프론트엔드 서버 시작 타임아웃! (90초 초과)"
+    log_info "서버가 아직 시작 중일 수 있습니다. 로그를 확인하세요:"
+    log_info "  tail -f $FRONTEND_LOG"
+    log_info ""
+    log_info "프로세스 상태:"
+    ps -p "$FRONTEND_PID" -o pid,ppid,stat,time,command || echo "  프로세스가 종료되었습니다"
+    exit 1
+fi
 
 # 4. 완료 메시지
 echo ""

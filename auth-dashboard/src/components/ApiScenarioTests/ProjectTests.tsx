@@ -195,3 +195,4 @@ export const getProjectSections = (): TestSection[] => [
 // Note: 실제 테스트 함수들은 index.tsx에 있으므로, 여기서는 섹션 정의만 export합니다.
 // 테스트 함수는 index.tsx에서 각 섹션별로 호출하도록 유지합니다.
 
+

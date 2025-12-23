@@ -363,3 +363,4 @@ async function getAnnotationPermissions(
 
 - **2024-01-XX**: 초기 문서 작성
 
+

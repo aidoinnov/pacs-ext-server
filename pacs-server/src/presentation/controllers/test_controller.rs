@@ -504,7 +504,7 @@ pub async fn test_login(
     keycloak: web::Data<Arc<KeycloakClient>>,
     body: web::Json<LoginRequest>,
 ) -> impl Responder {
-    match keycloak.get_user_token(&body.username, &body.password).await {
+    match keycloak.authenticate_user(&body.username, &body.password).await {
         Ok(token_response) => {
             HttpResponse::Ok().json(LoginResponse {
                 access_token: token_response.access_token,
@@ -522,20 +522,24 @@ pub async fn test_login(
 }
 
 /// 라우트 설정
-pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/test")
-            .route("/login", web::post().to(test_login))
-    )
-    .service(
-        web::scope("/test/project-data-access")
-            .route("/setup", web::post().to(setup_project_data_access_scenario))
-            .route("/cleanup/{project_id}", web::delete().to(cleanup_project_data_access_scenario)),
-    )
-    .service(
-        web::scope("/test/series-api")
-            .route("/setup", web::post().to(setup_series_api_scenario))
-            .route("/cleanup/{project_id}", web::delete().to(cleanup_series_api_scenario)),
-    );
+pub fn configure_routes(
+    cfg: &mut web::ServiceConfig,
+    keycloak_client: Arc<KeycloakClient>,
+) {
+    cfg.app_data(web::Data::new(keycloak_client))
+        .service(
+            web::scope("/test")
+                .route("/login", web::post().to(test_login))
+                .service(
+                    web::scope("/project-data-access")
+                        .route("/setup", web::post().to(setup_project_data_access_scenario))
+                        .route("/cleanup/{project_id}", web::delete().to(cleanup_project_data_access_scenario)),
+                )
+                .service(
+                    web::scope("/series-api")
+                        .route("/setup", web::post().to(setup_series_api_scenario))
+                        .route("/cleanup/{project_id}", web::delete().to(cleanup_series_api_scenario)),
+                )
+        );
 }
 

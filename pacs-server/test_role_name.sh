@@ -62,3 +62,4 @@ echo "   1. Restart the server to apply new code"
 echo "   2. Provide authentication token"
 echo "   3. Create test annotations first"
 
+

@@ -138,7 +138,7 @@ export const getDicomSections = (): TestSection[] => [
   },
   {
     title: '📊 DICOM Series API (QIDO-RS 프록시)',
-    description: 'Series 레벨 QIDO-RS 프록시 + RBAC 필터링 + 페이지네이션 + 썸네일 URL 테스트 (순차 실행)',
+    description: 'Series 레벨 QIDO-RS 프록시 + RBAC 필터링 + 페이지네이션 + 썸네일 URL 테스트 (실제 PACS 데이터 사용)',
     isSequential: true,
     tests: [
       {
@@ -148,29 +148,28 @@ export const getDicomSections = (): TestSection[] => [
         indentLevel: 0,
       },
       {
-        name: '🔧 Setup: 테스트 데이터 생성 (프로젝트 + Study + Series 3개)',
+        name: '🔧 Setup: 실제 PACS 데이터 확인 (project_id=2)',
         status: 'pending',
         dependencies: ['🔐 Login: Keycloak 로그인 (Bearer 토큰 획득)'],
         isSequential: true,
         indentLevel: 0,
-        delayAfter: 1500,
       },
       {
-        name: 'Series 전체 조회 (project_id + PatientID)',
+        name: 'Series 전체 조회 (SarcopeniaCase1)',
         status: 'pending',
-        dependencies: ['🔧 Setup: 테스트 데이터 생성 (프로젝트 + Study + Series 3개)'],
+        dependencies: ['🔧 Setup: 실제 PACS 데이터 확인 (project_id=2)'],
         indentLevel: 1,
       },
       {
-        name: 'Series 개수 검증 (3개 예상)',
+        name: 'Series 개수 검증 (1개 예상)',
         status: 'pending',
-        dependencies: ['Series 전체 조회 (project_id + PatientID)'],
+        dependencies: ['Series 전체 조회 (SarcopeniaCase1)'],
         indentLevel: 1,
       },
       {
         name: 'Series 페이지네이션 (limit=1)',
         status: 'pending',
-        dependencies: ['Series 개수 검증 (3개 예상)'],
+        dependencies: ['Series 개수 검증 (1개 예상)'],
         indentLevel: 1,
       },
       {
@@ -180,7 +179,7 @@ export const getDicomSections = (): TestSection[] => [
         indentLevel: 1,
       },
       {
-        name: 'Series 필터링 (Modality=MR)',
+        name: 'Series 필터링 (Modality=SM)',
         status: 'pending',
         dependencies: ['Series 필터링 (Modality=CT)'],
         indentLevel: 1,
@@ -188,7 +187,7 @@ export const getDicomSections = (): TestSection[] => [
       {
         name: 'Series DICOM JSON 구조 검증',
         status: 'pending',
-        dependencies: ['Series 필터링 (Modality=MR)'],
+        dependencies: ['Series 필터링 (Modality=SM)'],
         indentLevel: 1,
       },
       {
@@ -204,15 +203,33 @@ export const getDicomSections = (): TestSection[] => [
         indentLevel: 1,
       },
       {
-        name: 'project_id 없이 조회 (400 에러)',
+        name: '🔐 Login: 일반 USER 로그인 (test_user)',
         status: 'pending',
         dependencies: ['thumbnail_url 형식 검증 (WADO-RS 표준)'],
         indentLevel: 1,
       },
       {
+        name: 'SUPER_ADMIN: project_id 없이 조회 (성공 - 전체 접근 권한)',
+        status: 'pending',
+        dependencies: ['🔐 Login: 일반 USER 로그인 (test_user)'],
+        indentLevel: 1,
+      },
+      {
+        name: '일반 USER: project_id 없이 조회 (400 에러)',
+        status: 'pending',
+        dependencies: ['SUPER_ADMIN: project_id 없이 조회 (성공 - 전체 접근 권한)'],
+        indentLevel: 1,
+      },
+      {
+        name: '일반 USER: project_id와 함께 조회 (성공)',
+        status: 'pending',
+        dependencies: ['일반 USER: project_id 없이 조회 (400 에러)'],
+        indentLevel: 1,
+      },
+      {
         name: '잘못된 project_id (0) 에러 처리',
         status: 'pending',
-        dependencies: ['project_id 없이 조회 (400 에러)'],
+        dependencies: ['일반 USER: project_id와 함께 조회 (성공)'],
         indentLevel: 1,
       },
       {
@@ -240,7 +257,7 @@ export const getDicomSections = (): TestSection[] => [
         indentLevel: 1,
       },
       {
-        name: '🧹 Cleanup: 테스트 데이터 삭제',
+        name: '🧹 Cleanup: 실제 데이터 사용 - 삭제 불필요',
         status: 'pending',
         dependencies: ['다른 프로젝트로 조회 (빈 배열 - RBAC)'],
         cleanup: true,
@@ -250,3 +267,4 @@ export const getDicomSections = (): TestSection[] => [
     ],
   },
 ];
+

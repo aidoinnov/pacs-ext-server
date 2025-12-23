@@ -891,6 +891,7 @@ pub async fn get_series_all(
         .and_then(|s| s.strip_prefix("Bearer "))
         .map(|s| s.to_string());
 
+    // 3. Dcm4chee QIDO 호출
     let qido_response = match qido
         .qido_series_all_with_bearer(bearer_opt.as_deref(), user_params)
         .await
@@ -944,7 +945,7 @@ pub async fn get_series_all(
     };
 
     // 4. 각 Series에 thumbnail_url 필드 추가
-    let final_response = add_thumbnail_urls(filtered_response, qido.base_url());
+    let final_response = add_thumbnail_urls(filtered_response, qido.base_url(), qido.qido_path());
 
     HttpResponse::Ok().json(final_response)
 }
@@ -985,7 +986,7 @@ async fn get_allowed_series_uids(project_id: i32, pool: &sqlx::PgPool) -> Result
 }
 
 /// 각 Series에 thumbnail_url 필드 추가
-fn add_thumbnail_urls(series_array: serde_json::Value, base_url: &str) -> serde_json::Value {
+fn add_thumbnail_urls(series_array: serde_json::Value, base_url: &str, qido_path: &str) -> serde_json::Value {
     if let Some(array) = series_array.as_array() {
         let mut result = Vec::new();
         for item in array.iter() {
@@ -996,9 +997,12 @@ fn add_thumbnail_urls(series_array: serde_json::Value, base_url: &str) -> serde_
                 extract_study_uid(item),
                 extract_series_uid(item),
             ) {
+                // qido_path에서 /rs를 제거하고 thumbnail 경로 생성
+                // 예: /iaid-pacs/aets/iAID_PACS/rs -> /iaid-pacs/aets/iAID_PACS/rs/studies/.../thumbnail
                 let thumbnail_url = format!(
-                    "{}/rs/studies/{}/series/{}/thumbnail",
+                    "{}{}/studies/{}/series/{}/thumbnail",
                     base_url,
+                    qido_path,
                     study_uid,
                     series_uid
                 );
@@ -1177,8 +1181,8 @@ fn build_qido_params_from_user_query(
 
     // DICOMweb 네이티브 파라미터 패스스루: 알려진 필드 외 문자열/숫자/불리언은 그대로 전달
     for (k, v) in extra.iter() {
-        // 내부 파라미터는 전달하지 않음 (check_assignment_for_project 추가)
-        if matches!(k.as_str(), "project_id" | "page" | "page_size" | "check_assignment_for_project") {
+        // 내부 파라미터는 전달하지 않음 (user_id 추가)
+        if matches!(k.as_str(), "project_id" | "user_id" | "page" | "page_size" | "check_assignment_for_project") {
             continue;
         }
         // 소문자 사용자 별칭은 이미 위에서 변환 처리됨(modality/patient_id/study_date/accession_number/patient_name)

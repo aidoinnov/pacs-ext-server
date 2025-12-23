@@ -421,3 +421,4 @@ curl -X GET "http://localhost:8080/api/users/5?project_id=2" \
 - [Annotation 권한 조회 API](./annotation-api/ANNOTATION-PERMISSIONS-API.md) - 사용자의 어노테이션 권한 조회
 - [사용자 프로젝트 목록 조회](./user-crud-api-complete.md#사용자가-속한-프로젝트-목록-조회) - 사용자가 속한 프로젝트 목록 조회
 
+

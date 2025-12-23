@@ -750,7 +750,8 @@ const ApiScenarioTests: React.FC = () => {
   const createdAnnotationIdsRef = useRef<number[]>([]);
 
   // Series API 테스트용 Bearer 토큰
-  const seriesApiTokenRef = useRef<string | null>(null);
+  const seriesApiTokenRef = useRef<string | null>(null); // SUPER_ADMIN 토큰
+  const seriesApiUserTokenRef = useRef<string | null>(null); // 일반 USER 토큰
 
   // 순차 시나리오용 ref
   const sequentialProjectIdRef = useRef<number | null>(null);
@@ -2534,14 +2535,18 @@ const ApiScenarioTests: React.FC = () => {
     }
   };
 
-  // DICOM Series API 테스트 (QIDO-RS 프록시 + 테스트 API)
+  // DICOM Series API 테스트 (QIDO-RS 프록시 + 실제 PACS 데이터)
   const runSeriesTest = async (testIndex: number) => {
+    // 실제 PACS에 데이터가 있는 프로젝트 사용
+    const REAL_PROJECT_ID = 2;
+    const REAL_PATIENT_IDS = ['SarcopeniaCase1', 'C3L-00165-26', '000000547'];
+
     if (testIndex === 0) {
       // 🔐 Login: Keycloak 로그인 (Bearer 토큰 획득)
       try {
         const response = await axios.post(`${apiUrl}/api/test/login`, {
-          username: 'pacsadmin',
-          password: 'HhL}qb(tl}?zJ4}(',
+          username: 'test_super_admin',
+          password: 'TestAdmin123!',
         });
 
         const accessToken = response.data.access_token;
@@ -2553,7 +2558,7 @@ const ApiScenarioTests: React.FC = () => {
         console.log(`     - Token Length: ${accessToken.length}`);
 
         return {
-          request: { method: 'POST', url: '/api/test/login', body: { username: 'pacsadmin' } },
+          request: { method: 'POST', url: '/api/test/login', body: { username: 'test_super_admin' } },
           response: { token_type: response.data.token_type, expires_in: response.data.expires_in },
         };
       } catch (error: any) {
@@ -2561,51 +2566,35 @@ const ApiScenarioTests: React.FC = () => {
           error.config = {
             method: 'post',
             url: `${apiUrl}/api/test/login`,
-            data: { username: 'pacsadmin' },
+            data: { username: 'test_super_admin' },
           };
         }
         throw error;
       }
     } else if (testIndex === 1) {
-      // 🔧 Setup: 테스트 데이터 생성 (프로젝트 + Study + Series 3개)
+      // 🔧 Setup: 실제 데이터 확인 (project_id=2, 3개 Patient)
       try {
-        const response = await axios.post(`${apiUrl}/api/test/series-api/setup`);
+        // 실제 데이터 사용 - Setup API 호출 없음
+        setCreatedProjectId(REAL_PROJECT_ID);
+        createdProjectIdRef.current = REAL_PROJECT_ID;
+        createdPatientIdRef.current = REAL_PATIENT_IDS[0]; // 첫 번째 Patient 사용
 
-        const projectId = response.data.project_id;
-        const patientId = response.data.patient_id;
-        const seriesCount = response.data.series_count;
-
-        setCreatedProjectId(projectId);
-        createdProjectIdRef.current = projectId;
-        createdPatientIdRef.current = patientId;
-
-        console.log(`  ✅ 테스트 데이터 생성 성공`);
-        console.log(`     - 프로젝트 ID: ${projectId}`);
-        console.log(`     - Patient ID: ${patientId}`);
-        console.log(`     - Series 개수: ${seriesCount}`);
+        console.log(`  ✅ 실제 PACS 데이터 사용`);
+        console.log(`     - 프로젝트 ID: ${REAL_PROJECT_ID}`);
+        console.log(`     - Patient IDs: ${REAL_PATIENT_IDS.join(', ')}`);
 
         return {
-          request: { method: 'POST', url: '/api/test/series-api/setup' },
-          response: response.data,
+          request: { method: 'INFO', url: 'Using real PACS data' },
+          response: { project_id: REAL_PROJECT_ID, patient_ids: REAL_PATIENT_IDS },
         };
       } catch (error: any) {
-        if (!error.config) {
-          error.config = {
-            method: 'post',
-            url: `${apiUrl}/api/test/series-api/setup`,
-          };
-        }
         throw error;
       }
     } else if (testIndex === 2) {
       // Series 전체 조회 (project_id + PatientID)
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      const projectId = 2; // 실제 데이터가 있는 프로젝트
+      const patientId = 'SarcopeniaCase1'; // 실제 PACS에 있는 Patient
       const token = seriesApiTokenRef.current;
-
-      if (!projectId || !patientId) {
-        throw new Error('Setup이 완료되지 않았습니다.');
-      }
 
       if (!token) {
         throw new Error('Bearer 토큰이 없습니다. 먼저 로그인하세요.');
@@ -2631,13 +2620,13 @@ const ApiScenarioTests: React.FC = () => {
         response: response.data,
       };
     } else if (testIndex === 3) {
-      // Series 개수 검증 (3개 예상)
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      // Series 개수 검증 (1개 예상 - SarcopeniaCase1은 1개 Series)
+      const projectId = 2;
+      const patientId = 'SarcopeniaCase1';
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
@@ -2649,24 +2638,24 @@ const ApiScenarioTests: React.FC = () => {
         throw new Error('응답이 배열이 아닙니다.');
       }
 
-      if (response.data.length !== 3) {
-        throw new Error(`3개가 예상되는데 ${response.data.length}개 반환됨`);
+      if (response.data.length !== 1) {
+        throw new Error(`1개가 예상되는데 ${response.data.length}개 반환됨`);
       }
 
-      console.log(`  ✅ Series 개수 검증 성공: 3개`);
+      console.log(`  ✅ Series 개수 검증 성공: 1개`);
 
       return {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}` },
-        response: { count: response.data.length, expected: 3 },
+        response: { count: response.data.length, expected: 1 },
       };
     } else if (testIndex === 4) {
       // Series 페이지네이션 (limit=1)
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      const projectId = 2;
+      const patientId = '000000547'; // 107 instances가 있는 Patient
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
@@ -2690,12 +2679,12 @@ const ApiScenarioTests: React.FC = () => {
       };
     } else if (testIndex === 5) {
       // Series 필터링 (Modality=CT)
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      const projectId = 2;
+      const patientId = 'SarcopeniaCase1'; // CT 데이터
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
@@ -2714,17 +2703,17 @@ const ApiScenarioTests: React.FC = () => {
         response: response.data,
       };
     } else if (testIndex === 6) {
-      // Series 필터링 (Modality=MR)
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      // Series 필터링 (Modality=SM)
+      const projectId = 2;
+      const patientId = 'C3L-00165-26'; // SM 데이터
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
-        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=MR`,
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=SM`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -2732,20 +2721,20 @@ const ApiScenarioTests: React.FC = () => {
         throw new Error('응답이 배열이 아닙니다.');
       }
 
-      console.log(`  ✅ Modality=MR 필터링 성공: ${response.data.length}개`);
+      console.log(`  ✅ Modality=SM 필터링 성공: ${response.data.length}개`);
 
       return {
-        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=MR` },
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=SM` },
         response: response.data,
       };
     } else if (testIndex === 7) {
       // Series DICOM JSON 구조 검증
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      const projectId = 2;
+      const patientId = 'SarcopeniaCase1';
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
@@ -2773,17 +2762,17 @@ const ApiScenarioTests: React.FC = () => {
       console.log(`  ✅ DICOM JSON 구조 검증 성공`);
 
       return {
-        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&limit=1` },
+        request: { method: 'GET', url: `/api/dicom/series?project_id=2&PatientID=SarcopeniaCase1&limit=1` },
         response: { validated_tags: requiredTags },
       };
     } else if (testIndex === 8) {
       // Series thumbnail_url 필드 검증
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      const projectId = 2;
+      const patientId = 'SarcopeniaCase1';
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
@@ -2813,12 +2802,12 @@ const ApiScenarioTests: React.FC = () => {
       };
     } else if (testIndex === 9) {
       // thumbnail_url 형식 검증 (WADO-RS 표준)
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      const projectId = 2;
+      const patientId = 'SarcopeniaCase1';
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
@@ -2846,29 +2835,115 @@ const ApiScenarioTests: React.FC = () => {
         response: { thumbnail_url: thumbnailUrl, format: 'WADO-RS compliant' },
       };
     } else if (testIndex === 10) {
-      // project_id 없이 조회 (400 에러)
-      const token = seriesApiTokenRef.current;
-
-      if (!token) {
-        throw new Error('Bearer 토큰이 없습니다.');
-      }
-
+      // 🔐 Login: 일반 USER 로그인 (test_user)
       try {
-        await axios.get(`${apiUrl}/api/dicom/series?PatientID=TEST`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        const response = await axios.post(`${apiUrl}/api/test/login`, {
+          username: 'test_user',
+          password: 'TestUser123!',
         });
-        throw new Error('400 에러가 발생해야 하는데 성공했습니다.');
+
+        const accessToken = response.data.access_token;
+        seriesApiUserTokenRef.current = accessToken;
+
+        console.log(`  ✅ 일반 USER 로그인 성공`);
+        console.log(`     - Token Type: ${response.data.token_type}`);
+        console.log(`     - Expires In: ${response.data.expires_in}s`);
+        console.log(`     - Token Length: ${accessToken.length}`);
+
+        return {
+          request: { method: 'POST', url: '/api/test/login', body: { username: 'test_user' } },
+          response: { token_type: response.data.token_type, expires_in: response.data.expires_in },
+        };
       } catch (error: any) {
-        if (error.response?.status === 400) {
-          console.log(`  ✅ 400 에러 발생 (예상대로)`);
-          return {
-            request: { method: 'GET', url: '/api/dicom/series?PatientID=TEST' },
-            response: error.response.data,
+        if (!error.config) {
+          error.config = {
+            method: 'post',
+            url: `${apiUrl}/api/test/login`,
+            data: { username: 'test_user' },
           };
         }
         throw error;
       }
     } else if (testIndex === 11) {
+      // SUPER_ADMIN: project_id 없이 조회 (성공 - 전체 접근 권한)
+      const token = seriesApiTokenRef.current; // SUPER_ADMIN 토큰
+
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
+      }
+
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?PatientID=SarcopeniaCase1`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      if (response.data.length === 0) {
+        throw new Error('SUPER_ADMIN은 전체 접근 권한이 있어야 하는데 빈 배열 반환됨');
+      }
+
+      console.log(`  ✅ SUPER_ADMIN 전체 접근 성공: ${response.data.length}개 (project_id 없이 조회)`);
+
+      return {
+        request: { method: 'GET', url: '/api/dicom/series?PatientID=SarcopeniaCase1' },
+        response: { count: response.data.length, message: 'Global access granted' },
+      };
+    } else if (testIndex === 12) {
+      // 일반 USER: project_id 없이 조회 (400 에러)
+      const token = seriesApiUserTokenRef.current; // 일반 USER 토큰
+
+      if (!token) {
+        throw new Error('일반 USER 토큰이 없습니다.');
+      }
+
+      try {
+        await axios.get(`${apiUrl}/api/dicom/series?PatientID=SarcopeniaCase1`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        throw new Error('400 에러가 발생해야 하는데 성공했습니다.');
+      } catch (error: any) {
+        if (error.response?.status === 400) {
+          console.log(`  ✅ 400 에러 발생 (예상대로 - 일반 USER는 project_id 필수)`);
+          return {
+            request: { method: 'GET', url: '/api/dicom/series?PatientID=SarcopeniaCase1' },
+            response: error.response.data,
+          };
+        }
+        throw error;
+      }
+    } else if (testIndex === 13) {
+      // 일반 USER: project_id와 함께 조회 (성공)
+      const projectId = 2;
+      const patientId = 'SarcopeniaCase1';
+      const token = seriesApiUserTokenRef.current; // 일반 USER 토큰
+
+      if (!token) {
+        throw new Error('일반 USER 토큰이 없습니다.');
+      }
+
+      const response = await axios.get(
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+
+      if (!Array.isArray(response.data)) {
+        throw new Error('응답이 배열이 아닙니다.');
+      }
+
+      if (response.data.length === 0) {
+        throw new Error('일반 USER도 project_id를 제공하면 조회 가능해야 함');
+      }
+
+      console.log(`  ✅ 일반 USER project_id 제공 조회 성공: ${response.data.length}개`);
+
+      return {
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}` },
+        response: { count: response.data.length },
+      };
+    } else if (testIndex === 14) {
       // 잘못된 project_id (0) 에러 처리
       const token = seriesApiTokenRef.current;
 
@@ -2891,7 +2966,7 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 12) {
+    } else if (testIndex === 15) {
       // 잘못된 project_id (음수) 에러 처리
       const token = seriesApiTokenRef.current;
 
@@ -2914,13 +2989,13 @@ const ApiScenarioTests: React.FC = () => {
         }
         throw error;
       }
-    } else if (testIndex === 13) {
+    } else if (testIndex === 16) {
       // 존재하지 않는 PatientID 조회 (빈 배열)
-      const projectId = createdProjectIdRef.current;
+      const projectId = 2;
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
@@ -2942,18 +3017,18 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=NONEXISTENT_PATIENT_12345` },
         response: response.data,
       };
-    } else if (testIndex === 14) {
+    } else if (testIndex === 17) {
       // 존재하지 않는 Modality 조회 (빈 배열)
-      const projectId = createdProjectIdRef.current;
-      const patientId = createdPatientIdRef.current;
+      const projectId = 2;
+      const patientId = 'SarcopeniaCase1'; // CT 데이터만 있음
       const token = seriesApiTokenRef.current;
 
-      if (!projectId || !patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       const response = await axios.get(
-        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=NONEXISTENT`,
+        `${apiUrl}/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=MR`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -2968,16 +3043,16 @@ const ApiScenarioTests: React.FC = () => {
       console.log(`  ✅ 존재하지 않는 Modality 조회 성공: 빈 배열 반환`);
 
       return {
-        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=NONEXISTENT` },
+        request: { method: 'GET', url: `/api/dicom/series?project_id=${projectId}&PatientID=${patientId}&Modality=MR` },
         response: response.data,
       };
-    } else if (testIndex === 15) {
+    } else if (testIndex === 18) {
       // 다른 프로젝트로 조회 (빈 배열 - RBAC 필터링)
-      const patientId = createdPatientIdRef.current;
+      const patientId = 'SarcopeniaCase1'; // project_id=2에 있는 Patient
       const token = seriesApiTokenRef.current;
 
-      if (!patientId || !token) {
-        throw new Error('Setup이 완료되지 않았습니다.');
+      if (!token) {
+        throw new Error('Bearer 토큰이 없습니다.');
       }
 
       // 다른 프로젝트 ID 사용 (999 - 존재하지 않는 프로젝트)
@@ -3002,39 +3077,14 @@ const ApiScenarioTests: React.FC = () => {
         request: { method: 'GET', url: `/api/dicom/series?project_id=${otherProjectId}&PatientID=${patientId}` },
         response: response.data,
       };
-    } else if (testIndex === 16) {
-      // 🧹 Cleanup: 테스트 데이터 삭제
-      const projectId = createdProjectIdRef.current;
+    } else if (testIndex === 19) {
+      // 🧹 Cleanup: 실제 데이터 사용하므로 삭제 불필요
+      console.log(`  ✅ 실제 PACS 데이터 사용 - Cleanup 불필요`);
 
-      if (!projectId) {
-        console.log(`  ⚠️  삭제할 프로젝트가 없습니다.`);
-        return {
-          request: { method: 'DELETE', url: '/api/test/series-api/cleanup/:id' },
-          response: { message: 'No project to delete' },
-        };
-      }
-
-      try {
-        const response = await axios.delete(`${apiUrl}/api/test/series-api/cleanup/${projectId}`);
-        console.log(`  ✅ 테스트 데이터 삭제 성공 (프로젝트 ID: ${projectId})`);
-
-        createdProjectIdRef.current = null;
-        createdPatientIdRef.current = null;
-        setCreatedProjectId(null);
-
-        return {
-          request: { method: 'DELETE', url: `/api/test/series-api/cleanup/${projectId}` },
-          response: response.data,
-        };
-      } catch (error: any) {
-        if (!error.config) {
-          error.config = {
-            method: 'delete',
-            url: `${apiUrl}/api/test/series-api/cleanup/${projectId}`,
-          };
-        }
-        throw error;
-      }
+      return {
+        request: { method: 'INFO', url: 'Using real PACS data - no cleanup needed' },
+        response: { message: 'Real data used, no cleanup needed' },
+      };
     }
   };
 
