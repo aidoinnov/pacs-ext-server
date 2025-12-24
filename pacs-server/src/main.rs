@@ -46,13 +46,14 @@ use application::use_cases::{
     AccessControlUseCase, AnnotationUseCase, AuthUseCase, MaskGroupUseCase, MaskUseCase,
     PermissionUseCase, ProjectDataAccessUseCase, ProjectUseCase, ProjectUserMatrixUseCase,
     ProjectUserUseCase, RoleCapabilityMatrixUseCase, RolePermissionMatrixUseCase,
-    UserProjectMatrixUseCase, UserRegistrationUseCase, UserUseCase,
+    SeriesUserNoteUseCase, UserProjectMatrixUseCase, UserRegistrationUseCase, UserUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
 use domain::services::{
     AccessControlServiceImpl, AnnotationServiceImpl, AuthServiceImpl, MaskGroupServiceImpl,
-    MaskServiceImpl, PermissionServiceImpl, ProjectService, ProjectServiceImpl, UserServiceImpl,
+    MaskServiceImpl, PermissionServiceImpl, ProjectService, ProjectServiceImpl,
+    SeriesUserNoteServiceImpl, UserServiceImpl,
 };
 
 // 인프라스트럭처 레이어 - 리포지토리 구현체들
@@ -61,7 +62,7 @@ use infrastructure::repositories::{
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, CapabilityRepositoryImpl,
     MaskGroupRepositoryImpl, MaskRepositoryImpl, PermissionRepositoryImpl,
     ProjectDataAccessRepositoryImpl, ProjectDataRepositoryImpl, ProjectRepositoryImpl,
-    RoleRepositoryImpl, UserRepositoryImpl,
+    RoleRepositoryImpl, SeriesUserNoteRepositoryImpl, UserRepositoryImpl,
 };
 use infrastructure::services::{
     CapabilityServiceImpl, ProjectDataServiceImpl, UserRegistrationServiceImpl,
@@ -80,8 +81,8 @@ use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
     mask_group_controller, project_controller, project_data_access_controller,
     project_user_controller, project_user_matrix_controller, role_controller,
-    role_permission_matrix_controller, test_controller, user_controller,
-    user_project_matrix_controller,
+    role_permission_matrix_controller, series_user_note_controller, test_controller,
+    user_controller, user_project_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -252,6 +253,8 @@ async fn main() -> std::io::Result<()> {
     let project_data_repo = Arc::new(ProjectDataRepositoryImpl::new(pool.clone()));
     // 프로젝트 데이터 접근 권한 관련 데이터 접근을 위한 리포지토리
     let project_data_access_repo = Arc::new(ProjectDataAccessRepositoryImpl::new(pool.clone()));
+    // Series User Note 관련 데이터 접근을 위한 리포지토리
+    let series_user_note_repo = SeriesUserNoteRepositoryImpl::new(pool.clone());
 
     // DICOM RBAC Evaluator
     use crate::infrastructure::services::DicomRbacEvaluatorImpl;
@@ -315,6 +318,13 @@ async fn main() -> std::io::Result<()> {
     let project_data_service = Arc::new(ProjectDataServiceImpl::new(
         project_data_repo.clone(),
         project_data_access_repo.clone(),
+    ));
+    // Series User Note 서비스: Series note CRUD, 권한 검증 등
+    let series_user_note_service = Arc::new(SeriesUserNoteServiceImpl::new(
+        series_user_note_repo,
+        user_repo.clone(),
+        project_repo.clone(),
+        project_data_repo.clone(),
     ));
 
     // 사용자 등록 서비스: 회원가입, 이메일 인증, 계정 삭제 등
@@ -392,6 +402,10 @@ async fn main() -> std::io::Result<()> {
     ));
     let user_registration_use_case =
         Arc::new(UserRegistrationUseCase::new(user_registration_service));
+    let series_user_note_use_case = Arc::new(SeriesUserNoteUseCase::new(
+        series_user_note_service.clone(),
+        Arc::new(user_repo.clone()),
+    ));
     println!("✅ Done");
 
     // Cache configuration
@@ -605,6 +619,19 @@ async fn main() -> std::io::Result<()> {
                                 project_use_case.clone(),
                                 project_data_access_use_case.clone(),
                                 project_user_use_case.clone(),
+                            )
+                        }
+                    })
+                    // ========================================
+                    // 📝 Series User Note 관리 API (구체적인 경로 우선 - project-data 스코프 충돌 방지)
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            series_user_note_controller::configure_routes(
+                                cfg,
+                                series_user_note_use_case.clone(),
+                                jwt_service.clone(),
+                                Arc::new(user_repo.clone()),
                             )
                         }
                     })
