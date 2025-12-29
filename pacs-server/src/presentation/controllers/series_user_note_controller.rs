@@ -493,14 +493,39 @@ pub fn configure_routes<S, U>(
         .route(
             "/project-data/{project_id}/series/{series_id}/note",
             web::delete().to(delete_project_note::<S, U>),
-        )
+        );
+}
+
+/// 전역 Series API 스코프 설정 (Note + Report 통합)
+pub fn configure_global_series_routes<S, U, R, UR>(
+    cfg: &mut web::ServiceConfig,
+    note_use_case: Arc<SeriesUserNoteUseCase<S, U>>,
+    report_use_case: Arc<crate::application::reporting::use_cases::SeriesUserReportUseCase<R, UR>>,
+    jwt: Arc<JwtService>,
+    user_repo: Arc<UserRepositoryImpl>,
+) where
+    S: crate::domain::services::SeriesUserNoteService + 'static,
+    U: crate::domain::repositories::UserRepository + 'static,
+    R: crate::domain::reporting::services::SeriesUserReportService + 'static,
+    UR: crate::domain::repositories::UserRepository + 'static,
+{
+    cfg.app_data(web::Data::new(note_use_case))
+        .app_data(web::Data::new(report_use_case))
+        .app_data(web::Data::new(jwt))
+        .app_data(web::Data::new(user_repo))
         .service(
-            // 전역 API
+            // 전역 API (Note + Report 통합)
             web::scope("/series")
+                // Note API
                 .route("/{series_id}/note", web::put().to(create_or_update_global_note::<S, U>))
                 .route("/{series_id}/note", web::get().to(get_global_note::<S, U>))
                 .route("/{series_id}/notes", web::get().to(get_global_notes::<S, U>))
-                .route("/{series_id}/note", web::delete().to(delete_global_note::<S, U>)),
+                .route("/{series_id}/note", web::delete().to(delete_global_note::<S, U>))
+                // Report API
+                .route("/{series_id}/report", web::put().to(crate::presentation::reporting::controllers::series_user_report_controller::create_or_update_global_report::<R, UR>))
+                .route("/{series_id}/report", web::get().to(crate::presentation::reporting::controllers::series_user_report_controller::get_global_report::<R, UR>))
+                .route("/{series_id}/reports", web::get().to(crate::presentation::reporting::controllers::series_user_report_controller::get_global_reports::<R, UR>))
+                .route("/{series_id}/report", web::delete().to(crate::presentation::reporting::controllers::series_user_report_controller::delete_global_report::<R, UR>)),
         );
 }
 

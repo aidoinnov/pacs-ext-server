@@ -406,6 +406,39 @@ async fn main() -> std::io::Result<()> {
         series_user_note_service.clone(),
         Arc::new(user_repo.clone()),
     ));
+    
+    // Series User Report 서비스 및 UseCase 초기화 (Reporting Context)
+    use crate::domain::reporting::repositories::SeriesUserReportRepository;
+    use crate::domain::reporting::services::{SeriesUserReportService, SeriesUserReportServiceImpl};
+    use crate::infrastructure::reporting::repositories::SeriesUserReportRepositoryImpl;
+    use crate::application::reporting::use_cases::SeriesUserReportUseCase;
+    
+    let series_user_report_repo = SeriesUserReportRepositoryImpl::new(pool.clone());
+    let series_user_report_service = Arc::new(SeriesUserReportServiceImpl::new(
+        series_user_report_repo,
+        user_repo.clone(),
+        project_repo.clone(),
+        project_data_repo.clone(),
+    ));
+    let series_user_report_use_case = Arc::new(SeriesUserReportUseCase::new(
+        series_user_report_service.clone(),
+        Arc::new(user_repo.clone()),
+    ));
+    
+    // Report Guide Template 서비스 및 UseCase 초기화 (Template Context)
+    use crate::domain::template::repositories::ReportGuideTemplateRepository;
+    use crate::domain::template::services::{ReportGuideTemplateService, ReportGuideTemplateServiceImpl};
+    use crate::infrastructure::template::repositories::ReportGuideTemplateRepositoryImpl;
+    use crate::application::template::use_cases::ReportGuideTemplateUseCase;
+    
+    let report_guide_template_repo = ReportGuideTemplateRepositoryImpl::new(pool.clone());
+    let report_guide_template_service = Arc::new(ReportGuideTemplateServiceImpl::new(
+        report_guide_template_repo,
+    ));
+    let report_guide_template_use_case = Arc::new(ReportGuideTemplateUseCase::new(
+        report_guide_template_service.clone(),
+    ));
+    
     println!("✅ Done");
 
     // Cache configuration
@@ -623,13 +656,64 @@ async fn main() -> std::io::Result<()> {
                         }
                     })
                     // ========================================
-                    // 📝 Series User Note 관리 API (구체적인 경로 우선 - project-data 스코프 충돌 방지)
+                    // 📝 Series User Note 관리 API (프로젝트 종속 API)
                     // ========================================
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
                             series_user_note_controller::configure_routes(
                                 cfg,
                                 series_user_note_use_case.clone(),
+                                jwt_service.clone(),
+                                Arc::new(user_repo.clone()),
+                            )
+                        }
+                    })
+                    // ========================================
+                    // 📋 Series User Report 관리 API (프로젝트 종속 API)
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            use crate::presentation::reporting::controllers::series_user_report_controller;
+                            series_user_report_controller::configure_routes(
+                                cfg,
+                                series_user_report_use_case.clone(),
+                                jwt_service.clone(),
+                                Arc::new(user_repo.clone()),
+                            );
+                            series_user_report_controller::configure_report_extension_routes(
+                                cfg,
+                                series_user_report_use_case.clone(),
+                                report_guide_template_use_case.clone(),
+                                signed_url_service.clone(),
+                                jwt_service.clone(),
+                                Arc::new(user_repo.clone()),
+                            );
+                        }
+                    })
+                    // ========================================
+                    // 📝 전역 Series API (Note + Report 통합 스코프)
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            series_user_note_controller::configure_global_series_routes(
+                                cfg,
+                                series_user_note_use_case.clone(),
+                                series_user_report_use_case.clone(),
+                                jwt_service.clone(),
+                                Arc::new(user_repo.clone()),
+                            );
+                        }
+                    })
+                    // ========================================
+                    // 📝 Report Guide Template 관리 API (Template Context)
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            use crate::presentation::template::controllers::report_guide_template_controller;
+                            report_guide_template_controller::configure_routes(
+                                cfg,
+                                report_guide_template_use_case.clone(),
+                                signed_url_service.clone(),
                                 jwt_service.clone(),
                                 Arc::new(user_repo.clone()),
                             )

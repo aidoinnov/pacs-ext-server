@@ -1,7 +1,9 @@
 pub mod entities;
 pub mod errors;
 pub mod repositories;
+pub mod reporting;
 pub mod services;
+pub mod template;
 
 // ServiceError를 직접 정의
 #[derive(Debug, Clone)]

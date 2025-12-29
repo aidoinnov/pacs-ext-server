@@ -123,6 +123,92 @@ impl SyncServiceImpl {
         Ok(processed)
     }
 
+    async fn cleanup_missing_studies(&self) -> Result<usize, String> {
+        // PACS에 있는 모든 study_uid 조회
+        let pacs_study_uids: Vec<String> = sqlx::query_scalar::<_, String>(
+            r#"SELECT DISTINCT study_iuid FROM study"#
+        )
+        .fetch_all(&self.dcm4chee_pool)
+        .await
+        .map_err(|e| format!("dcm4chee select all study uids failed: {}", e))?;
+
+        if pacs_study_uids.is_empty() {
+            // PACS에 Study가 없으면 모든 Study 삭제하지 않음 (안전을 위해)
+            eprintln!("⚠️  [Sync] PACS에 Study가 없어 삭제 작업을 건너뜁니다");
+            return Ok(0);
+        }
+
+        // 우리 DB에 있지만 PACS에 없는 Study 삭제
+        // CASCADE DELETE로 인해 Series, Instance, project_data도 자동 삭제됨
+        // PostgreSQL 배열을 사용하여 NOT IN 처리
+        let deleted = sqlx::query(
+            r#"DELETE FROM project_data_study 
+               WHERE study_uid NOT IN (SELECT unnest($1::text[]))"#
+        )
+        .bind(&pacs_study_uids)
+        .execute(&self.rbac_pool)
+        .await
+        .map_err(|e| format!("rbac delete missing studies failed: {}", e))?;
+
+        Ok(deleted.rows_affected() as usize)
+    }
+
+    async fn cleanup_missing_series(&self) -> Result<usize, String> {
+        // PACS에 있는 모든 series_uid 조회
+        let pacs_series_uids: Vec<String> = sqlx::query_scalar::<_, String>(
+            r#"SELECT DISTINCT series_iuid FROM series"#
+        )
+        .fetch_all(&self.dcm4chee_pool)
+        .await
+        .map_err(|e| format!("dcm4chee select all series uids failed: {}", e))?;
+
+        if pacs_series_uids.is_empty() {
+            eprintln!("⚠️  [Sync] PACS에 Series가 없어 삭제 작업을 건너뜁니다");
+            return Ok(0);
+        }
+
+        // 우리 DB에 있지만 PACS에 없는 Series 삭제
+        // CASCADE DELETE로 인해 Instance, project_data도 자동 삭제됨
+        let deleted = sqlx::query(
+            r#"DELETE FROM project_data_series 
+               WHERE series_uid NOT IN (SELECT unnest($1::text[]))"#
+        )
+        .bind(&pacs_series_uids)
+        .execute(&self.rbac_pool)
+        .await
+        .map_err(|e| format!("rbac delete missing series failed: {}", e))?;
+
+        Ok(deleted.rows_affected() as usize)
+    }
+
+    async fn cleanup_missing_instances(&self) -> Result<usize, String> {
+        // PACS에 있는 모든 instance_uid (sop_iuid) 조회
+        let pacs_instance_uids: Vec<String> = sqlx::query_scalar::<_, String>(
+            r#"SELECT DISTINCT sop_iuid FROM instance"#
+        )
+        .fetch_all(&self.dcm4chee_pool)
+        .await
+        .map_err(|e| format!("dcm4chee select all instance uids failed: {}", e))?;
+
+        if pacs_instance_uids.is_empty() {
+            eprintln!("⚠️  [Sync] PACS에 Instance가 없어 삭제 작업을 건너뜁니다");
+            return Ok(0);
+        }
+
+        // 우리 DB에 있지만 PACS에 없는 Instance 삭제
+        // CASCADE DELETE로 인해 project_data도 자동 삭제됨
+        let deleted = sqlx::query(
+            r#"DELETE FROM project_data_instance 
+               WHERE instance_uid NOT IN (SELECT unnest($1::text[]))"#
+        )
+        .bind(&pacs_instance_uids)
+        .execute(&self.rbac_pool)
+        .await
+        .map_err(|e| format!("rbac delete missing instances failed: {}", e))?;
+
+        Ok(deleted.rows_affected() as usize)
+    }
+
     async fn sync_series(
         &self,
         last_run: Option<chrono::DateTime<chrono::Utc>>,
@@ -269,13 +355,8 @@ impl SyncServiceImpl {
 #[async_trait]
 impl SyncService for SyncServiceImpl {
     async fn run_once(&self) -> SyncResult {
-        eprintln!("🔄 [Sync] run_once() called - TEST MODE");
-        return SyncResult {
-            success: true,
-            processed: 999,
-            duration_ms: 123,
-            error: None,
-        };
+        let start_time = std::time::Instant::now();
+        eprintln!("🔄 [Sync] run_once() called");
 
         // 간단한 델타 동기화: last_run 기준으로 변경분 조회 후 upsert
         let last_run_opt = { self.state.read().await.last_run };
@@ -320,10 +401,51 @@ impl SyncService for SyncServiceImpl {
             }
         }
 
+        // PACS에 없는 데이터 삭제 (정리 작업)
+        eprintln!("🔄 [Sync] Starting cleanup of missing data...");
+        let mut deleted_count = 0usize;
+
+        // Instance부터 삭제 (가장 하위 레벨)
+        match self.cleanup_missing_instances().await {
+            Ok(n) => {
+                eprintln!("🔄 [Sync] Deleted {} missing instances", n);
+                deleted_count += n;
+            },
+            Err(e) => {
+                eprintln!("⚠️  [Sync] cleanup_missing_instances failed: {}", e);
+            }
+        }
+
+        // Series 삭제
+        match self.cleanup_missing_series().await {
+            Ok(n) => {
+                eprintln!("🔄 [Sync] Deleted {} missing series", n);
+                deleted_count += n;
+            },
+            Err(e) => {
+                eprintln!("⚠️  [Sync] cleanup_missing_series failed: {}", e);
+            }
+        }
+
+        // Study 삭제 (가장 상위 레벨, CASCADE로 Series/Instance도 함께 삭제됨)
+        match self.cleanup_missing_studies().await {
+            Ok(n) => {
+                eprintln!("🔄 [Sync] Deleted {} missing studies", n);
+                deleted_count += n;
+            },
+            Err(e) => {
+                eprintln!("⚠️  [Sync] cleanup_missing_studies failed: {}", e);
+            }
+        }
+
+        eprintln!("🔄 [Sync] Cleanup completed: {} items deleted", deleted_count);
+
+        let duration_ms = start_time.elapsed().as_millis();
+
         SyncResult {
             success: true,
             processed: total_processed,
-            duration_ms: 0,
+            duration_ms,
             error: None,
         }
     }

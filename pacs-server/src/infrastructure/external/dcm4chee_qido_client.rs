@@ -147,22 +147,15 @@ impl Dcm4cheeQidoClient {
             .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .header("Accept", "application/json");
 
+        // Bearer token 우선, 없으면 Basic Auth
         if let Some(token) = bearer_token {
-            req = req.bearer_auth(token);
-            tracing::debug!(
-                "QIDO /studies: Using Bearer token (length: {})",
-                token.len()
-            );
-            tracing::debug!("QIDO /studies: URL: {}", url);
-            tracing::debug!(
-                "QIDO /studies: Bearer token preview: {}...",
-                &token[..std::cmp::min(50, token.len())]
-            );
+            tracing::debug!("  🔑 Using Bearer token (length: {})", token.len());
+            req = req.header("Authorization", format!("Bearer {}", token));
         } else if let (Some(u), Some(p)) = (&self.username, &self.password) {
+            tracing::debug!("  🔑 Using Basic Auth (username: {})", u);
             req = req.basic_auth(u, Some(p));
-            tracing::debug!("QIDO /studies: Using Basic Auth");
         } else {
-            tracing::warn!("QIDO /studies: No authentication method available");
+            tracing::warn!("  ⚠️ No authentication provided");
         }
 
         // Build final URL with query parameters
@@ -279,6 +272,11 @@ impl Dcm4cheeQidoClient {
                 "QIDO /series failed ({}): {}",
                 status, body
             )));
+        }
+        // 빈 응답 처리 (Dcm4chee가 결과가 없을 때 빈 문자열 반환)
+        if body.is_empty() || body.trim().is_empty() {
+            tracing::info!("QIDO /series: Empty response (no matching series)");
+            return Ok(serde_json::json!([]));
         }
         let json: Value = serde_json::from_str(&body).map_err(|e| {
             ServiceError::ExternalServiceError(format!("QIDO /series parse error: {}", e))

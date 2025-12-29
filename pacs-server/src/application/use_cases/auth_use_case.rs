@@ -27,7 +27,8 @@ impl<A: AuthService> AuthUseCase<A> {
             keycloak_id: auth_response.user.keycloak_id,
             username: auth_response.user.username,
             email: auth_response.user.email,
-            token: auth_response.token,
+            // token 필드에 Keycloak Access Token 사용 (Dcm4chee 인증용)
+            token: auth_response.keycloak_access_token.clone(),
             keycloak_access_token: auth_response.keycloak_access_token,
             refresh_token: auth_response.refresh_token,
             token_type: "Bearer".to_string(),

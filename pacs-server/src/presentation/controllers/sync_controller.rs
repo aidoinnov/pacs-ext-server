@@ -50,8 +50,8 @@ async fn run_once(svc: web::Data<SyncServiceImpl>) -> HttpResponse {
         result
     });
 
-    eprintln!("🔄 [Controller] Waiting for task with 5 second timeout...");
-    match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
+    eprintln!("🔄 [Controller] Waiting for task with 60 second timeout...");
+    match tokio::time::timeout(std::time::Duration::from_secs(60), handle).await {
         Ok(Ok(res)) => {
             eprintln!("🔄 [Controller] Task completed successfully");
             HttpResponse::Ok().json(serde_json::json!({
@@ -68,9 +68,9 @@ async fn run_once(svc: web::Data<SyncServiceImpl>) -> HttpResponse {
             }))
         }
         Err(_) => {
-            eprintln!("⏱️ [Controller] Task timed out after 5 seconds");
+            eprintln!("⏱️ [Controller] Task timed out after 60 seconds");
             HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Sync operation timed out"
+                "error": "Sync operation timed out (60 seconds)"
             }))
         }
     }
