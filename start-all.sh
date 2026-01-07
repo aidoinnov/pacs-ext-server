@@ -63,35 +63,55 @@ if [ -f "$DB_TUNNEL_PID_FILE" ]; then
     rm -f "$DB_TUNNEL_PID_FILE"
 fi
 
-# DB 터널 시작 (올바른 경로 사용)
-if [ -f "$BACKEND_DIR/db-tunnel.sh" ]; then
-    cd "$BACKEND_DIR"
-    nohup ./db-tunnel.sh -t extension > "$DB_TUNNEL_LOG" 2>&1 &
+# DB 터널 시작 (all: extension + postgres + redis)
+if [ -f "$SCRIPTS_DIR/db-tunnel.sh" ]; then
+    cd "$PROJECT_ROOT"
+    # nohup으로 터널 실행 (스크립트 종료 후에도 유지)
+    nohup "$SCRIPTS_DIR/db-tunnel.sh" -t all > "$DB_TUNNEL_LOG" 2>&1 &
     DB_TUNNEL_PID=$!
     echo "$DB_TUNNEL_PID" > "$DB_TUNNEL_PID_FILE"
+    disown $DB_TUNNEL_PID 2>/dev/null || true
 
-    # DB 터널 연결 대기
-    log_info "DB 터널 연결 대기 중..."
+    # DB 터널 연결 대기 (Extension DB)
+    log_info "Extension DB 터널 연결 대기 중..."
     for i in {1..15}; do
         if lsof -ti:5456 > /dev/null 2>&1; then
-            log_success "DB 터널 연결 완료! (PID: $DB_TUNNEL_PID, Port: 5456)"
+            log_success "Extension DB 터널 연결 완료! (Port: 5456)"
             break
         fi
         if [ $i -eq 15 ]; then
-            log_error "DB 터널 연결 타임아웃!"
+            log_error "Extension DB 터널 연결 타임아웃!"
             log_info "로그 확인: tail -f $DB_TUNNEL_LOG"
             exit 1
+        fi
+        sleep 1
+    done
+
+    # Redis 터널 연결 대기 (SSH → kubectl로 시간이 더 걸림)
+    log_info "Redis 터널 연결 대기 중..."
+    for i in {1..20}; do
+        if lsof -ti:6379 > /dev/null 2>&1; then
+            log_success "Redis 터널 연결 완료! (Port: 6379)"
+            break
+        fi
+        if [ $i -eq 20 ]; then
+            log_warning "Redis 터널 연결 실패 (View Selection 기능 비활성화됨)"
         fi
         sleep 1
     done
 else
     # DB 터널이 이미 실행 중인지 확인
     if lsof -ti:5456 > /dev/null 2>&1; then
-        log_success "DB 터널이 이미 실행 중입니다 (Port: 5456)"
+        log_success "Extension DB 터널이 이미 실행 중입니다 (Port: 5456)"
     else
-        log_error "DB 터널 스크립트를 찾을 수 없습니다: $BACKEND_DIR/db-tunnel.sh"
+        log_error "DB 터널 스크립트를 찾을 수 없습니다: $SCRIPTS_DIR/db-tunnel.sh"
         log_warning "수동으로 DB 터널을 시작하거나 계속 진행하려면 Enter를 누르세요..."
         read -r
+    fi
+    if lsof -ti:6379 > /dev/null 2>&1; then
+        log_success "Redis 터널이 이미 실행 중입니다 (Port: 6379)"
+    else
+        log_warning "Redis 터널이 실행 중이 아닙니다 (View Selection 기능 비활성화됨)"
     fi
 fi
 
@@ -250,8 +270,7 @@ echo "==========================================================================
 echo ""
 echo "🔌 DB 터널:"
 echo "   - PID: $DB_TUNNEL_PID"
-echo "   - Local Port: 5456 (extension), 5457 (postgres)"
-echo "   - Remote: pacs-extension.ciyua2gsk8ke.ap-northeast-2.rds.amazonaws.com"
+echo "   - Local Port: 5456 (extension), 5457 (postgres), 6379 (redis)"
 echo "   - 로그: tail -f $DB_TUNNEL_LOG"
 echo ""
 echo "📦 백엔드 서버:"

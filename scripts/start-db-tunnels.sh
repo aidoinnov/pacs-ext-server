@@ -35,6 +35,14 @@ cd "$ROOT_DIR"
 POSTGRES_PID=$!
 sleep 3
 
+# Redis 터널 시작 (포트 6379)
+echo -e "\n${CYAN}🔗 3. Redis 터널 시작 (포트 6379)...${NC}"
+cd "$ROOT_DIR"
+./scripts/db-tunnel.sh -t redis &
+REDIS_PID=$!
+# Redis는 SSH → kubectl port-forward 과정이라 더 오래 걸림
+sleep 10
+
 # 터널 상태 확인
 echo -e "\n${BLUE}============================================================${NC}"
 echo -e "${CYAN}📊 터널 상태 확인${NC}"
@@ -58,6 +66,16 @@ else
     echo -e "${RED}❌ Postgres DB 터널 실패 (포트 5457)${NC}"
 fi
 
+echo ""
+
+# Redis 터널 확인 (포트 6379)
+if lsof -i :6379 > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ Redis 터널 실행 중 (포트 6379)${NC}"
+    lsof -i :6379 | head -3
+else
+    echo -e "${RED}❌ Redis 터널 실패 (포트 6379)${NC}"
+fi
+
 echo -e "\n${BLUE}============================================================${NC}"
 echo -e "${GREEN}✨ DB 터널 시작 완료!${NC}"
 echo -e "${BLUE}============================================================${NC}"
@@ -71,7 +89,12 @@ echo -e "   - Host: localhost"
 echo -e "   - Port: 5457"
 echo -e "   - Database: postgres"
 echo ""
+echo -e "${WHITE}📌 Redis:${NC}"
+echo -e "   - Host: localhost"
+echo -e "   - Port: 6379"
+echo -e "   - URL: redis://localhost:6379"
+echo ""
 echo -e "${YELLOW}🛑 터널 중지:${NC}"
-echo -e "   ./scripts/db-tunnel.sh -k -t both"
+echo -e "   ./scripts/db-tunnel.sh -k -t all"
 echo -e "${BLUE}============================================================${NC}"
 
