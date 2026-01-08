@@ -35,30 +35,7 @@ interface ApiResponse {
   duration: number;
 }
 
-// DICOM includefield 옵션들
-const INCLUDE_FIELDS = [
-  { key: 'PatientName', label: '환자명', tag: '00100010' },
-  { key: 'PatientID', label: '환자ID', tag: '00100020' },
-  { key: 'PatientBirthDate', label: '생년월일', tag: '00100030' },
-  { key: 'PatientSex', label: '성별', tag: '00100040' },
-  { key: 'StudyDate', label: 'Study일자', tag: '00080020' },
-  { key: 'StudyTime', label: 'Study시간', tag: '00080030' },
-  { key: 'StudyDescription', label: 'Study설명', tag: '00081030' },
-  { key: 'AccessionNumber', label: 'Accession', tag: '00080050' },
-  { key: 'Modality', label: 'Modality', tag: '00080060' },
-  { key: 'ModalitiesInStudy', label: 'Modalities', tag: '00080061' },
-  { key: 'ReferringPhysicianName', label: '의뢰의', tag: '00080090' },
-  { key: 'InstitutionName', label: '기관명', tag: '00080080' },
-  { key: 'NumberOfStudyRelatedSeries', label: 'Series수', tag: '00201206' },
-  { key: 'NumberOfStudyRelatedInstances', label: 'Instance수', tag: '00201208' },
-];
 
-// Extension 필드 옵션들 (_ext에 포함되는 확장 필드)
-const EXTENSION_FIELDS = [
-  { key: 'projects', label: '📁 Projects', description: '프로젝트 목록 (id, name, role_name)' },
-  { key: 'report_status', label: '📄 Report Status', description: '리포트 상태 (unread, approval, unapproval)' },
-  { key: 'review', label: '🔄 Review/Annotations', description: 'reviewStage, availableStages, annotationSummary' },
-];
 
 const QidoEnhancedTests: React.FC = () => {
   // Query Parameters State
@@ -66,12 +43,6 @@ const QidoEnhancedTests: React.FC = () => {
     page: 1,
     page_size: 10,
   });
-
-  // Include fields State (DICOM)
-  const [selectedFields, setSelectedFields] = useState<string[]>([]);
-
-  // Extension fields State (_ext)
-  const [selectedExtFields, setSelectedExtFields] = useState<string[]>([]);
 
   // E2E Test State
   const [e2eTests, setE2eTests] = useState<E2ETestCase[]>([]);
@@ -101,23 +72,7 @@ const QidoEnhancedTests: React.FC = () => {
     });
   };
 
-  // Include field toggle
-  const toggleIncludeField = (fieldKey: string) => {
-    setSelectedFields(prev =>
-      prev.includes(fieldKey)
-        ? prev.filter(f => f !== fieldKey)
-        : [...prev, fieldKey]
-    );
-  };
 
-  // Extension field toggle
-  const toggleExtField = (fieldKey: string) => {
-    setSelectedExtFields(prev =>
-      prev.includes(fieldKey)
-        ? prev.filter(f => f !== fieldKey)
-        : [...prev, fieldKey]
-    );
-  };
 
   // Quick API Call
   const callApi = async () => {
@@ -130,20 +85,11 @@ const QidoEnhancedTests: React.FC = () => {
 
       // Build query params
       const queryParts: string[] = [];
+
       Object.entries(params).forEach(([k, v]) => {
         if (v !== undefined && v !== '') {
           queryParts.push(`${k}=${encodeURIComponent(String(v))}`);
         }
-      });
-
-      // Add includefield params (DICOM fields)
-      selectedFields.forEach(field => {
-        queryParts.push(`includefield=${encodeURIComponent(field)}`);
-      });
-
-      // Add extension fields (_ext)
-      selectedExtFields.forEach(field => {
-        queryParts.push(`_ext=${encodeURIComponent(field)}`);
       });
 
       const queryString = queryParts.join('&');
@@ -351,67 +297,7 @@ const QidoEnhancedTests: React.FC = () => {
           ))}
         </div>
 
-        {/* Extension Fields (_ext) */}
-        <div className="include-fields-section ext-section">
-          <div className="section-label">
-            <span>🔌 _ext (확장 필드):</span>
-            <button
-              className="btn-small"
-              onClick={() => setSelectedExtFields(EXTENSION_FIELDS.map(f => f.key))}
-            >
-              전체선택
-            </button>
-            <button
-              className="btn-small"
-              onClick={() => setSelectedExtFields([])}
-            >
-              초기화
-            </button>
-          </div>
-          <div className="ext-fields-grid">
-            {EXTENSION_FIELDS.map(field => (
-              <button
-                key={field.key}
-                className={`ext-chip ${selectedExtFields.includes(field.key) ? 'active' : ''}`}
-                onClick={() => toggleExtField(field.key)}
-                title={field.description}
-              >
-                {field.label}
-              </button>
-            ))}
-          </div>
-        </div>
 
-        {/* Include Fields (DICOM) */}
-        <div className="include-fields-section">
-          <div className="section-label">
-            <span>📋 includefield (DICOM):</span>
-            <button
-              className="btn-small"
-              onClick={() => setSelectedFields(INCLUDE_FIELDS.map(f => f.key))}
-            >
-              전체선택
-            </button>
-            <button
-              className="btn-small"
-              onClick={() => setSelectedFields([])}
-            >
-              초기화
-            </button>
-          </div>
-          <div className="include-fields-grid">
-            {INCLUDE_FIELDS.map(field => (
-              <button
-                key={field.key}
-                className={`field-chip ${selectedFields.includes(field.key) ? 'active' : ''}`}
-                onClick={() => toggleIncludeField(field.key)}
-                title={`${field.tag} - ${field.key}`}
-              >
-                {field.label}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Custom Inputs */}
         <div className="custom-params">
@@ -454,13 +340,12 @@ const QidoEnhancedTests: React.FC = () => {
 
         {/* Current Query Display */}
         <div className="query-preview">
-          <code>GET /api/me/dicom/studies?{[
-            ...Object.entries(params)
+          <code>GET /api/me/dicom/studies?{
+            Object.entries(params)
               .filter(([_, v]) => v !== undefined && v !== '')
-              .map(([k, v]) => `${k}=${v}`),
-            ...selectedFields.map(f => `includefield=${f}`),
-            ...selectedExtFields.map(f => `_ext=${f}`)
-          ].join('&') || '(no params)'}</code>
+              .map(([k, v]) => `${k}=${v}`)
+              .join('&') || '(no params)'
+          }</code>
         </div>
       </div>
 
