@@ -14,6 +14,7 @@ pub struct Settings {
     pub signed_url: SignedUrlConfig,
     pub dcm4chee: Dcm4cheeConfig,
     pub sync: Option<SyncConfig>,
+    pub redis: Option<RedisConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -137,6 +138,23 @@ pub struct Dcm4cheeDbConfig {
     pub database: String,
     pub username: String,
     pub password: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct RedisConfig {
+    pub url: String,
+    #[serde(default = "default_redis_pool_size")]
+    pub pool_size: u32,
+    #[serde(default = "default_view_selection_ttl")]
+    pub view_selection_ttl_sec: u64,
+}
+
+fn default_redis_pool_size() -> u32 {
+    10
+}
+
+fn default_view_selection_ttl() -> u64 {
+    1800 // 30 minutes
 }
 
 impl Settings {
@@ -302,7 +320,7 @@ impl Settings {
                     .collect(),
                 expose_headers: env::var("APP_CORS__EXPOSE_HEADERS")
                     .or_else(|_| env::var("CORS_EXPOSE_HEADERS"))
-                    .unwrap_or_else(|_| "Content-Length,X-Total-Count".to_string())
+                    .unwrap_or_else(|_| "Content-Length,X-Total-Count,X-Page,X-Page-Size,X-Total-Pages".to_string())
                     .split(',')
                     .map(|s| s.trim().to_string())
                     .collect(),
@@ -471,6 +489,29 @@ impl Settings {
                     .ok()
                     .and_then(|s| s.parse::<i32>().ok()),
             }),
+            redis: {
+                let redis_url = env::var("APP_REDIS__URL")
+                    .or_else(|_| env::var("REDIS_URL"))
+                    .ok();
+                
+                if let Some(url) = redis_url {
+                    Some(RedisConfig {
+                        url,
+                        pool_size: env::var("APP_REDIS__POOL_SIZE")
+                            .or_else(|_| env::var("REDIS_POOL_SIZE"))
+                            .unwrap_or_else(|_| "10".to_string())
+                            .parse()
+                            .unwrap_or(10),
+                        view_selection_ttl_sec: env::var("APP_REDIS__VIEW_SELECTION_TTL_SEC")
+                            .or_else(|_| env::var("REDIS_VIEW_SELECTION_TTL_SEC"))
+                            .unwrap_or_else(|_| "1800".to_string())
+                            .parse()
+                            .unwrap_or(1800),
+                    })
+                } else {
+                    None
+                }
+            },
         };
 
         Ok(settings)
