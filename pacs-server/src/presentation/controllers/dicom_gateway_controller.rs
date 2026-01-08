@@ -710,11 +710,12 @@ pub async fn get_all_user_studies(
     let offset = (page - 1) * page_size;
 
     // 사용자 필터/페이지네이션 파라미터 파싱
-    // page, page_size, report_status는 extra에서 제거 (QIDO에 전달하지 않음)
+    // page, page_size, report_status, _ext는 extra에서 제거 (QIDO에 전달하지 않음)
     let mut extra_for_qido = query.extra.clone();
     extra_for_qido.remove("report_status");
     extra_for_qido.remove("page");
     extra_for_qido.remove("page_size");
+    extra_for_qido.remove("_ext");
     let user_params = match build_qido_params_from_user_query(&extra_for_qido) {
         Ok(p) => p,
         Err(msg) => {
