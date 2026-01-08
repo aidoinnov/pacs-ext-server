@@ -3,16 +3,18 @@ use base64::Engine;
 use serde::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
+use sqlx::PgPool;
 
 use crate::domain::entities::access_condition::AccessCondition;
-use crate::domain::repositories::{AccessConditionRepository, ProjectDataRepository, UserRepository};
+use crate::domain::repositories::{AccessConditionRepository, ProjectDataRepository, UserRepository, StudyListViewRepository, AnnotationRepository};
 use crate::domain::services::DicomRbacEvaluator;
 use crate::infrastructure::auth::{JwtService, extract_user_id_from_request, decode_keycloak_token_sub};
 use crate::presentation::controllers::annotation_controller::AnnotationController;
 use crate::infrastructure::external::Dcm4cheeQidoClient;
-use crate::infrastructure::repositories::{AccessConditionRepositoryImpl, ProjectDataRepositoryImpl, UserRepositoryImpl};
+use crate::infrastructure::repositories::{AccessConditionRepositoryImpl, ProjectDataRepositoryImpl, UserRepositoryImpl, StudyListViewRepositoryImpl, AnnotationRepositoryImpl};
 use crate::infrastructure::services::DicomRbacEvaluatorImpl;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -21,6 +23,8 @@ pub struct GatewayQuery {
     pub project_id: Option<i32>,
     #[serde(default)]
     pub report_status: Option<String>, // "approved,unread" 형식
+    #[serde(default)]
+    pub view: Option<String>, // Study List View ID (e.g., "default")
     #[serde(flatten)]
     pub extra: serde_json::Map<String, Value>,
 }
@@ -33,6 +37,9 @@ pub fn configure_routes(
     access_condition_repo: Arc<AccessConditionRepositoryImpl>,
     user_repo: Arc<UserRepositoryImpl>,
     project_data_repo: Arc<ProjectDataRepositoryImpl>,
+    study_list_view_repo: Arc<StudyListViewRepositoryImpl>,
+    annotation_repo: Arc<AnnotationRepositoryImpl>,
+    pool: PgPool,
 ) {
     // 공통 app_data 설정
     let shared_data = (
@@ -42,6 +49,9 @@ pub fn configure_routes(
         web::Data::new(access_condition_repo),
         web::Data::new(user_repo),
         web::Data::new(project_data_repo),
+        web::Data::new(study_list_view_repo),
+        web::Data::new(annotation_repo),
+        web::Data::new(pool),
     );
 
     cfg
@@ -56,6 +66,9 @@ pub fn configure_routes(
                 .app_data(shared_data.3.clone())
                 .app_data(shared_data.4.clone())
                 .app_data(shared_data.5.clone())
+                .app_data(shared_data.6.clone())
+                .app_data(shared_data.7.clone())
+                .app_data(shared_data.8.clone())
                 .route("/studies", web::get().to(get_all_user_studies))
                 .route("/series", web::get().to(get_all_user_series))
                 .route("/studies/{study_uid}/series", web::get().to(get_user_study_series))
@@ -71,6 +84,9 @@ pub fn configure_routes(
                 .app_data(shared_data.3.clone())
                 .app_data(shared_data.4.clone())
                 .app_data(shared_data.5.clone())
+                .app_data(shared_data.6.clone())
+                .app_data(shared_data.7.clone())
+                .app_data(shared_data.8.clone())
                 .route("/studies", web::get().to(get_admin_studies))
                 .route("/series", web::get().to(get_admin_series))
                 .route("/studies/{study_uid}/series", web::get().to(get_admin_study_series))
@@ -86,6 +102,9 @@ pub fn configure_routes(
                 .app_data(shared_data.3)
                 .app_data(shared_data.4)
                 .app_data(shared_data.5)
+                .app_data(shared_data.6)
+                .app_data(shared_data.7)
+                .app_data(shared_data.8)
                 .route(
                     "/ping",
                     web::get().to(|| async { HttpResponse::Ok().finish() }),
@@ -171,7 +190,7 @@ async fn has_global_dicom_access(user_id: i32, pool: &sqlx::PgPool) -> bool {
 /// 2. 레코드가 있으면 → 해당 레코드의 status와 expires_at 확인
 ///    - status = 'APPROVED' AND (expires_at IS NULL OR expires_at > NOW()) → 접근 가능
 ///    - 그 외 → 접근 불가
-async fn can_access_study(
+pub async fn can_access_study(
     user_id: i32,
     project_id: i32,
     study_uid: &str,
@@ -554,6 +573,7 @@ pub async fn get_admin_studies(
 
 /// 사용자가 속한 모든 프로젝트의 스터디 목록을 통합 조회
 /// project_id 파라미터가 있으면 해당 프로젝트만 필터링
+/// view 파라미터가 있으면 해당 View의 필드 정의에 따라 확장 필드 포함
 pub async fn get_all_user_studies(
     qido: web::Data<Dcm4cheeQidoClient>,
     evaluator: web::Data<Arc<DicomRbacEvaluatorImpl>>,
@@ -561,6 +581,9 @@ pub async fn get_all_user_studies(
     access_condition_repo: web::Data<Arc<AccessConditionRepositoryImpl>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
     project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
+    study_list_view_repo: web::Data<Arc<StudyListViewRepositoryImpl>>,
+    annotation_repo: web::Data<Arc<AnnotationRepositoryImpl>>,
+    pool: web::Data<PgPool>,
     query: web::Query<GatewayQuery>,
     req: HttpRequest,
 ) -> HttpResponse {
@@ -629,33 +652,75 @@ pub async fn get_all_user_studies(
 
     if user_projects.is_empty() {
         tracing::debug!("Gateway: User {} has no projects", user_id);
-        return HttpResponse::Ok().json(serde_json::json!([]));
+        return HttpResponse::Ok()
+            .insert_header(("X-Total-Count", "0"))
+            .insert_header(("X-Page", "1"))
+            .insert_header(("X-Page-Size", "50"))
+            .insert_header(("X-Total-Pages", "0"))
+            .json(serde_json::json!([]));
     }
 
     tracing::debug!("Gateway: User {} querying {} projects", user_id, user_projects.len());
 
+    // View 필드 조회 (view 파라미터가 있는 경우)
+    let view_fields = if let Some(ref view_id) = query.view {
+        match study_list_view_repo.find_view_fields(view_id).await {
+            Ok(fields) => Some(fields),
+            Err(e) => {
+                tracing::warn!("Gateway: Failed to fetch view fields for '{}': {:?}", view_id, e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Extension 필드 키 목록 추출 (view에서)
+    let ext_field_keys: Vec<String> = view_fields
+        .as_ref()
+        .map(|fields| {
+            fields
+                .iter()
+                .filter(|f| f.field_source == "extension" && f.visible)
+                .map(|f| f.field_key.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    tracing::debug!("Gateway: Extension fields requested: {:?}", ext_field_keys);
+
+    // 페이지네이션 파라미터 추출 (QIDO에 전달하기 전에 먼저 추출)
+    // query.extra의 값은 문자열로 들어오므로 파싱 필요
+    let page_size = query.extra
+        .get("page_size")
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+        })
+        .unwrap_or(50)
+        .clamp(1, 200) as i64;
+    let page = query.extra
+        .get("page")
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+        })
+        .unwrap_or(1)
+        .max(1);
+    let offset = (page - 1) * page_size;
+
     // 사용자 필터/페이지네이션 파라미터 파싱
+    // page, page_size, report_status는 extra에서 제거 (QIDO에 전달하지 않음)
     let mut extra_for_qido = query.extra.clone();
     extra_for_qido.remove("report_status");
+    extra_for_qido.remove("page");
+    extra_for_qido.remove("page_size");
     let user_params = match build_qido_params_from_user_query(&extra_for_qido) {
         Ok(p) => p,
         Err(msg) => {
             return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
         }
     };
-
-    // 페이지네이션 파라미터 추출
-    let page_size = query.extra
-        .get("page_size")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(50)
-        .clamp(1, 200) as i64;
-    let page = query.extra
-        .get("page")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(1)
-        .max(1);
-    let offset = (page - 1) * page_size;
 
     // 각 프로젝트별로 스터디 조회 및 통합
     let mut all_studies: Vec<serde_json::Value> = Vec::new();
@@ -674,6 +739,9 @@ pub async fn get_all_user_studies(
     } else {
         tracing::warn!("⚠️ Gateway /me/studies: No Bearer token found in request");
     }
+
+    // study_uid → project_ids 매핑 (같은 study가 여러 프로젝트에 있을 수 있음)
+    let mut study_project_map: HashMap<String, Vec<i32>> = HashMap::new();
 
     for project_id in user_projects.iter() {
         // 프로젝트별 Access Condition 적용
@@ -709,10 +777,19 @@ pub async fn get_all_user_studies(
                             )
                             .await;
 
-                            // 접근 가능하고 중복이 아닌 경우만 추가
-                            if result.allowed && has_data_access && !study_uids_seen.contains(&study_uid) {
-                                study_uids_seen.insert(study_uid.clone());
-                                all_studies.push(item.clone());
+                            // 접근 가능한 경우
+                            if result.allowed && has_data_access {
+                                // project_id 매핑 추가
+                                study_project_map
+                                    .entry(study_uid.clone())
+                                    .or_insert_with(Vec::new)
+                                    .push(*project_id);
+
+                                // 중복이 아닌 경우만 study 추가
+                                if !study_uids_seen.contains(&study_uid) {
+                                    study_uids_seen.insert(study_uid.clone());
+                                    all_studies.push(item.clone());
+                                }
                             }
                         }
                     }
@@ -739,6 +816,11 @@ pub async fn get_all_user_studies(
 
     // 페이지네이션 적용
     let total_count = all_studies.len();
+    let total_pages = if page_size > 0 {
+        (total_count as i64 + page_size - 1) / page_size
+    } else {
+        0
+    };
     let start = offset as usize;
     let end = std::cmp::min(start + page_size as usize, total_count);
     let paginated_studies = if start < total_count {
@@ -747,14 +829,73 @@ pub async fn get_all_user_studies(
         Vec::new()
     };
 
+    // _ext 필드 추가
+    let ext_builder = StudyExtBuilder::new(pool.get_ref(), annotation_repo.get_ref(), user_id);
+
+    // 성능 최적화: 모든 project_ids를 미리 수집하여 한 번에 조회
+    let all_project_ids: Vec<i32> = study_project_map
+        .values()
+        .flat_map(|ids| ids.iter().copied())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    let project_info_cache = ext_builder.fetch_projects_batch(&all_project_ids).await;
+
+    let mut enriched_studies: Vec<serde_json::Value> = Vec::with_capacity(paginated_studies.len());
+
+    for mut study in paginated_studies {
+        if let Some(study_uid) = extract_study_uid(&study) {
+            // _ext 객체 생성
+            let mut ext = serde_json::Map::new();
+
+            // projects 정보는 항상 추가 (id, name, role_name)
+            if let Some(project_ids) = study_project_map.get(&study_uid) {
+                let projects: Vec<ProjectInfo> = project_ids
+                    .iter()
+                    .filter_map(|id| project_info_cache.get(id).cloned())
+                    .collect();
+                ext.insert("projects".to_string(), serde_json::json!(projects));
+
+                // report_status 추가 (ext_field_keys에 포함된 경우만)
+                if ext_field_keys.contains(&"report_status".to_string()) {
+                    if let Some(status) = ext_builder.fetch_report_status(&study_uid, project_ids).await {
+                        ext.insert("report_status".to_string(), serde_json::json!(status));
+                    }
+                }
+
+                // review 추가 (ext_field_keys에 포함된 경우만)
+                if ext_field_keys.contains(&"review".to_string()) {
+                    if let Some(review) = ext_builder.fetch_review(&study_uid, project_ids).await {
+                        ext.insert("review".to_string(), serde_json::json!(review));
+                    }
+                }
+            }
+
+            // _ext 필드를 study에 추가
+            if !ext.is_empty() {
+                if let Some(obj) = study.as_object_mut() {
+                    obj.insert("_ext".to_string(), serde_json::Value::Object(ext));
+                }
+            }
+        }
+        enriched_studies.push(study);
+    }
+
     tracing::debug!(
-        "Gateway: Returning {} studies (page {}, total {})",
-        paginated_studies.len(),
+        "Gateway: Returning {} studies (page {}/{}, total {})",
+        enriched_studies.len(),
         page,
+        total_pages,
         total_count
     );
 
-    HttpResponse::Ok().json(paginated_studies)
+    HttpResponse::Ok()
+        .insert_header(("X-Total-Count", total_count.to_string()))
+        .insert_header(("X-Page", page.to_string()))
+        .insert_header(("X-Page-Size", page_size.to_string()))
+        .insert_header(("X-Total-Pages", total_pages.to_string()))
+        .json(enriched_studies)
 }
 
 /// Study Date 추출 헬퍼 함수
@@ -1515,9 +1656,13 @@ pub async fn get_series_all(
     tracing::debug!("Gateway /series: user_id={}, project_id={:?}", user_id, project_id_opt);
 
     // 1. 사용자 필터/페이지네이션 파라미터 파싱
-    // report_status는 extra에서 제거 (serde(flatten)으로 인해 포함될 수 있음)
+    // report_status, page, page_size는 extra에서 제거
+    // - report_status: 필터링 후 적용
+    // - page, page_size: 필터링 후 메모리에서 페이지네이션 적용 (QIDO에는 전달하지 않음)
     let mut extra_for_qido = query.extra.clone();
     extra_for_qido.remove("report_status");
+    extra_for_qido.remove("page");
+    extra_for_qido.remove("page_size");
     let user_params = match build_qido_params_from_user_query(&extra_for_qido) {
         Ok(p) => p,
         Err(msg) => {
@@ -1542,7 +1687,7 @@ pub async fn get_series_all(
         }
     };
 
-    tracing::debug!("Gateway /series: QIDO response received");
+    tracing::info!("🔍 Gateway /series: QIDO response received");
 
     // 3. RBAC 필터링 (프로젝트에 할당된 Series만)
     let filtered_response = if let Some(project_id) = project_id_opt {
@@ -1557,23 +1702,63 @@ pub async fn get_series_all(
             }
         };
 
-        tracing::debug!("Gateway /series: Found {} allowed series UIDs for project {}", allowed_series_uids.len(), project_id);
+        tracing::info!("🔍 Gateway /series: Found {} allowed series UIDs for project {}", allowed_series_uids.len(), project_id);
+        if allowed_series_uids.len() > 0 {
+            if allowed_series_uids.len() <= 10 {
+                tracing::info!("   Allowed Series UIDs: {:?}", allowed_series_uids);
+            } else {
+                tracing::info!("   Allowed Series UIDs (first 10): {:?}", allowed_series_uids.iter().take(10).collect::<Vec<_>>());
+            }
+        } else {
+            tracing::warn!("⚠️  No allowed series UIDs found for project {}!", project_id);
+        }
 
         // QIDO 응답 필터링
         if let Some(series_list) = qido_response.as_array() {
+            tracing::info!("🔍 Gateway /series: QIDO returned {} series", series_list.len());
+            
+            // QIDO 응답의 Series UID 추출 (디버깅용)
+            let qido_series_uids: Vec<String> = series_list
+                .iter()
+                .filter_map(|series| extract_series_uid(series))
+                .collect();
+            
+            if qido_series_uids.len() > 0 && qido_series_uids.len() <= 10 {
+                tracing::info!("   QIDO Series UIDs: {:?}", qido_series_uids);
+            } else if qido_series_uids.len() > 10 {
+                tracing::info!("   QIDO Series UIDs (first 10): {:?}", qido_series_uids.iter().take(10).collect::<Vec<_>>());
+            }
+            
+            // 매칭 확인
+            let matched_count = qido_series_uids.iter()
+                .filter(|uid| allowed_series_uids.contains(*uid))
+                .count();
+            tracing::info!("   Matched Series UIDs: {}/{}", matched_count, qido_series_uids.len());
+            
+            if matched_count == 0 && allowed_series_uids.len() > 0 && qido_series_uids.len() > 0 {
+                tracing::warn!("⚠️  No Series UIDs matched! This might indicate a UID format mismatch.");
+                tracing::warn!("   Allowed UIDs (first 3): {:?}", allowed_series_uids.iter().take(3).collect::<Vec<_>>());
+                tracing::warn!("   QIDO UIDs (first 3): {:?}", qido_series_uids.iter().take(3).collect::<Vec<_>>());
+            }
+            
             let filtered: Vec<serde_json::Value> = series_list
                 .iter()
                 .filter(|series| {
                     if let Some(series_uid) = extract_series_uid(series) {
-                        allowed_series_uids.contains(&series_uid)
+                        let contains = allowed_series_uids.contains(&series_uid);
+                        if !contains {
+                            tracing::debug!("   Series {} not in allowed list", series_uid);
+                        }
+                        contains
                     } else {
+                        tracing::debug!("   Failed to extract series_uid from QIDO response");
                         false
                     }
                 })
                 .cloned()
                 .collect();
 
-            tracing::debug!("Gateway /series: Filtered {} series from {} QIDO results", filtered.len(), series_list.len());
+            tracing::info!("🔍 Gateway /series: Filtered {} series from {} QIDO results", filtered.len(), series_list.len());
             serde_json::json!(filtered)
         } else {
             qido_response
@@ -1583,10 +1768,48 @@ pub async fn get_series_all(
         qido_response
     };
 
-    // 4. 각 Series에 thumbnail_url 필드 추가
-    let mut final_response = add_thumbnail_urls(filtered_response, qido.base_url(), qido.qido_path());
+    // 4. 페이지네이션 적용 (필터링 후 메모리에서)
+    let paginated_response = if let Some(array) = filtered_response.as_array() {
+        let page = query.extra
+            .get("page")
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+            })
+            .unwrap_or(1)
+            .max(1) as usize;
+        let page_size = query.extra
+            .get("page_size")
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+            })
+            .unwrap_or(50)
+            .max(1)
+            .min(200) as usize;
+        let offset = (page - 1) * page_size;
+        
+        let paginated: Vec<serde_json::Value> = array
+            .iter()
+            .skip(offset as usize)
+            .take(page_size as usize)
+            .cloned()
+            .collect();
+        
+        tracing::debug!(
+            "Gateway /series: Pagination applied - page={}, page_size={}, offset={}, total={}, returned={}",
+            page, page_size, offset, array.len(), paginated.len()
+        );
+        
+        serde_json::json!(paginated)
+    } else {
+        filtered_response
+    };
 
-    // 5. Report Status 필터링 적용 (옵셔널)
+    // 5. 각 Series에 thumbnail_url 필드 추가
+    let mut final_response = add_thumbnail_urls(paginated_response, qido.base_url(), qido.qido_path());
+
+    // 6. Report Status 필터링 적용 (옵셔널)
     if let Some(status_str) = &query.report_status {
         let status_filter = parse_report_status_filter(status_str);
         if !status_filter.is_empty() {
@@ -1793,9 +2016,34 @@ pub async fn get_all_user_series(
 
     tracing::debug!("Gateway: User {} querying {} projects for series", user_id, user_projects.len());
 
+    // 페이지네이션 파라미터 추출 (QIDO에 전달하기 전에 먼저 추출)
+    // query.extra의 값은 문자열로 들어오므로 파싱 필요
+    let page_size = query.extra
+        .get("page_size")
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+        })
+        .unwrap_or(50)
+        .clamp(1, 200) as i64;
+    let page = query.extra
+        .get("page")
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+        })
+        .unwrap_or(1)
+        .max(1);
+    let offset = (page - 1) * page_size;
+
+    tracing::info!("🔍 Pagination params: page={}, page_size={}, offset={}", page, page_size, offset);
+
     // 사용자 필터/페이지네이션 파라미터 파싱
+    // page, page_size, report_status는 extra에서 제거 (QIDO에 전달하지 않음)
     let mut extra_for_qido = query.extra.clone();
     extra_for_qido.remove("report_status");
+    extra_for_qido.remove("page");
+    extra_for_qido.remove("page_size");
     let user_params = match build_qido_params_from_user_query(&extra_for_qido) {
         Ok(p) => p,
         Err(msg) => {
@@ -1803,35 +2051,25 @@ pub async fn get_all_user_series(
         }
     };
 
-    // 페이지네이션 파라미터 추출
-    let page_size = query.extra
-        .get("page_size")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(50)
-        .clamp(1, 200) as i64;
-    let page = query.extra
-        .get("page")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(1)
-        .max(1);
-    let offset = (page - 1) * page_size;
-
     // 각 프로젝트별로 시리즈 조회 및 통합 (병렬 처리)
     let bearer_opt = extract_bearer_token(&req);
 
     // 병렬로 모든 프로젝트의 QIDO 호출
     let mut qido_futures = Vec::new();
     let projects_count = user_projects.len();
-    
+
     // 페이지네이션 최적화: 각 프로젝트에서 필요한 만큼만 가져오기
-    // 필터링 후에도 충분한 데이터를 확보하기 위해 page_size * 프로젝트 수만큼 가져옴
-    // 단일 프로젝트인 경우 page_size * 2로 설정 (필터링 여유분)
+    // QIDO 서버가 offset을 지원하지 않으므로, 충분한 데이터를 가져온 후 메모리에서 페이지네이션 적용
+    // QIDO 서버가 limit를 제대로 처리하지 못하는 경우가 있으므로, 충분히 큰 값으로 설정
+    // offset + page_size만큼 가져와야 하지만, 여유분을 크게 설정
     let qido_limit = if projects_count == 1 {
-        (page_size * 2).min(500) // 최대 500개로 제한
+        // 단일 프로젝트: 최소 100개 이상 가져오기 (QIDO 서버 버그 회피)
+        std::cmp::max(offset + page_size * 10, 100).min(500)
     } else {
-        (page_size * projects_count as i64).min(500)
+        // 여러 프로젝트: offset + page_size * 프로젝트 수 * 10
+        std::cmp::max(offset + page_size * projects_count as i64 * 10, 100).min(500)
     };
-    
+
     for project_id in user_projects.iter() {
         let project_id = *project_id;
         let qido_clone = qido.clone();
@@ -1848,6 +2086,10 @@ pub async fn get_all_user_series(
             } else {
                 user_params_clone
             };
+
+            // offset 파라미터 제거 (QIDO 서버가 지원하지 않음)
+            // 메모리에서 페이지네이션을 적용하므로 QIDO에는 offset을 전달하지 않음
+            qido_params.retain(|(k, _)| k != "offset" && k != "Offset");
 
             // limit 파라미터 최적화: 기존 limit를 최적화된 값으로 덮어쓰기
             // build_qido_params_from_user_query가 이미 limit를 추가했지만,
@@ -2102,24 +2344,36 @@ pub async fn get_all_user_series(
     }
 
     // 페이지네이션 적용
+    // QIDO 서버가 offset을 지원하지 않으므로, 메모리에서 offset을 적용
     let total_count = if let Some(array) = final_series.as_array() {
         array.len()
     } else {
         0
     };
-    let start = offset as usize;
+
+    // 메모리에서 offset 적용
+    let start = std::cmp::min(offset as usize, total_count);
     let end = std::cmp::min(start + page_size as usize, total_count);
+
+    tracing::info!(
+        "🔍 Pagination DEBUG: page={}, page_size={}, offset={}, start={}, end={}, total_count={}, QIDO_offset_applied=false (memory pagination)",
+        page, page_size, offset, start, end, total_count
+    );
+
     let paginated_series = if let Some(array) = final_series.as_array() {
-        if start < total_count {
+        if total_count > 0 && start < total_count {
+            tracing::info!("🔍 Slicing array[{}..{}] from QIDO result (total: {})", start, end, total_count);
             serde_json::Value::Array(array[start..end].to_vec())
         } else {
+            tracing::info!("🔍 No data in range or empty result, returning empty array");
             serde_json::Value::Array(vec![])
         }
     } else {
+        tracing::warn!("🔍 final_series is not an array!");
         serde_json::Value::Array(vec![])
     };
 
-    tracing::debug!(
+    tracing::info!(
         "Gateway: Returning {} series (page {}, total {})",
         if let Some(arr) = paginated_series.as_array() { arr.len() } else { 0 },
         page,
@@ -2306,13 +2560,34 @@ async fn get_allowed_patient_ids(project_id: i32, pool: &sqlx::PgPool) -> Result
 
 /// 프로젝트에 할당된 Series UID 목록 조회
 async fn get_allowed_series_uids(project_id: i32, pool: &sqlx::PgPool) -> Result<std::collections::HashSet<String>, sqlx::Error> {
+    // resource_level에 따라 다른 쿼리 사용
+    // SERIES 레벨: series_id로 직접 조회 (해당 series만)
+    // STUDY 레벨: study_id로 조인하여 study의 모든 series 조회
+    
     let rows: Vec<(Option<String>,)> = sqlx::query_as(
-        "SELECT DISTINCT pdser.series_uid
-         FROM project_data pd
-         INNER JOIN project_data_study pds ON pd.study_id = pds.id
-         INNER JOIN project_data_series pdser ON pds.id = pdser.study_id
-         WHERE pd.project_id = $1
-           AND pdser.series_uid IS NOT NULL"
+        "SELECT DISTINCT combined.series_uid
+         FROM (
+             -- resource_level='SERIES'인 경우: series_id로 직접 조회
+             SELECT pdser.series_uid
+             FROM project_data pd
+             INNER JOIN project_data_series pdser ON pd.series_id = pdser.id
+             WHERE pd.project_id = $1
+               AND pd.resource_level = 'SERIES'
+               AND pd.series_id IS NOT NULL
+               AND pdser.series_uid IS NOT NULL
+             
+             UNION
+             
+             -- resource_level='STUDY'인 경우: study_id로 조인하여 study의 모든 series 조회
+             SELECT DISTINCT pdser.series_uid
+             FROM project_data pd
+             INNER JOIN project_data_study pds ON pd.study_id = pds.id
+             INNER JOIN project_data_series pdser ON pds.id = pdser.study_id
+             WHERE pd.project_id = $1
+               AND pd.resource_level = 'STUDY'
+               AND pd.study_id IS NOT NULL
+               AND pdser.series_uid IS NOT NULL
+         ) AS combined"
     )
     .bind(project_id)
     .fetch_all(pool)
@@ -2475,7 +2750,7 @@ async fn evaluate_series_access_batch(
 
 /// Authorization 헤더에서 Bearer 토큰 추출
 /// X-Keycloak-Token 헤더를 우선 확인하고, 없으면 Authorization 헤더 사용
-fn extract_bearer_token(req: &HttpRequest) -> Option<String> {
+pub fn extract_bearer_token(req: &HttpRequest) -> Option<String> {
     req.headers()
         .get("X-Keycloak-Token")
         .and_then(|h| h.to_str().ok())
@@ -2735,6 +3010,227 @@ fn merge_qido_params(
         map.insert(k, v);
     }
     map.into_iter().collect()
+}
+
+// ============================================================================
+// _ext 필드 관련 구조체 및 헬퍼 함수
+// ============================================================================
+
+/// 프로젝트 정보 (id, name, role_name)
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ProjectInfo {
+    pub id: i32,
+    pub name: String,
+    pub role_name: Option<String>,
+}
+
+/// Review 상태 정보
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewInfo {
+    pub review_stage: String,
+    pub available_stages: Vec<String>,
+    pub annotation_summary: HashMap<String, bool>,
+}
+
+/// Study 확장 정보 빌더
+pub struct StudyExtBuilder<'a> {
+    pool: &'a PgPool,
+    annotation_repo: &'a AnnotationRepositoryImpl,
+    user_id: i32,
+}
+
+impl<'a> StudyExtBuilder<'a> {
+    pub fn new(pool: &'a PgPool, annotation_repo: &'a AnnotationRepositoryImpl, user_id: i32) -> Self {
+        Self { pool, annotation_repo, user_id }
+    }
+
+    /// 프로젝트 정보 배치 조회 (HashMap으로 반환)
+    pub async fn fetch_projects_batch(&self, project_ids: &[i32]) -> HashMap<i32, ProjectInfo> {
+        if project_ids.is_empty() {
+            return HashMap::new();
+        }
+
+        let results = sqlx::query_as::<_, (i32, String, Option<String>)>(
+            r#"
+            SELECT
+                p.id,
+                p.name,
+                r.name as role_name
+            FROM security_project p
+            LEFT JOIN security_user_project up ON p.id = up.project_id AND up.user_id = $1
+            LEFT JOIN security_role r ON up.role_id = r.id
+            WHERE p.id = ANY($2)
+            ORDER BY p.id
+            "#
+        )
+        .bind(self.user_id)
+        .bind(project_ids)
+        .fetch_all(self.pool)
+        .await;
+
+        match results {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|(id, name, role_name)| (id, ProjectInfo { id, name, role_name }))
+                .collect(),
+            Err(e) => {
+                tracing::warn!("Failed to fetch project info batch: {:?}", e);
+                HashMap::new()
+            }
+        }
+    }
+
+    /// 프로젝트 정보 조회 (id, name, role_name) - 하위 호환성 유지
+    pub async fn fetch_projects(&self, project_ids: &[i32]) -> Vec<ProjectInfo> {
+        if project_ids.is_empty() {
+            return Vec::new();
+        }
+
+        // 프로젝트 정보와 사용자의 역할을 함께 조회
+        let results = sqlx::query_as::<_, (i32, String, Option<String>)>(
+            r#"
+            SELECT
+                p.id,
+                p.name,
+                r.name as role_name
+            FROM security_project p
+            LEFT JOIN security_user_project up ON p.id = up.project_id AND up.user_id = $1
+            LEFT JOIN security_role r ON up.role_id = r.id
+            WHERE p.id = ANY($2)
+            ORDER BY p.id
+            "#
+        )
+        .bind(self.user_id)
+        .bind(project_ids)
+        .fetch_all(self.pool)
+        .await;
+
+        match results {
+            Ok(rows) => rows.into_iter().map(|(id, name, role_name)| ProjectInfo { id, name, role_name }).collect(),
+            Err(e) => {
+                tracing::warn!("Failed to fetch project info: {:?}", e);
+                Vec::new()
+            }
+        }
+    }
+
+    /// Report Status 조회 (study_uid 기준으로 가장 최근 report의 status)
+    pub async fn fetch_report_status(&self, study_uid: &str, project_ids: &[i32]) -> Option<String> {
+        if project_ids.is_empty() {
+            return None;
+        }
+
+        // study_uid → project_data_study → project_data_series → series_user_report
+        let result = sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT sur.status
+            FROM series_user_report sur
+            INNER JOIN project_data_series pds ON sur.series_id = pds.id
+            INNER JOIN project_data_study pst ON pds.study_id = pst.id
+            WHERE pst.study_uid = $1
+              AND sur.project_id = ANY($2)
+              AND sur.user_id = $3
+            ORDER BY sur.updated_at DESC
+            LIMIT 1
+            "#
+        )
+        .bind(study_uid)
+        .bind(project_ids)
+        .bind(self.user_id)
+        .fetch_optional(self.pool)
+        .await;
+
+        match result {
+            Ok(status) => status,
+            Err(e) => {
+                tracing::debug!("Failed to fetch report status for study {}: {:?}", study_uid, e);
+                None
+            }
+        }
+    }
+
+    /// Review 상태 조회 (annotation 기반)
+    pub async fn fetch_review(&self, study_uid: &str, project_ids: &[i32]) -> Option<ReviewInfo> {
+        if project_ids.is_empty() {
+            return None;
+        }
+
+        // 각 프로젝트별로 annotation을 조회하고 user_id별로 그룹화
+        let mut all_annotator_ids: HashSet<i32> = HashSet::new();
+        let mut current_user_role: Option<String> = None;
+
+        for project_id in project_ids {
+            // annotation 조회
+            if let Ok(annotations) = self.annotation_repo.find_by_project_and_study(*project_id, study_uid).await {
+                for ann in annotations {
+                    all_annotator_ids.insert(ann.user_id);
+                }
+            }
+
+            // 현재 사용자의 역할 조회 (첫 번째 프로젝트 기준)
+            if current_user_role.is_none() {
+                let role = sqlx::query_scalar::<_, String>(
+                    r#"
+                    SELECT r.name
+                    FROM security_user_project up
+                    INNER JOIN security_role r ON up.role_id = r.id
+                    WHERE up.user_id = $1 AND up.project_id = $2
+                    "#
+                )
+                .bind(self.user_id)
+                .bind(*project_id)
+                .fetch_optional(self.pool)
+                .await;
+
+                if let Ok(Some(role_name)) = role {
+                    current_user_role = Some(role_name);
+                }
+            }
+        }
+
+        let annotation_count = all_annotator_ids.len();
+
+        // reviewStage 계산
+        let review_stage = match annotation_count {
+            0 => "NOT_STARTED",
+            1 => "IN_PROGRESS",
+            _ => "READY_FOR_ADJUDICATION",
+        }.to_string();
+
+        // availableStages 계산 (역할 기반)
+        let role_name = current_user_role.as_deref().unwrap_or("");
+        let is_adjudicator_or_pm = role_name.to_uppercase().contains("ADMIN")
+            || role_name.to_uppercase().contains("ADJUDICATOR")
+            || role_name.to_uppercase().contains("PM");
+
+        let available_stages = if is_adjudicator_or_pm {
+            vec!["NOT_STARTED".to_string(), "IN_PROGRESS".to_string(), "READY_FOR_ADJUDICATION".to_string()]
+        } else {
+            // reader는 파랑 단계 제외
+            vec!["NOT_STARTED".to_string(), "IN_PROGRESS".to_string()]
+        };
+
+        // annotationSummary 생성 (reader1, reader2 형태)
+        let mut annotation_summary = HashMap::new();
+        for (idx, _user_id) in all_annotator_ids.iter().enumerate() {
+            let key = format!("reader{}", idx + 1);
+            annotation_summary.insert(key, true);
+        }
+        // 최대 2명까지 표시
+        if !annotation_summary.contains_key("reader1") {
+            annotation_summary.insert("reader1".to_string(), false);
+        }
+        if !annotation_summary.contains_key("reader2") {
+            annotation_summary.insert("reader2".to_string(), false);
+        }
+
+        Some(ReviewInfo {
+            review_stage,
+            available_stages,
+            annotation_summary,
+        })
+    }
 }
 
 #[cfg(test)]
