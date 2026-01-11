@@ -81,8 +81,8 @@ use presentation::controllers::{
     access_control_controller, annotation_controller, auth_controller, mask_controller,
     mask_group_controller, project_controller, project_data_access_controller,
     project_user_controller, project_user_matrix_controller, role_controller,
-    role_permission_matrix_controller, series_user_note_controller, test_controller,
-    user_controller, user_project_matrix_controller,
+    role_permission_matrix_controller, series_user_note_controller, study_list_view_controller,
+    test_controller, user_controller, user_project_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -215,19 +215,32 @@ async fn main() -> std::io::Result<()> {
     let qido_client = Arc::new(Dcm4cheeQidoClient::new(settings.dcm4chee.clone()));
     println!("✅ Done");
 
-    // Redis 연결 (현재 비활성화 상태)
-    // 캐싱 및 세션 저장을 위한 Redis 연결 설정
-    // 향후 캐싱 기능 구현 시 활성화 예정
-    // let redis_url = std::env::var("REDIS_URL")
-    //     .unwrap_or_else(|_| "redis://:redis123@localhost:6379/0".to_string());
-    // let redis_client = RedisClient::open(redis_url)
-    //     .expect("Failed to create Redis client");
-    // let mut redis_conn = redis_client.get_connection()
-    //     .expect("Failed to connect to Redis");
-    // redis::cmd("PING")
-    //     .query::<String>(&mut redis_conn)
-    //     .expect("Failed to ping Redis");
-    // println!("Successfully connected to Redis");
+    // Redis 연결 (View Selection 저장소용)
+    print!("🔴 Connecting to Redis... ");
+    let redis_connection = if let Some(redis_config) = &settings.redis {
+        match infrastructure::redis::RedisClientFactory::create(&redis_config.url).await {
+            Ok(conn) => {
+                // 연결 테스트
+                match conn.ping().await {
+                    Ok(_) => {
+                        println!("✅ Connected");
+                        Some(conn)
+                    }
+                    Err(e) => {
+                        println!("⚠️  Failed to ping Redis: {}", e);
+                        None
+                    }
+                }
+            }
+            Err(e) => {
+                println!("⚠️  Failed to connect to Redis: {} (View Selection 기능 비활성화)", e);
+                None
+            }
+        }
+    } else {
+        println!("⏭️  Skipped (Redis not configured)");
+        None
+    };
 
     // 데이터 접근 계층(Repository) 초기화
     // 각 엔티티별로 데이터베이스 작업을 담당하는 리포지토리 생성
@@ -407,6 +420,42 @@ async fn main() -> std::io::Result<()> {
         Arc::new(user_repo.clone()),
     ));
     
+    // ViewSelection 서비스 및 UseCase 초기화
+    let view_selection_use_case = if let Some(ref redis_conn) = redis_connection {
+        use crate::infrastructure::view_selection::ViewSelectionRepositoryImpl;
+        use crate::infrastructure::view_selection::ViewSelectionServiceImpl;
+        use crate::application::use_cases::ViewSelectionUseCase;
+        
+        let view_selection_repo = Arc::new(ViewSelectionRepositoryImpl::new(
+            Arc::new(redis_conn.clone()),
+            None, // 기본 키 접두사 사용
+        ));
+        
+        let default_ttl = settings.redis
+            .as_ref()
+            .map(|r| r.view_selection_ttl_sec)
+            .unwrap_or(1800); // 기본 30분
+        
+        let view_selection_service = Arc::new(ViewSelectionServiceImpl::new(
+            view_selection_repo.clone(),
+            default_ttl,
+        ));
+        
+        Some(Arc::new(ViewSelectionUseCase::new(
+            view_selection_service,
+            default_ttl,
+        )))
+    } else {
+        None
+    };
+    
+    // Study List View UseCase 초기화
+    use crate::infrastructure::repositories::StudyListViewRepositoryImpl;
+    use crate::application::use_cases::StudyListViewUseCase;
+
+    let study_list_view_repo = Arc::new(StudyListViewRepositoryImpl::new(pool.clone()));
+    let study_list_view_use_case = Arc::new(StudyListViewUseCase::new(study_list_view_repo.clone()));
+
     // Series User Report 서비스 및 UseCase 초기화 (Reporting Context)
     use crate::domain::reporting::repositories::SeriesUserReportRepository;
     use crate::domain::reporting::services::{SeriesUserReportService, SeriesUserReportServiceImpl};
@@ -615,6 +664,9 @@ async fn main() -> std::io::Result<()> {
                             ),
                             Arc::new(user_repo.clone()),
                             project_data_repo.clone(),
+                            study_list_view_repo.clone(),
+                            Arc::new(annotation_repo.clone()),
+                            pool.clone(),
                         )
                     })
                     // Sync API (only in Full/SyncOnly)
@@ -701,6 +753,7 @@ async fn main() -> std::io::Result<()> {
                                 series_user_report_use_case.clone(),
                                 jwt_service.clone(),
                                 Arc::new(user_repo.clone()),
+                                project_data_repo.clone(),
                             );
                         }
                     })
@@ -717,6 +770,99 @@ async fn main() -> std::io::Result<()> {
                                 jwt_service.clone(),
                                 Arc::new(user_repo.clone()),
                             )
+                        }
+                    })
+                    // ========================================
+                    // 🎬 View Selection API (Viewer Session 기반 멀티-Study/Series)
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            if let Some(ref view_selection_use_case) = view_selection_use_case {
+                                cfg.service(
+                                    web::resource("/v1/view-selections")
+                                        .route(web::post().to(
+                                            presentation::controllers::view_selection_controller::create_view_selection::<
+                                                crate::infrastructure::view_selection::ViewSelectionServiceImpl<
+                                                    crate::infrastructure::view_selection::ViewSelectionRepositoryImpl,
+                                                >,
+                                            >,
+                                        ))
+                                )
+                                .service(
+                                    web::resource("/v1/view-selections/{selection_id}")
+                                        .route(web::get().to(
+                                            presentation::controllers::view_selection_controller::get_view_selection::<
+                                                crate::infrastructure::view_selection::ViewSelectionServiceImpl<
+                                                    crate::infrastructure::view_selection::ViewSelectionRepositoryImpl,
+                                                >,
+                                            >,
+                                        ))
+                                        .route(web::delete().to(
+                                            presentation::controllers::view_selection_controller::delete_view_selection::<
+                                                crate::infrastructure::view_selection::ViewSelectionServiceImpl<
+                                                    crate::infrastructure::view_selection::ViewSelectionRepositoryImpl,
+                                                >,
+                                            >,
+                                        ))
+                                );
+
+                                // App data 등록
+                                cfg.app_data(web::Data::new(view_selection_use_case.clone()));
+                                cfg.app_data(web::Data::new(dicom_evaluator.clone()));
+                                cfg.app_data(web::Data::new(project_data_repo.clone()));
+                            }
+                        }
+                    })
+                    // ========================================
+                    // 📋 Study List View API (/study-list-views/*)
+                    // - View CRUD
+                    // - Field definitions
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            study_list_view_controller::configure_routes(
+                                cfg,
+                                study_list_view_use_case.clone(),
+                                jwt_service.clone(),
+                                Arc::new(user_repo.clone()),
+                            )
+                        }
+                    })
+                    // ========================================
+                    // 🎬 Viewer API (Viewer 전용 BFF)
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            // Study Meta API
+                            cfg.service(
+                                web::resource("/v1/viewer/studies/meta")
+                                    .route(web::post().to(
+                                        presentation::controllers::viewer_controller::get_studies_meta
+                                    ))
+                            );
+                            // Series Meta API (Batch)
+                            cfg.service(
+                                web::resource("/v1/viewer/series/meta")
+                                    .route(web::post().to(
+                                        presentation::controllers::viewer_controller::get_series_meta
+                                    ))
+                            );
+                            // Study의 모든 Series Meta API (POST)
+                            cfg.service(
+                                web::resource("/v1/viewer/studies/{study_uid}/series/meta")
+                                    .route(web::post().to(
+                                        presentation::controllers::viewer_controller::get_study_series_meta
+                                    ))
+                            );
+                            // 의존성 주입
+                            // qido_client는 Arc<Dcm4cheeQidoClient> 이므로, Viewer 스코프에는
+                            // Dcm4cheeQidoClient 자체를 복제해서 web::Data<Dcm4cheeQidoClient>로 등록한다.
+                            // (dicom_gateway_controller의 configure_routes와 동일한 패턴)
+                            cfg.app_data(web::Data::new((*qido_client).clone()));
+                            cfg.app_data(web::Data::new(Arc::new(jwt_service.clone())));
+                            cfg.app_data(web::Data::new(Arc::new(user_repo.clone())));
+                            cfg.app_data(web::Data::new(Arc::new(dicom_evaluator.clone())));
+                            cfg.app_data(web::Data::new(Arc::new(project_data_repo.clone())));
                         }
                     })
                     // ========================================

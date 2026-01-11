@@ -239,22 +239,35 @@ impl<A: AuthService> AuthController<A> {
     }
 
     /// Keycloak 토큰 획득 프록시 (CORS 우회용)
+    /// username/password가 없으면 client_credentials grant 사용
     pub async fn get_keycloak_token(
         req: web::Json<KeycloakTokenRequest>,
     ) -> impl Responder {
-        let keycloak_url = "https://keycloak.pacs.ai-do.kr/realms/dcm4che/protocol/openid-connect/token";
+        let keycloak_url = "https://keycloak.pacs.ai-do.co.kr/realms/dcm4che/protocol/openid-connect/token";
 
         let client = reqwest::Client::new();
-        let params = [
-            ("grant_type", "password"),
-            ("client_id", "pacs-extension-server"),
-            ("client_secret", "85TSWxK8ruF750z0Qzh0tQZ8xH5h3y99"),
-            ("username", req.username.as_str()),
-            ("password", req.password.as_str()),
-        ];
+
+        // username/password가 없거나 빈 문자열이면 client_credentials 사용
+        let use_client_credentials = req.username.is_empty() || req.password.is_empty();
+
+        let form_params: Vec<(&str, &str)> = if use_client_credentials {
+            vec![
+                ("grant_type", "client_credentials"),
+                ("client_id", "pacs-extension-server"),
+                ("client_secret", "vYMipExC4DCpesgWMy11FEOMWybxtpfq"),
+            ]
+        } else {
+            vec![
+                ("grant_type", "password"),
+                ("client_id", "pacs-extension-server"),
+                ("client_secret", "vYMipExC4DCpesgWMy11FEOMWybxtpfq"),
+                ("username", req.username.as_str()),
+                ("password", req.password.as_str()),
+            ]
+        };
 
         match client.post(keycloak_url)
-            .form(&params)
+            .form(&form_params)
             .send()
             .await
         {

@@ -211,31 +211,31 @@ GET /api/user-project-matrix?user_page=1&user_page_size=10&project_page=1&projec
 ### 1. 기본 조회 (첫 페이지)
 
 ```bash
-curl "https://extension.pacs.ai-do.kr/api/user-project-matrix?user_page=1&user_page_size=10&project_page=1&project_page_size=10"
+curl "https://extension.pacs.ai-do.co.kr/api/user-project-matrix?user_page=1&user_page_size=10&project_page=1&project_page_size=10"
 ```
 
 ### 2. 유저 검색
 
 ```bash
-curl "https://extension.pacs.ai-do.kr/api/user-project-matrix?user_search=admin&user_page=1&user_page_size=10"
+curl "https://extension.pacs.ai-do.co.kr/api/user-project-matrix?user_search=admin&user_page=1&user_page_size=10"
 ```
 
 ### 3. 특정 유저만 조회
 
 ```bash
-curl "https://extension.pacs.ai-do.kr/api/user-project-matrix?user_ids=1,2,3&project_page=1&project_page_size=10"
+curl "https://extension.pacs.ai-do.co.kr/api/user-project-matrix?user_ids=1,2,3&project_page=1&project_page_size=10"
 ```
 
 ### 4. 특정 프로젝트만 조회
 
 ```bash
-curl "https://extension.pacs.ai-do.kr/api/user-project-matrix?project_ids=2,3&user_page=1&user_page_size=10"
+curl "https://extension.pacs.ai-do.co.kr/api/user-project-matrix?project_ids=2,3&user_page=1&user_page_size=10"
 ```
 
 ### 5. 유저 정렬 (이메일 기준 내림차순)
 
 ```bash
-curl "https://extension.pacs.ai-do.kr/api/user-project-matrix?user_sort_by=email&user_sort_order=desc&user_page=1&user_page_size=10"
+curl "https://extension.pacs.ai-do.co.kr/api/user-project-matrix?user_sort_by=email&user_sort_order=desc&user_page=1&user_page_size=10"
 ```
 
 ---

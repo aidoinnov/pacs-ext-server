@@ -10,7 +10,7 @@ import json
 import time
 
 # Configuration from environment or defaults
-KEYCLOAK_BASE = os.getenv("KEYCLOAK_BASE_URL", "https://keycloak.ai-do.kr")
+KEYCLOAK_BASE = os.getenv("KEYCLOAK_BASE_URL", "https://keycloak.ai-do.co.kr")
 REALM = os.getenv("KEYCLOAK_REALM", "dcm4che")
 CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "pacs-frontend")
 CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
@@ -31,7 +31,7 @@ def main():
     if not USERNAME or not PASSWORD:
         print("⚠️  KEYCLOAK_USERNAME and KEYCLOAK_PASSWORD not set, skipping E2E test")
         print("   Set these environment variables to run the test:")
-        print("   export KEYCLOAK_BASE_URL=https://keycloak.ai-do.kr")
+        print("   export KEYCLOAK_BASE_URL=https://keycloak.ai-do.co.kr")
         print("   export KEYCLOAK_REALM=dcm4che")
         print("   export KEYCLOAK_CLIENT_ID=pacs-frontend")
         print("   export KEYCLOAK_USERNAME=your-username")

@@ -7,13 +7,13 @@ import requests
 import json
 
 # Keycloak 설정
-KEYCLOAK_URL = "https://keycloak.pacs.ai-do.kr"
+KEYCLOAK_URL = "https://keycloak.pacs.ai-do.co.kr"
 REALM = "dcm4che"
 CLIENT_ID = "pacs-extension-server"
-CLIENT_SECRET = "85TSWxK8ruF750z0Qzh0tQZ8xH5h3y99"
+CLIENT_SECRET = "vYMipExC4DCpesgWMy11FEOMWybxtpfq"
 
 # Dcm4chee 설정 (config/development.toml에서 확인)
-DCM4CHEE_URL = "https://archive.pacs.ai-do.kr"
+DCM4CHEE_URL = "https://archive.pacs.ai-do.co.kr"
 QIDO_PATH = "/iaid-pacs/aets/iAID_PACS/rs"
 
 # 사용자 정보

@@ -9,8 +9,10 @@ use crate::application::reporting::use_cases::SeriesUserReportUseCase;
 use crate::application::template::use_cases::ReportGuideTemplateUseCase;
 use crate::application::services::{SignedUrlService, SignedUrlRequest};
 use crate::domain::ServiceError;
+use crate::domain::repositories::ProjectDataRepository;
 use crate::infrastructure::auth::{extract_user_id_from_request, JwtService};
-use crate::infrastructure::repositories::UserRepositoryImpl;
+use crate::infrastructure::repositories::{UserRepositoryImpl, ProjectDataRepositoryImpl};
+use sqlx;
 
 /// ServiceError를 HttpResponse로 변환하는 헬퍼 함수
 fn handle_service_error(error: ServiceError) -> HttpResponse {
@@ -94,7 +96,8 @@ where
     {
         Ok(report) => Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
             success: true,
-            report: Some(report),
+            description: report.description,
+            conclusion: report.conclusion,
         })),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -143,10 +146,16 @@ where
         .get_report(series_id, user_id, Some(project_id))
         .await
     {
-        Ok(report) => Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
-            success: true,
-            report,
-        })),
+        Ok(report) => {
+            let (description, conclusion) = report
+                .map(|r| (r.description, r.conclusion))
+                .unwrap_or_default();
+            Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
+                success: true,
+                description,
+                conclusion,
+            }))
+        },
         Err(e) => Ok(handle_service_error(e)),
     }
 }
@@ -250,10 +259,28 @@ where
 // 전역 API
 // ========================================
 
+/// Series UID로 Series ID를 찾는 헬퍼 함수
+async fn find_series_id_by_uid(
+    series_uid: &str,
+    project_data_repo: &ProjectDataRepositoryImpl,
+) -> Result<i32, ServiceError> {
+    let series_id: Option<i32> = sqlx::query_scalar(
+        "SELECT id FROM project_data_series WHERE series_uid = $1 LIMIT 1"
+    )
+    .bind(series_uid)
+    .fetch_optional(project_data_repo.pool())
+    .await
+    .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+    series_id.ok_or_else(|| ServiceError::NotFound(
+        format!("Series not found: {}", series_uid)
+    ))
+}
+
 /// 전역 Series User Report 생성/수정
 #[utoipa::path(
     put,
-    path = "/api/series/{series_id}/report",
+    path = "/api/series/{series_uid}/report",
     request_body = CreateOrUpdateSeriesReportRequest,
     responses(
         (status = 200, description = "Report 생성/수정 성공", body = SeriesReportResponse),
@@ -263,23 +290,30 @@ where
         (status = 500, description = "서버 내부 오류")
     ),
     params(
-        ("series_id" = i32, Path, description = "Series ID")
+        ("series_uid" = String, Path, description = "Series UID (DICOM Series Instance UID)")
     ),
     tag = "series-user-report"
 )]
 pub async fn create_or_update_global_report<S, U>(
-    path: web::Path<i32>,
+    path: web::Path<String>,
     request: web::Json<CreateOrUpdateSeriesReportRequest>,
     req: HttpRequest,
     use_case: web::Data<Arc<SeriesUserReportUseCase<S, U>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     S: crate::domain::reporting::services::SeriesUserReportService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
 {
-    let series_id = path.into_inner();
+    let series_uid = path.into_inner();
+    
+    // Series UID로 Series ID 찾기
+    let series_id = match find_series_id_by_uid(&series_uid, &project_data_repo).await {
+        Ok(id) => id,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
 
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
@@ -297,7 +331,8 @@ where
     {
         Ok(report) => Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
             success: true,
-            report: Some(report),
+            description: report.description,
+            conclusion: report.conclusion,
         })),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -306,7 +341,7 @@ where
 /// 전역 Series User Report 조회
 #[utoipa::path(
     get,
-    path = "/api/series/{series_id}/report",
+    path = "/api/series/{series_uid}/report",
     responses(
         (status = 200, description = "Report 조회 성공", body = SeriesReportSingleResponse),
         (status = 401, description = "인증 실패"),
@@ -314,22 +349,29 @@ where
         (status = 500, description = "서버 내부 오류")
     ),
     params(
-        ("series_id" = i32, Path, description = "Series ID")
+        ("series_uid" = String, Path, description = "Series UID (DICOM Series Instance UID)")
     ),
     tag = "series-user-report"
 )]
 pub async fn get_global_report<S, U>(
-    path: web::Path<i32>,
+    path: web::Path<String>,
     req: HttpRequest,
     use_case: web::Data<Arc<SeriesUserReportUseCase<S, U>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     S: crate::domain::reporting::services::SeriesUserReportService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
 {
-    let series_id = path.into_inner();
+    let series_uid = path.into_inner();
+    
+    // Series UID로 Series ID 찾기
+    let series_id = match find_series_id_by_uid(&series_uid, &project_data_repo).await {
+        Ok(id) => id,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
 
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
@@ -342,10 +384,16 @@ where
     };
 
     match use_case.get_report(series_id, user_id, None).await {
-        Ok(report) => Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
-            success: true,
-            report,
-        })),
+        Ok(report) => {
+            let (description, conclusion) = report
+                .map(|r| (r.description, r.conclusion))
+                .unwrap_or_default();
+            Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
+                success: true,
+                description,
+                conclusion,
+            }))
+        },
         Err(e) => Ok(handle_service_error(e)),
     }
 }
@@ -353,29 +401,36 @@ where
 /// 전역 Series의 모든 Report 조회
 #[utoipa::path(
     get,
-    path = "/api/series/{series_id}/reports",
+    path = "/api/series/{series_uid}/reports",
     responses(
         (status = 200, description = "Report 목록 조회 성공", body = SeriesReportListResponse),
         (status = 401, description = "인증 실패"),
         (status = 500, description = "서버 내부 오류")
     ),
     params(
-        ("series_id" = i32, Path, description = "Series ID")
+        ("series_uid" = String, Path, description = "Series UID (DICOM Series Instance UID)")
     ),
     tag = "series-user-report"
 )]
 pub async fn get_global_reports<S, U>(
-    path: web::Path<i32>,
+    path: web::Path<String>,
     req: HttpRequest,
     use_case: web::Data<Arc<SeriesUserReportUseCase<S, U>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     S: crate::domain::reporting::services::SeriesUserReportService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
 {
-    let series_id = path.into_inner();
+    let series_uid = path.into_inner();
+    
+    // Series UID로 Series ID 찾기
+    let series_id = match find_series_id_by_uid(&series_uid, &project_data_repo).await {
+        Ok(id) => id,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
 
     let _user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
@@ -396,7 +451,7 @@ where
 /// 전역 Series User Report 삭제
 #[utoipa::path(
     delete,
-    path = "/api/series/{series_id}/report",
+    path = "/api/series/{series_uid}/report",
     responses(
         (status = 200, description = "Report 삭제 성공"),
         (status = 401, description = "인증 실패"),
@@ -404,22 +459,29 @@ where
         (status = 500, description = "서버 내부 오류")
     ),
     params(
-        ("series_id" = i32, Path, description = "Series ID")
+        ("series_uid" = String, Path, description = "Series UID (DICOM Series Instance UID)")
     ),
     tag = "series-user-report"
 )]
 pub async fn delete_global_report<S, U>(
-    path: web::Path<i32>,
+    path: web::Path<String>,
     req: HttpRequest,
     use_case: web::Data<Arc<SeriesUserReportUseCase<S, U>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     S: crate::domain::reporting::services::SeriesUserReportService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
 {
-    let series_id = path.into_inner();
+    let series_uid = path.into_inner();
+    
+    // Series UID로 Series ID 찾기
+    let series_id = match find_series_id_by_uid(&series_uid, &project_data_repo).await {
+        Ok(id) => id,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
 
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,

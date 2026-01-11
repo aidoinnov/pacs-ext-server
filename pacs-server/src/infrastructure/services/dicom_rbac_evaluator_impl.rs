@@ -11,6 +11,16 @@ impl DicomRbacEvaluatorImpl {
         Self { pool }
     }
 
+    /// 사용자가 속한 모든 프로젝트 ID 조회
+    pub async fn get_user_project_ids(&self, user_id: i32) -> Result<Vec<i32>, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT project_id FROM security_user_project WHERE user_id = $1"
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// 사용자의 프로젝트 내 역할 ID 조회
     async fn get_user_role_id(&self, user_id: i32, project_id: i32) -> Option<i32> {
         sqlx::query_scalar(
@@ -549,13 +559,22 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         project_id: i32,
         series_uid: &str,
     ) -> RbacEvaluationResult {
-        // series_uid로 series 찾기 (project_data를 통해 project_id로 필터링)
+        // series_uid로 series 찾기 (계층적 할당 지원: Study, Series 레벨 확인)
         let series_id: Option<i32> = sqlx::query_scalar(
             "SELECT pds.id
              FROM project_data_series pds
              INNER JOIN project_data_study pdst ON pds.study_id = pdst.id
-             INNER JOIN project_data pd ON pd.study_id = pdst.id
-             WHERE pds.series_uid = $1 AND pd.project_id = $2
+             WHERE pds.series_uid = $1
+             AND EXISTS (
+                 SELECT 1 FROM project_data pd
+                 WHERE pd.project_id = $2
+                 AND (
+                     -- Study 레벨 할당 (상위 계층)
+                     (pd.resource_level = 'STUDY' AND pd.study_id = pdst.id)
+                     -- Series 레벨 할당
+                     OR (pd.resource_level = 'SERIES' AND pd.series_id = pds.id)
+                 )
+             )
              LIMIT 1",
         )
         .bind(series_uid)
@@ -677,13 +696,24 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         instance_uid: &str,
     ) -> RbacEvaluationResult {
         // instance_uid로 instance 찾기 (project_id로 필터링하여 정확도 향상)
-        // project_data 테이블을 통해 project와 instance를 연결
+        // 계층적 할당 지원: Study, Series, Instance 레벨 모두 확인
         let instance_id: Option<i32> = sqlx::query_scalar(
             "SELECT pdi.id FROM project_data_instance pdi
              JOIN project_data_series pds ON pdi.series_id = pds.id
              JOIN project_data_study pdt ON pds.study_id = pdt.id
-             JOIN project_data pd ON pd.study_id = pdt.id
-             WHERE pdi.instance_uid = $1 AND pd.project_id = $2 AND pd.resource_level = 'STUDY'",
+             WHERE pdi.instance_uid = $1
+             AND EXISTS (
+                 SELECT 1 FROM project_data pd
+                 WHERE pd.project_id = $2
+                 AND (
+                     -- Study 레벨 할당
+                     (pd.resource_level = 'STUDY' AND pd.study_id = pdt.id)
+                     -- Series 레벨 할당
+                     OR (pd.resource_level = 'SERIES' AND pd.series_id = pds.id)
+                     -- Instance 레벨 할당
+                     OR (pd.resource_level = 'INSTANCE' AND pd.instance_id = pdi.id)
+                 )
+             )",
         )
         .bind(instance_uid)
         .bind(project_id)
@@ -699,7 +729,7 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         }
         RbacEvaluationResult {
             allowed: false,
-            reason: Some("instance_not_found".to_string()),
+            reason: Some("instance_not_found_in_project".to_string()),
         }
     }
 }

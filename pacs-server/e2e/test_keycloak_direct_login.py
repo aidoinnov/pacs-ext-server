@@ -7,10 +7,10 @@ import requests
 import json
 
 # Keycloak 설정
-KEYCLOAK_URL = "https://keycloak.pacs.ai-do.kr"
+KEYCLOAK_URL = "https://keycloak.pacs.ai-do.co.kr"
 REALM = "dcm4che"
 CLIENT_ID = "pacs-extension-server"
-CLIENT_SECRET = "85TSWxK8ruF750z0Qzh0tQZ8xH5h3y99"  # 코드에서 확인한 시크릿
+CLIENT_SECRET = "vYMipExC4DCpesgWMy11FEOMWybxtpfq"  # 코드에서 확인한 시크릿
 
 # 사용자 정보
 USERNAME = "iaid-pacs-admin"

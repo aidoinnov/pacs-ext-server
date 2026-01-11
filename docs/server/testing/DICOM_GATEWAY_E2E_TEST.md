@@ -17,10 +17,10 @@ RUST_LOG=info cargo run --bin pacs_server
 Keycloak 인증 정보를 설정합니다:
 
 ```bash
-export KEYCLOAK_BASE_URL=https://keycloak.pacs.ai-do.kr
+export KEYCLOAK_BASE_URL=https://keycloak.pacs.ai-do.co.kr
 export KEYCLOAK_REALM=dcm4che
 export KEYCLOAK_CLIENT_ID=pacs-extension-server
-export KEYCLOAK_CLIENT_SECRET=85TSWxK8ruF750z0Qzh0tQZ8xH5h3y99
+export KEYCLOAK_CLIENT_SECRET=vYMipExC4DCpesgWMy11FEOMWybxtpfq
 export KEYCLOAK_USERNAME=<실제_사용자명>
 export KEYCLOAK_PASSWORD=<실제_비밀번호>
 export GATEWAY_BASE_URL=http://127.0.0.1:8080

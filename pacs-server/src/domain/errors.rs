@@ -4,8 +4,10 @@ pub enum ServiceError {
     NotFound(String),
     AlreadyExists(String),
     ValidationError(String),
+    ValidationFailed(String),
     DatabaseError(String),
     Unauthorized(String),
+    Forbidden(String),
 }
 
 impl From<sqlx::Error> for ServiceError {
@@ -20,8 +22,10 @@ impl std::fmt::Display for ServiceError {
             ServiceError::NotFound(msg) => write!(f, "Not found: {}", msg),
             ServiceError::AlreadyExists(msg) => write!(f, "Already exists: {}", msg),
             ServiceError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
+            ServiceError::ValidationFailed(msg) => write!(f, "Validation failed: {}", msg),
             ServiceError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
             ServiceError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
+            ServiceError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
         }
     }
 }

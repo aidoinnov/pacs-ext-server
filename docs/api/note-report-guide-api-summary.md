@@ -708,3 +708,5 @@ Authorization: Bearer <jwt_token>
 - [API 엔드포인트 참조](../server/technical/API_ENDPOINTS_REFERENCE.md)
 - [Swagger UI](http://localhost:8080/swagger-ui/)
 
+
+

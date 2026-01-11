@@ -230,6 +230,59 @@ impl Dcm4cheeQidoClient {
         Ok(json)
     }
 
+    /// 특정 StudyInstanceUID로 Study 조회 (Bearer token 지원)
+    ///
+    /// dcm4chee QIDO-RS는 `/rs/studies/{uid}` 형식이 아니라
+    /// `/rs/studies?StudyInstanceUID={uid}` 형태의 **검색**으로 단일 Study를 찾는다.
+    /// 따라서 구현을 전용 엔드포인트 호출 대신 `qido_studies_with_bearer` 래핑으로 변경한다.
+    pub async fn qido_study_by_uid_with_bearer(
+        &self,
+        bearer_token: Option<&str>,
+        study_uid: &str,
+    ) -> Result<Value, ServiceError> {
+        tracing::debug!(
+            "QIDO (by StudyInstanceUID) /studies?StudyInstanceUID={}: base_url={}, qido_path={}",
+            study_uid,
+            self.base_url,
+            self.qido_path
+        );
+
+	        // QIDO-RS 스펙에 맞게 쿼리 파라미터로 StudyInstanceUID를 전달한다.
+	        // Viewer Study Meta에서 필요로 하는 기본 Study/Patient 메타데이터 태그들도
+	        // includefield로 명시해서 항상 포함되도록 한다.
+	        //
+	        // - 0020000D : StudyInstanceUID
+	        // - 00080020 : StudyDate
+	        // - 00080030 : StudyTime
+	        // - 00081030 : StudyDescription
+	        // - 00100010 : PatientName
+	        // - 00100020 : PatientID
+	        // - 00100030 : PatientBirthDate
+	        // - 00100040 : PatientSex
+	        // - 00101010 : PatientAge
+	        // - 00080061 : ModalitiesInStudy
+	        // - 00201206 : NumberOfStudyRelatedSeries
+	        // - 00201208 : NumberOfStudyRelatedInstances
+	        let params = vec![
+	            ("StudyInstanceUID".to_string(), study_uid.to_string()),
+	            ("limit".to_string(), "1".to_string()),
+	            ("includefield".to_string(), "0020000D".to_string()),
+	            ("includefield".to_string(), "00080020".to_string()),
+	            ("includefield".to_string(), "00080030".to_string()),
+	            ("includefield".to_string(), "00081030".to_string()),
+	            ("includefield".to_string(), "00100010".to_string()),
+	            ("includefield".to_string(), "00100020".to_string()),
+	            ("includefield".to_string(), "00100030".to_string()),
+	            ("includefield".to_string(), "00100040".to_string()),
+	            ("includefield".to_string(), "00101010".to_string()),
+	            ("includefield".to_string(), "00080061".to_string()),
+	            ("includefield".to_string(), "00201206".to_string()),
+	            ("includefield".to_string(), "00201208".to_string()),
+	        ];
+
+        self.qido_studies_with_bearer(bearer_token, params).await
+    }
+
     pub async fn qido_series_with_bearer(
         &self,
         bearer_token: Option<&str>,
@@ -500,12 +553,14 @@ impl Dcm4cheeQidoClient {
         }
 
         if !params.is_empty() {
-            tracing::debug!("  📊 Query params: {:?}", params);
+            tracing::info!("  📊 QIDO /series Query params: {:?}", params);
             let qp: Vec<(&str, &str)> = params
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.as_str()))
                 .collect();
             req = req.query(&qp);
+        } else {
+            tracing::info!("  📊 QIDO /series: No query params");
         }
 
         tracing::info!("  🚀 Sending QIDO /series request...");

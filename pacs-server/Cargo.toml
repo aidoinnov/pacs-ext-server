@@ -23,7 +23,7 @@ actix-web = "4.9"
 actix-cors = "0.7"
 actix-rt = "2.10"
 futures = "0.3.31"
-redis = "0.32.7"
+redis = { version = "0.32.7", features = ["tokio-comp", "connection-manager"] }
 utoipa = { version = "5.4.0", features = ["actix_extras", "uuid"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
 aws-sdk-s3 = "1.0"
@@ -33,6 +33,7 @@ thiserror = "1.0"
 reqwest = { version = "0.11", features = ["json"] }
 tracing = "0.1"
 env_logger = "0.11.8"
+rand = "0.8"
 
 [dev-dependencies]
 tokio-test = "0.4"

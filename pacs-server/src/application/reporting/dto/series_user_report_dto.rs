@@ -103,7 +103,14 @@ pub struct SeriesReportListResponse {
 pub struct SeriesReportSingleResponse {
     #[schema(example = true)]
     pub success: bool,
-    pub report: Option<SeriesReportResponse>,
+    /// Report 설명 (없으면 빈 문자열)
+    #[schema(example = "이 시리즈는 정상 소견입니다")]
+    #[serde(default)]
+    pub description: String,
+    /// Report 결론 (없으면 빈 문자열)
+    #[schema(example = "추가 검사 불필요")]
+    #[serde(default)]
+    pub conclusion: String,
 }
 
 /// 오디오 파일 업로드 URL 요청 DTO

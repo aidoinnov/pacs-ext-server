@@ -3,6 +3,9 @@ import axios from 'axios';
 import './Dashboard.css';
 import ApiHealthCheck from './ApiHealthCheck';
 import ApiScenarioTests from './ApiScenarioTests';
+import StudyListViewTests from './ApiScenarioTests/StudyListViewTests';
+import ViewSelectionTests from './ApiScenarioTests/ViewSelectionTests';
+import QidoEnhancedTests from './ApiScenarioTests/QidoEnhancedTests';
 import Sidebar from './Sidebar';
 import {
   DEFAULT_API_URL,
@@ -12,6 +15,14 @@ import {
   HTTP_METHOD_COLORS,
   SIDEBAR_MENU,
 } from '../constants/app.constants';
+
+// API 점검 하위 메뉴 ID (사이드바 상수와 동일)
+const API_SUB_MENU = {
+  SCENARIO: 'api-health-scenario',
+  STUDY_LIST_VIEW: 'api-health-study-list-view',
+  VIEW_SELECTION: 'api-health-view-selection',
+  QIDO_ENHANCED: 'api-health-qido-enhanced',
+} as const;
 
 interface User {
   user_id: number;
@@ -243,11 +254,27 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tokens: initialTokens, onLo
             </>
           )}
 
-          {activeMenu === SIDEBAR_MENU.API_HEALTH.id && (
+          {/* 시나리오 테스트 (API 점검 > 시나리오 테스트) */}
+          {activeMenu === API_SUB_MENU.SCENARIO && (
             <>
               <ApiHealthCheck />
               <ApiScenarioTests />
             </>
+          )}
+
+          {/* 컬럼 설정 테스트 (API 점검 > 컬럼 설정) */}
+          {activeMenu === API_SUB_MENU.STUDY_LIST_VIEW && (
+            <StudyListViewTests />
+          )}
+
+          {/* View Selection 테스트 (API 점검 > View Selection) */}
+          {activeMenu === API_SUB_MENU.VIEW_SELECTION && (
+            <ViewSelectionTests />
+          )}
+
+          {/* QIDO Enhanced 테스트 (API 점검 > QIDO Enhanced) */}
+          {activeMenu === API_SUB_MENU.QIDO_ENHANCED && (
+            <QidoEnhancedTests />
           )}
         </div>
       </div>

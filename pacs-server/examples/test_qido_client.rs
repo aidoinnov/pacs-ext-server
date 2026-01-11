@@ -10,7 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let base_url = std::env::var("APP_DCM4CHEEBASE_URL")
-        .unwrap_or_else(|_| "https://archive.pacs.ai-do.kr".to_string());
+        .unwrap_or_else(|_| "https://archive.pacs.ai-do.co.kr".to_string());
     let qido_path = std::env::var("APP_DCM4CHEEQIDO_PATH")
         .unwrap_or_else(|_| "/iaid-pacs/aets/iAID_PACS/rs".to_string());
 
@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Keycloak에서 토큰 받기
     println!("🔐 Getting Bearer token from Keycloak...");
-    let keycloak_url = "https://keycloak.pacs.ai-do.kr/realms/dcm4che/protocol/openid-connect/token";
+    let keycloak_url = "https://keycloak.pacs.ai-do.co.kr/realms/dcm4che/protocol/openid-connect/token";
     let http_client = reqwest::Client::new();
     
     let token_response = http_client
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .form(&[
             ("grant_type", "password"),
             ("client_id", "pacs-extension-server"),
-            ("client_secret", "85TSWxK8ruF750z0Qzh0tQZ8xH5h3y99"),
+            ("client_secret", "vYMipExC4DCpesgWMy11FEOMWybxtpfq"),
             ("username", "iaid-pacs-admin"),
             ("password", "Qlalfqjsgh1!"),
         ])

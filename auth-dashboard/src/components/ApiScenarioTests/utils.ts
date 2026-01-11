@@ -9,23 +9,16 @@ export const getTestToken = async (
   setCurrentTestAccount: (account: TestAccount) => void
 ): Promise<string> => {
   try {
-    console.log(`🔑 Keycloak 토큰 획득 중... (계정: ${account.username}, 역할: ${account.role})`);
+    console.log(`🔑 Keycloak 토큰 획득 중... (iaid-pacs-admin 계정)`);
 
-    // 비밀번호 매핑
-    const passwords: Record<string, string> = {
-      'test_super_admin': 'TestAdmin123!',
-      'test_admin': 'TestAdmin123!',
-      'test_user': 'TestUser123!',
-    };
-
-    // 백엔드 프록시를 통해 Keycloak 토큰 획득 (CORS 우회)
+    // 실제 Keycloak 계정으로 토큰 획득
     const response = await axios.post(`${apiUrl}/api/auth/keycloak-token`, {
-      username: account.username,
-      password: passwords[account.username] || 'TestAdmin123!',
+      username: 'iaid-pacs-admin',
+      password: 'Qlalfqjsgh1!',
     });
 
     const token = response.data.access_token;
-    console.log(`✅ Keycloak 토큰 획득 성공! (계정: ${account.username})`);
+    console.log(`✅ Keycloak 토큰 획득 성공!`);
     console.log(`   토큰 길이: ${token.length}, 미리보기: ${token.substring(0, 50)}...`);
 
     setTestToken(token);

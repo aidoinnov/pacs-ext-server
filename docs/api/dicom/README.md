@@ -4,6 +4,32 @@
 
 ## 📄 문서 목록
 
+### [사용자-스터디-조회-API.md](./사용자-스터디-조회-API.md)
+
+**사용자 Study 조회 API 상세 문서**
+
+현재 로그인한 사용자가 접근 가능한 모든 Study를 조회하는 API 문서입니다:
+
+- 다중 프로젝트 통합 조회
+- RBAC 기반 필터링
+- Access Condition 적용
+- Extension Fields 지원 (report_status, review 등)
+- Study List View 지원
+- 병렬 처리를 통한 성능 최적화
+
+### [시리즈-인스턴스-조회-API.md](./시리즈-인스턴스-조회-API.md)
+
+**시리즈 Instance 조회 API 상세 문서**
+
+특정 Series에 속한 모든 Instance(이미지)를 조회하는 API 문서입니다:
+
+- RBAC 기반 권한 검증
+- InstanceNumber 기준 정렬 지원
+- DICOM 메타데이터 제공
+- WADO-RS URL 자동 생성
+- 이미지 다운로드 가이드
+- 실제 사용 사례 및 예제 코드
+
 ### [frontend-api-spec.md](./frontend-api-spec.md)
 
 **프론트엔드 개발자를 위한 완전한 API 명세**
@@ -133,6 +159,21 @@ const response = await axios.post(
 
 ## 📝 변경 이력
 
+### 2026-01-09
+
+- **시리즈-인스턴스-조회-API.md** 추가
+  - Instance 조회 API 상세 문서 작성
+  - InstanceNumber 정렬 기능 문서화
+  - 이미지 다운로드 가이드 추가
+  - 실제 사용 사례 및 예제 코드 추가
+
+### 2026-01-08
+
+- **사용자-스터디-조회-API.md** 추가
+  - 사용자 Study 조회 API 상세 문서 작성
+  - 병렬 처리 및 성능 최적화 문서화
+  - Extension Fields 상세 설명 추가
+
 ### 2025-11-11
 
 - 초기 문서 작성
@@ -152,6 +193,6 @@ const response = await axios.post(
 
 ---
 
-**문서 버전**: 1.0  
-**최종 수정일**: 2025-11-11
+**문서 버전**: 1.2
+**최종 수정일**: 2026-01-09
 

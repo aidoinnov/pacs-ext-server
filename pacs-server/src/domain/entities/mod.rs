@@ -13,6 +13,7 @@ pub mod project_data;
 pub mod relations;
 pub mod role;
 pub mod series_user_note;
+pub mod study_list_view;
 pub mod user;
 pub mod viewer;
 
@@ -25,4 +26,5 @@ pub use permission::*;
 pub use project::*;
 pub use role::*;
 pub use series_user_note::*;
+pub use study_list_view::*;
 pub use user::*;

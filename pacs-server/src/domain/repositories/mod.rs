@@ -11,6 +11,7 @@ mod project_data_repository;
 mod project_repository;
 mod role_repository;
 mod series_user_note_repository;
+mod study_list_view_repository;
 mod user_repository;
 
 pub use access_condition_repository::*;
@@ -26,4 +27,5 @@ pub use project_data_repository::*;
 pub use project_repository::*;
 pub use role_repository::*;
 pub use series_user_note_repository::*;
+pub use study_list_view_repository::*;
 pub use user_repository::*;

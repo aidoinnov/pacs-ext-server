@@ -76,10 +76,10 @@
 **파일**: `pacs-server/env.development`
 
 ```bash
-APP_KEYCLOAK_URL=https://keycloak.pacs.ai-do.kr
+APP_KEYCLOAK_URL=https://keycloak.pacs.ai-do.co.kr
 APP_KEYCLOAK_REALM=dcm4che
 APP_KEYCLOAK_CLIENT_ID=pacs-extension-server
-APP_KEYCLOAK_CLIENT_SECRET=85TSWxK8ruF750z0Qzh0tQZ8xH5h3y99
+APP_KEYCLOAK_CLIENT_SECRET=vYMipExC4DCpesgWMy11FEOMWybxtpfq
 ```
 
 ### 4. API 엔드포인트

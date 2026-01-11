@@ -6,8 +6,10 @@ use std::sync::Arc;
 use crate::application::dto::series_user_note_dto::*;
 use crate::application::use_cases::SeriesUserNoteUseCase;
 use crate::domain::ServiceError;
+use crate::domain::repositories::ProjectDataRepository;
 use crate::infrastructure::auth::{extract_user_id_from_request, JwtService};
-use crate::infrastructure::repositories::UserRepositoryImpl;
+use crate::infrastructure::repositories::{UserRepositoryImpl, ProjectDataRepositoryImpl};
+use sqlx;
 
 /// ServiceError를 HttpResponse로 변환하는 헬퍼 함수
 fn handle_service_error(error: ServiceError) -> HttpResponse {
@@ -93,7 +95,7 @@ where
     {
         Ok(note) => Ok(HttpResponse::Ok().json(SeriesNoteSingleResponse {
             success: true,
-            note: Some(note),
+            note: note.note,
         })),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -145,7 +147,7 @@ where
     {
         Ok(note) => Ok(HttpResponse::Ok().json(SeriesNoteSingleResponse {
             success: true,
-            note,
+            note: note.map(|n| n.note).unwrap_or_default(),
         })),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -262,10 +264,28 @@ where
 // 전역 API
 // ========================================
 
+/// Series UID로 Series ID를 찾는 헬퍼 함수
+async fn find_series_id_by_uid(
+    series_uid: &str,
+    project_data_repo: &ProjectDataRepositoryImpl,
+) -> Result<i32, ServiceError> {
+    let series_id: Option<i32> = sqlx::query_scalar(
+        "SELECT id FROM project_data_series WHERE series_uid = $1 LIMIT 1"
+    )
+    .bind(series_uid)
+    .fetch_optional(project_data_repo.pool())
+    .await
+    .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+    series_id.ok_or_else(|| ServiceError::NotFound(
+        format!("Series not found: {}", series_uid)
+    ))
+}
+
 /// 전역 Series User Note 생성/수정
 #[utoipa::path(
     put,
-    path = "/api/series/{series_id}/note",
+    path = "/api/series/{series_uid}/note",
     request_body = CreateOrUpdateSeriesNoteRequest,
     responses(
         (status = 200, description = "Note 생성/수정 성공", body = SeriesNoteResponse),
@@ -275,23 +295,30 @@ where
         (status = 500, description = "서버 내부 오류")
     ),
     params(
-        ("series_id" = i32, Path, description = "Series ID")
+        ("series_uid" = String, Path, description = "Series UID (DICOM Series Instance UID)")
     ),
     tag = "series-user-note"
 )]
 pub async fn create_or_update_global_note<S, U>(
-    path: web::Path<i32>,
+    path: web::Path<String>,
     request: web::Json<CreateOrUpdateSeriesNoteRequest>,
     req: HttpRequest,
     use_case: web::Data<Arc<SeriesUserNoteUseCase<S, U>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     S: crate::domain::services::SeriesUserNoteService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
 {
-    let series_id = path.into_inner();
+    let series_uid = path.into_inner();
+    
+    // Series UID로 Series ID 찾기
+    let series_id = match find_series_id_by_uid(&series_uid, &project_data_repo).await {
+        Ok(id) => id,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
 
     // 사용자 ID 추출
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
@@ -310,7 +337,7 @@ where
     {
         Ok(note) => Ok(HttpResponse::Ok().json(SeriesNoteSingleResponse {
             success: true,
-            note: Some(note),
+            note: note.note,
         })),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -319,7 +346,7 @@ where
 /// 전역 Series User Note 조회
 #[utoipa::path(
     get,
-    path = "/api/series/{series_id}/note",
+    path = "/api/series/{series_uid}/note",
     responses(
         (status = 200, description = "Note 조회 성공", body = SeriesNoteSingleResponse),
         (status = 401, description = "인증 실패"),
@@ -327,22 +354,29 @@ where
         (status = 500, description = "서버 내부 오류")
     ),
     params(
-        ("series_id" = i32, Path, description = "Series ID")
+        ("series_uid" = String, Path, description = "Series UID (DICOM Series Instance UID)")
     ),
     tag = "series-user-note"
 )]
 pub async fn get_global_note<S, U>(
-    path: web::Path<i32>,
+    path: web::Path<String>,
     req: HttpRequest,
     use_case: web::Data<Arc<SeriesUserNoteUseCase<S, U>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     S: crate::domain::services::SeriesUserNoteService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
 {
-    let series_id = path.into_inner();
+    let series_uid = path.into_inner();
+    
+    // Series UID로 Series ID 찾기
+    let series_id = match find_series_id_by_uid(&series_uid, &project_data_repo).await {
+        Ok(id) => id,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
 
     // 사용자 ID 추출
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
@@ -358,7 +392,7 @@ where
     match use_case.get_note(series_id, user_id, None).await {
         Ok(note) => Ok(HttpResponse::Ok().json(SeriesNoteSingleResponse {
             success: true,
-            note,
+            note: note.map(|n| n.note).unwrap_or_default(),
         })),
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -367,7 +401,7 @@ where
 /// 전역 Series의 모든 User Note 조회 (관리자용)
 #[utoipa::path(
     get,
-    path = "/api/series/{series_id}/notes",
+    path = "/api/series/{series_uid}/notes",
     responses(
         (status = 200, description = "Note 목록 조회 성공", body = SeriesNoteListResponse),
         (status = 401, description = "인증 실패"),
@@ -375,22 +409,29 @@ where
         (status = 500, description = "서버 내부 오류")
     ),
     params(
-        ("series_id" = i32, Path, description = "Series ID")
+        ("series_uid" = String, Path, description = "Series UID (DICOM Series Instance UID)")
     ),
     tag = "series-user-note"
 )]
 pub async fn get_global_notes<S, U>(
-    path: web::Path<i32>,
+    path: web::Path<String>,
     req: HttpRequest,
     use_case: web::Data<Arc<SeriesUserNoteUseCase<S, U>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     S: crate::domain::services::SeriesUserNoteService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
 {
-    let series_id = path.into_inner();
+    let series_uid = path.into_inner();
+    
+    // Series UID로 Series ID 찾기
+    let series_id = match find_series_id_by_uid(&series_uid, &project_data_repo).await {
+        Ok(id) => id,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
 
     // 사용자 ID 추출 (권한 확인용)
     let _user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
@@ -417,7 +458,7 @@ where
 /// 전역 Series User Note 삭제
 #[utoipa::path(
     delete,
-    path = "/api/series/{series_id}/note",
+    path = "/api/series/{series_uid}/note",
     responses(
         (status = 200, description = "Note 삭제 성공"),
         (status = 401, description = "인증 실패"),
@@ -426,22 +467,29 @@ where
         (status = 500, description = "서버 내부 오류")
     ),
     params(
-        ("series_id" = i32, Path, description = "Series ID")
+        ("series_uid" = String, Path, description = "Series UID (DICOM Series Instance UID)")
     ),
     tag = "series-user-note"
 )]
 pub async fn delete_global_note<S, U>(
-    path: web::Path<i32>,
+    path: web::Path<String>,
     req: HttpRequest,
     use_case: web::Data<Arc<SeriesUserNoteUseCase<S, U>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     S: crate::domain::services::SeriesUserNoteService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
 {
-    let series_id = path.into_inner();
+    let series_uid = path.into_inner();
+    
+    // Series UID로 Series ID 찾기
+    let series_id = match find_series_id_by_uid(&series_uid, &project_data_repo).await {
+        Ok(id) => id,
+        Err(e) => return Ok(handle_service_error(e)),
+    };
 
     // 사용자 ID 추출
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
@@ -503,6 +551,7 @@ pub fn configure_global_series_routes<S, U, R, UR>(
     report_use_case: Arc<crate::application::reporting::use_cases::SeriesUserReportUseCase<R, UR>>,
     jwt: Arc<JwtService>,
     user_repo: Arc<UserRepositoryImpl>,
+    project_data_repo: Arc<ProjectDataRepositoryImpl>,
 ) where
     S: crate::domain::services::SeriesUserNoteService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
@@ -513,19 +562,20 @@ pub fn configure_global_series_routes<S, U, R, UR>(
         .app_data(web::Data::new(report_use_case))
         .app_data(web::Data::new(jwt))
         .app_data(web::Data::new(user_repo))
+        .app_data(web::Data::new(project_data_repo))
         .service(
             // 전역 API (Note + Report 통합)
             web::scope("/series")
-                // Note API
-                .route("/{series_id}/note", web::put().to(create_or_update_global_note::<S, U>))
-                .route("/{series_id}/note", web::get().to(get_global_note::<S, U>))
-                .route("/{series_id}/notes", web::get().to(get_global_notes::<S, U>))
-                .route("/{series_id}/note", web::delete().to(delete_global_note::<S, U>))
-                // Report API
-                .route("/{series_id}/report", web::put().to(crate::presentation::reporting::controllers::series_user_report_controller::create_or_update_global_report::<R, UR>))
-                .route("/{series_id}/report", web::get().to(crate::presentation::reporting::controllers::series_user_report_controller::get_global_report::<R, UR>))
-                .route("/{series_id}/reports", web::get().to(crate::presentation::reporting::controllers::series_user_report_controller::get_global_reports::<R, UR>))
-                .route("/{series_id}/report", web::delete().to(crate::presentation::reporting::controllers::series_user_report_controller::delete_global_report::<R, UR>)),
+                // Note API - Series UID 사용
+                .route("/{series_uid}/note", web::put().to(create_or_update_global_note::<S, U>))
+                .route("/{series_uid}/note", web::get().to(get_global_note::<S, U>))
+                .route("/{series_uid}/notes", web::get().to(get_global_notes::<S, U>))
+                .route("/{series_uid}/note", web::delete().to(delete_global_note::<S, U>))
+                // Report API - Series UID 사용
+                .route("/{series_uid}/report", web::put().to(crate::presentation::reporting::controllers::series_user_report_controller::create_or_update_global_report::<R, UR>))
+                .route("/{series_uid}/report", web::get().to(crate::presentation::reporting::controllers::series_user_report_controller::get_global_report::<R, UR>))
+                .route("/{series_uid}/reports", web::get().to(crate::presentation::reporting::controllers::series_user_report_controller::get_global_reports::<R, UR>))
+                .route("/{series_uid}/report", web::delete().to(crate::presentation::reporting::controllers::series_user_report_controller::delete_global_report::<R, UR>)),
         );
 }
 

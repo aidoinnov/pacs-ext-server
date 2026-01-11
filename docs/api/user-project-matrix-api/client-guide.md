@@ -90,7 +90,7 @@ async function getUserProjectMatrix(
   if (params.role_id) queryParams.append('role_id', params.role_id.toString());
   
   const response = await fetch(
-    `https://extension.pacs.ai-do.kr/api/user-project-matrix?${queryParams.toString()}`
+    `https://extension.pacs.ai-do.co.kr/api/user-project-matrix?${queryParams.toString()}`
   );
   
   if (!response.ok) {
@@ -120,7 +120,7 @@ async function getUserProjectMatrix(
   params: UserProjectMatrixParams
 ): Promise<UserProjectMatrixResponse> {
   const response = await axios.get<UserProjectMatrixResponse>(
-    'https://extension.pacs.ai-do.kr/api/user-project-matrix',
+    'https://extension.pacs.ai-do.co.kr/api/user-project-matrix',
     { params }
   );
   

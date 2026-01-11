@@ -94,10 +94,10 @@ print("3. Dcm4chee 직접 호출 (비교용)")
 print("=" * 70)
 
 # Keycloak에서 직접 토큰 받기
-KEYCLOAK_URL = "https://keycloak.pacs.ai-do.kr"
+KEYCLOAK_URL = "https://keycloak.pacs.ai-do.co.kr"
 REALM = "dcm4che"
 CLIENT_ID = "pacs-extension-server"
-CLIENT_SECRET = "85TSWxK8ruF750z0Qzh0tQZ8xH5h3y99"
+CLIENT_SECRET = "vYMipExC4DCpesgWMy11FEOMWybxtpfq"
 TOKEN_URL = f"{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/token"
 
 token_data = {
@@ -113,7 +113,7 @@ try:
     if kc_resp.status_code == 200:
         kc_token = kc_resp.json().get("access_token")
         
-        DCM4CHEE_URL = "https://archive.pacs.ai-do.kr"
+        DCM4CHEE_URL = "https://archive.pacs.ai-do.co.kr"
         QIDO_PATH = "/iaid-pacs/aets/iAID_PACS/rs"
         qido_url = f"{DCM4CHEE_URL}{QIDO_PATH}/studies?limit=100"
         
@@ -156,6 +156,8 @@ if isinstance(data2, list):
         print("✅ 두 엔드포인트가 동일한 Study를 반환합니다!")
     else:
         print(f"⚠️  두 엔드포인트가 다른 Study를 반환합니다 (차이: {abs(len(study_uids_me) - len(study_uids_2))}개)")
+
+
 
 
 

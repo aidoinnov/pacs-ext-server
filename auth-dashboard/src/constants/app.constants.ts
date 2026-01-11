@@ -46,6 +46,12 @@ export const SIDEBAR_MENU = {
     icon: '🔍',
     label: 'API 점검',
     description: 'E2E 테스트 실행',
+    subMenus: [
+      { id: 'api-health-scenario', label: '시나리오 테스트', icon: '📊' },
+      { id: 'api-health-study-list-view', label: '컬럼 설정 (View)', icon: '📋' },
+      { id: 'api-health-view-selection', label: 'View Selection', icon: '🎬' },
+      { id: 'api-health-qido-enhanced', label: 'QIDO Enhanced', icon: '🚀' },
+    ],
   },
   PROJECT_MANAGEMENT: {
     id: 'projects',

@@ -94,7 +94,9 @@ pub struct SeriesNoteSingleResponse {
     /// 성공 여부
     #[schema(example = true)]
     pub success: bool,
-    /// Note 정보 (없으면 null)
-    pub note: Option<SeriesNoteResponse>,
+    /// Note 내용 (없으면 빈 문자열)
+    #[schema(example = "이 시리즈는 프로젝트 A에서 분석 중입니다")]
+    #[serde(default)]
+    pub note: String,
 }
 

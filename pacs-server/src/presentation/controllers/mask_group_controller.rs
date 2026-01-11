@@ -113,6 +113,14 @@ where
             "current_version": current_version,
             "client_version": client_version,
         })),
+        Err(ServiceError::ValidationFailed(msg)) => HttpResponse::BadRequest().json(json!({
+            "error": "Validation Failed",
+            "message": msg
+        })),
+        Err(ServiceError::Forbidden(msg)) => HttpResponse::Forbidden().json(json!({
+            "error": "Forbidden",
+            "message": msg
+        })),
     }
 }
 

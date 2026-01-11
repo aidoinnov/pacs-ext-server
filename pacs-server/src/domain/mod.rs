@@ -4,6 +4,7 @@ pub mod repositories;
 pub mod reporting;
 pub mod services;
 pub mod template;
+pub mod view_selection;
 
 // ServiceError를 직접 정의
 #[derive(Debug, Clone)]
@@ -11,8 +12,10 @@ pub enum ServiceError {
     NotFound(String),
     AlreadyExists(String),
     ValidationError(String),
+    ValidationFailed(String),
     DatabaseError(String),
     Unauthorized(String),
+    Forbidden(String),
     ExternalServiceError(String),
     /// 버전 충돌 에러 (Optimistic Locking)
     /// 클라이언트가 제공한 버전과 서버의 현재 버전이 일치하지 않음
@@ -28,8 +31,10 @@ impl std::fmt::Display for ServiceError {
             ServiceError::NotFound(msg) => write!(f, "Not found: {}", msg),
             ServiceError::AlreadyExists(msg) => write!(f, "Already exists: {}", msg),
             ServiceError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
+            ServiceError::ValidationFailed(msg) => write!(f, "Validation failed: {}", msg),
             ServiceError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
             ServiceError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
+            ServiceError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
             ServiceError::ExternalServiceError(msg) => write!(f, "External service error: {}", msg),
             ServiceError::VersionConflict {
                 current_version,
@@ -70,13 +75,18 @@ impl actix_web::ResponseError for ServiceError {
                     "error": self.to_string()
                 }))
             }
-            ServiceError::ValidationError(_) => {
+            ServiceError::ValidationError(_) | ServiceError::ValidationFailed(_) => {
                 actix_web::HttpResponse::BadRequest().json(serde_json::json!({
                     "error": self.to_string()
                 }))
             }
             ServiceError::Unauthorized(_) => {
                 actix_web::HttpResponse::Unauthorized().json(serde_json::json!({
+                    "error": self.to_string()
+                }))
+            }
+            ServiceError::Forbidden(_) => {
+                actix_web::HttpResponse::Forbidden().json(serde_json::json!({
                     "error": self.to_string()
                 }))
             }

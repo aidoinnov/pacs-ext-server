@@ -14,8 +14,10 @@ use crate::application::dto::user_dto::*;
 use crate::application::dto::user_project_matrix_dto::*;
 use crate::application::dto::series_user_note_dto::*;
 use crate::application::dto::user_registration_dto::*;
+use crate::application::dto::view_selection_dto::*;
+use crate::application::dto::viewer_dto::*;
 use crate::presentation::controllers::annotation_controller::*;
-use crate::presentation::controllers::auth_controller_docs::*;
+// use crate::presentation::controllers::auth_controller_docs::*; // 모듈이 controllers/mod.rs에 선언되지 않음
 use crate::presentation::controllers::mask_group_controller::*;
 use crate::presentation::controllers::project_controller::*;
 use crate::presentation::controllers::project_data_access_controller::*;
@@ -23,15 +25,17 @@ use crate::presentation::controllers::project_user_matrix_controller::*;
 use crate::presentation::controllers::role_permission_matrix_controller::*;
 use crate::presentation::controllers::series_user_note_controller::*;
 use crate::presentation::controllers::user_project_matrix_controller;
+use crate::presentation::controllers::view_selection_controller::*;
+use crate::presentation::controllers::viewer_controller::*;
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
         // Auth endpoints
-        login_doc,
-        verify_token_doc,
-        refresh_token_doc,
+        // login_doc, // auth_controller_docs 모듈이 없음
+        // verify_token_doc, // auth_controller_docs 모듈이 없음
+        // refresh_token_doc, // auth_controller_docs 모듈이 없음
         // Annotation endpoints
         create_annotation,
         get_annotation,
@@ -77,6 +81,14 @@ use utoipa::OpenApi;
         get_global_note,
         get_global_notes,
         delete_global_note,
+        // View Selection endpoints
+        create_view_selection,
+        get_view_selection,
+        delete_view_selection,
+        // Viewer endpoints
+        get_studies_meta,
+        get_series_meta,
+        get_study_series_meta,
         // User Registration endpoints (TODO: Add OpenAPI annotations)
         // signup,
         // verify_email,
@@ -170,6 +182,22 @@ use utoipa::OpenApi;
             SeriesNoteListResponse,
             SeriesNoteWithUserResponse,
             SeriesNoteUserInfo,
+            // View Selection DTOs
+            CreateViewSelectionRequest,
+            CreateViewSelectionResponse,
+            ViewSelectionResponse,
+            SelectedSeriesDto,
+            // Viewer DTOs
+            ViewerStudyMetaRequest,
+            ViewerStudyMetaResponse,
+            ViewerStudyMeta,
+            ViewerSeriesMetaRequest,
+            ViewerSeriesMetaResponse,
+            ViewerSeriesMeta,
+            ViewerStudySeriesMetaRequest,
+            ViewerStudySeriesMetaResponse,
+            ViewerPaginationInfo,
+            SeriesQuery,
             // User Registration DTOs
             SignupRequest,
             VerifyEmailRequest,
@@ -192,6 +220,8 @@ use utoipa::OpenApi;
         (name = "role-permission-matrix", description = "Role Permission Matrix endpoints - 역할 권한 매트릭스 API"),
         (name = "project-data-access", description = "Project Data Access endpoints - 프로젝트 데이터 접근 관리 API"),
         (name = "series-user-note", description = "Series User Note endpoints - Series 사용자 메모 관리 API"),
+        (name = "view-selection", description = "View Selection endpoints - Viewer Session 기반 멀티-Study/Series 선택 관리 API"),
+        (name = "viewer", description = "Viewer BFF endpoints - Viewer 전용 Backend-for-Frontend API (Study/Series Meta Batch)"),
         (name = "user-registration", description = "User Registration endpoints - 사용자 등록 및 계정 관리 API"),
     ),
     info(
