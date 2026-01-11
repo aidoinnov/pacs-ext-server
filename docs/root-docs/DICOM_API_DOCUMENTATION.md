@@ -22,7 +22,7 @@
 PACS Extension Server는 DICOM 이미지 메타데이터를 조회할 수 있는 RESTful API를 제공합니다.
 
 ### 기본 정보
-- **Base URL**: `http://localhost:8080` (개발), `https://api.pacs.ai-do.kr` (프로덕션)
+- **Base URL**: `http://localhost:8080` (개발), `https://api.pacs.ai-do.co.kr` (프로덕션)
 - **프로토콜**: HTTPS (프로덕션), HTTP (개발)
 - **데이터 형식**: JSON (DICOM JSON 표준)
 - **인증 방식**: Bearer Token (JWT)
@@ -231,7 +231,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
       "Value": ["8"],
       "vr": "IS"
     },
-    "thumbnail_url": "https://archive.pacs.ai-do.kr/rs/studies/1.2.410.200022.500.200612201921171.113378644/series/1.3.12.2.1107.5.1.4.51698.30000006122005083573400013771/thumbnail"
+    "thumbnail_url": "https://archive.pacs.ai-do.co.kr/rs/studies/1.2.410.200022.500.200612201921171.113378644/series/1.3.12.2.1107.5.1.4.51698.30000006122005083573400013771/thumbnail"
   }
 ]
 ```
@@ -264,7 +264,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ### 썸네일 URL 형식
 
 ```
-https://archive.pacs.ai-do.kr/rs/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/thumbnail
+https://archive.pacs.ai-do.co.kr/rs/studies/{StudyInstanceUID}/series/{SeriesInstanceUID}/thumbnail
 ```
 
 - WADO-RS 표준 준수
@@ -618,7 +618,7 @@ getSeries(token, 2, 'PATIENT_001', { limit: 100, offset: 200 });
 
 ## 9. 문의
 
-- **기술 지원**: dev@ai-do.kr
+- **기술 지원**: dev@ai-do.co.kr
 - **버그 리포트**: GitHub Issues
 - **API 문서**: http://localhost:8080/swagger-ui/ (개발 환경)
 

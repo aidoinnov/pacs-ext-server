@@ -122,7 +122,7 @@ Authorization: Bearer {access_token}
       "Value": ["8"],
       "vr": "IS"
     },
-    "thumbnail_url": "https://archive.pacs.ai-do.kr/rs/studies/1.2.410.200022.500.200612201921171.113378644/series/1.3.12.2.1107.5.1.4.51698.30000006122005083573400013771/thumbnail"
+    "thumbnail_url": "https://archive.pacs.ai-do.co.kr/rs/studies/1.2.410.200022.500.200612201921171.113378644/series/1.3.12.2.1107.5.1.4.51698.30000006122005083573400013771/thumbnail"
   }
 ]
 ```
@@ -171,7 +171,7 @@ Authorization: Bearer {access_token}
       "Value": ["6"],
       "vr": "IS"
     },
-    "thumbnail_url": "https://archive.pacs.ai-do.kr/rs/studies/1.2.826.0.1.3680043.8.498.12345678901234567890/series/1.2.826.0.1.3680043.8.498.98765432109876543210/thumbnail"
+    "thumbnail_url": "https://archive.pacs.ai-do.co.kr/rs/studies/1.2.826.0.1.3680043.8.498.12345678901234567890/series/1.2.826.0.1.3680043.8.498.98765432109876543210/thumbnail"
   }
 ]
 ```
