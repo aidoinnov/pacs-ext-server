@@ -502,3 +502,60 @@ mod tests {
     //     // Test implementation would go here
     // }
 }
+
+// Arc<SignedUrlServiceImpl>이 SignedUrlService trait을 구현하도록 blanket implementation 추가
+#[async_trait]
+impl SignedUrlService for std::sync::Arc<SignedUrlServiceImpl> {
+    async fn generate_upload_url(
+        &self,
+        request: SignedUrlRequest,
+    ) -> Result<SignedUrlResponse, SignedUrlError> {
+        (**self).generate_upload_url(request).await
+    }
+
+    async fn generate_download_url(
+        &self,
+        request: SignedUrlRequest,
+    ) -> Result<SignedUrlResponse, SignedUrlError> {
+        (**self).generate_download_url(request).await
+    }
+
+    async fn generate_mask_upload_url(
+        &self,
+        annotation_id: i32,
+        mask_group_id: i32,
+        file_name: String,
+        content_type: String,
+        ttl_seconds: Option<u64>,
+        user_id: Option<i32>,
+    ) -> Result<SignedUrlResponse, SignedUrlError> {
+        (**self).generate_mask_upload_url(annotation_id, mask_group_id, file_name, content_type, ttl_seconds, user_id).await
+    }
+
+    async fn generate_mask_download_url(
+        &self,
+        file_path: String,
+        ttl_seconds: Option<u64>,
+    ) -> Result<SignedUrlResponse, SignedUrlError> {
+        (**self).generate_mask_download_url(file_path, ttl_seconds).await
+    }
+
+    async fn generate_annotation_upload_url(
+        &self,
+        annotation_id: i32,
+        file_name: String,
+        content_type: String,
+        ttl_seconds: Option<u64>,
+        user_id: Option<i32>,
+    ) -> Result<SignedUrlResponse, SignedUrlError> {
+        (**self).generate_annotation_upload_url(annotation_id, file_name, content_type, ttl_seconds, user_id).await
+    }
+
+    async fn generate_annotation_download_url(
+        &self,
+        file_path: String,
+        ttl_seconds: Option<u64>,
+    ) -> Result<SignedUrlResponse, SignedUrlError> {
+        (**self).generate_annotation_download_url(file_path, ttl_seconds).await
+    }
+}

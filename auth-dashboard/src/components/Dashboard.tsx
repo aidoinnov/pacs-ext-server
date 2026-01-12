@@ -6,6 +6,7 @@ import ApiScenarioTests from './ApiScenarioTests';
 import StudyListViewTests from './ApiScenarioTests/StudyListViewTests';
 import ViewSelectionTests from './ApiScenarioTests/ViewSelectionTests';
 import QidoEnhancedTests from './ApiScenarioTests/QidoEnhancedTests';
+import AnnotationSnapshotTests from './ApiScenarioTests/AnnotationSnapshotTests';
 import Sidebar from './Sidebar';
 import {
   DEFAULT_API_URL,
@@ -22,6 +23,7 @@ const API_SUB_MENU = {
   STUDY_LIST_VIEW: 'api-health-study-list-view',
   VIEW_SELECTION: 'api-health-view-selection',
   QIDO_ENHANCED: 'api-health-qido-enhanced',
+  ANNOTATION_SNAPSHOT: 'api-health-annotation-snapshot',
 } as const;
 
 interface User {
@@ -275,6 +277,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tokens: initialTokens, onLo
           {/* QIDO Enhanced 테스트 (API 점검 > QIDO Enhanced) */}
           {activeMenu === API_SUB_MENU.QIDO_ENHANCED && (
             <QidoEnhancedTests />
+          )}
+
+          {/* Annotation Snapshot 테스트 (API 점검 > Annotation Snapshot) */}
+          {activeMenu === API_SUB_MENU.ANNOTATION_SNAPSHOT && (
+            <AnnotationSnapshotTests />
           )}
         </div>
       </div>

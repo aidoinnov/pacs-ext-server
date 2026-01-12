@@ -18,6 +18,7 @@ pub mod user_project_matrix_dto;
 pub mod user_registration_dto;
 pub mod view_selection_dto;
 pub mod viewer_dto;
+pub mod annotation_snapshot_dto;
 
 pub use access_control_dto::*;
 pub use annotation_dto::*;
@@ -28,3 +29,4 @@ pub use series_user_note_dto::*;
 pub use study_list_view_dto::*;
 pub use user_dto::*;
 pub use view_selection_dto::*;
+pub use annotation_snapshot_dto::*;

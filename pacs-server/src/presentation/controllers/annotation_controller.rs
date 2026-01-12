@@ -2,15 +2,22 @@
 use crate::application::dto::annotation_dto::{
     AnnotationListResponse, AnnotationPermissionsResponse, AnnotationResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
 };
+use crate::application::dto::{
+    SnapshotUploadUrlRequest, SnapshotUploadUrlResponse,
+    CompleteSnapshotUploadRequest, SnapshotStatusResponse,
+};
+use crate::application::services::SignedUrlServiceImpl;
 use crate::application::use_cases::AnnotationUseCase;
 use crate::domain::services::annotation_service::AnnotationService;
-use crate::domain::services::{AnnotationServiceImpl, AccessControlServiceImpl};
+use crate::domain::services::{AnnotationServiceImpl, AccessControlServiceImpl, AccessControlService};
+use crate::domain::repositories::UserRepository;
 use crate::domain::ServiceError;
 use crate::infrastructure::repositories::{
     AnnotationRepositoryImpl, ProjectRepositoryImpl, UserRepositoryImpl,
     AccessLogRepositoryImpl, RoleRepositoryImpl, PermissionRepositoryImpl,
 };
 use crate::infrastructure::auth::{extract_user_id_from_request, JwtService};
+use crate::application::services::SignedUrlService;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
@@ -217,6 +224,7 @@ pub async fn create_annotation(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                Arc<SignedUrlServiceImpl>
             >,
         >,
     >,
@@ -273,6 +281,7 @@ pub async fn get_annotation(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                Arc<SignedUrlServiceImpl>
             >,
         >,
     >,
@@ -332,6 +341,7 @@ pub async fn head_annotation(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                SignedUrlServiceImpl
             >,
         >,
     >,
@@ -427,6 +437,7 @@ pub async fn head_annotation_summary(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                SignedUrlServiceImpl
             >,
         >,
     >,
@@ -532,6 +543,7 @@ pub async fn head_annotations(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                SignedUrlServiceImpl
             >,
         >,
     >,
@@ -641,6 +653,7 @@ pub async fn get_annotation_summary(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                Arc<SignedUrlServiceImpl>,
             >,
         >,
     >,
@@ -754,7 +767,9 @@ pub async fn list_annotations(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                SignedUrlServiceImpl
             >,
+            
         >,
     >,
 ) -> impl Responder {
@@ -1254,7 +1269,9 @@ pub async fn update_annotation(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                SignedUrlServiceImpl
             >,
+            
         >,
     >,
 ) -> impl Responder {
@@ -1307,6 +1324,7 @@ pub async fn delete_annotation(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                SignedUrlServiceImpl
             >,
         >,
     >,
@@ -1358,6 +1376,7 @@ pub async fn get_annotation_permissions(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
+                Arc<SignedUrlServiceImpl>
             >,
         >,
     >,
@@ -1409,6 +1428,143 @@ pub async fn get_annotation_permissions(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/annotations/{annotation_id}/snapshot/upload-url",
+    tag = "Annotations",
+    request_body = SnapshotUploadUrlRequest,
+    responses(
+        (status = 200, description = "Upload URL generated successfully", body = SnapshotUploadUrlResponse),
+        (status = 401, description = "Unauthorized - Not the annotation owner"),
+        (status = 404, description = "Annotation not found"),
+        (status = 500, description = "Internal server error"),
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn generate_snapshot_upload_url<AS, UR, ACS, SUS>(
+    path: web::Path<i32>,
+    request: web::Json<SnapshotUploadUrlRequest>,
+    http_req: HttpRequest,
+    jwt_service: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    use_case: web::Data<Arc<AnnotationUseCase<AS, UR, ACS, SUS>>>,
+) -> impl Responder
+where
+    AS: AnnotationService + 'static,
+    UR: UserRepository + 'static,
+    ACS: AccessControlService + 'static,
+    SUS: SignedUrlService + 'static,
+{
+    let annotation_id = path.into_inner();
+
+    // Extract user_id from JWT token
+    let user_id = match extract_user_id_from_request(&http_req, &jwt_service, &user_repo).await {
+        Some(id) if id > 0 => id,
+        _ => return HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": "Invalid or missing authentication token"
+        })),
+    };
+
+    match use_case.generate_snapshot_upload_url(annotation_id, request.into_inner(), user_id).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => AnnotationController::handle_service_error(e),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/annotations/{annotation_id}/snapshot/complete-upload",
+    tag = "Annotations",
+    request_body = CompleteSnapshotUploadRequest,
+    responses(
+        (status = 200, description = "Snapshot upload completed", body = AnnotationResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Annotation not found"),
+        (status = 500, description = "Internal server error"),
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn complete_snapshot_upload<AS, UR, ACS, SUS>(
+    path: web::Path<i32>,
+    request: web::Json<CompleteSnapshotUploadRequest>,
+    http_req: HttpRequest,
+    use_case: web::Data<Arc<AnnotationUseCase<AS, UR, ACS, SUS>>>,
+) -> impl Responder
+where
+    AS: AnnotationService + 'static,
+    UR: UserRepository + 'static,
+    ACS: AccessControlService + 'static,
+    SUS: SignedUrlService + 'static,
+{
+    let annotation_id = path.into_inner();
+
+    let user_id = http_req
+        .headers()
+        .get("X-User-ID")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(1);
+
+    match use_case.complete_snapshot_upload(
+        annotation_id,
+        request.into_inner(),
+        user_id
+    ).await {
+        Ok(annotation) => HttpResponse::Ok().json(annotation),
+        Err(e) => AnnotationController::handle_service_error(e),
+    }
+}
+
+/// 스냅샷 업로드 상태 조회
+#[utoipa::path(
+    get,
+    path = "/annotations/{annotation_id}/snapshot/status",
+    tag = "Annotations",
+    responses(
+        (status = 200, description = "Snapshot status retrieved", body = SnapshotStatusResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Annotation not found"),
+        (status = 500, description = "Internal server error"),
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub async fn get_snapshot_status<AS, UR, ACS, SUS>(
+    path: web::Path<i32>,
+    http_req: HttpRequest,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    use_case: web::Data<Arc<AnnotationUseCase<AS, UR, ACS, SUS>>>,
+) -> impl Responder
+where
+    AS: AnnotationService + 'static,
+    UR: UserRepository + 'static,
+    ACS: AccessControlService + 'static,
+    SUS: SignedUrlService + 'static,
+{
+    let annotation_id = path.into_inner();
+
+    // Extract user_id from JWT token
+    let user_id = match extract_user_id_from_request(&http_req, &jwt, &user_repo).await {
+        Some(id) if id > 0 => id,
+        _ => return HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": "Invalid or missing authentication token"
+        })),
+    };
+
+    match use_case.get_snapshot_status(annotation_id, user_id).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => AnnotationController::handle_service_error(e),
+    }
+}
+
 pub fn configure_routes(
     cfg: &mut web::ServiceConfig,
     use_case: Arc<
@@ -1426,6 +1582,7 @@ pub fn configure_routes(
                 RoleRepositoryImpl,
                 PermissionRepositoryImpl,
             >,
+            Arc<SignedUrlServiceImpl>,
         >,
     >,
     mask_group_use_case: Arc<
@@ -1438,9 +1595,14 @@ pub fn configure_routes(
             crate::application::services::SignedUrlServiceImpl,
         >,
     >,
+    jwt_service: Arc<crate::infrastructure::auth::JwtService>,
+    user_repo: Arc<UserRepositoryImpl>,
 ) {
+    // cfg 레벨에서 app_data 등록 (scope 밖)
     cfg.app_data(web::Data::new(use_case))
         .app_data(web::Data::new(mask_group_use_case))
+        .app_data(web::Data::new(jwt_service))
+        .app_data(web::Data::new(user_repo))
         .service(
             web::scope("/annotations")
                 .route("/summary", web::get().to(get_annotation_summary))
@@ -1643,6 +1805,69 @@ pub fn configure_routes(
                         >,
                         crate::application::services::SignedUrlServiceImpl,
                     >),
+                )
+                .route(
+                    "/{annotation_id}/snapshot/upload-url",
+                    web::post().to(
+                        generate_snapshot_upload_url::<
+                            crate::domain::services::AnnotationServiceImpl<
+                                crate::infrastructure::repositories::AnnotationRepositoryImpl,
+                                crate::infrastructure::repositories::UserRepositoryImpl,
+                                crate::infrastructure::repositories::ProjectRepositoryImpl,
+                            >,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
+                            crate::domain::services::AccessControlServiceImpl<
+                                crate::infrastructure::repositories::AccessLogRepositoryImpl,
+                                crate::infrastructure::repositories::UserRepositoryImpl,
+                                crate::infrastructure::repositories::ProjectRepositoryImpl,
+                                crate::infrastructure::repositories::RoleRepositoryImpl,
+                                crate::infrastructure::repositories::PermissionRepositoryImpl,
+                            >,
+                            Arc<crate::application::services::SignedUrlServiceImpl>,
+                        >,
+                    ),
+                )
+                .route(
+                    "/{annotation_id}/snapshot/complete-upload",
+                    web::post().to(
+                        complete_snapshot_upload::<
+                            AnnotationServiceImpl<
+                                AnnotationRepositoryImpl,
+                                UserRepositoryImpl,
+                                ProjectRepositoryImpl,
+                            >,
+                            UserRepositoryImpl,
+                            AccessControlServiceImpl<
+                                AccessLogRepositoryImpl,
+                                UserRepositoryImpl,
+                                ProjectRepositoryImpl,
+                                RoleRepositoryImpl,
+                                PermissionRepositoryImpl,
+                            >,
+                            Arc<SignedUrlServiceImpl>,
+                        >,
+                    ),
+                )
+                .route(
+                    "/{annotation_id}/snapshot/status",
+                    web::get().to(
+                        get_snapshot_status::<
+                            AnnotationServiceImpl<
+                                AnnotationRepositoryImpl,
+                                UserRepositoryImpl,
+                                ProjectRepositoryImpl,
+                            >,
+                            UserRepositoryImpl,
+                            AccessControlServiceImpl<
+                                AccessLogRepositoryImpl,
+                                UserRepositoryImpl,
+                                ProjectRepositoryImpl,
+                                RoleRepositoryImpl,
+                                PermissionRepositoryImpl,
+                            >,
+                            Arc<SignedUrlServiceImpl>,
+                        >,
+                    ),
                 ),
         );
 }

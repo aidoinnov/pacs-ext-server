@@ -12,6 +12,27 @@ use serde::{Deserialize, Serialize};
 // SQLx를 통한 데이터베이스 행 매핑을 위한 트레이트
 use sqlx::FromRow;
 
+// 스냅샷 업로드 상태 ENUM
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "snapshot_upload_status", rename_all = "lowercase")]
+pub enum SnapshotUploadStatus {
+    Pending,    // URL 생성됨, 업로드 대기 중
+    Uploading,  // 업로드 진행 중
+    Completed,  // 업로드 완료
+    Failed,     // 업로드 실패
+}
+
+impl std::fmt::Display for SnapshotUploadStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SnapshotUploadStatus::Pending => write!(f, "pending"),
+            SnapshotUploadStatus::Uploading => write!(f, "uploading"),
+            SnapshotUploadStatus::Completed => write!(f, "completed"),
+            SnapshotUploadStatus::Failed => write!(f, "failed"),
+        }
+    }
+}
+
 /// 의료 영상 어노테이션을 나타내는 엔티티
 ///
 /// 이 구조체는 데이터베이스의 `annotation_annotation` 테이블과 매핑되며,
@@ -74,15 +95,19 @@ pub struct Annotation {
     pub data: serde_json::Value,
     /// 다른 사용자와 공유 여부
     pub is_shared: bool,
+    /// 스냅샷 이미지의 S3 object key (선택사항)
+    pub snapshot_image_key: Option<String>,     // 추가
+    /// 스냅샷 업로드 상태 (선택사항)
+    pub snapshot_status: Option<SnapshotUploadStatus>,     // 추가
+    /// 스냅샷 업로드 완료 시간 (선택사항) 
+    pub snapshot_uploaded_at: Option<DateTime<Utc>>,
     /// 어노테이션이 생성된 시각
-    // pub created_at: NaiveDateTime,
     pub created_at: DateTime<Utc>,
     /// 어노테이션이 마지막으로 수정된 시각
-    // pub updated_at: NaiveDateTime,
+    pub updated_at: DateTime<Utc>,
     /// 낙관적 잠금(Optimistic Locking)을 위한 버전 번호
     /// 각 업데이트마다 증가하며, 동시 편집 충돌 감지에 사용됨
     pub version: i32,
-    pub updated_at: DateTime<Utc>,
     /// 어노테이션 생성에 사용된 뷰어 소프트웨어 (선택사항)
     pub viewer_software: Option<String>,
     /// 어노테이션에 대한 설명 (선택사항)
@@ -202,4 +227,8 @@ pub struct NewAnnotation {
     pub data: serde_json::Value,
     /// 다른 사용자와 공유 여부
     pub is_shared: bool,
+    /// 스냅샷 이미지의 S3 object key (선택사항)
+    pub snapshot_image_key: Option<String>,
+    /// 스냅샷 업로드 상태 (선택사항)
+    pub snapshot_status: Option<SnapshotUploadStatus>,
 }

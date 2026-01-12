@@ -10,6 +10,7 @@ use actix_web::{web, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
+use std::process::Command;
 use uuid::Uuid;
 use crate::infrastructure::external::KeycloakClient;
 
@@ -521,6 +522,59 @@ pub async fn test_login(
     }
 }
 
+/// Annotation Snapshot E2E 테스트 실행
+pub async fn run_annotation_snapshot_e2e() -> impl Responder {
+    use std::time::Duration;
+    use tokio::time::timeout;
+
+    // Python 테스트 스크립트를 비동기로 실행 (120초 타임아웃)
+    let result = timeout(
+        Duration::from_secs(120),
+        tokio::task::spawn_blocking(|| {
+            Command::new("python3")
+                .arg("e2e/test_annotation_snapshot_e2e.py")
+                .current_dir(".")
+                .output()
+        })
+    ).await;
+
+    match result {
+        Ok(Ok(output_result)) => {
+            match output_result {
+                Ok(output) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+
+                    if output.status.success() {
+                        HttpResponse::Ok()
+                            .content_type("text/plain; charset=utf-8")
+                            .body(format!("{}\n{}", stdout, stderr))
+                    } else {
+                        HttpResponse::InternalServerError()
+                            .content_type("text/plain; charset=utf-8")
+                            .body(format!("테스트 실패:\n{}\n{}", stdout, stderr))
+                    }
+                }
+                Err(e) => {
+                    HttpResponse::InternalServerError()
+                        .content_type("text/plain; charset=utf-8")
+                        .body(format!("테스트 실행 실패: {}", e))
+                }
+            }
+        }
+        Ok(Err(e)) => {
+            HttpResponse::InternalServerError()
+                .content_type("text/plain; charset=utf-8")
+                .body(format!("테스트 태스크 실패: {}", e))
+        }
+        Err(_) => {
+            HttpResponse::RequestTimeout()
+                .content_type("text/plain; charset=utf-8")
+                .body("테스트 실행 타임아웃 (120초 초과)")
+        }
+    }
+}
+
 /// 라우트 설정
 pub fn configure_routes(
     cfg: &mut web::ServiceConfig,
@@ -530,6 +584,7 @@ pub fn configure_routes(
         .service(
             web::scope("/test")
                 .route("/login", web::post().to(test_login))
+                .route("/annotation-snapshot-e2e", web::get().to(run_annotation_snapshot_e2e))
                 .service(
                     web::scope("/project-data-access")
                         .route("/setup", web::post().to(setup_project_data_access_scenario))

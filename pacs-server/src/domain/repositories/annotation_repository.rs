@@ -1,4 +1,4 @@
-use crate::domain::entities::{Annotation, AnnotationHistory, NewAnnotation};
+use crate::domain::entities::{Annotation, AnnotationHistory, NewAnnotation, SnapshotUploadStatus};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -71,6 +71,16 @@ pub trait AnnotationRepository: Send + Sync {
         measurement_values: Option<serde_json::Value>,
         label: Option<String>,
     ) -> Result<Option<Annotation>, sqlx::Error>;
+
+    async fn update_snapshot(
+        &self,
+        id: i32,
+        snapshot_image_key: String,
+        snapshot_status: SnapshotUploadStatus,
+        snapshot_uploaded_at: Option<DateTime<Utc>>,
+    ) -> Result<Option<Annotation>, sqlx::Error>;
+
+
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;
     async fn create_history(
         &self,

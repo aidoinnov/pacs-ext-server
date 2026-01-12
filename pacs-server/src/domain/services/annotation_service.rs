@@ -1,4 +1,4 @@
-use crate::domain::entities::{Annotation, AnnotationHistory, NewAnnotation};
+use crate::domain::entities::{Annotation, AnnotationHistory, NewAnnotation, SnapshotUploadStatus};
 use crate::domain::repositories::{AnnotationRepository, ProjectRepository, UserRepository};
 use crate::domain::ServiceError;
 use async_trait::async_trait;
@@ -101,6 +101,15 @@ pub trait AnnotationService: Send + Sync {
         is_shared: bool,
         measurement_values: Option<serde_json::Value>,
         label: Option<String>,
+    ) -> Result<Annotation, ServiceError>;
+
+    /// 스냅샷 정보 업데이트
+    async fn update_snapshot(
+        &self, 
+        id: i32,
+        snapshot_image_key: String,
+        snapshot_status: SnapshotUploadStatus,
+        snapshot_uploaded_at: Option<DateTime<Utc>>,
     ) -> Result<Annotation, ServiceError>;
 
     /// Annotation 삭제
@@ -420,6 +429,27 @@ where
             None => Err(ServiceError::NotFound("Annotation not found".into())),
         }
     }
+
+    async fn update_snapshot(
+        &self, 
+        id: i32,
+        snapshot_image_key: String,
+        snapshot_status: SnapshotUploadStatus,
+        snapshot_uploaded_at: Option<DateTime<Utc>>,
+    ) -> Result<Annotation, ServiceError> {
+        // 어노테이션 존재 확인
+        let _ = self.get_annotation_by_id(id).await?;
+        
+        // 스냅샷 정보 업데이트
+        match self.annotation_repository
+            .update_snapshot(id, snapshot_image_key,
+            snapshot_status, snapshot_uploaded_at).await?
+        {
+            Some(updated) => Ok(updated),
+            None => Err(ServiceError::NotFound("Annotation not found".into())),
+        }
+    }
+
 
     async fn delete_annotation(&self, id: i32) -> Result<(), ServiceError> {
         // Annotation 존재 확인

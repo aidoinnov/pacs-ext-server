@@ -317,6 +317,9 @@ mod annotation_tests {
             description: Some("Test annotation".to_string()),
             is_shared: false,
             measurement_values: None,
+            label: None,
+            snapshot_image_key: None,
+            snapshot_status: None,
         };
 
         assert_eq!(new_annotation.tool_name, "ROI");

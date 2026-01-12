@@ -51,6 +51,7 @@ export const SIDEBAR_MENU = {
       { id: 'api-health-study-list-view', label: '컬럼 설정 (View)', icon: '📋' },
       { id: 'api-health-view-selection', label: 'View Selection', icon: '🎬' },
       { id: 'api-health-qido-enhanced', label: 'QIDO Enhanced', icon: '🚀' },
+      { id: 'api-health-annotation-snapshot', label: 'Annotation Snapshot', icon: '📸' },
     ],
   },
   PROJECT_MANAGEMENT: {

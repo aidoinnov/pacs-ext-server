@@ -375,7 +375,6 @@ async fn main() -> std::io::Result<()> {
         annotation_service,
         user_repo.clone(),
         access_control_service.clone(),
-        signed_url_service.clone(),
     ));
     let access_control_use_case = Arc::new(AccessControlUseCase::new(access_control_service));
     let mask_group_use_case = Arc::new(MaskGroupUseCase::new(
@@ -930,8 +929,6 @@ async fn main() -> std::io::Result<()> {
                                 cfg,
                                 annotation_use_case.clone(),
                                 mask_group_use_case.clone(),
-                                jwt_service.clone(),
-                                Arc::new(user_repo.clone()),
                             )
                         }
                     })

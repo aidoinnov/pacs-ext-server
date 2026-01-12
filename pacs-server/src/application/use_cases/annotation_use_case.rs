@@ -16,14 +16,19 @@
 
 // 애플리케이션 레이어의 DTO 모듈들
 use crate::application::dto::{
-    AnnotationListResponse, AnnotationPermissionsResponse, AnnotationResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
+    AnnotationListResponse, AnnotationPermissionsResponse, AnnotationResponse,
+    CreateAnnotationRequest, UpdateAnnotationRequest,
+    SnapshotUploadUrlRequest, SnapshotUploadUrlResponse, CompleteSnapshotUploadRequest,
+    SnapshotStatusResponse,
 };
+// 애플리케이션 레이어의 서비스
+use crate::application::services::SignedUrlService;
 // 도메인 레이어의 서비스 인터페이스
 use crate::domain::services::{AnnotationService, AccessControlService};
 // 도메인 레이어의 에러 타입
 use crate::domain::ServiceError;
 // 도메인 레이어의 엔티티
-use crate::domain::entities::{Annotation, NewAnnotation};
+use crate::domain::entities::{Annotation, NewAnnotation, SnapshotUploadStatus};
 // 도메인 레이어의 리포지토리
 use crate::domain::repositories::UserRepository;
 // 표준 라이브러리
@@ -53,16 +58,18 @@ use tracing;
 /// let annotation_use_case = AnnotationUseCase::new(annotation_service, user_repository, access_control_service);
 /// let result = annotation_use_case.create_annotation(request, user_id, project_id).await;
 /// ```
-pub struct AnnotationUseCase<A: AnnotationService, U: UserRepository, AC: AccessControlService> {
+pub struct AnnotationUseCase<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: SignedUrlService> {
     /// 어노테이션 도메인 서비스
     annotation_service: A,
     /// 사용자 리포지토리 (사용자 이름 조회용)
     user_repository: U,
     /// 접근 제어 서비스 (권한 확인용)
     access_control_service: AC,
+    /// S3 Presigned URL 서비스
+    signed_url_service: SUS
 }
 
-impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> AnnotationUseCase<A, U, AC> {
+impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: SignedUrlService> AnnotationUseCase<A, U, AC, SUS> {
     /// 새로운 어노테이션 Use Case를 생성합니다.
     ///
     /// # 매개변수
@@ -72,11 +79,12 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
     ///
     /// # 반환값
     /// 생성된 `AnnotationUseCase` 인스턴스
-    pub fn new(annotation_service: A, user_repository: U, access_control_service: AC) -> Self {
+    pub fn new(annotation_service: A, user_repository: U, access_control_service: AC, signed_url_service: SUS) -> Self {
         Self {
             annotation_service,
             user_repository,
             access_control_service,
+            signed_url_service
         }
     }
 
@@ -129,6 +137,9 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             version: annotation.version,
             created_at: annotation.created_at,
             updated_at: annotation.updated_at,
+            snapshot_image_key: annotation.snapshot_image_key,
+            snapshot_status: annotation.snapshot_status.map(|s| s.to_string()),
+            snapshot_uploaded_at: annotation.snapshot_uploaded_at,
         })
     }
 
@@ -243,6 +254,9 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
                     version: annotation.version,
                     created_at: annotation.created_at,
                     updated_at: annotation.updated_at,
+                    snapshot_image_key: annotation.snapshot_image_key,
+                    snapshot_status: annotation.snapshot_status.map(|s| s.to_string()),
+                    snapshot_uploaded_at: annotation.snapshot_uploaded_at,
                 }
             })
             .collect();
@@ -345,6 +359,8 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             label: request.label,
             data: request.annotation_data,
             is_shared: false, // 기본값은 비공유
+            snapshot_image_key: None, // 생성 시에는 스냅샷 없음
+            snapshot_status: None,    // 생성 시에는 스냅샷 상태 없음
         };
 
         let annotation = self
@@ -1395,4 +1411,140 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService> Annotati
             .is_project_member(user_id, project_id)
             .await
     }
+
+
+    pub async fn generate_snapshot_upload_url(
+        &self,
+        annotation_id: i32,
+        request: SnapshotUploadUrlRequest,
+        user_id: i32,
+    )-> Result<SnapshotUploadUrlResponse, ServiceError> {
+        // 1. 어노테이션 존재 확인
+        let annotation = self.annotation_service
+            .get_annotation_by_id(annotation_id)
+            .await?;
+
+        // 2. 권한 확인 (어노테이션 소유자만 업로드 가능)
+        if annotation.user_id != user_id{
+            return Err(ServiceError::Unauthorized(
+                "Not authorized to upload snapshot for this annotation".to_string()
+            ));
+        }
+
+        // 3. S3 경로 생성
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+        let image_key = format!(
+            "annotations/{}/snapshots/{}_{}",
+            annotation_id,
+            timestamp,
+            request.filename
+        );
+
+        // 4. Signed URL 요청 생성
+        let signed_url_request = crate::application::services::SignedUrlRequest::new(image_key.clone())
+            .with_ttl(request.ttl_seconds.unwrap_or(600))
+            .with_content_type(request.mime_type.clone());
+
+        // 5. 업로드 URL 생성
+        let upload_response = self.signed_url_service
+            .generate_upload_url(signed_url_request.clone())
+            .await
+            .map_err(|e| ServiceError::ExternalServiceError(format!
+                ("Failed to generate upload URL: {:?}", e)))?;
+
+        // 6. 다운로드 URL 생성
+        let download_response = self.signed_url_service
+            .generate_download_url(signed_url_request)
+            .await
+            .map_err(|e| ServiceError::ExternalServiceError(format!
+                ("Failed to generate download URL: {:?}", e)))?;
+            
+        // 7. New 어노테잇션  상태를 'pending'으로 업데이트
+        self.annotation_service
+                .update_snapshot(annotation_id, 
+                    image_key.clone(),
+                    SnapshotUploadStatus::Pending,
+                    None,   // uploaded_at은 아직 NULL
+            )
+            .await?;
+
+        Ok(SnapshotUploadUrlResponse {
+            upload_url: upload_response.url,
+            download_url: download_response.url,
+            image_key,
+            expires_in: upload_response.ttl_seconds,
+            expires_at: upload_response.expires_at.to_string(),
+        })
+    }
+
+    /// 스냅샷 업로드 완료 처리
+    pub async fn complete_snapshot_upload(
+        &self,
+        annotation_id: i32,
+        request: CompleteSnapshotUploadRequest,
+        user_id: i32,
+    ) -> Result<Annotation, ServiceError> {
+        // 1. 어노테이션 존재 및 권한 확인
+        let annotation = self.annotation_service
+            .get_annotation_by_id(annotation_id)
+            .await?;
+
+        if annotation.user_id != user_id {
+            return Err(ServiceError::Unauthorized(
+                "Not authorized to update this annotation".to_string()
+            ));
+        }
+
+        // 2. 업로드 성공/실패에 따라 상태 업데이트
+        let success = request.success.unwrap_or(true);
+        let new_status = if success {
+            SnapshotUploadStatus::Completed
+        } else {
+            SnapshotUploadStatus::Failed
+        };
+
+        // 3. ⭐ 서버에서 현재 시간을 자동으로 생성
+        let now = chrono::Utc::now();
+
+        // 4. 스냅샷 정보 업데이트
+        self.annotation_service
+            .update_snapshot(
+                annotation_id,
+                request.image_key,
+                new_status,
+                if success { Some(now) } else { None },  // ⭐ 성공 시에만 시간 기록
+            )
+            .await
+    }
+
+    /// 스냅샷 업로드 상태 조회
+    pub async fn get_snapshot_status(
+        &self,
+        annotation_id: i32,
+        user_id: i32,
+    ) -> Result<SnapshotStatusResponse, ServiceError> {
+        // 1. 어노테이션 조회
+        let annotation = self.annotation_service
+            .get_annotation_by_id(annotation_id)
+            .await?;
+
+        // 2. 권한 확인 (소유자만 조회 가능)
+        if annotation.user_id != user_id {
+            return Err(ServiceError::Unauthorized(
+                "Not authorized to view this annotation".to_string()
+            ));
+        }
+
+        // 3. 상태 응답 생성
+        Ok(SnapshotStatusResponse {
+            annotation_id,
+            image_key: annotation.snapshot_image_key,
+            status: annotation.snapshot_status
+                .map(|s| format!("{:?}", s).to_lowercase())
+                .unwrap_or_else(|| "none".to_string()),
+            uploaded_at: annotation.snapshot_uploaded_at
+                .map(|dt| dt.to_rfc3339()),
+        })
+    }
+
 }

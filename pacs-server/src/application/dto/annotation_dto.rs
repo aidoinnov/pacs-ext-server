@@ -195,6 +195,21 @@ pub struct AnnotationResponse {
     #[schema(value_type = String, example = "2024-01-01T00:00:00")]
     // pub updated_at: NaiveDateTime,
     pub updated_at: DateTime<Utc>,
+
+    /// 스냅샷 이미지 키
+    /// S3에 저장된 스냅샷 이미지의 object key
+    #[schema(example = "annotations/123/snapshots/20240101_120000_snapshot.png")]
+    pub snapshot_image_key: Option<String>,
+
+    /// 스냅샷 업로드 상태
+    /// 스냅샷 업로드 상태 (pending/uploading/completed/failed)
+    #[schema(example = "completed")]
+    pub snapshot_status: Option<String>,
+
+    /// 스냅샷 업로드 완료 시간
+    /// 스냅샷 업로드가 완료된 시각
+    #[schema(value_type = String, example = "2024-01-01T00:00:00")]
+    pub snapshot_uploaded_at: Option<DateTime<Utc>>,
 }
 
 /// Annotation 목록 응답 DTO
