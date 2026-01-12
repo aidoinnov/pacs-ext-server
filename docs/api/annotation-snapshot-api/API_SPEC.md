@@ -179,7 +179,7 @@ Content-Type: application/json
   "tool_name": "Circle Tool",
   "label": "Tumor",
   "snapshot_image_key": "annotations/123/snapshots/20260112_120000_snapshot.png",
-  "snapshot_status": "Completed",
+  "snapshot_status": "completed",
   "snapshot_uploaded_at": "2026-01-12T10:00:00Z",
   "created_at": "2026-01-12T09:00:00Z",
   "updated_at": "2026-01-12T10:00:00Z"
@@ -226,7 +226,7 @@ Authorization: Bearer <JWT_TOKEN>
 **필드 설명**:
 - `annotation_id` (integer): 어노테이션 ID
 - `image_key` (string|null): S3 object key
-- `status` (string): 업로드 상태 (none, pending, uploading, completed, failed)
+- `status` (string|null): 업로드 상태 (null, pending, uploading, completed, failed)
 - `uploaded_at` (string|null): 업로드 완료 시간 (ISO 8601)
 
 #### Errors
@@ -365,7 +365,7 @@ curl -X POST "http://localhost:8080/api/annotations/123/snapshot/complete-upload
     "success": true
   }'
 
-# 응답: {"id": 123, "snapshot_status": "Completed", "snapshot_uploaded_at": "2026-01-12T10:00:00Z"}
+# 응답: {"id": 123, "snapshot_status": "completed", "snapshot_uploaded_at": "2026-01-12T10:00:00Z"}
 
 # 5. 스냅샷 상태 조회
 curl -X GET "http://localhost:8080/api/annotations/123/snapshot/status" \
