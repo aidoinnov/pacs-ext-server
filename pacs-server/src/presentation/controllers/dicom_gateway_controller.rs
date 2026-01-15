@@ -1,5 +1,4 @@
 use actix_web::{web, HttpRequest, HttpResponse};
-use base64::Engine;
 use serde::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
@@ -9,14 +8,13 @@ use futures::future::join_all;
 use crate::domain::entities::access_condition::AccessCondition;
 use crate::domain::repositories::{AccessConditionRepository, ProjectDataRepository, UserRepository, StudyListViewRepository, AnnotationRepository};
 use crate::domain::services::DicomRbacEvaluator;
-use crate::infrastructure::auth::{JwtService, extract_user_id_from_request, decode_keycloak_token_sub};
+use crate::infrastructure::auth::{JwtService, extract_user_id_from_request};
 use crate::presentation::controllers::annotation_controller::AnnotationController;
 use crate::infrastructure::external::Dcm4cheeQidoClient;
 use crate::infrastructure::repositories::{AccessConditionRepositoryImpl, ProjectDataRepositoryImpl, UserRepositoryImpl, StudyListViewRepositoryImpl, AnnotationRepositoryImpl};
 use crate::infrastructure::services::DicomRbacEvaluatorImpl;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct GatewayQuery {
@@ -120,6 +118,10 @@ pub fn configure_routes(
                 .route(
                     "/studies/{study_uid}/series/{series_uid}/instances",
                     web::get().to(get_instances),
+                )
+                .route(
+                    "/studies/{study_uid}/series/{series_uid}/metadata",
+                    web::get().to(get_instances_metadata),
                 ),
         );
 }
@@ -263,6 +265,68 @@ pub async fn can_access_study(
     }
 
     is_approved
+}
+
+/// V2: Study 배치 권한 확인 (N개의 Study를 1번의 쿼리로 확인)
+///
+/// 로직:
+/// 1. project_data_access 레코드가 있는 Study들을 배치로 조회
+/// 2. 레코드가 없으면 → 접근 가능 (기본)
+/// 3. 레코드가 있으면 → APPROVED 상태만 접근 가능
+///
+/// 반환: 접근 가능한 study_uid 목록
+pub async fn check_study_access_batch(
+    user_id: i32,
+    project_id: i32,
+    study_uids: &[String],
+    pool: &sqlx::PgPool,
+) -> Vec<String> {
+    if study_uids.is_empty() {
+        return Vec::new();
+    }
+
+    // 1. project_data_access 레코드가 있는 Study들 조회
+    let restricted_studies: Vec<(String, String)> = sqlx::query_as(
+        "SELECT pds.study_uid, pda.status
+         FROM project_data_access pda
+         INNER JOIN project_data_study pds ON pda.study_id = pds.id
+         WHERE pda.user_id = $1
+           AND pda.project_id = $2
+           AND pds.study_uid = ANY($3)
+           AND (pda.expires_at IS NULL OR pda.expires_at > NOW())",
+    )
+    .bind(user_id)
+    .bind(project_id)
+    .bind(study_uids)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    let restricted_map: std::collections::HashMap<String, String> = restricted_studies
+        .into_iter()
+        .collect();
+
+    // 2. 접근 가능한 Study 필터링
+    let accessible: Vec<String> = study_uids
+        .iter()
+        .filter(|uid| {
+            match restricted_map.get(*uid) {
+                None => true, // 레코드 없음 → 접근 가능
+                Some(status) => status == "APPROVED", // APPROVED만 접근 가능
+            }
+        })
+        .cloned()
+        .collect();
+
+    tracing::debug!(
+        "V2 Batch: User {} in project {} - {} / {} studies accessible",
+        user_id,
+        project_id,
+        accessible.len(),
+        study_uids.len()
+    );
+
+    accessible
 }
 
 /// Study가 특정 프로젝트에 할당되어 있는지 확인
@@ -782,29 +846,34 @@ pub async fn get_all_user_studies(
 
     let qido_results = join_all(qido_futures).await;
 
-    // 결과 처리
+    // 결과 처리 - V2: 배치 권한 확인 사용
     for (project_id, result) in qido_results {
         match result {
             Ok(json) => {
                 if let Some(array) = json.as_array() {
+                    // V2: 모든 study_uid 추출
+                    let study_uids: Vec<String> = array
+                        .iter()
+                        .filter_map(|item| extract_study_uid(item))
+                        .collect();
+
+                    // V2: 배치로 한 번에 권한 확인 (1번의 쿼리)
+                    let accessible_studies = check_study_access_batch(
+                        user_id,
+                        project_id,
+                        &study_uids,
+                        project_data_repo.pool(),
+                    )
+                    .await;
+
+                    // V2: HashSet으로 O(1) 조회
+                    let accessible_set: std::collections::HashSet<String> =
+                        accessible_studies.into_iter().collect();
+
+                    // V2: 필터링 및 추가
                     for item in array.iter() {
                         if let Some(study_uid) = extract_study_uid(item) {
-                            // RBAC 평가
-                            let rbac_result = evaluator
-                                .evaluate_study_uid(user_id, project_id, &study_uid)
-                                .await;
-
-                            // project_data_access 확인
-                            let has_data_access = can_access_study(
-                                user_id,
-                                project_id,
-                                &study_uid,
-                                project_data_repo.pool(),
-                            )
-                            .await;
-
-                            // 접근 가능한 경우
-                            if rbac_result.allowed && has_data_access {
+                            if accessible_set.contains(&study_uid) {
                                 // project_id 매핑 추가
                                 study_project_map
                                     .entry(study_uid.clone())
@@ -819,6 +888,43 @@ pub async fn get_all_user_studies(
                             }
                         }
                     }
+
+                    // ============================================================
+                    // V1 코드 (참고용 - 제거하지 마세요)
+                    // ============================================================
+                    // for item in array.iter() {
+                    //     if let Some(study_uid) = extract_study_uid(item) {
+                    //         // RBAC 평가
+                    //         let rbac_result = evaluator
+                    //             .evaluate_study_uid(user_id, project_id, &study_uid)
+                    //             .await;
+                    //
+                    //         // project_data_access 확인
+                    //         let has_data_access = can_access_study(
+                    //             user_id,
+                    //             project_id,
+                    //             &study_uid,
+                    //             project_data_repo.pool(),
+                    //         )
+                    //         .await;
+                    //
+                    //         // 접근 가능한 경우
+                    //         if rbac_result.allowed && has_data_access {
+                    //             // project_id 매핑 추가
+                    //             study_project_map
+                    //                 .entry(study_uid.clone())
+                    //                 .or_insert_with(Vec::new)
+                    //                 .push(project_id);
+                    //
+                    //             // 중복이 아닌 경우만 study 추가
+                    //             if !study_uids_seen.contains(&study_uid) {
+                    //                 study_uids_seen.insert(study_uid.clone());
+                    //                 all_studies.push(item.clone());
+                    //             }
+                    //         }
+                    //     }
+                    // }
+                    // ============================================================
                 }
             }
             Err(e) => {
@@ -1575,20 +1681,36 @@ pub async fn get_user_study_series_instances(
         {
             Ok(json) => {
                 if let Some(array) = json.as_array() {
+                    // V2: Study 레벨 권한만 확인 (이미 위에서 확인됨)
+                    // Instance 개별 RBAC 평가 제거 - Study 접근 가능하면 모든 Instance 접근 가능
                     for item in array.iter() {
                         if let Some(instance_uid) = extract_instance_uid(item) {
-                            // RBAC 평가
-                            let result = evaluator
-                                .evaluate_instance_uid(user_id, *project_id, &instance_uid)
-                                .await;
-
-                            // 접근 가능하고 중복이 아닌 경우만 추가
-                            if result.allowed && !instance_uids_seen.contains(&instance_uid) {
+                            // 중복이 아닌 경우만 추가
+                            if !instance_uids_seen.contains(&instance_uid) {
                                 instance_uids_seen.insert(instance_uid.clone());
                                 all_instances.push(item.clone());
                             }
                         }
                     }
+
+                    // ============================================================
+                    // V1 코드 (참고용 - 제거하지 마세요)
+                    // ============================================================
+                    // for item in array.iter() {
+                    //     if let Some(instance_uid) = extract_instance_uid(item) {
+                    //         // RBAC 평가
+                    //         let result = evaluator
+                    //             .evaluate_instance_uid(user_id, *project_id, &instance_uid)
+                    //             .await;
+                    //
+                    //         // 접근 가능하고 중복이 아닌 경우만 추가
+                    //         if result.allowed && !instance_uids_seen.contains(&instance_uid) {
+                    //             instance_uids_seen.insert(instance_uid.clone());
+                    //             all_instances.push(item.clone());
+                    //         }
+                    //     }
+                    // }
+                    // ============================================================
                 }
             }
             Err(e) => {
@@ -1713,25 +1835,224 @@ pub async fn get_instances(
         }
     };
 
-    // 3. RBAC 필터링 적용
+    // 3. RBAC 필터링 적용 (V2: 배치 쿼리 사용)
     let filtered = if has_global_access && project_id_opt.is_none() {
         // 전체 데이터 조회 권한이 있고 project_id가 없으면 필터링 안 함
         tracing::debug!("Gateway: Global access granted, skipping RBAC filtering");
         qido_response
     } else if let Some(pid) = project_id_opt {
-        // project_id가 있으면 RBAC 필터링 적용
+        // project_id가 있으면 RBAC 필터링 적용 (V2: 배치 쿼리)
         if let Some(array) = qido_response.as_array() {
-            let mut allowed_items = Vec::new();
-            for item in array.iter() {
-                if let Some(instance_uid) = extract_instance_uid(item) {
-                    let result = evaluator
-                        .evaluate_instance_uid(user_id, pid, &instance_uid)
-                        .await;
-                    if result.allowed {
-                        allowed_items.push(item.clone());
-                    }
-                }
+            // 모든 instance_uid 추출
+            let instance_uids: Vec<String> = array
+                .iter()
+                .filter_map(|item| extract_instance_uid(item))
+                .collect();
+
+            if instance_uids.is_empty() {
+                tracing::debug!("Gateway: No instance UIDs found in QIDO response");
+                return HttpResponse::Ok().json(serde_json::Value::Array(Vec::new()));
             }
+
+            // V2: 배치로 한 번에 권한 확인
+            let allowed_uids = match evaluator
+                .evaluate_instances_batch_v2(user_id, pid, &study_uid, &series_uid, &instance_uids)
+                .await
+            {
+                Ok(uids) => uids,
+                Err(e) => {
+                    tracing::error!("Gateway: Failed to evaluate instances batch: {}", e);
+                    return HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Failed to evaluate permissions"
+                    }));
+                }
+            };
+
+            // HashSet으로 변환하여 빠른 조회
+            let allowed_set: std::collections::HashSet<String> = allowed_uids.into_iter().collect();
+
+            // 허용된 instance만 필터링
+            let allowed_items: Vec<serde_json::Value> = array
+                .iter()
+                .filter(|item| {
+                    if let Some(uid) = extract_instance_uid(item) {
+                        allowed_set.contains(&uid)
+                    } else {
+                        false
+                    }
+                })
+                .cloned()
+                .collect();
+
+            tracing::debug!(
+                "Gateway: Filtered {} instances from {} QIDO results",
+                allowed_items.len(),
+                array.len()
+            );
+
+            serde_json::Value::Array(allowed_items)
+        } else {
+            qido_response
+        }
+    } else {
+        // 이 경우는 발생하지 않아야 함 (위에서 검증됨)
+        qido_response
+    };
+
+    HttpResponse::Ok().json(filtered)
+}
+
+/// GET /api/dicom/studies/{study_uid}/series/{series_uid}/metadata
+/// DICOMweb WADO-RS Series Metadata 조회 (모든 인스턴스의 DICOM 태그 포함)
+///
+/// instances 엔드포인트와 달리 metadata는 모든 DICOM 태그를 반환합니다.
+/// V2 배치 쿼리를 사용하여 N+1 문제를 해결합니다.
+pub async fn get_instances_metadata(
+    qido: web::Data<Dcm4cheeQidoClient>,
+    evaluator: web::Data<Arc<DicomRbacEvaluatorImpl>>,
+    jwt: web::Data<Arc<JwtService>>,
+    access_condition_repo: web::Data<Arc<AccessConditionRepositoryImpl>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    project_data_repo: web::Data<Arc<ProjectDataRepositoryImpl>>,
+    path: web::Path<(String, String)>,
+    query: web::Query<GatewayQuery>,
+    req: HttpRequest,
+) -> HttpResponse {
+    let (study_uid, series_uid) = path.into_inner();
+
+    // 사용자 ID 추출
+    let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
+        Some(id) if id > 0 => id,
+        _ => {
+            tracing::warn!("Gateway /instances/metadata: Unauthorized - failed to extract user_id from token");
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "Invalid or missing authorization token"
+            }));
+        }
+    };
+
+    // 전체 데이터 조회 권한 확인
+    let has_global_access = has_global_dicom_access(user_id, project_data_repo.pool()).await;
+
+    // 프로젝트 ID 검증
+    let project_id_opt = query.project_id;
+
+    // 전체 데이터 조회 권한이 없으면 project_id 필수
+    if !has_global_access && project_id_opt.is_none() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "project_id is required (no global access permission)"
+        }));
+    }
+
+    // project_id가 있으면 검증
+    if let Some(id) = project_id_opt {
+        if id <= 0 {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "project_id must be greater than 0"
+            }));
+        }
+    }
+
+    // 0. project_id가 있으면 Study 접근 권한 확인
+    if let Some(pid) = project_id_opt {
+        let has_study_access = can_access_study(
+            user_id,
+            pid,
+            &study_uid,
+            project_data_repo.pool(),
+        )
+        .await;
+
+        if !has_study_access {
+            tracing::warn!(
+                "Gateway /instances/metadata: User {} does not have access to study {} in project {}",
+                user_id,
+                study_uid,
+                pid
+            );
+            return HttpResponse::Forbidden().json(serde_json::json!({
+                "error": "Access denied to this study"
+            }));
+        }
+    }
+
+    // 1. 사용자 파라미터 파싱
+    let mut extra_for_qido = query.extra.clone();
+    extra_for_qido.remove("report_status");
+    let user_params = match build_qido_params_from_user_query(&extra_for_qido) {
+        Ok(p) => p,
+        Err(msg) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({"error": msg}));
+        }
+    };
+
+    // 2. Dcm4chee WADO-RS Metadata 호출
+    let bearer_opt = extract_bearer_token(&req);
+    let qido_response = match qido
+        .qido_instances_metadata_with_bearer(bearer_opt.as_deref(), &study_uid, &series_uid, user_params)
+        .await
+    {
+        Ok(json) => json,
+        Err(e) => {
+            return HttpResponse::BadGateway().json(serde_json::json!({"error": e.to_string()}))
+        }
+    };
+
+    // 3. RBAC 필터링 적용 (V2: 배치 쿼리 사용)
+    let filtered = if has_global_access && project_id_opt.is_none() {
+        // 전체 데이터 조회 권한이 있고 project_id가 없으면 필터링 안 함
+        tracing::debug!("Gateway /instances/metadata: Global access granted, skipping RBAC filtering");
+        qido_response
+    } else if let Some(pid) = project_id_opt {
+        // project_id가 있으면 RBAC 필터링 적용 (V2: 배치 쿼리)
+        if let Some(array) = qido_response.as_array() {
+            // 모든 instance_uid 추출
+            let instance_uids: Vec<String> = array
+                .iter()
+                .filter_map(|item| extract_instance_uid(item))
+                .collect();
+
+            if instance_uids.is_empty() {
+                tracing::debug!("Gateway /instances/metadata: No instance UIDs found in QIDO response");
+                return HttpResponse::Ok().json(serde_json::Value::Array(Vec::new()));
+            }
+
+            // V2: 배치로 한 번에 권한 확인
+            let allowed_uids = match evaluator
+                .evaluate_instances_batch_v2(user_id, pid, &study_uid, &series_uid, &instance_uids)
+                .await
+            {
+                Ok(uids) => uids,
+                Err(e) => {
+                    tracing::error!("Gateway /instances/metadata: Failed to evaluate instances batch: {}", e);
+                    return HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Failed to evaluate permissions"
+                    }));
+                }
+            };
+
+            // HashSet으로 변환하여 빠른 조회
+            let allowed_set: std::collections::HashSet<String> = allowed_uids.into_iter().collect();
+
+            // 허용된 instance만 필터링
+            let allowed_items: Vec<serde_json::Value> = array
+                .iter()
+                .filter(|item| {
+                    if let Some(uid) = extract_instance_uid(item) {
+                        allowed_set.contains(&uid)
+                    } else {
+                        false
+                    }
+                })
+                .cloned()
+                .collect();
+
+            tracing::debug!(
+                "Gateway /instances/metadata: Filtered {} instances from {} QIDO results",
+                allowed_items.len(),
+                array.len()
+            );
+
             serde_json::Value::Array(allowed_items)
         } else {
             qido_response
