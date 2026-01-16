@@ -1007,10 +1007,11 @@ pub async fn get_all_user_studies(
                     .collect();
                 ext.insert("projects".to_string(), serde_json::json!(projects));
 
-                // report_status 추가 (캐시에서 가져오기)
-                if let Some(status) = report_status_cache.get(&study_uid) {
-                    ext.insert("report_status".to_string(), serde_json::json!(status));
-                }
+                // report_status 추가 (캐시에서 가져오기, 없으면 기본값 "unread")
+                let status = report_status_cache.get(&study_uid)
+                    .map(|s| s.as_str())
+                    .unwrap_or("unread");
+                ext.insert("report_status".to_string(), serde_json::json!(status));
 
                 // review 추가 (캐시에서 가져오기)
                 if let Some(review) = review_cache.get(&study_uid) {
@@ -1029,7 +1030,7 @@ pub async fn get_all_user_studies(
     }
 
     // Report Status 필터링 적용 (옵셔널)
-    let final_studies = if let Some(status_str) = query.extra.get("report_status").and_then(|v| v.as_str()) {
+    let final_studies = if let Some(status_str) = &query.report_status {
         let status_filter = parse_report_status_filter(status_str);
         if !status_filter.is_empty() {
             tracing::debug!("Gateway: Applying report_status filter: {:?}", status_filter);
@@ -2952,18 +2953,18 @@ pub async fn get_all_user_series(
 // 토큰 파싱/추출 유틸은 `infrastructure::auth::token_extractor`로 분리
 
 /// Report Status 필터 파싱
-/// 입력: "approval,unread" 또는 "approved,unread" (호환성을 위해 둘 다 지원)
+/// 입력: "approval,unread" 또는 "approved,unread,unapproved" (호환성을 위해 둘 다 지원)
 /// 출력: DB 스키마에 맞는 값 ("approval", "unread", "unapproval")
 pub fn parse_report_status_filter(status_str: &str) -> Vec<String> {
     status_str
         .split(',')
         .map(|s| {
             let trimmed = s.trim().to_lowercase();
-            // "approved"를 "approval"로 변환 (DB 스키마에 맞춤)
-            if trimmed == "approved" {
-                "approval".to_string()
-            } else {
-                trimmed
+            // 호환성을 위한 변환
+            match trimmed.as_str() {
+                "approved" => "approval".to_string(),
+                "unapproved" => "unapproval".to_string(),
+                _ => trimmed,
             }
         })
         .filter(|s| matches!(s.as_str(), "approval" | "unread" | "unapproval"))
@@ -3110,6 +3111,7 @@ pub async fn filter_series_by_report_status_batch(
 
 /// 배치 쿼리를 사용하여 Report Status로 Studies 필터링
 /// Studies는 _ext.report_status 필드를 기반으로 필터링
+/// report_status가 없는 경우 기본값 "unread"로 처리
 pub async fn filter_studies_by_report_status_batch(
     studies_array: &[serde_json::Value],
     status_filter: &[String],
@@ -3122,15 +3124,22 @@ pub async fn filter_studies_by_report_status_batch(
     studies_array
         .iter()
         .filter(|study| {
-            // _ext.report_status 추출
-            if let Some(ext) = study.get("_ext") {
+            // _ext.report_status 추출 (없으면 기본값 "unread")
+            let status = if let Some(ext) = study.get("_ext") {
                 if let Some(report_status) = ext.get("report_status") {
                     if let Some(status_str) = report_status.as_str() {
-                        return status_filter.contains(&status_str.to_lowercase());
+                        status_str.to_lowercase()
+                    } else {
+                        "unread".to_string()
                     }
+                } else {
+                    "unread".to_string()
                 }
-            }
-            false // _ext.report_status가 없으면 제외
+            } else {
+                "unread".to_string()
+            };
+
+            status_filter.contains(&status)
         })
         .cloned()
         .collect()

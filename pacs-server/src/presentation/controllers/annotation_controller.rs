@@ -29,6 +29,29 @@ impl AnnotationController {
         Self
     }
 
+    /// 어노테이션 응답에 snapshot_image_url을 채워넣는 헬퍼 함수
+    async fn populate_snapshot_urls(
+        mut response: AnnotationListResponse,
+        signed_url_service: &Arc<SignedUrlServiceImpl>,
+    ) -> AnnotationListResponse {
+        for annotation in &mut response.annotations {
+            if let Some(ref snapshot_key) = annotation.snapshot_image_key {
+                if annotation.snapshot_status.as_deref() == Some("completed") {
+                    // Signed URL 생성 (TTL: 1시간)
+                    match signed_url_service.generate_download_url_simple(snapshot_key, 3600).await {
+                        Ok(url) => {
+                            annotation.snapshot_image_url = Some(url);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to generate snapshot URL for {}: {:?}", snapshot_key, e);
+                        }
+                    }
+                }
+            }
+        }
+        response
+    }
+
     /// ServiceError를 HttpResponse로 변환하는 헬퍼 함수
     fn handle_service_error(error: ServiceError) -> HttpResponse {
         match error {
@@ -265,6 +288,7 @@ pub async fn get_annotation(
     req: HttpRequest,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    signed_url_service: web::Data<Arc<SignedUrlServiceImpl>>,
     use_case: web::Data<
         Arc<
             AnnotationUseCase<
@@ -293,67 +317,20 @@ pub async fn get_annotation(
     };
 
     match use_case.get_annotation_by_id(user_id, *annotation_id).await {
-        Ok(annotation) => HttpResponse::Ok()
-            .insert_header(("Cache-Control", "public, max-age=5"))
-            .insert_header(("ETag", format!("\"{}\"", annotation.version)))
-            .insert_header(("Last-Modified", annotation.updated_at.to_rfc2822()))
-            .json(annotation),
-        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
-            "error": "Not Found",
-            "message": msg
-        })),
-        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
-            "error": "Unauthorized",
-            "message": msg
-        })),
-        Err(e) => HttpResponse::InternalServerError().json(json!({
-            "error": "Internal Server Error",
-            "message": e.to_string()
-        })),
-    }
-}
-
-/// HEAD 요청 핸들러 - 응답 헤더만 반환 (본문 없음)
-///
-/// 이 메서드는 GET 요청과 동일한 헤더를 반환하지만 응답 본문은 비어있습니다.
-/// 클라이언트는 ETag와 Last-Modified 헤더를 사용하여 캐시 검증을 수행할 수 있습니다.
-///
-/// # 사용 사례
-/// - 캐시 검증: If-None-Match, If-Modified-Since 헤더 사용
-/// - 대역폭 절약: 응답 본문 없이 메타데이터만 전송
-/// - 리소스 존재 확인: 404 응답으로 리소스 존재 여부 확인
-pub async fn head_annotation(
-    annotation_id: web::Path<i32>,
-    req: HttpRequest,
-    use_case: web::Data<
-        Arc<
-            AnnotationUseCase<
-                AnnotationServiceImpl<
-                    AnnotationRepositoryImpl,
-                    UserRepositoryImpl,
-                    ProjectRepositoryImpl,
-                >,
-                UserRepositoryImpl,
-                AccessControlServiceImpl<
-                    AccessLogRepositoryImpl,
-                    UserRepositoryImpl,
-                    ProjectRepositoryImpl,
-                    RoleRepositoryImpl,
-                    PermissionRepositoryImpl,
-                >,
-                SignedUrlServiceImpl
-            >,
-        >,
-    >,
-) -> impl Responder {
-    // user_id 추출
-    let user_id = match AnnotationController::extract_user_id_or_unauthorized(&req) {
-        Ok(id) => id,
-        Err(response) => return response,
-    };
-
-    match use_case.get_annotation_by_id(user_id, *annotation_id).await {
-        Ok(annotation) => {
+        Ok(mut annotation) => {
+            // Snapshot URL 생성 (있는 경우)
+            if let Some(ref snapshot_key) = annotation.snapshot_image_key {
+                if annotation.snapshot_status.as_deref() == Some("completed") {
+                    match signed_url_service.generate_download_url_simple(snapshot_key, 3600).await {
+                        Ok(url) => {
+                            annotation.snapshot_image_url = Some(url);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to generate snapshot URL for {}: {:?}", snapshot_key, e);
+                        }
+                    }
+                }
+            }
             let etag = format!("\"{}\"", annotation.version);
             let last_modified = annotation.updated_at.to_rfc2822();
 
@@ -375,7 +352,11 @@ pub async fn head_annotation(
                 if let Ok(if_modified_since_str) = if_modified_since.to_str() {
                     // RFC 2822 형식으로 파싱하여 비교
                     if let Ok(client_time) = chrono::DateTime::parse_from_rfc2822(if_modified_since_str) {
-                        if annotation.updated_at <= client_time.with_timezone(&chrono::Utc) {
+                        // RFC 2822는 초 단위까지만 표현하므로, 비교를 위해 초 단위로 truncate
+                        let annotation_time_secs = annotation.updated_at.timestamp();
+                        let client_time_secs = client_time.timestamp();
+
+                        if annotation_time_secs <= client_time_secs {
                             // 304 Not Modified 응답
                             return HttpResponse::NotModified()
                                 .insert_header(("Last-Modified", last_modified))
@@ -386,231 +367,25 @@ pub async fn head_annotation(
                 }
             }
 
-            // 200 OK 응답 (본문 없음)
+            // 200 OK 응답
             HttpResponse::Ok()
+                .insert_header(("Cache-Control", "public, max-age=5"))
                 .insert_header(("ETag", etag))
                 .insert_header(("Last-Modified", last_modified))
-                .insert_header(("Cache-Control", "public, max-age=5"))
-                .finish()
+                .json(annotation)
         }
-        Err(e) => AnnotationController::handle_service_error(e),
-    }
-}
-
-/// 어노테이션 요약 목록 조회 (HEAD 요청)
-///
-/// Series UID로 어노테이션 목록의 메타데이터를 조회합니다.
-/// 응답 헤더에 list_version을 포함하여 캐시 검증에 사용할 수 있습니다.
-#[utoipa::path(
-    head,
-    path = "/api/annotations/summary",
-    tag = "annotations",
-    params(
-        ("series_instance_uid" = String, Query, description = "Series Instance UID"),
-        ("project_id" = i32, Query, description = "프로젝트 ID"),
-        ("page" = Option<i32>, Query, description = "페이지 번호 (기본값: 1)"),
-        ("limit" = Option<i32>, Query, description = "페이지 크기 (기본값: 20)"),
-    ),
-    responses(
-        (status = 200, description = "Annotation summary metadata retrieved successfully"),
-        (status = 304, description = "Not Modified (캐시 유효)"),
-        (status = 400, description = "Invalid parameters"),
-        (status = 401, description = "Unauthorized"),
-    )
-)]
-pub async fn head_annotation_summary(
-    query: web::Query<std::collections::HashMap<String, String>>,
-    req: HttpRequest,
-    use_case: web::Data<
-        Arc<
-            AnnotationUseCase<
-                AnnotationServiceImpl<
-                    AnnotationRepositoryImpl,
-                    UserRepositoryImpl,
-                    ProjectRepositoryImpl,
-                >,
-                UserRepositoryImpl,
-                AccessControlServiceImpl<
-                    AccessLogRepositoryImpl,
-                    UserRepositoryImpl,
-                    ProjectRepositoryImpl,
-                    RoleRepositoryImpl,
-                    PermissionRepositoryImpl,
-                >,
-                SignedUrlServiceImpl
-            >,
-        >,
-    >,
-) -> impl Responder {
-    // 필수 파라미터 추출
-    let series_instance_uid = match query.get("series_instance_uid") {
-        Some(uid) => uid.clone(),
-        None => {
-            return HttpResponse::BadRequest().finish()
-        }
-    };
-
-    let project_id = match query.get("project_id").and_then(|s| s.parse::<i32>().ok()) {
-        Some(id) => id,
-        None => {
-            return HttpResponse::BadRequest().finish()
-        }
-    };
-
-    // 선택적 파라미터 추출
-    let page = query.get("page").and_then(|s| s.parse::<i32>().ok()).unwrap_or(1);
-    let limit = query.get("limit").and_then(|s| s.parse::<i32>().ok()).unwrap_or(20);
-
-    // 어노테이션 조회 (페이지네이션 포함)
-    match use_case
-        .get_annotations_by_project_and_series_paginated(project_id, &series_instance_uid, page, limit)
-        .await
-    {
-        Ok(response) => {
-            // If-Modified-Since 헤더 확인 (캐시 검증)
-            if let Some(if_modified_since) = req.headers().get("If-Modified-Since") {
-                if let Ok(if_modified_since_str) = if_modified_since.to_str() {
-                    if let Ok(client_time) = chrono::DateTime::parse_from_rfc2822(if_modified_since_str) {
-                        if let Some(list_version) = response.list_version {
-                            if list_version <= client_time.with_timezone(&chrono::Utc) {
-                                // 304 Not Modified 응답
-                                return HttpResponse::NotModified()
-                                    .insert_header(("Last-Modified", list_version.to_rfc2822()))
-                                    .insert_header(("Cache-Control", "public, max-age=30"))
-                                    .finish();
-                            }
-                        }
-                    }
-                }
-            }
-
-            // list_version을 Last-Modified 헤더로 설정
-            if let Some(list_version) = response.list_version {
-                HttpResponse::Ok()
-                    .insert_header(("Cache-Control", "public, max-age=30"))
-                    .insert_header(("Last-Modified", list_version.to_rfc2822()))
-                    .insert_header(("X-List-Version", list_version.to_rfc3339()))
-                    .finish()
-            } else {
-                HttpResponse::Ok()
-                    .insert_header(("Cache-Control", "public, max-age=30"))
-                    .finish()
-            }
-        }
-        Err(_) => HttpResponse::InternalServerError().finish(),
-    }
-}
-
-/// 어노테이션 목록 버전 조회 (HEAD 요청)
-///
-/// SOP Instance UID, Series UID, 또는 Study UID로 어노테이션 목록의 버전 정보를 조회합니다.
-/// 응답 헤더에 list_version을 포함하여 캐시 검증에 사용할 수 있습니다.
-#[utoipa::path(
-    head,
-    path = "/api/annotations",
-    tag = "annotations",
-    params(
-        ("sop_instance_uid" = Option<String>, Query, description = "SOP Instance UID로 필터링"),
-        ("series_instance_uid" = Option<String>, Query, description = "Series Instance UID로 필터링"),
-        ("study_instance_uid" = Option<String>, Query, description = "Study Instance UID로 필터링"),
-    ),
-    responses(
-        (status = 200, description = "Annotation list metadata", headers(
-            ("Last-Modified" = String, description = "최신 어노테이션 수정 시간"),
-            ("X-List-Version" = String, description = "목록 버전 (ISO 8601)"),
-            ("X-Total-Count" = String, description = "총 어노테이션 개수"),
-        )),
-        (status = 304, description = "Not Modified"),
-        (status = 400, description = "Bad Request"),
-    )
-)]
-pub async fn head_annotations(
-    query: web::Query<std::collections::HashMap<String, String>>,
-    req: HttpRequest,
-    use_case: web::Data<
-        Arc<
-            AnnotationUseCase<
-                AnnotationServiceImpl<
-                    AnnotationRepositoryImpl,
-                    UserRepositoryImpl,
-                    ProjectRepositoryImpl,
-                >,
-                UserRepositoryImpl,
-                AccessControlServiceImpl<
-                    AccessLogRepositoryImpl,
-                    UserRepositoryImpl,
-                    ProjectRepositoryImpl,
-                    RoleRepositoryImpl,
-                    PermissionRepositoryImpl,
-                >,
-                SignedUrlServiceImpl
-            >,
-        >,
-    >,
-) -> impl Responder {
-    // 쿼리 파라미터 확인
-    let sop_instance_uid = query.get("sop_instance_uid");
-    let series_instance_uid = query.get("series_instance_uid");
-    let study_instance_uid = query.get("study_instance_uid");
-
-    // 최소한 하나의 UID가 필요
-    if sop_instance_uid.is_none() && series_instance_uid.is_none() && study_instance_uid.is_none() {
-        return HttpResponse::BadRequest().json(json!({
-            "error": "Bad Request",
-            "message": "At least one of sop_instance_uid, series_instance_uid, or study_instance_uid is required"
-        }));
-    }
-
-    // 우선순위: sop_instance_uid > series_instance_uid > study_instance_uid
-    let result = if let Some(sop_uid) = sop_instance_uid {
-        use_case.get_annotations_by_instance(sop_uid).await
-    } else if let Some(series_uid) = series_instance_uid {
-        use_case.get_annotations_by_series(series_uid).await
-    } else if let Some(study_uid) = study_instance_uid {
-        use_case.get_annotations_by_study(study_uid).await
-    } else {
-        return HttpResponse::BadRequest().finish();
-    };
-
-    match result {
-        Ok(response) => {
-            // list_version 계산 (가장 최근 updated_at)
-            let list_version = response
-                .annotations
-                .iter()
-                .map(|ann| ann.updated_at)
-                .max();
-
-            // If-Modified-Since 헤더 확인 (캐시 검증)
-            if let Some(if_modified_since) = req.headers().get("If-Modified-Since") {
-                if let Ok(if_modified_since_str) = if_modified_since.to_str() {
-                    if let Ok(client_time) = chrono::DateTime::parse_from_rfc2822(if_modified_since_str) {
-                        if let Some(lv) = list_version {
-                            if lv <= client_time.with_timezone(&chrono::Utc) {
-                                // 304 Not Modified 응답
-                                return HttpResponse::NotModified()
-                                    .insert_header(("Last-Modified", lv.to_rfc2822()))
-                                    .insert_header(("Cache-Control", "public, max-age=5"))
-                                    .finish();
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 200 OK 응답 (본문 없음)
-            let mut resp = HttpResponse::Ok();
-            resp.insert_header(("Cache-Control", "public, max-age=5"))
-                .insert_header(("X-Total-Count", response.total.to_string()));
-
-            if let Some(lv) = list_version {
-                resp.insert_header(("Last-Modified", lv.to_rfc2822()))
-                    .insert_header(("X-List-Version", lv.to_rfc3339()));
-            }
-
-            resp.finish()
-        }
-        Err(_) => HttpResponse::InternalServerError().finish(),
+        Err(ServiceError::NotFound(msg)) => HttpResponse::NotFound().json(json!({
+            "error": "Not Found",
+            "message": msg
+        })),
+        Err(ServiceError::Unauthorized(msg)) => HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": msg
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({
+            "error": "Internal Server Error",
+            "message": e.to_string()
+        })),
     }
 }
 
@@ -751,6 +526,10 @@ pub async fn get_annotation_summary(
 )]
 pub async fn list_annotations(
     query: web::Query<std::collections::HashMap<String, String>>,
+    http_req: HttpRequest,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
+    signed_url_service: web::Data<Arc<SignedUrlServiceImpl>>,
     use_case: web::Data<
         Arc<
             AnnotationUseCase<
@@ -767,21 +546,25 @@ pub async fn list_annotations(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
-                SignedUrlServiceImpl
+                Arc<SignedUrlServiceImpl>
             >,
-            
+
         >,
     >,
 ) -> impl Responder {
-    // TODO: 실제로는 인증에서 user_id를 가져와야 함
-    // 기본값으로 1을 사용하지만, 쿼리 파라미터가 있으면 그것을 사용
-    let mut user_id = 336;
-
-    // 쿼리 파라미터에서 user_id 추출
-    let user_id_param = query.get("user_id").and_then(|s| s.parse::<i32>().ok());
-    if let Some(uid) = user_id_param {
-        user_id = uid;
-    }
+    // JWT에서 user_id 추출 (fallback: query parameter)
+    let user_id = match extract_user_id_from_request(&http_req, &jwt, &user_repo).await {
+        Some(id) if id > 0 => id,
+        _ => {
+            // Fallback: query parameter (개발용, 곧 제거 예정)
+            query.get("user_id")
+                .and_then(|s| s.parse::<i32>().ok())
+                .unwrap_or_else(|| {
+                    tracing::warn!("No valid user_id found in JWT or query parameter");
+                    336 // 기본값
+                })
+        }
+    };
 
     // viewer_software 파라미터 추출
     let viewer_software = query.get("viewer_software").map(|s| s.as_str());
@@ -798,7 +581,7 @@ pub async fn list_annotations(
     let result = if let Some(sop_instance_uid) = query.get("sop_instance_uid") {
         // SOP Instance UID (가장 구체적인 필터)
         // project_id와 user_id가 모두 있으면 권한 기반 필터링 수행
-        if let (Some(proj_id), Some(_)) = (project_id, user_id_param) {
+        if let Some(proj_id) = project_id {
             // 권한 기반 조회 (UseCase에서 권한 체크 수행)
             use_case
                 .get_annotations_by_project_and_instance_with_user(user_id, proj_id, sop_instance_uid)
@@ -891,11 +674,10 @@ pub async fn list_annotations(
         // Series Instance UID 처리
         if let Some(proj_id) = project_id {
             // series_instance_uid + project_id 조합
-            // user_id 파라미터가 있으면 권한 기반 필터링 수행
-            if user_id_param.is_some() {
-                use_case
-                    .get_annotations_by_series_and_project_with_user(user_id, series_instance_uid, proj_id)
-                    .await
+            // 권한 기반 필터링 수행
+            use_case
+                .get_annotations_by_series_and_project_with_user(user_id, series_instance_uid, proj_id)
+                .await
                     .map(|mut response| {
                         // 권한 기반 필터링: READ_ALL 권한이 없으면 본인 어노테이션만
                         // (이미 UseCase에서 처리됨)
@@ -935,48 +717,6 @@ pub async fn list_annotations(
 
                         response
                     })
-            } else {
-                // user_id 파라미터가 없으면 기존 방식 (권한 체크 없음)
-                use_case
-                    .get_annotations_by_project_and_series(proj_id, series_instance_uid)
-                    .await
-                    .map(|mut response| {
-                        // level로 필터링
-                        if let Some(lvl) = level {
-                            match lvl {
-                                "study" => {
-                                    response.annotations.retain(|ann| {
-                                        ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
-                                    });
-                                }
-                                "series" => {
-                                    response.annotations.retain(|ann| {
-                                        !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
-                                    });
-                                }
-                                "instance" => {
-                                    response.annotations.retain(|ann| {
-                                        !ann.sop_instance_uid.is_empty()
-                                    });
-                                }
-                                _ => {}
-                            }
-                            response.total = response.annotations.len();
-                        }
-
-                        // viewer_software로 추가 필터링
-                        if let Some(viewer) = viewer_software {
-                            response.annotations.retain(|ann| {
-                                ann.viewer_software.as_ref()
-                                    .map(|v| v.as_str() == viewer)
-                                    .unwrap_or(false)
-                            });
-                            response.total = response.annotations.len();
-                        }
-
-                        response
-                    })
-            }
         } else {
             // series_instance_uid만 있으면 권한 체크 없이 조회
             use_case
@@ -1022,11 +762,10 @@ pub async fn list_annotations(
     } else if let Some(study_uid) = query.get("study_instance_uid") {
         if let Some(proj_id) = project_id {
             // study_instance_uid + project_id 조합
-            // user_id 파라미터가 있으면 권한 기반 필터링 수행
-            if user_id_param.is_some() {
-                use_case
-                    .get_annotations_by_project_and_study_with_user(user_id, proj_id, study_uid)
-                    .await
+            // 권한 기반 필터링 수행
+            use_case
+                .get_annotations_by_project_and_study_with_user(user_id, proj_id, study_uid)
+                .await
                     .map(|mut response| {
                         // level로 필터링
                         if let Some(lvl) = level {
@@ -1063,51 +802,6 @@ pub async fn list_annotations(
 
                         response
                     })
-            } else {
-                // user_id 파라미터가 없으면 기존 방식 (권한 체크 없음)
-                match use_case
-                    .get_annotations_by_project_and_study(proj_id, study_uid)
-                    .await
-                {
-                    Ok(mut response) => {
-                        // level로 필터링
-                        if let Some(lvl) = level {
-                            match lvl {
-                                "study" => {
-                                    response.annotations.retain(|ann| {
-                                        ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
-                                    });
-                                }
-                                "series" => {
-                                    response.annotations.retain(|ann| {
-                                        !ann.series_instance_uid.is_empty() && ann.sop_instance_uid.is_empty()
-                                    });
-                                }
-                                "instance" => {
-                                    response.annotations.retain(|ann| {
-                                        !ann.sop_instance_uid.is_empty()
-                                    });
-                                }
-                                _ => {}
-                            }
-                            response.total = response.annotations.len();
-                        }
-
-                        // viewer_software로 추가 필터링
-                        if let Some(viewer) = viewer_software {
-                            response.annotations.retain(|ann| {
-                                ann.viewer_software.as_ref()
-                                    .map(|v| v.as_str() == viewer)
-                                    .unwrap_or(false)
-                            });
-                            response.total = response.annotations.len();
-                        }
-
-                        Ok(response)
-                    }
-                    Err(e) => Err(e),
-                }
-            }
         } else {
             // study_instance_uid만 있으면 study로 필터링
             use_case
@@ -1206,7 +900,56 @@ pub async fn list_annotations(
     };
 
     match result {
-        Ok(annotations) => {
+        Ok(mut annotations) => {
+            // include_snapshot_urls 파라미터 확인 (기본값: true)
+            let include_snapshot_urls = query
+                .get("include_snapshot_urls")
+                .and_then(|s| s.parse::<bool>().ok())
+                .unwrap_or(true);
+
+            // Snapshot URLs 생성 (bulk)
+            if include_snapshot_urls {
+                // snapshot_image_key가 있는 annotation들의 key 수집
+                let snapshot_keys: Vec<String> = annotations
+                    .annotations
+                    .iter()
+                    .filter_map(|ann| ann.snapshot_image_key.clone())
+                    .collect();
+
+                if !snapshot_keys.is_empty() {
+                    tracing::info!("Generating signed URLs for {} snapshots", snapshot_keys.len());
+                    // Bulk로 signed URL 생성 (병렬 처리)
+                    match signed_url_service.generate_download_urls_bulk(snapshot_keys.clone(), Some(3600)).await {
+                        Ok(url_map) => {
+                            tracing::info!("Successfully generated {} signed URLs", url_map.len());
+                            // HashMap으로 변환하여 빠른 조회
+                            let url_lookup: std::collections::HashMap<String, Option<String>> =
+                                url_map.into_iter().collect();
+
+                            // 각 annotation에 signed URL 추가
+                            let mut url_added_count = 0;
+                            for ann in &mut annotations.annotations {
+                                if let Some(ref key) = ann.snapshot_image_key {
+                                    if let Some(url_opt) = url_lookup.get(key) {
+                                        ann.snapshot_image_url = url_opt.clone();
+                                        if url_opt.is_some() {
+                                            url_added_count += 1;
+                                        }
+                                    }
+                                }
+                            }
+                            tracing::info!("Added {} snapshot URLs to annotations", url_added_count);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to generate snapshot URLs: {:?}", e);
+                            // URL 생성 실패해도 응답은 계속 진행
+                        }
+                    }
+                } else {
+                    tracing::debug!("No snapshots to generate URLs for");
+                }
+            }
+
             // list_version 계산 (가장 최근 updated_at)
             let list_version = annotations
                 .annotations
@@ -1269,9 +1012,8 @@ pub async fn update_annotation(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
-                SignedUrlServiceImpl
+                Arc<SignedUrlServiceImpl>,
             >,
-            
         >,
     >,
 ) -> impl Responder {
@@ -1324,7 +1066,7 @@ pub async fn delete_annotation(
                     RoleRepositoryImpl,
                     PermissionRepositoryImpl,
                 >,
-                SignedUrlServiceImpl
+                Arc<SignedUrlServiceImpl>,
             >,
         >,
     >,
@@ -1381,9 +1123,11 @@ pub async fn get_annotation_permissions(
         >,
     >,
     http_req: HttpRequest,
+    jwt: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
 ) -> impl Responder {
-    // 요청한 사용자의 user_id 추출
-    let requesting_user_id = match AnnotationController::extract_user_id_or_unauthorized(&http_req) {
+    // 요청한 사용자의 user_id 추출 (개발 모드 + JWT 인증 지원)
+    let requesting_user_id = match AnnotationController::extract_user_id_with_auth(&http_req, &jwt, &user_repo).await {
         Ok(id) => id,
         Err(response) => return response,
     };
@@ -1493,6 +1237,8 @@ pub async fn complete_snapshot_upload<AS, UR, ACS, SUS>(
     path: web::Path<i32>,
     request: web::Json<CompleteSnapshotUploadRequest>,
     http_req: HttpRequest,
+    jwt_service: web::Data<Arc<JwtService>>,
+    user_repo: web::Data<Arc<UserRepositoryImpl>>,
     use_case: web::Data<Arc<AnnotationUseCase<AS, UR, ACS, SUS>>>,
 ) -> impl Responder
 where
@@ -1503,12 +1249,14 @@ where
 {
     let annotation_id = path.into_inner();
 
-    let user_id = http_req
-        .headers()
-        .get("X-User-ID")
-        .and_then(|h| h.to_str().ok())
-        .and_then(|s| s.parse::<i32>().ok())
-        .unwrap_or(1);
+    // Extract user_id from JWT token
+    let user_id = match extract_user_id_from_request(&http_req, &jwt_service, &user_repo).await {
+        Some(id) if id > 0 => id,
+        _ => return HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": "Invalid or missing authentication token"
+        })),
+    };
 
     match use_case.complete_snapshot_upload(
         annotation_id,
@@ -1606,13 +1354,13 @@ pub fn configure_routes(
         .service(
             web::scope("/annotations")
                 .route("/summary", web::get().to(get_annotation_summary))
-                .route("/summary", web::head().to(head_annotation_summary))
+                .route("/summary", web::head().to(get_annotation_summary))
                 .route("", web::post().to(create_annotation))
                 .route("", web::get().to(list_annotations))
-                .route("", web::head().to(head_annotations))
+                .route("", web::head().to(list_annotations))
                 .route("/permissions", web::get().to(get_annotation_permissions))
                 .route("/{annotation_id}", web::get().to(get_annotation))
-                .route("/{annotation_id}", web::head().to(head_annotation))
+                .route("/{annotation_id}", web::head().to(get_annotation))
                 .route("/{annotation_id}", web::put().to(update_annotation))
                 .route("/{annotation_id}", web::delete().to(delete_annotation))
                 // Mask Groups routes

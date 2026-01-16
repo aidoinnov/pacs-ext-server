@@ -224,7 +224,15 @@ impl Dcm4cheeQidoClient {
                 status, body
             )));
         }
+
+        // 빈 응답 처리 (Dcm4chee가 결과가 없을 때 빈 문자열 반환)
+        if body.is_empty() || body.trim().is_empty() {
+            tracing::info!("QIDO /studies: Empty response (no matching studies)");
+            return Ok(serde_json::json!([]));
+        }
+
         let json: Value = serde_json::from_str(&body).map_err(|e| {
+            tracing::error!("QIDO /studies: JSON parse error: {} - Body: {}", e, &body[..std::cmp::min(200, body.len())]);
             ServiceError::ExternalServiceError(format!("QIDO /studies parse error: {}", e))
         })?;
         Ok(json)
@@ -426,6 +434,101 @@ impl Dcm4cheeQidoClient {
 
         if let Some(arr) = json.as_array() {
             tracing::info!("  ✅ Parsed {} instances from QIDO response", arr.len());
+        }
+
+        Ok(json)
+    }
+
+    /// GET /rs/studies/{studyUID}/series/{seriesUID}/metadata
+    /// DICOMweb WADO-RS Series Metadata 조회 (모든 인스턴스의 DICOM 태그 포함)
+    pub async fn qido_instances_metadata_with_bearer(
+        &self,
+        bearer_token: Option<&str>,
+        study_uid: &str,
+        series_uid: &str,
+        params: Vec<(String, String)>,
+    ) -> Result<Value, ServiceError> {
+        let metadata_path = if self.qido_path.ends_with("/rs") {
+            format!(
+                "{}/studies/{}/series/{}/metadata",
+                self.qido_path, study_uid, series_uid
+            )
+        } else {
+            format!(
+                "{}/rs/studies/{}/series/{}/metadata",
+                self.qido_path, study_uid, series_uid
+            )
+        };
+        let url = self.build_url(&metadata_path, &[])?;
+
+        tracing::info!("🔍 QIDO Series Metadata Request:");
+        tracing::info!("  📍 URL: {}", url);
+        tracing::info!("  🔑 Bearer Token: {}", if bearer_token.is_some() {
+            format!("Present ({}...)", bearer_token.unwrap().chars().take(20).collect::<String>())
+        } else {
+            "None".to_string()
+        });
+        tracing::info!("  📋 Params: {:?}", params);
+        tracing::info!("  👤 Study UID: {}", study_uid);
+        tracing::info!("  📁 Series UID: {}", series_uid);
+
+        let mut req = self
+            .http_client
+            .get(url)
+            .timeout(std::time::Duration::from_millis(self.timeout_ms))
+            .header("Accept", "application/dicom+json");
+
+        if let Some(token) = bearer_token {
+            req = req.bearer_auth(token);
+            tracing::info!("  ✅ Using Bearer token authentication");
+        } else if let (Some(u), Some(p)) = (&self.username, &self.password) {
+            req = req.basic_auth(u, Some(p));
+            tracing::info!("  ✅ Using Basic authentication (user: {})", u);
+        } else {
+            tracing::warn!("  ⚠️  No authentication provided!");
+        }
+
+        if !params.is_empty() {
+            let qp: Vec<(&str, &str)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            req = req.query(&qp);
+            tracing::info!("  📊 Query params added: {:?}", qp);
+        }
+
+        tracing::info!("  🚀 Sending metadata request...");
+        let resp = req.send().await.map_err(|e| {
+            tracing::error!("  ❌ QIDO /instances/metadata request failed: {}", e);
+            ServiceError::ExternalServiceError(format!("QIDO /instances/metadata failed: {}", e))
+        })?;
+        let status = resp.status();
+        tracing::info!("  📥 Response status: {}", status);
+
+        let body = resp.text().await.unwrap_or_default();
+        tracing::info!("  📄 Response body length: {} bytes", body.len());
+
+        if body.len() < 500 {
+            tracing::info!("  📄 Response body: {}", body);
+        } else {
+            tracing::info!("  📄 Response body (first 500 chars): {}", &body[..500]);
+        }
+
+        if !status.is_success() {
+            tracing::error!("  ❌ QIDO series metadata request failed with status {}: {}", status, body);
+            return Err(ServiceError::ExternalServiceError(format!(
+                "QIDO /series/metadata failed ({}): {}",
+                status, body
+            )));
+        }
+
+        let json: Value = serde_json::from_str(&body).map_err(|e| {
+            tracing::error!("  ❌ Failed to parse JSON: {}", e);
+            ServiceError::ExternalServiceError(format!("QIDO /series/metadata parse error: {}", e))
+        })?;
+
+        if let Some(arr) = json.as_array() {
+            tracing::info!("  ✅ Parsed {} instances metadata from series metadata response", arr.len());
         }
 
         Ok(json)
