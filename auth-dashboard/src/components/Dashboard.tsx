@@ -7,6 +7,7 @@ import StudyListViewTests from './ApiScenarioTests/StudyListViewTests';
 import ViewSelectionTests from './ApiScenarioTests/ViewSelectionTests';
 import QidoEnhancedTests from './ApiScenarioTests/QidoEnhancedTests';
 import AnnotationSnapshotTests from './ApiScenarioTests/AnnotationSnapshotTests';
+import E2ETests from './E2ETests';
 import Sidebar from './Sidebar';
 import {
   DEFAULT_API_URL,
@@ -24,6 +25,14 @@ const API_SUB_MENU = {
   VIEW_SELECTION: 'api-health-view-selection',
   QIDO_ENHANCED: 'api-health-qido-enhanced',
   ANNOTATION_SNAPSHOT: 'api-health-annotation-snapshot',
+} as const;
+
+// E2E 테스트 하위 메뉴 ID
+const E2E_SUB_MENU = {
+  ANNOTATION_SNAPSHOT: 'e2e-annotation-snapshot',
+  ME_STUDIES: 'e2e-me-studies',
+  KEYCLOAK_QIDO: 'e2e-keycloak-qido',
+  ALL_STUDIES: 'e2e-all-studies',
 } as const;
 
 interface User {
@@ -282,6 +291,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tokens: initialTokens, onLo
           {/* Annotation Snapshot 테스트 (API 점검 > Annotation Snapshot) */}
           {activeMenu === API_SUB_MENU.ANNOTATION_SNAPSHOT && (
             <AnnotationSnapshotTests />
+          )}
+
+          {/* E2E 테스트 - Annotation Snapshot */}
+          {activeMenu === E2E_SUB_MENU.ANNOTATION_SNAPSHOT && (
+            <E2ETests testType="annotation-snapshot" />
+          )}
+
+          {/* E2E 테스트 - Me Studies */}
+          {activeMenu === E2E_SUB_MENU.ME_STUDIES && (
+            <E2ETests testType="me-studies" />
+          )}
+
+          {/* E2E 테스트 - Keycloak QIDO */}
+          {activeMenu === E2E_SUB_MENU.KEYCLOAK_QIDO && (
+            <E2ETests testType="keycloak-qido" />
+          )}
+
+          {/* E2E 테스트 - All Studies */}
+          {activeMenu === E2E_SUB_MENU.ALL_STUDIES && (
+            <E2ETests testType="all-studies" />
           )}
         </div>
       </div>

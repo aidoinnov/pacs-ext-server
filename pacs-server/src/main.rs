@@ -78,8 +78,8 @@ use infrastructure::config::Settings;
 use infrastructure::middleware::{configure_cors, CacheHeaders};
 // 프레젠테이션 레이어 - 컨트롤러들
 use presentation::controllers::{
-    access_control_controller, annotation_controller, auth_controller, mask_controller,
-    mask_group_controller, project_controller, project_data_access_controller,
+    access_control_controller, annotation_controller, auth_controller, e2e_controller,
+    mask_controller, mask_group_controller, project_controller, project_data_access_controller,
     project_user_controller, project_user_matrix_controller, role_controller,
     role_permission_matrix_controller, series_user_note_controller, study_list_view_controller,
     test_controller, user_controller, user_project_matrix_controller,
@@ -940,7 +940,11 @@ async fn main() -> std::io::Result<()> {
                     // ========================================
                     .configure(|cfg| {
                         test_controller::configure_routes(cfg, keycloak_client.clone())
-                    }),
+                    })
+                    // ========================================
+                    // 🧪 E2E 테스트 API
+                    // ========================================
+                    .configure(e2e_controller::configure_routes),
             )
     })
     .bind((settings.server.host.as_str(), settings.server.port))?

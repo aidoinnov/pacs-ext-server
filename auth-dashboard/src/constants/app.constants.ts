@@ -66,12 +66,25 @@ export const SIDEBAR_MENU = {
     label: '사용자 관리',
     description: '사용자 및 권한',
   },
+  E2E_TESTS: {
+    id: 'e2e',
+    icon: '🧪',
+    label: 'E2E 테스트',
+    description: 'Python E2E 테스트',
+    subMenus: [
+      { id: 'e2e-annotation-snapshot', label: 'Annotation Snapshot', icon: '📸' },
+      { id: 'e2e-me-studies', label: 'Me Studies', icon: '📊' },
+      { id: 'e2e-keycloak-qido', label: 'Keycloak QIDO', icon: '🔐' },
+      { id: 'e2e-all-studies', label: 'All Studies Access', icon: '📋' },
+    ],
+  },
 } as const;
 
 // 사이드바 메뉴 순서
 export const SIDEBAR_MENU_ORDER = [
   SIDEBAR_MENU.AUTH_TEST,
   SIDEBAR_MENU.API_HEALTH,
+  SIDEBAR_MENU.E2E_TESTS,
   // SIDEBAR_MENU.PROJECT_MANAGEMENT,  // 향후 추가
   // SIDEBAR_MENU.USER_MANAGEMENT,     // 향후 추가
 ] as const;

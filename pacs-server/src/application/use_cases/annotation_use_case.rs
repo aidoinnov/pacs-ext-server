@@ -138,6 +138,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
             created_at: annotation.created_at,
             updated_at: annotation.updated_at,
             snapshot_image_key: annotation.snapshot_image_key,
+            snapshot_image_url: None, // Controller에서 필요 시 설정
             snapshot_status: annotation.snapshot_status.map(|s| s.to_string()),
             snapshot_uploaded_at: annotation.snapshot_uploaded_at,
         })
@@ -255,6 +256,7 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
                     created_at: annotation.created_at,
                     updated_at: annotation.updated_at,
                     snapshot_image_key: annotation.snapshot_image_key,
+                    snapshot_image_url: None, // Controller에서 필요 시 설정
                     snapshot_status: annotation.snapshot_status.map(|s| s.to_string()),
                     snapshot_uploaded_at: annotation.snapshot_uploaded_at,
                 }
@@ -334,23 +336,20 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
                 "Study Instance UID cannot be empty".to_string(),
             ));
         }
-        if request.series_instance_uid.trim().is_empty() {
-            return Err(ServiceError::ValidationError(
-                "Series Instance UID cannot be empty".to_string(),
-            ));
-        }
-        if request.sop_instance_uid.trim().is_empty() {
-            return Err(ServiceError::ValidationError(
-                "SOP Instance UID cannot be empty".to_string(),
-            ));
-        }
+
+        // series_instance_uid와 sop_instance_uid는 Optional이므로 빈 문자열 체크만 수행
+        let series_uid = request.series_instance_uid
+            .filter(|s| !s.trim().is_empty());
+
+        let instance_uid = request.sop_instance_uid
+            .filter(|s| !s.trim().is_empty());
 
         let new_annotation = NewAnnotation {
             project_id,
             user_id,
             study_uid: request.study_instance_uid,
-            series_uid: Some(request.series_instance_uid),
-            instance_uid: Some(request.sop_instance_uid),
+            series_uid,
+            instance_uid,
             tool_name: request.tool_name.unwrap_or_else(|| "manual".to_string()),
             tool_version: request.tool_version,
             viewer_software: request.viewer_software,
@@ -1432,9 +1431,11 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
         }
 
         // 3. S3 경로 생성
+        // snapshots/{project_id}/{annotation_id}/{timestamp}_{filename}
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let image_key = format!(
-            "annotations/{}/snapshots/{}_{}",
+            "snapshots/{}/{}/{}_{}",
+            annotation.project_id,
             annotation_id,
             timestamp,
             request.filename

@@ -4,7 +4,7 @@
 
 use crate::application::dto::study_list_view_dto::*;
 use crate::domain::entities::{
-    FieldDef, NewStudyListView, NewStudyListViewField, StudyListView, StudyListViewField,
+    FieldDef, NewStudyListView, NewStudyListViewField, StudyListViewField,
     UpdateStudyListView,
 };
 use crate::domain::repositories::{FieldDefFilter, StudyListViewRepository, ViewListFilter};

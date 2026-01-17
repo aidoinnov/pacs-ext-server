@@ -1,22 +1,27 @@
 # Snapshot GC 구현 가이드
 
-> **작성일**: 2026-01-12  
+> **작성일**: 2026-01-12
+> **갱신일**: 2026-01-13
 > **목적**: Snapshot GC 배치 작업 구현 상세 가이드
+> **상태**: ✅ **구현 완료**
 
 ---
 
 ## 📋 구현 개요
 
 ### 목표
-- PENDING 상태 타임아웃 처리 (3일)
-- FAILED 상태 Snapshot S3 삭제 (7일 grace period)
-- Orphan Snapshot 정리 (DB에 없는 S3 오브젝트)
+- ✅ PENDING 상태 타임아웃 처리 (3일) - **완료**
+- ✅ FAILED 상태 Snapshot S3 삭제 (7일 grace period) - **완료**
+- ✅ file_size 기록 (용량 모니터링) - **완료**
+- ✅ Advisory Lock (동시 실행 방지) - **완료**
+- ⏸️ Orphan Snapshot 정리 (DB에 없는 S3 오브젝트) - **보류**
 
 ### 전제 조건
 - ✅ `snapshot_upload_status` ENUM 존재
 - ✅ `snapshot_uploaded_at` 필드 존재
 - ✅ `snapshot_image_key` 필드 존재
 - ✅ 상태 전이 로직 완벽 구현
+- ✅ `gc_deletion_log` 테이블 생성 (file_size 포함)
 
 ---
 

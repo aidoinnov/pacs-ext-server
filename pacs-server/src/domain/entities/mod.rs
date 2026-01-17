@@ -1,6 +1,7 @@
 #![allow(ambiguous_glob_reexports)]
 pub mod access_condition;
 pub mod annotation;
+pub mod gc_deletion_log;
 pub mod capability;
 pub mod group;
 pub mod institution;
@@ -17,7 +18,9 @@ pub mod study_list_view;
 pub mod user;
 pub mod viewer;
 
+
 pub use annotation::*;
+pub use gc_deletion_log::*;
 pub use capability::*;
 pub use logs::*;
 pub use mask::*;

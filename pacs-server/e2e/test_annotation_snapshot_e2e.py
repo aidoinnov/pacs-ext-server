@@ -9,6 +9,7 @@ import os
 import io
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
+from test_utils import cleanup_annotations
 
 BASE_URL = "http://localhost:8080"
 USER_ID = 'iaid-pacs-admin'
@@ -70,8 +71,12 @@ def create_test_image():
     img_byte_arr.seek(0)
     
     return img_byte_arr.getvalue()
-def test_annotation_snapshot_workflow(token: str):
-    """스냅샷 업로드 전체 워크플로우 테스트"""
+def test_annotation_snapshot_workflow(token: str) -> int:
+    """스냅샷 업로드 전체 워크플로우 테스트
+
+    Returns:
+        생성된 어노테이션 ID
+    """
     headers = {"Authorization": f"Bearer {token}"}
 
     print("=" * 70)
@@ -268,12 +273,17 @@ def test_annotation_snapshot_workflow(token: str):
     print(f"   - Uploaded At: {final_annotation.get('snapshot_uploaded_at', 'N/A')}")
     print()
 
+    return annotation_id
+
 
 if __name__ == '__main__':
+    created_ids = []
+    token = None
     try:
         print("\n🚀 Annotation Snapshot E2E Test 시작...\n")
         token = login()
-        test_annotation_snapshot_workflow(token)
+        annotation_id = test_annotation_snapshot_workflow(token)
+        created_ids.append(annotation_id)
         print("✅ 테스트 완료!\n")
     except AssertionError as e:
         print(f"\n❌ 검증 실패: {e}\n")
@@ -283,3 +293,7 @@ if __name__ == '__main__':
         import traceback
         traceback.print_exc()
         exit(1)
+    finally:
+        # Cleanup
+        if created_ids and token:
+            cleanup_annotations(token, created_ids)

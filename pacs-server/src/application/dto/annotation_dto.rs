@@ -18,13 +18,13 @@ pub struct CreateAnnotationRequest {
     #[schema(example = "1.2.840.113619.2.55.3.604688119.868.1234567890.1")]
     pub study_instance_uid: String,
 
-    /// Series Instance UID
+    /// Series Instance UID (Optional for study-level annotations)
     #[schema(example = "1.2.840.113619.2.55.3.604688119.868.1234567890.2")]
-    pub series_instance_uid: String,
+    pub series_instance_uid: Option<String>,
 
-    /// SOP Instance UID
+    /// SOP Instance UID (Optional for study/series-level annotations)
     #[schema(example = "1.2.840.113619.2.55.3.604688119.868.1234567890.3")]
-    pub sop_instance_uid: String,
+    pub sop_instance_uid: Option<String>,
 
     /// Annotation 데이터 (JSON 형식)
     /// 어노테이션의 실제 데이터를 담는 JSON 객체
@@ -200,6 +200,12 @@ pub struct AnnotationResponse {
     /// S3에 저장된 스냅샷 이미지의 object key
     #[schema(example = "annotations/123/snapshots/20240101_120000_snapshot.png")]
     pub snapshot_image_key: Option<String>,
+
+    /// 스냅샷 이미지 다운로드 URL (Signed URL)
+    /// include_snapshot_urls=true 쿼리 파라미터가 있을 때만 포함됨
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "https://s3.amazonaws.com/bucket/annotations/123/snapshots/snapshot.png?X-Amz-Signature=...")]
+    pub snapshot_image_url: Option<String>,
 
     /// 스냅샷 업로드 상태
     /// 스냅샷 업로드 상태 (pending/uploading/completed/failed)

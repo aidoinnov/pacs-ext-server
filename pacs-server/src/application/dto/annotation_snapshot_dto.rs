@@ -21,15 +21,15 @@ pub struct SnapshotUploadUrlRequest{
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SnapshotUploadUrlResponse{
     /// 업로드용 Presigned URL
-    #[schema(example = "https://s3.amazonaws.com/bucket/annotations/123/snapshots/image.png?X-Amz-...")]
+    #[schema(example = "https://s3.amazonaws.com/bucket/snapshots/1/123/20260111_120000_image.png?X-Amz-...")]
     pub upload_url: String,
 
     /// 다운로드용 Presigned URL
-    #[schema(example = "https://s3.amazonaws.com/bucket/annotations/123/snapshots/image.png?X-Amz-...")]
+    #[schema(example = "https://s3.amazonaws.com/bucket/snapshots/1/123/20260111_120000_image.png?X-Amz-...")]
     pub download_url: String,
 
     /// S3 object key (DB에 저장할 값)
-    #[schema(example = "annotations/123/snapshots/snapshot_20260111_120000.png")]
+    #[schema(example = "snapshots/1/123/20260111_120000_snapshot.png")]
     pub image_key: String,
     /// 만료 시간 (초))
     #[schema(example= 600)]

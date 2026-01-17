@@ -1,0 +1,108 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gc-job-b-cleanup-failed
+  namespace: pacs-system
+  labels:
+    app: pacs-gc
+    job: cleanup-failed
+spec:
+  # 매일 새벽 3시 실행 (Job A 이후, KST 기준 새벽 3시 = UTC 18시 전날)
+  schedule: "0 18 * * *"
+  
+  # 동시 실행 방지 (Advisory Lock으로도 보호되지만 추가 안전장치)
+  concurrencyPolicy: Forbid
+  
+  # 성공한 Job 3개, 실패한 Job 1개 유지 (디버깅용)
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  
+  # Job 시작 기한 (스케줄 시간으로부터 1시간 이내 시작 안하면 실패)
+  startingDeadlineSeconds: 3600
+  
+  jobTemplate:
+    metadata:
+      labels:
+        app: pacs-gc
+        job: cleanup-failed
+    spec:
+      # Job 타임아웃 (30분)
+      activeDeadlineSeconds: 1800
+      
+      # 실패 시 재시도 안함 (멱등성 보장되므로 다음 스케줄 대기)
+      backoffLimit: 0
+      
+      template:
+        metadata:
+          labels:
+            app: pacs-gc
+            job: cleanup-failed
+        spec:
+          restartPolicy: Never
+          
+          containers:
+          - name: gc-runner
+            image: your-registry/pacs-server:latest  # 실제 이미지 경로로 변경
+            imagePullPolicy: Always
+            
+            # GC Runner 실행
+            command: ["/usr/local/bin/gc_runner"]
+            args:
+              - "cleanup-failed"
+              - "--grace-days"
+              - "7"
+              - "--batch-size"
+              - "1000"
+              # Dry-run 모드 (프로덕션 배포 전 1주일 테스트)
+              # - "--dry-run"
+            
+            env:
+            # 데이터베이스 연결
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pacs-secrets
+                  key: database-url
+            
+            # S3 설정
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: pacs-config
+                  key: s3-bucket
+            
+            - name: S3_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: pacs-config
+                  key: s3-region
+            
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pacs-secrets
+                  key: s3-access-key
+            
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pacs-secrets
+                  key: s3-secret-key
+            
+            # 로깅
+            - name: RUST_LOG
+              value: "info"
+            
+            # 리소스 제한
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+          
+          # 이미지 Pull Secret (필요한 경우)
+          # imagePullSecrets:
+          # - name: registry-secret
+

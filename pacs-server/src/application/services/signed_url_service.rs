@@ -175,6 +175,13 @@ pub trait SignedUrlService: Send + Sync {
         request: SignedUrlRequest,
     ) -> Result<SignedUrlResponse, SignedUrlError>;
 
+    /// 여러 파일의 다운로드용 Signed URL을 병렬로 생성 (Bulk)
+    async fn generate_download_urls_bulk(
+        &self,
+        file_paths: Vec<String>,
+        ttl_seconds: Option<u64>,
+    ) -> Result<Vec<(String, Option<String>)>, SignedUrlError>;
+
     /// 마스크 업로드용 Signed URL 생성
     async fn generate_mask_upload_url(
         &self,
@@ -284,6 +291,25 @@ impl SignedUrlServiceImpl {
             metadata: request.metadata.clone(),
         }
     }
+
+    /// 간단한 다운로드 URL 생성 (파일 경로와 TTL만 사용)
+    pub async fn generate_download_url_simple(
+        &self,
+        file_path: &str,
+        ttl_seconds: u64,
+    ) -> Result<String, SignedUrlError> {
+        // 파일 경로 검증
+        self.validate_file_path(file_path)?;
+
+        // TTL 검증
+        self.validate_ttl(ttl_seconds)?;
+
+        // Object Storage에서 Signed URL 생성
+        self.object_storage
+            .generate_download_url(file_path, ttl_seconds)
+            .await
+            .map_err(|e| SignedUrlError::ObjectStorageError(e))
+    }
 }
 
 #[async_trait]
@@ -339,6 +365,33 @@ impl SignedUrlService for SignedUrlServiceImpl {
             ttl_seconds,
             "GET".to_string(),
         ))
+    }
+
+    async fn generate_download_urls_bulk(
+        &self,
+        file_paths: Vec<String>,
+        ttl_seconds: Option<u64>,
+    ) -> Result<Vec<(String, Option<String>)>, SignedUrlError> {
+        let ttl = ttl_seconds.unwrap_or(self.default_ttl);
+
+        // 모든 파일 경로에 대해 순차적으로 signed URL 생성
+        // TODO: 성능 개선을 위해 병렬 처리 고려 (Arc<ObjectStorageService> 필요)
+        let mut results = Vec::new();
+
+        for file_path in file_paths {
+            let request = SignedUrlRequest::new(file_path.clone()).with_ttl(ttl);
+            match self.generate_download_url(request).await {
+                Ok(response) => {
+                    results.push((file_path, Some(response.url)));
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to generate download URL for {}: {:?}", file_path, e);
+                    results.push((file_path, None));
+                }
+            }
+        }
+
+        Ok(results)
     }
 
     async fn generate_mask_upload_url(
@@ -518,6 +571,14 @@ impl SignedUrlService for std::sync::Arc<SignedUrlServiceImpl> {
         request: SignedUrlRequest,
     ) -> Result<SignedUrlResponse, SignedUrlError> {
         (**self).generate_download_url(request).await
+    }
+
+    async fn generate_download_urls_bulk(
+        &self,
+        file_paths: Vec<String>,
+        ttl_seconds: Option<u64>,
+    ) -> Result<Vec<(String, Option<String>)>, SignedUrlError> {
+        (**self).generate_download_urls_bulk(file_paths, ttl_seconds).await
     }
 
     async fn generate_mask_upload_url(

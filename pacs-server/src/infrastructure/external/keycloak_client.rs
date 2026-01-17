@@ -60,6 +60,7 @@ struct RefreshTokenRequest {
     grant_type: String,
     refresh_token: String,
     client_id: String,
+    client_secret: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -673,6 +674,7 @@ impl KeycloakClient {
             grant_type: "refresh_token".to_string(),
             refresh_token: refresh_token.to_string(),
             client_id: self.client_id.clone(),
+            client_secret: self.client_secret.clone(),           
         };
 
         let response = self

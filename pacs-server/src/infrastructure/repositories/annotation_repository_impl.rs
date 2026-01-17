@@ -238,8 +238,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         // 기존 annotation 데이터를 가져와서 history에 저장
         let old_annotation = sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                    tool_name, tool_version, data, is_shared, created_at, updated_at,
-                    viewer_software, description, measurement_values, label, version
+                    tool_name, tool_version, data, is_shared,
+                    snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                    created_at, updated_at, version,
+                    viewer_software, description, measurement_values, label
              FROM annotation_annotation WHERE id = $1",
         )
         .bind(id)
@@ -299,8 +301,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         // 기존 annotation 데이터를 가져와서 history에 저장
         let old_annotation = sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                    tool_name, tool_version, data, is_shared, created_at, updated_at,
-                    viewer_software, description, measurement_values, label, version
+                    tool_name, tool_version, data, is_shared,
+                    snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                    created_at, updated_at, version,
+                    viewer_software, description, measurement_values, label
              FROM annotation_annotation WHERE id = $1",
         )
         .bind(id)
@@ -363,8 +367,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         // 기존 annotation 데이터를 가져와서 history에 저장
         let old_annotation = sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                    tool_name, tool_version, data, is_shared, created_at, updated_at,
-                    viewer_software, description, measurement_values, label, version
+                    tool_name, tool_version, data, is_shared,
+                    snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                    created_at, updated_at, version,
+                    viewer_software, description, measurement_values, label
              FROM annotation_annotation WHERE id = $1",
         )
         .bind(id)
@@ -548,8 +554,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
             Some(viewer) => {
                 sqlx::query_as::<_, Annotation>(
                     "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                            tool_name, tool_version, data, is_shared, created_at, updated_at,
-                            viewer_software, description, measurement_values, label, version
+                            tool_name, tool_version, data, is_shared,
+                            snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                            created_at, updated_at, version,
+                            viewer_software, description, measurement_values, label
                      FROM annotation_annotation
                      WHERE user_id = $1 AND viewer_software = $2
                      ORDER BY created_at DESC",
@@ -562,8 +570,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
             None => {
                 sqlx::query_as::<_, Annotation>(
                     "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                            tool_name, tool_version, data, is_shared, created_at, updated_at,
-                            viewer_software, description, measurement_values, label, version
+                            tool_name, tool_version, data, is_shared,
+                            snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                            created_at, updated_at, version,
+                            viewer_software, description, measurement_values, label
                      FROM annotation_annotation
                      WHERE user_id = $1
                      ORDER BY created_at DESC",
@@ -584,8 +594,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
             Some(viewer) => {
                 sqlx::query_as::<_, Annotation>(
                     "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                            tool_name, tool_version, data, is_shared, created_at, updated_at,
-                            viewer_software, description, measurement_values, label, version
+                            tool_name, tool_version, data, is_shared,
+                            snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                            created_at, updated_at, version,
+                            viewer_software, description, measurement_values, label
                      FROM annotation_annotation
                      WHERE project_id = $1 AND viewer_software = $2
                      ORDER BY created_at DESC",
@@ -598,8 +610,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
             None => {
                 sqlx::query_as::<_, Annotation>(
                     "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                            tool_name, tool_version, data, is_shared, created_at, updated_at,
-                            viewer_software, description, measurement_values, label, version
+                            tool_name, tool_version, data, is_shared,
+                            snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                            created_at, updated_at, version,
+                            viewer_software, description, measurement_values, label
                      FROM annotation_annotation
                      WHERE project_id = $1
                      ORDER BY created_at DESC",
@@ -620,8 +634,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
             Some(viewer) => {
                 sqlx::query_as::<_, Annotation>(
                     "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                            tool_name, tool_version, data, is_shared, created_at, updated_at,
-                            viewer_software, description, measurement_values, label, version
+                            tool_name, tool_version, data, is_shared,
+                            snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                            created_at, updated_at, version,
+                            viewer_software, description, measurement_values, label
                      FROM annotation_annotation
                      WHERE study_uid = $1 AND viewer_software = $2
                      ORDER BY created_at DESC",
@@ -634,8 +650,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
             None => {
                 sqlx::query_as::<_, Annotation>(
                     "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                            tool_name, tool_version, data, is_shared, created_at, updated_at,
-                            viewer_software, description, measurement_values, label, version
+                            tool_name, tool_version, data, is_shared,
+                            snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                            created_at, updated_at, version,
+                            viewer_software, description, measurement_values, label
                      FROM annotation_annotation
                      WHERE study_uid = $1
                      ORDER BY created_at DESC",
@@ -681,8 +699,10 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
 
         sqlx::query_as::<_, Annotation>(
             "SELECT id, project_id, user_id, study_uid, series_uid, instance_uid,
-                    tool_name, tool_version, data, is_shared, created_at, updated_at,
-                    viewer_software, description, measurement_values, label, version
+                    tool_name, tool_version, data, is_shared,
+                    snapshot_image_key, snapshot_status, snapshot_uploaded_at,
+                    created_at, updated_at, version,
+                    viewer_software, description, measurement_values, label
              FROM annotation_annotation
              WHERE project_id = $1 AND series_uid = $2
              ORDER BY created_at DESC

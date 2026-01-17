@@ -1,6 +1,8 @@
 mod access_condition_repository;
 mod access_log_repository;
 mod annotation_repository;
+mod gc_repository;
+mod gc_log_repository;
 mod capability_repository;
 mod institution_repository;
 mod mask_group_repository;
@@ -17,6 +19,8 @@ mod user_repository;
 pub use access_condition_repository::*;
 pub use access_log_repository::*;
 pub use annotation_repository::*;
+pub use gc_repository::*;
+pub use gc_log_repository::*;
 pub use capability_repository::*;
 pub use institution_repository::*;
 pub use mask_group_repository::*;

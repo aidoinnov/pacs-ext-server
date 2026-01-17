@@ -7,6 +7,11 @@ edition = "2021"
 name = "pacs_server"
 path = "src/lib.rs"
 
+[[bin]]
+name = "gc_runner"
+path = "src/bin/gc_runner.rs"
+
+
 [dependencies]
 sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "uuid", "chrono", "json", "bigdecimal"] }
 tokio = { version = "1", features = ["full"] }
@@ -34,6 +39,7 @@ reqwest = { version = "0.11", features = ["json"] }
 tracing = "0.1"
 env_logger = "0.11.8"
 rand = "0.8"
+clap = { version = "4.5", features = ["derive"] }
 
 [dev-dependencies]
 tokio-test = "0.4"

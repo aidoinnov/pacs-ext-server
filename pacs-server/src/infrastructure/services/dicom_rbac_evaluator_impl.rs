@@ -732,6 +732,94 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
             reason: Some("instance_not_found_in_project".to_string()),
         }
     }
+
+}
+
+// V2: DicomRbacEvaluatorImpl에 대한 추가 메서드 (trait 외부)
+impl DicomRbacEvaluatorImpl {
+    /// V2: 배치로 여러 instance_uid의 접근 권한을 한 번에 확인
+    ///
+    /// 단순화된 로직:
+    /// 1. 사용자가 프로젝트 멤버인지 확인
+    /// 2. 해당 Series가 프로젝트에 할당되어 있는지 확인 (Study/Series 레벨만)
+    ///
+    /// 반환: 접근 가능한 instance_uid 목록
+    pub async fn evaluate_instances_batch_v2(
+        &self,
+        user_id: i32,
+        project_id: i32,
+        study_uid: &str,
+        series_uid: &str,
+        instance_uids: &[String],
+    ) -> Result<Vec<String>, sqlx::Error> {
+        if instance_uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // 1. 사용자가 프로젝트 멤버인지 확인
+        let is_member: bool = sqlx::query_scalar(
+            "SELECT EXISTS(
+                SELECT 1
+                FROM security_user_project
+                WHERE user_id = $1 AND project_id = $2
+            )"
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        if !is_member {
+            tracing::debug!(
+                "User {} is not a member of project {}",
+                user_id,
+                project_id
+            );
+            return Ok(Vec::new());
+        }
+
+        // 2. Series가 프로젝트에 할당되어 있는지 확인 (Study 또는 Series 레벨)
+        // 그리고 해당 Series에 속한 instance_uid 중 접근 가능한 것들만 반환
+
+        // instance_uids를 Vec<String>으로 변환 (PostgreSQL 배열 타입 호환)
+        let instance_uids_vec: Vec<String> = instance_uids.to_vec();
+
+        let allowed_uids: Vec<String> = sqlx::query_scalar(
+            "SELECT pdi.instance_uid
+             FROM project_data_instance pdi
+             JOIN project_data_series pds ON pdi.series_id = pds.id
+             JOIN project_data_study pdt ON pds.study_id = pdt.id
+             WHERE pdt.study_uid = $1
+             AND pds.series_uid = $2
+             AND pdi.instance_uid = ANY($3::text[])
+             AND EXISTS (
+                 SELECT 1 FROM project_data pd
+                 WHERE pd.project_id = $4
+                 AND (
+                     -- Study 레벨 할당
+                     (pd.resource_level = 'STUDY' AND pd.study_id = pdt.id)
+                     -- Series 레벨 할당
+                     OR (pd.resource_level = 'SERIES' AND pd.series_id = pds.id)
+                 )
+             )"
+        )
+        .bind(study_uid)
+        .bind(series_uid)
+        .bind(&instance_uids_vec)
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        tracing::debug!(
+            "Batch RBAC v2: {} out of {} instances allowed for user {} in project {}",
+            allowed_uids.len(),
+            instance_uids.len(),
+            user_id,
+            project_id
+        );
+
+        Ok(allowed_uids)
+    }
 }
 
 #[cfg(test)]

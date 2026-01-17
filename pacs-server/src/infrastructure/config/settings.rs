@@ -614,6 +614,11 @@ mod tests {
                 interval_sec: 30,
                 default_project_id: Some(1),
             }),
+            redis: Some(RedisConfig {
+                url: "redis://localhost:6379".to_string(),
+                pool_size: 10,
+                view_selection_ttl_sec: 3600,
+            }),
         };
 
         let url = settings.database_url();
@@ -693,6 +698,11 @@ mod tests {
                 enabled: true,
                 interval_sec: 30,
                 default_project_id: Some(1),
+            }),
+            redis: Some(RedisConfig {
+                url: "redis://localhost:6379".to_string(),
+                pool_size: 10,
+                view_selection_ttl_sec: 3600,
             }),
         };
 

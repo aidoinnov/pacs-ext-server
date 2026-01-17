@@ -1,6 +1,8 @@
 mod access_condition_repository_impl;
 mod access_log_repository_impl;
 mod annotation_repository_impl;
+mod gc_repository_impl;
+mod gc_log_repository_impl;
 mod capability_repository_impl;
 mod institution_repository_impl;
 mod mask_group_repository_impl;
@@ -13,10 +15,12 @@ mod role_repository_impl;
 mod series_user_note_repository_impl;
 mod study_list_view_repository_impl;
 mod user_repository_impl;
-pub use access_condition_repository_impl::*;
 
+pub use access_condition_repository_impl::*;
 pub use access_log_repository_impl::*;
 pub use annotation_repository_impl::*;
+pub use gc_repository_impl::*;
+pub use gc_log_repository_impl::*;
 pub use capability_repository_impl::*;
 pub use mask_group_repository_impl::*;
 pub use mask_repository_impl::*;

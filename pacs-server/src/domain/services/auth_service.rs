@@ -5,7 +5,6 @@ use crate::infrastructure::auth::{Claims, JwtService};
 use crate::infrastructure::external::KeycloakClient;
 use async_trait::async_trait;
 use std::sync::Arc;
-use uuid::Uuid;
 
 /// 인증 도메인 서비스
 #[async_trait]

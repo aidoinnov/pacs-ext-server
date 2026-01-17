@@ -11,7 +11,6 @@ use crate::application::use_cases::user_use_case::UserUseCase;
 use crate::domain::services::user_service::UserService;
 use crate::infrastructure::auth::{extract_user_id_from_request, JwtService};
 use crate::infrastructure::repositories::UserRepositoryImpl;
-use crate::domain::repositories::UserRepository; // bring trait for find_by_id into scope
 
 pub struct UserController<U: UserService> {
     user_use_case: Arc<UserUseCase<U>>,
