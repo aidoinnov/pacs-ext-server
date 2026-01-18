@@ -32,6 +32,7 @@ class SubjectMigrator:
         self.db_url = db_url
         self.dry_run = dry_run
         self.conn = None
+        self.subject_counter = {}  # project_id -> count (dry-run용)
 
     def connect(self):
         """데이터베이스 연결"""
@@ -54,7 +55,7 @@ class SubjectMigrator:
             return cur.fetchall()
 
     def get_assigned_studies(self, project_id: int) -> List[Dict]:
-        """프로젝트에 할당된 Study 목록 조회"""
+        """프로젝트에 할당된 Study 목록 조회 (patient_id 유무 무관)"""
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
                 SELECT DISTINCT s.id, s.study_uid, s.patient_id, s.patient_name, s.patient_birth_date
@@ -62,12 +63,15 @@ class SubjectMigrator:
                 JOIN project_data_study s ON pd.study_id = s.id
                 WHERE pd.project_id = %s
                   AND pd.resource_level = 'STUDY'
-                  AND s.patient_id IS NOT NULL
+                ORDER BY s.id
             """, (project_id,))
             return cur.fetchall()
 
-    def get_existing_subject(self, project_id: int, patient_id: str) -> Optional[Dict]:
-        """기존 Subject 조회"""
+    def get_existing_subject(self, project_id: int, patient_id: Optional[str]) -> Optional[Dict]:
+        """기존 Subject 조회 (patient_id 기반)"""
+        if not patient_id:
+            return None
+
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, subject_code, patient_id
@@ -76,42 +80,60 @@ class SubjectMigrator:
             """, (project_id, patient_id))
             return cur.fetchone()
 
-    def generate_subject_code(self, project_id: int, patient_id: str) -> str:
-        """유일한 Subject Code 생성"""
-        # 1차: Patient ID 기반
-        base_code = patient_id[:50]  # 최대 50자
-        candidate = base_code
-        suffix = 0
+    def generate_subject_code(self, project_id: int, patient_id: Optional[str]) -> str:
+        """
+        유일한 Subject Code 생성
 
+        - patient_id가 있으면: patient_id 기반 (예: P12345)
+        - patient_id가 없으면: A-001, A-002, ..., A-999, B-001, ... 형식
+        """
+        if patient_id:
+            # Patient ID 기반 생성
+            base_code = patient_id[:50]
+            candidate = base_code
+            suffix = 0
+
+            with self.conn.cursor() as cur:
+                while True:
+                    cur.execute("""
+                        SELECT EXISTS(
+                            SELECT 1 FROM project_subject
+                            WHERE project_id = %s AND subject_code = %s
+                        )
+                    """, (project_id, candidate))
+                    exists = cur.fetchone()[0]
+
+                    if not exists:
+                        return candidate
+
+                    suffix += 1
+                    candidate = f"{base_code}_{suffix}"
+
+                    if suffix > 100:
+                        break
+
+        # patient_id가 없거나 충돌 시: A-001, A-002, ... 형식
         with self.conn.cursor() as cur:
-            while True:
-                cur.execute("""
-                    SELECT EXISTS(
-                        SELECT 1 FROM project_subject
-                        WHERE project_id = %s AND subject_code = %s
-                    )
-                """, (project_id, candidate))
-                exists = cur.fetchone()[0]
-
-                if not exists:
-                    return candidate
-
-                suffix += 1
-                candidate = f"{base_code}_{suffix}"
-
-                if suffix > 100:
-                    break
-
-        # 2차: 순차 번호
-        with self.conn.cursor() as cur:
+            # 기존 Subject 수 조회
             cur.execute("""
                 SELECT COUNT(*) FROM project_subject WHERE project_id = %s
             """, (project_id,))
             count = cur.fetchone()[0]
 
-            offset = 1
+            # Dry-run 모드에서는 카운터 사용
+            if self.dry_run:
+                if project_id not in self.subject_counter:
+                    self.subject_counter[project_id] = count
+                count = self.subject_counter[project_id]
+
+            offset = 0
             while True:
-                candidate = f"SUB{count + offset:03d}"
+                # A-001 ~ A-999, B-001 ~ B-999, ...
+                total_num = count + offset
+                prefix = chr(65 + (total_num // 999))  # A, B, C, ...
+                number = (total_num % 999) + 1
+                candidate = f"{prefix}-{number:03d}"
+
                 cur.execute("""
                     SELECT EXISTS(
                         SELECT 1 FROM project_subject
@@ -121,10 +143,13 @@ class SubjectMigrator:
                 exists = cur.fetchone()[0]
 
                 if not exists:
+                    # Dry-run 모드에서는 카운터 증가
+                    if self.dry_run:
+                        self.subject_counter[project_id] += 1
                     return candidate
 
                 offset += 1
-                if offset > 1000:
+                if offset > 10000:
                     raise Exception("Failed to generate unique subject code")
 
     def create_subject(self, project_id: int, subject_code: str, study: Dict) -> int:
@@ -147,7 +172,12 @@ class SubjectMigrator:
 
         # 할당된 Study 조회
         studies = self.get_assigned_studies(project_id)
-        logger.info(f"Found {len(studies)} studies with patient_id")
+        studies_with_patient = [s for s in studies if s['patient_id']]
+        studies_without_patient = [s for s in studies if not s['patient_id']]
+
+        logger.info(f"Found {len(studies)} studies total")
+        logger.info(f"  - With patient_id: {len(studies_with_patient)}")
+        logger.info(f"  - Without patient_id: {len(studies_without_patient)}")
 
         if not studies:
             logger.info("No studies to migrate")
@@ -163,18 +193,21 @@ class SubjectMigrator:
             existing = self.get_existing_subject(project_id, patient_id)
 
             if existing:
-                logger.info(f"  ✓ Reuse Subject: {existing['subject_code']} (Patient: {patient_id})")
+                patient_info = f"Patient: {patient_id}" if patient_id else "No patient_id"
+                logger.info(f"  ✓ Reuse Subject: {existing['subject_code']} ({patient_info})")
                 reused_count += 1
                 continue
 
             # Subject Code 생성
             subject_code = self.generate_subject_code(project_id, patient_id)
 
+            patient_info = f"Patient: {patient_id}" if patient_id else "No patient_id"
+
             if self.dry_run:
-                logger.info(f"  [DRY-RUN] Would create Subject: {subject_code} (Patient: {patient_id})")
+                logger.info(f"  [DRY-RUN] Would create Subject: {subject_code} ({patient_info})")
             else:
                 subject_id = self.create_subject(project_id, subject_code, study)
-                logger.info(f"  ✓ Created Subject: {subject_code} (ID: {subject_id}, Patient: {patient_id})")
+                logger.info(f"  ✓ Created Subject: {subject_code} (ID: {subject_id}, {patient_info})")
 
             created_count += 1
 
