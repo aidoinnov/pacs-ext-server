@@ -72,17 +72,49 @@ python scripts/migrate_subjects.py --all-projects \
 
 ### 출력 예시
 
+#### Dry-run 모드
 ```
-2026-01-18 10:30:00 - INFO - ✓ Database connected
-2026-01-18 10:30:00 - INFO - Found 2 project(s) to migrate
+$ python scripts/migrate_subjects.py --all-projects --dry-run
+
+2026-01-18 13:17:19 - INFO - Database: localhost:5456/pacs_extension
+2026-01-18 13:17:19 - INFO - 🔍 DRY-RUN MODE: 실제 생성하지 않습니다
+2026-01-18 13:17:19 - INFO - ✓ Database connected
+2026-01-18 13:17:19 - INFO - Found 375 project(s) to migrate
 
 ============================================================
 Project: Clinical Trial A (ID: 1)
 ============================================================
-2026-01-18 10:30:01 - INFO - Found 15 studies with patient_id
-2026-01-18 10:30:01 - INFO -   ✓ Created Subject: P12345 (ID: 101, Patient: P12345)
-2026-01-18 10:30:01 - INFO -   ✓ Created Subject: P12346 (ID: 102, Patient: P12346)
-2026-01-18 10:30:01 - INFO -   ✓ Reuse Subject: P12347 (Patient: P12347)
+2026-01-18 13:17:19 - INFO - Found 15 studies with patient_id
+2026-01-18 13:17:19 - INFO -   [DRY-RUN] Would create Subject: P12345 (Patient: P12345)
+2026-01-18 13:17:19 - INFO -   [DRY-RUN] Would create Subject: P12346 (Patient: P12346)
+2026-01-18 13:17:19 - INFO -   ✓ Reuse Subject: P12347 (Patient: P12347)
+...
+
+Summary:
+  - Created: 12
+  - Reused: 3
+  - Total: 15
+
+============================================================
+✓ Migration completed successfully
+============================================================
+```
+
+#### 실제 실행 모드
+```
+$ python scripts/migrate_subjects.py --project-id 1
+
+2026-01-18 13:20:00 - INFO - Database: localhost:5456/pacs_extension
+2026-01-18 13:20:00 - INFO - ✓ Database connected
+2026-01-18 13:20:00 - INFO - Found 1 project(s) to migrate
+
+============================================================
+Project: Clinical Trial A (ID: 1)
+============================================================
+2026-01-18 13:20:01 - INFO - Found 15 studies with patient_id
+2026-01-18 13:20:01 - INFO -   ✓ Created Subject: P12345 (ID: 101, Patient: P12345)
+2026-01-18 13:20:01 - INFO -   ✓ Created Subject: P12346 (ID: 102, Patient: P12346)
+2026-01-18 13:20:01 - INFO -   ✓ Reuse Subject: P12347 (Patient: P12347)
 ...
 
 Summary:
