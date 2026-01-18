@@ -4,6 +4,9 @@ Cargo.lock
 
 # Environment
 .env
+.env.bak
+*.env.bak
+CONNECTION_INFO.md
 
 # IDE
 .idea/
