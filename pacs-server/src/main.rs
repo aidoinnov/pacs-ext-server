@@ -432,6 +432,7 @@ async fn main() -> std::io::Result<()> {
     let project_data_access_use_case = Arc::new(ProjectDataAccessUseCase::new(
         project_data_service.clone(),
         Arc::new(project_service.clone()),
+        subject_service.clone(),
     ));
     let user_registration_use_case =
         Arc::new(UserRegistrationUseCase::new(user_registration_service));

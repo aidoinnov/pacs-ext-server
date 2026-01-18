@@ -3,7 +3,8 @@ use crate::domain::entities::project_data::{
     DataAccessStatus, NewProjectData, ProjectDataInstance, ProjectDataSeries, ProjectDataStudy,
     UpdateProjectDataAccess,
 };
-use crate::domain::services::{ProjectDataService, ProjectService};
+use crate::domain::entities::subject::CreateSubject;
+use crate::domain::services::{ProjectDataService, ProjectService, SubjectService};
 use crate::domain::ServiceError;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -11,16 +12,19 @@ use std::sync::Arc;
 pub struct ProjectDataAccessUseCase {
     project_data_service: Arc<dyn ProjectDataService>,
     project_service: Arc<dyn ProjectService>,
+    subject_service: Arc<dyn SubjectService>,
 }
 
 impl ProjectDataAccessUseCase {
     pub fn new(
         project_data_service: Arc<dyn ProjectDataService>,
         project_service: Arc<dyn ProjectService>,
+        subject_service: Arc<dyn SubjectService>,
     ) -> Self {
         Self {
             project_data_service,
             project_service,
+            subject_service,
         }
     }
 
@@ -530,11 +534,129 @@ impl ProjectDataAccessUseCase {
         .await
         .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
+        // 5. Subject 자동 생성 (Patient ID가 있는 경우)
+        if let Some(ref patient_id) = study.patient_id {
+            // Patient ID로 기존 Subject 찾기
+            let existing_subject: Option<(i32,)> = sqlx::query_as(
+                "SELECT id FROM project_subject
+                 WHERE project_id = $1 AND patient_id = $2",
+            )
+            .bind(project_id)
+            .bind(patient_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+            // Subject가 없으면 자동 생성
+            if existing_subject.is_none() {
+                let subject_code = self.generate_unique_subject_code(project_id, patient_id).await?;
+
+                let new_subject = CreateSubject {
+                    project_id,
+                    subject_code,
+                    patient_id: Some(patient_id.clone()),
+                    patient_name: study.patient_name.clone(),
+                    patient_birth_date: study.patient_birth_date,
+                };
+
+                // Subject 생성 (에러 무시 - 동시성 이슈로 이미 생성되었을 수 있음)
+                let _ = self.subject_service.create_subject(new_subject).await;
+            }
+        }
+
         Ok(AssignStudyToProjectResponse {
             success: true,
             message: format!("Study {} assigned to project successfully", request.study_uid),
             study_id: study.id,
         })
+    }
+
+    /// 유일한 Subject Code 생성
+    ///
+    /// Patient ID 기반으로 Subject Code를 생성하되, 중복 시 suffix를 추가합니다.
+    /// Patient ID가 너무 길거나 유효하지 않으면 순차 번호를 사용합니다.
+    async fn generate_unique_subject_code(
+        &self,
+        project_id: i32,
+        patient_id: &str,
+    ) -> Result<String, ServiceError> {
+        let pool = self.project_data_service.pool();
+
+        // Patient ID를 Subject Code로 사용 가능한지 검증 (1-50자, 영문자/숫자/하이픈/언더스코어)
+        let sanitized_patient_id = patient_id
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+            .take(50)
+            .collect::<String>();
+
+        if !sanitized_patient_id.is_empty() {
+            // Patient ID 기반 Subject Code 시도
+            let mut candidate = sanitized_patient_id.clone();
+            let mut suffix = 0;
+
+            loop {
+                // 중복 체크
+                let exists: bool = sqlx::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM project_subject WHERE project_id = $1 AND subject_code = $2)",
+                )
+                .bind(project_id)
+                .bind(&candidate)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+                if !exists {
+                    return Ok(candidate);
+                }
+
+                // 중복이면 suffix 추가
+                suffix += 1;
+                candidate = format!("{}_{}", sanitized_patient_id, suffix);
+
+                // 무한 루프 방지 (최대 100번 시도)
+                if suffix > 100 {
+                    break;
+                }
+            }
+        }
+
+        // Patient ID 기반 생성 실패 시 순차 번호 사용
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM project_subject WHERE project_id = $1",
+        )
+        .bind(project_id)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+        let mut candidate = format!("SUB{:03}", count + 1);
+        let mut offset = 1;
+
+        // 순차 번호도 중복 체크 (동시성 이슈 대비)
+        loop {
+            let exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM project_subject WHERE project_id = $1 AND subject_code = $2)",
+            )
+            .bind(project_id)
+            .bind(&candidate)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+
+            if !exists {
+                return Ok(candidate);
+            }
+
+            offset += 1;
+            candidate = format!("SUB{:03}", count + offset);
+
+            // 무한 루프 방지
+            if offset > 1000 {
+                return Err(ServiceError::DatabaseError(
+                    "Failed to generate unique subject code".to_string(),
+                ));
+            }
+        }
     }
 
     /// 프로젝트에서 Series 할당 해제
