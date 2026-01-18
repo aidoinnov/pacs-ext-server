@@ -39,6 +39,11 @@ PACS Extension Server의 전체 데이터베이스 스키마를 시각화한 ERD
 ### 7. GC SCHEMA (Garbage Collection)
 - **삭제 로그**: `gc_deletion_log`
 
+### 8. SUBJECT & TIMEPOINT SCHEMA (임상시험 관리)
+- **Subject 관리**: `project_subject` (프로젝트별 환자)
+- **TimePoint 관리**: `subject_timepoint` (Baseline, TP1, TP2...)
+- **Study 매핑**: `subject_timepoint_study_map` (TimePoint ↔ Study)
+
 ## ERD 다이어그램
 
 ```mermaid
@@ -435,6 +440,46 @@ erDiagram
     }
 
     %% ========================================
+    %% SUBJECT & TIMEPOINT SCHEMA - 임상시험 관리
+    %% ========================================
+
+    project_subject {
+        int id PK
+        int project_id FK
+        varchar subject_code UK
+        varchar external_subject_key UK
+        varchar patient_id
+        text patient_name
+        date patient_birth_date
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    subject_timepoint {
+        int id PK
+        int project_id FK
+        int subject_id FK
+        varchar name
+        varchar visit_type "Baseline/Visit/EOT/USV"
+        int visit_no
+        int order_index
+        varchar external_key UK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    subject_timepoint_study_map {
+        int id PK
+        int project_id FK
+        int subject_id FK
+        int timepoint_id FK
+        int study_id FK
+        int assigned_by FK
+        timestamptz assigned_at
+        timestamptz created_at
+    }
+
+    %% ========================================
     %% RELATIONSHIPS
     %% ========================================
 
@@ -500,6 +545,15 @@ erDiagram
     viewer_hanging_protocol ||--o{ viewer_hp_condition : "has"
     viewer_hanging_protocol ||--o{ viewer_hp_layout : "has"
     viewer_hp_layout ||--o{ viewer_hp_viewport : "contains"
+
+    %% Subject & TimePoint relationships
+    security_project ||--o{ project_subject : "has subjects"
+    project_subject ||--o{ subject_timepoint : "has timepoints"
+    security_project ||--o{ subject_timepoint : "contains"
+    subject_timepoint ||--o{ subject_timepoint_study_map : "maps to"
+    project_subject ||--o{ subject_timepoint_study_map : "owns"
+    project_data_study ||--o{ subject_timepoint_study_map : "assigned to"
+    security_user ||--o{ subject_timepoint_study_map : "assigns"
 ```
 
 ## 테이블 상세 설명
@@ -525,6 +579,16 @@ erDiagram
 - **목적**: Series별 사용자 리포트
 - **주요 필드**: `status`, `description`, `conclusion`, `bodypart`
 - **특징**: 프로젝트별/전역 리포트, 템플릿 시스템 지원
+
+#### project_subject
+- **목적**: 프로젝트별 환자(Subject) 관리
+- **주요 필드**: `subject_code`, `external_subject_key` (CTIMS 연동), `patient_id`
+- **특징**: CTIMS 연동 대비, 프로젝트 내 환자 유일성 보장
+
+#### subject_timepoint
+- **목적**: Subject별 평가 시점 관리 (Baseline, TP1, TP2...)
+- **주요 필드**: `visit_type`, `order_index`, `external_key`
+- **특징**: Subject당 Baseline 1개 보장, CTIMS 연동 대비
 
 ### 주요 기능별 테이블 그룹
 
@@ -558,6 +622,18 @@ report_guide_template (원본) → user_custom_report_template (커스텀)
                     series_user_report
 ```
 
+#### 5. Subject & TimePoint 시스템 (임상시험)
+```
+security_project (1) → (N) project_subject (1) → (N) subject_timepoint
+                                                         ↓
+                                            subject_timepoint_study_map
+                                                         ↓
+                                                project_data_study
+```
+- Subject당 Baseline 1개 보장
+- Study는 하나의 TimePoint에만 할당 가능
+- Unassigned 상태: 매핑 테이블에 row 없음
+
 ## 주요 특징
 
 ### 1. 계층적 접근 제어
@@ -580,9 +656,15 @@ report_guide_template (원본) → user_custom_report_template (커스텀)
 - 기관별 접근 제어
 - 사용자별 커스터마이징
 
+### 5. 임상시험 지원 (Subject & TimePoint)
+- Subject 중심 TimePoint 관리
+- CTIMS 연동 대비 설계
+- Baseline 유일성 보장 (Partial Unique Index)
+- Study 재할당 트랜잭션 지원
+
 ## 마이그레이션 파일
 
-전체 스키마는 39개의 마이그레이션 파일로 구성:
+전체 스키마는 40개의 마이그레이션 파일로 구성:
 - `001_initial_schema.sql` - 기본 스키마
 - `019_create_project_data_tables.sql` - DICOM 데이터 테이블
 - `023_refactor_project_data_hierarchy.sql` - 계층 구조 리팩토링
@@ -592,17 +674,19 @@ report_guide_template (원본) → user_custom_report_template (커스텀)
 - `032_create_study_list_view.sql` - Study List View
 - `036_add_snapshot_image_to_annotations.sql` - 스냅샷 지원
 - `039_create_gc_deletion_log.sql` - GC 로그
+- `040_create_subject_timepoint.sql` - Subject & TimePoint 스키마 (NEW)
 
 ## 관련 문서
 
 - [마이그레이션 가이드](../migrations/README.md)
 - [GC 구현 가이드](../gc-batch-job/README.md)
+- [Subject & TimePoint 설계 문서](../timepoint/erd.md)
 - [API 문서](../api/)
 
 ---
 
-**Last Updated**: 2026-01-17
-**Total Tables**: 50+
-**Total Relationships**: 60+
+**Last Updated**: 2026-01-18
+**Total Tables**: 53 (Subject/TimePoint 추가)
+**Total Relationships**: 67+
 ```
 
