@@ -48,9 +48,9 @@ class SubjectMigrator:
         """프로젝트 목록 조회"""
         with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
             if project_id:
-                cur.execute("SELECT id, name FROM project WHERE id = %s", (project_id,))
+                cur.execute("SELECT id, name FROM security_project WHERE id = %s", (project_id,))
             else:
-                cur.execute("SELECT id, name FROM project WHERE status = 'active'")
+                cur.execute("SELECT id, name FROM security_project WHERE is_active = true")
             return cur.fetchall()
 
     def get_assigned_studies(self, project_id: int) -> List[Dict]:
