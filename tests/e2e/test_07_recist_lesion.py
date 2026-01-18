@@ -94,14 +94,14 @@ def baseline_timepoint(admin_client, test_subject):
     subject_id = test_subject['id']
 
     response = admin_client.post(f"/api/subjects/{subject_id}/timepoints", json={
-        "timepoint_name": "BL",
-        "visit_type": "BASELINE",
-        "visit_date": "2024-01-01"
+        "name": "BL",
+        "visit_type": "Baseline",
+        "order_index": 0
     })
 
     assert response.status_code == 201, f"Failed to create baseline timepoint: {response.text}"
     timepoint = response.json()
-    logger.info(f"Created baseline timepoint: {timepoint['timepoint_name']} (ID: {timepoint['id']})")
+    logger.info(f"Created baseline timepoint: {timepoint['name']} (ID: {timepoint['id']})")
 
     yield timepoint
 
@@ -119,14 +119,14 @@ def followup_timepoint(admin_client, test_subject):
     subject_id = test_subject['id']
 
     response = admin_client.post(f"/api/subjects/{subject_id}/timepoints", json={
-        "timepoint_name": "TP1",
-        "visit_type": "FOLLOW_UP",
-        "visit_date": "2024-02-01"
+        "name": "TP1",
+        "visit_type": "Visit",
+        "order_index": 1
     })
 
     assert response.status_code == 201, f"Failed to create follow-up timepoint: {response.text}"
     timepoint = response.json()
-    logger.info(f"Created follow-up timepoint: {timepoint['timepoint_name']} (ID: {timepoint['id']})")
+    logger.info(f"Created follow-up timepoint: {timepoint['name']} (ID: {timepoint['id']})")
 
     yield timepoint
 
