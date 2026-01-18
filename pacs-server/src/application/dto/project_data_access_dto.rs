@@ -513,16 +513,8 @@ pub struct AssignSeriesToProjectResponse {
 pub struct AssignStudyToProjectRequest {
     /// Study UID
     pub study_uid: String,
-    /// Study 설명
-    pub study_description: Option<String>,
-    /// 환자 ID
-    pub patient_id: Option<String>,
-    /// 환자 이름
-    pub patient_name: Option<String>,
-    /// Study 날짜
-    pub study_date: Option<String>,
-    /// 모달리티
-    pub modality: Option<String>,
+    /// Subject Code (연구자가 지정, 없으면 Patient ID 기반 자동 생성)
+    pub subject_code: Option<String>,
 }
 
 /// 프로젝트에 Study 할당 응답

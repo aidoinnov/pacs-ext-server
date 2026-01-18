@@ -480,27 +480,18 @@ impl ProjectDataAccessUseCase {
         // 1. 프로젝트 존재 확인
         self.project_service.get_project(project_id).await?;
 
-        // 2. Study 조회 또는 생성
+        // 2. Study 조회 (DICOM 메타데이터는 이미 DB에 있어야 함)
         let pool = self.project_data_service.pool();
         let study: ProjectDataStudy = sqlx::query_as(
-            "INSERT INTO project_data_study (study_uid, study_description, patient_id, patient_name, study_date)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (study_uid) DO UPDATE
-             SET study_description = EXCLUDED.study_description,
-                 patient_id = EXCLUDED.patient_id,
-                 patient_name = EXCLUDED.patient_name,
-                 study_date = EXCLUDED.study_date
-             RETURNING id, study_uid, study_description, patient_id, patient_name,
-                       patient_birth_date, study_date, created_at, updated_at",
+            "SELECT id, study_uid, study_description, patient_id, patient_name,
+                    patient_birth_date, study_date, created_at, updated_at
+             FROM project_data_study
+             WHERE study_uid = $1",
         )
         .bind(&request.study_uid)
-        .bind(&request.study_description)
-        .bind(&request.patient_id)
-        .bind(&request.patient_name)
-        .bind(request.study_date.and_then(|d| chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok()))
         .fetch_one(pool)
         .await
-        .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+        .map_err(|e| ServiceError::NotFound(format!("Study not found: {}", e)))?;
 
         // 3. 이미 할당되어 있는지 확인
         let already_assigned: bool = sqlx::query_scalar(
@@ -549,7 +540,14 @@ impl ProjectDataAccessUseCase {
 
             // Subject가 없으면 자동 생성
             if existing_subject.is_none() {
-                let subject_code = self.generate_unique_subject_code(project_id, patient_id).await?;
+                // Subject Code 결정: 사용자 지정 > Patient ID 기반 자동 생성
+                let subject_code = if let Some(ref code) = request.subject_code {
+                    // 사용자가 지정한 코드 사용 (중복 체크는 SubjectService에서 수행)
+                    code.clone()
+                } else {
+                    // Patient ID 기반 자동 생성
+                    self.generate_unique_subject_code(project_id, patient_id).await?
+                };
 
                 let new_subject = CreateSubject {
                     project_id,
