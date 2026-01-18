@@ -45,8 +45,9 @@ mod presentation;
 use application::use_cases::{
     AccessControlUseCase, AnnotationUseCase, AuthUseCase, MaskGroupUseCase, MaskUseCase,
     PermissionUseCase, ProjectDataAccessUseCase, ProjectUseCase, ProjectUserMatrixUseCase,
-    ProjectUserUseCase, RoleCapabilityMatrixUseCase, RolePermissionMatrixUseCase,
-    SeriesUserNoteUseCase, UserProjectMatrixUseCase, UserRegistrationUseCase, UserUseCase,
+    ProjectUserUseCase, RecistLesionUseCase, RoleCapabilityMatrixUseCase,
+    RolePermissionMatrixUseCase, SeriesUserNoteUseCase, UserProjectMatrixUseCase,
+    UserRegistrationUseCase, UserUseCase,
 };
 
 // 도메인 레이어 - 서비스 구현체들
@@ -62,8 +63,9 @@ use infrastructure::repositories::{
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, CapabilityRepositoryImpl,
     MaskGroupRepositoryImpl, MaskRepositoryImpl, PermissionRepositoryImpl,
     ProjectDataAccessRepositoryImpl, ProjectDataRepositoryImpl, ProjectRepositoryImpl,
-    RoleRepositoryImpl, SeriesUserNoteRepositoryImpl, SubjectRepositoryImpl,
-    TimePointRepositoryImpl, TimePointStudyRepositoryImpl, UserRepositoryImpl,
+    RecistLesionRepositoryImpl, RoleRepositoryImpl, SeriesUserNoteRepositoryImpl,
+    SubjectRepositoryImpl, TimePointRepositoryImpl, TimePointStudyRepositoryImpl,
+    UserRepositoryImpl,
 };
 use infrastructure::services::{
     CapabilityServiceImpl, ProjectDataServiceImpl, UserRegistrationServiceImpl,
@@ -276,6 +278,8 @@ async fn main() -> std::io::Result<()> {
     let timepoint_repo = TimePointRepositoryImpl::new(pool.clone());
     // TimePoint-Study 관련 데이터 접근을 위한 리포지토리
     let timepoint_study_repo = TimePointStudyRepositoryImpl::new(pool.clone());
+    // RECIST Lesion 관련 데이터 접근을 위한 리포지토리
+    let recist_lesion_repo = RecistLesionRepositoryImpl::new(pool.clone());
 
     // DICOM RBAC Evaluator
     use crate::infrastructure::services::DicomRbacEvaluatorImpl;
@@ -357,6 +361,12 @@ async fn main() -> std::io::Result<()> {
         timepoint_repo.clone(),
         timepoint_study_repo.clone(),
         subject_repo.clone(),
+    ));
+    // RECIST Lesion Use Case: Lesion CRUD, 비즈니스 규칙 검증 등
+    let recist_lesion_use_case = Arc::new(RecistLesionUseCase::new(
+        recist_lesion_repo.clone(),
+        subject_repo.clone(),
+        timepoint_repo.clone(),
     ));
 
     // 사용자 등록 서비스: 회원가입, 이메일 인증, 계정 삭제 등
@@ -976,6 +986,18 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
                             timepoint_controller::configure_routes(cfg, timepoint_service.clone())
+                        }
+                    })
+                    // ========================================
+                    // 📊 RECIST Lesion API
+                    // - RECIST 1.1 기준 병변 관리
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            subject_controller::configure_recist_lesion_routes(
+                                cfg,
+                                recist_lesion_use_case.clone(),
+                            )
                         }
                     })
                     // ========================================

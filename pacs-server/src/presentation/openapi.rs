@@ -106,6 +106,13 @@ use utoipa::OpenApi;
         unassign_studies,
         get_studies_by_timepoint,
         get_unassigned_studies_by_subject,
+        // RECIST Lesion endpoints
+        create_lesion,
+        list_lesions,
+        get_lesion_detail,
+        update_lesion,
+        delete_lesion,
+        link_annotation,
         // User Registration endpoints (TODO: Add OpenAPI annotations)
         // signup,
         // verify_email,
@@ -235,6 +242,15 @@ use utoipa::OpenApi;
             crate::domain::entities::AssignmentResult,
             crate::domain::entities::TimePointStudies,
             crate::domain::entities::StudyInfo,
+            // RECIST Lesion DTOs
+            crate::domain::entities::recist_lesion::RecistLesion,
+            crate::domain::entities::recist_lesion::RecistLesionType,
+            crate::domain::entities::recist_lesion::CreateRecistLesion,
+            crate::domain::entities::recist_lesion::CreateRecistLesionRequest,
+            crate::domain::entities::recist_lesion::UpdateRecistLesion,
+            crate::domain::entities::recist_lesion::CreateRecistLesionAnnotationMap,
+            crate::domain::entities::recist_lesion::RecistLesionDetail,
+            crate::domain::entities::recist_lesion::RecistLesionAnnotationInfo,
         )
     ),
     tags(
@@ -256,6 +272,7 @@ use utoipa::OpenApi;
         (name = "viewer", description = "Viewer BFF endpoints - Viewer 전용 Backend-for-Frontend API (Study/Series Meta Batch)"),
         (name = "subjects", description = "Subject management endpoints - 임상시험 Subject(환자) 관리 API"),
         (name = "timepoints", description = "TimePoint management endpoints - 임상시험 TimePoint(평가 시점) 관리 API"),
+        (name = "recist-lesions", description = "RECIST Lesion management endpoints - RECIST 1.1 기준 병변 관리 API"),
         (name = "user-registration", description = "User Registration endpoints - 사용자 등록 및 계정 관리 API"),
     ),
     info(
