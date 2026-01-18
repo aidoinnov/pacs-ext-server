@@ -429,11 +429,14 @@ async fn main() -> std::io::Result<()> {
     let role_capability_matrix_use_case =
         Arc::new(RoleCapabilityMatrixUseCase::new(capability_service));
 
-    let project_data_access_use_case = Arc::new(ProjectDataAccessUseCase::new(
-        project_data_service.clone(),
-        Arc::new(project_service.clone()),
-        subject_service.clone(),
-    ));
+    let project_data_access_use_case = Arc::new(
+        ProjectDataAccessUseCase::new(
+            project_data_service.clone(),
+            Arc::new(project_service.clone()),
+            subject_service.clone(),
+        )
+        .with_qido_client(qido_client.clone())
+    );
     let user_registration_use_case =
         Arc::new(UserRegistrationUseCase::new(user_registration_service));
     let series_user_note_use_case = Arc::new(SeriesUserNoteUseCase::new(

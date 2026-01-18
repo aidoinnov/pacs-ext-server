@@ -6,6 +6,7 @@ use crate::domain::entities::project_data::{
 use crate::domain::entities::subject::CreateSubject;
 use crate::domain::services::{ProjectDataService, ProjectService, SubjectService};
 use crate::domain::ServiceError;
+use crate::infrastructure::external::dcm4chee_qido_client::Dcm4cheeQidoClient;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -13,6 +14,7 @@ pub struct ProjectDataAccessUseCase {
     project_data_service: Arc<dyn ProjectDataService>,
     project_service: Arc<dyn ProjectService>,
     subject_service: Arc<dyn SubjectService>,
+    qido_client: Option<Arc<Dcm4cheeQidoClient>>,
 }
 
 impl ProjectDataAccessUseCase {
@@ -25,7 +27,13 @@ impl ProjectDataAccessUseCase {
             project_data_service,
             project_service,
             subject_service,
+            qido_client: None,
         }
+    }
+
+    pub fn with_qido_client(mut self, qido_client: Arc<Dcm4cheeQidoClient>) -> Self {
+        self.qido_client = Some(qido_client);
+        self
     }
 
     /// 프로젝트 데이터 접근 매트릭스 조회
@@ -480,8 +488,65 @@ impl ProjectDataAccessUseCase {
         // 1. 프로젝트 존재 확인
         self.project_service.get_project(project_id).await?;
 
-        // 2. Study 조회 (DICOM 메타데이터는 이미 DB에 있어야 함)
         let pool = self.project_data_service.pool();
+
+        // 2. PACS Archive에서 Study 메타데이터 가져오기 (patient_id 포함)
+        if let Some(qido_client) = &self.qido_client {
+            match qido_client.qido_study_by_uid_with_bearer(None, &request.study_uid).await {
+                Ok(json) => {
+                    if let Some(studies) = json.as_array() {
+                        if let Some(study_json) = studies.first() {
+                            // DICOM JSON에서 메타데이터 추출
+                            let patient_id = study_json.get("00100020")
+                                .and_then(|v| v.get("Value"))
+                                .and_then(|v| v.as_array())
+                                .and_then(|arr| arr.first())
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+
+                            let patient_name = study_json.get("00100010")
+                                .and_then(|v| v.get("Value"))
+                                .and_then(|v| v.as_array())
+                                .and_then(|arr| arr.first())
+                                .and_then(|v| v.get("Alphabetic"))
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+
+                            let study_description = study_json.get("00081030")
+                                .and_then(|v| v.get("Value"))
+                                .and_then(|v| v.as_array())
+                                .and_then(|arr| arr.first())
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+
+                            // project_data_study 테이블에 INSERT 또는 UPDATE
+                            sqlx::query(
+                                "INSERT INTO project_data_study (study_uid, study_description, patient_id, patient_name)
+                                 VALUES ($1, $2, $3, $4)
+                                 ON CONFLICT (study_uid) DO UPDATE
+                                 SET patient_id = COALESCE(EXCLUDED.patient_id, project_data_study.patient_id),
+                                     patient_name = COALESCE(EXCLUDED.patient_name, project_data_study.patient_name),
+                                     study_description = COALESCE(EXCLUDED.study_description, project_data_study.study_description),
+                                     updated_at = CURRENT_TIMESTAMP"
+                            )
+                            .bind(&request.study_uid)
+                            .bind(study_description)
+                            .bind(patient_id)
+                            .bind(patient_name)
+                            .execute(pool)
+                            .await
+                            .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to fetch study metadata from PACS: {:?}", e);
+                    // PACS 조회 실패해도 계속 진행 (DB에 이미 있을 수 있음)
+                }
+            }
+        }
+
+        // 3. Study 조회 (DB에서)
         let study: ProjectDataStudy = sqlx::query_as(
             "SELECT id, study_uid, study_description, patient_id, patient_name,
                     patient_birth_date, study_date, created_at, updated_at
@@ -491,9 +556,9 @@ impl ProjectDataAccessUseCase {
         .bind(&request.study_uid)
         .fetch_one(pool)
         .await
-        .map_err(|e| ServiceError::NotFound(format!("Study not found: {}", e)))?;
+        .map_err(|e| ServiceError::NotFound(format!("Study not found in DB: {}", e)))?;
 
-        // 3. 이미 할당되어 있는지 확인
+        // 4. 이미 할당되어 있는지 확인
         let already_assigned: bool = sqlx::query_scalar(
             "SELECT EXISTS(
                 SELECT 1 FROM project_data
@@ -514,7 +579,7 @@ impl ProjectDataAccessUseCase {
             ));
         }
 
-        // 4. project_data에 Study 매핑 추가
+        // 5. project_data에 Study 매핑 추가
         sqlx::query(
             "INSERT INTO project_data (project_id, resource_level, study_id)
              VALUES ($1, 'STUDY'::resource_level_enum, $2)",
@@ -525,7 +590,7 @@ impl ProjectDataAccessUseCase {
         .await
         .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
-        // 5. Subject 자동 생성 (Patient ID가 있는 경우)
+        // 6. Subject 자동 생성 (Patient ID가 있는 경우)
         if let Some(ref patient_id) = study.patient_id {
             // Patient ID로 기존 Subject 찾기
             let existing_subject: Option<(i32,)> = sqlx::query_as(
