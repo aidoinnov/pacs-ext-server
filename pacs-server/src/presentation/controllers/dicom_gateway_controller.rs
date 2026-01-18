@@ -1,6 +1,8 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::Deserialize;
 use serde_json::Value;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use sqlx::PgPool;
 use futures::future::join_all;
@@ -1101,11 +1103,33 @@ pub async fn get_all_user_studies(
         total_count
     );
 
+    // ETag 생성 (데이터의 해시값)
+    let mut hasher = DefaultHasher::new();
+    serde_json::to_string(&final_studies).unwrap_or_default().hash(&mut hasher);
+    total_count.hash(&mut hasher);
+    let etag = format!("\"{}\"", hasher.finish());
+
+    // If-None-Match 헤더 확인
+    if let Some(if_none_match) = req.headers().get("If-None-Match") {
+        if let Ok(client_etag) = if_none_match.to_str() {
+            if client_etag == etag {
+                // 데이터가 변경되지 않음 - 304 Not Modified 반환
+                return HttpResponse::NotModified()
+                    .insert_header(("ETag", etag))
+                    .insert_header(("Cache-Control", "no-cache, must-revalidate"))
+                    .finish();
+            }
+        }
+    }
+
+    // 데이터 반환 with ETag
     HttpResponse::Ok()
         .insert_header(("X-Total-Count", total_count.to_string()))
         .insert_header(("X-Page", page.to_string()))
         .insert_header(("X-Page-Size", page_size.to_string()))
         .insert_header(("X-Total-Pages", total_pages.to_string()))
+        .insert_header(("ETag", etag))
+        .insert_header(("Cache-Control", "no-cache, must-revalidate"))
         .json(final_studies)
 }
 

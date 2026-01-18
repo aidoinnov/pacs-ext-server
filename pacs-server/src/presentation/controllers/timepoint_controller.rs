@@ -219,7 +219,10 @@ pub async fn assign_studies<T: TimePointService + 'static>(
         .assign_studies(*id, req.into_inner(), user_id)
         .await
     {
-        Ok(result) => HttpResponse::Ok().json(result),
+        Ok(result) => HttpResponse::Ok()
+            // 클라이언트에게 관련 캐시를 무효화하도록 힌트 제공
+            .insert_header(("X-Cache-Invalidate", "dicom-studies"))
+            .json(result),
         Err(e) => {
             let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
@@ -257,9 +260,12 @@ pub async fn unassign_studies<T: TimePointService + 'static>(
         .unassign_studies(*id, req.into_inner())
         .await
     {
-        Ok(count) => HttpResponse::Ok().json(json!({
-            "unassigned_count": count
-        })),
+        Ok(count) => HttpResponse::Ok()
+            // 클라이언트에게 관련 캐시를 무효화하도록 힌트 제공
+            .insert_header(("X-Cache-Invalidate", "dicom-studies"))
+            .json(json!({
+                "unassigned_count": count
+            })),
         Err(e) => {
             let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
