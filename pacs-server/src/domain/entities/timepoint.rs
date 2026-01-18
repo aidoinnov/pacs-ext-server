@@ -7,6 +7,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 
 /// Visit 타입 열거형
 ///
@@ -20,7 +21,7 @@ use sqlx::FromRow;
 ///
 /// # Database Mapping
 /// PostgreSQL ENUM 타입 `timepoint_visit_type_enum`과 매핑됩니다.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type, PartialEq, Eq, ToSchema)]
 #[sqlx(type_name = "timepoint_visit_type_enum")]
 pub enum VisitType {
     Baseline,
@@ -84,7 +85,7 @@ impl VisitType {
 ///     updated_at: Utc::now(),
 /// };
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct TimePoint {
     /// 데이터베이스에서 자동 생성되는 고유 식별자
     pub id: i32,
@@ -113,14 +114,15 @@ pub struct TimePoint {
 /// 새로운 TimePoint를 생성할 때 사용하는 데이터 전송 객체입니다.
 ///
 /// # 필드
-/// - `subject_id`: 소속 Subject ID
+/// - `subject_id`: 소속 Subject ID (경로 파라미터로 전달되는 경우 생략 가능)
 /// - `name`: TimePoint 이름 (BL, TP1, TP2 등)
 /// - `visit_type`: Visit 타입 (Baseline, Visit, EOT, USV)
 /// - `visit_no`: CTIMS Visit Number (선택사항)
 /// - `order_index`: TimePoint 정렬 순서
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateTimePoint {
-    /// 소속 Subject ID
+    /// 소속 Subject ID (경로 파라미터로 전달되는 경우 생략 가능)
+    #[serde(default)]
     pub subject_id: i32,
     /// TimePoint 이름 (BL, TP1, TP2 등)
     pub name: String,
@@ -140,7 +142,7 @@ pub struct CreateTimePoint {
 /// - `name`: TimePoint 이름 (선택사항)
 /// - `visit_type`: Visit 타입 (선택사항)
 /// - `order_index`: TimePoint 정렬 순서 (선택사항)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateTimePoint {
     /// TimePoint 이름 (선택사항)
     pub name: Option<String>,

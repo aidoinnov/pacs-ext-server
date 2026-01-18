@@ -6,6 +6,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 
 /// TimePoint-Study 매핑 엔티티
 ///
@@ -36,7 +37,7 @@ use sqlx::FromRow;
 ///     assigned_at: Utc::now(),
 /// };
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct TimePointStudy {
     /// 데이터베이스에서 자동 생성되는 고유 식별자
     pub id: i32,
@@ -56,7 +57,7 @@ pub struct TimePointStudy {
 ///
 /// # 필드
 /// - `study_ids`: 할당할 Study ID 목록
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AssignStudies {
     /// 할당할 Study ID 목록
     pub study_ids: Vec<i32>,
@@ -68,7 +69,7 @@ pub struct AssignStudies {
 ///
 /// # 필드
 /// - `study_ids`: 해제할 Study ID 목록
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UnassignStudies {
     /// 해제할 Study ID 목록
     pub study_ids: Vec<i32>,
@@ -81,7 +82,7 @@ pub struct UnassignStudies {
 /// # 필드
 /// - `affected_count`: 영향받은 Study 개수
 /// - `study_ids`: 영향받은 Study ID 목록
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AssignmentResult {
     /// 영향받은 Study 개수
     pub affected_count: i32,
@@ -97,7 +98,7 @@ pub struct AssignmentResult {
 /// - `timepoint_id`: TimePoint ID
 /// - `timepoint_name`: TimePoint 이름
 /// - `studies`: Study 목록
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TimePointStudies {
     /// TimePoint ID
     pub timepoint_id: i32,
@@ -120,7 +121,7 @@ pub struct TimePointStudies {
 /// - `modality`: Modality
 /// - `assigned_at`: 할당 시각 (할당된 경우)
 /// - `assigned_by`: 할당한 사용자 ID (할당된 경우)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct StudyInfo {
     /// Study ID
     pub study_id: i32,

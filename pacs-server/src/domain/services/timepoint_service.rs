@@ -97,6 +97,7 @@ pub trait TimePointService: Send + Sync {
     /// # 매개변수
     /// - `timepoint_id`: TimePoint ID
     /// - `assign_studies`: 할당할 Study 정보
+    /// - `user_id`: 할당하는 사용자 ID
     ///
     /// # 반환값
     /// - `Ok(AssignmentResult)`: 할당 결과
@@ -104,6 +105,7 @@ pub trait TimePointService: Send + Sync {
         &self,
         timepoint_id: i32,
         assign_studies: AssignStudies,
+        user_id: i32,
     ) -> Result<AssignmentResult, ServiceError>;
 
     /// TimePoint에서 Study를 해제합니다.
@@ -332,6 +334,7 @@ where
         &self,
         timepoint_id: i32,
         assign_studies: AssignStudies,
+        user_id: i32,
     ) -> Result<AssignmentResult, ServiceError> {
         // 1. TimePoint 존재 확인
         let timepoint = self
@@ -343,12 +346,11 @@ where
         // 2. Study 할당 (MOVE 시맨틱)
         let assigned_count = self
             .timepoint_study_repository
-            .assign_studies(timepoint_id, assign_studies.study_ids.clone())
+            .assign_studies(timepoint_id, &assign_studies.study_ids, user_id)
             .await?;
 
         Ok(AssignmentResult {
-            timepoint_id,
-            assigned_count,
+            affected_count: assigned_count,
             study_ids: assign_studies.study_ids,
         })
     }
@@ -367,8 +369,8 @@ where
         // 2. Study 해제
         Ok(self
             .timepoint_study_repository
-            .unassign_studies(timepoint_id, unassign_studies.study_ids)
-            .await?)
+            .unassign_studies(&unassign_studies.study_ids)
+            .await? as i64)
     }
 
     async fn get_studies_by_timepoint(

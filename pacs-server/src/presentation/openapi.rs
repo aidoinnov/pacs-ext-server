@@ -24,6 +24,8 @@ use crate::presentation::controllers::project_data_access_controller::*;
 use crate::presentation::controllers::project_user_matrix_controller::*;
 use crate::presentation::controllers::role_permission_matrix_controller::*;
 use crate::presentation::controllers::series_user_note_controller::*;
+use crate::presentation::controllers::subject_controller::*;
+use crate::presentation::controllers::timepoint_controller::*;
 use crate::presentation::controllers::user_project_matrix_controller;
 use crate::presentation::controllers::view_selection_controller::*;
 use crate::presentation::controllers::viewer_controller::*;
@@ -89,6 +91,21 @@ use utoipa::OpenApi;
         get_studies_meta,
         get_series_meta,
         get_study_series_meta,
+        // Subject endpoints
+        create_subject,
+        get_subjects_by_project,
+        get_subject_detail,
+        update_subject,
+        delete_subject,
+        // TimePoint endpoints
+        create_timepoint,
+        get_timepoints_by_subject,
+        update_timepoint,
+        delete_timepoint,
+        assign_studies,
+        unassign_studies,
+        get_studies_by_timepoint,
+        get_unassigned_studies_by_subject,
         // User Registration endpoints (TODO: Add OpenAPI annotations)
         // signup,
         // verify_email,
@@ -203,6 +220,21 @@ use utoipa::OpenApi;
             VerifyEmailRequest,
             ApproveUserRequest,
             UserStatusResponse,
+            // Subject DTOs
+            crate::domain::entities::Subject,
+            crate::domain::entities::CreateSubjectRequest,
+            crate::domain::entities::UpdateSubject,
+            crate::domain::entities::SubjectDetail,
+            // TimePoint DTOs
+            crate::domain::entities::TimePoint,
+            crate::domain::entities::CreateTimePoint,
+            crate::domain::entities::UpdateTimePoint,
+            crate::domain::entities::VisitType,
+            crate::domain::entities::AssignStudies,
+            crate::domain::entities::UnassignStudies,
+            crate::domain::entities::AssignmentResult,
+            crate::domain::entities::TimePointStudies,
+            crate::domain::entities::StudyInfo,
         )
     ),
     tags(
@@ -222,6 +254,8 @@ use utoipa::OpenApi;
         (name = "series-user-note", description = "Series User Note endpoints - Series 사용자 메모 관리 API"),
         (name = "view-selection", description = "View Selection endpoints - Viewer Session 기반 멀티-Study/Series 선택 관리 API"),
         (name = "viewer", description = "Viewer BFF endpoints - Viewer 전용 Backend-for-Frontend API (Study/Series Meta Batch)"),
+        (name = "subjects", description = "Subject management endpoints - 임상시험 Subject(환자) 관리 API"),
+        (name = "timepoints", description = "TimePoint management endpoints - 임상시험 TimePoint(평가 시점) 관리 API"),
         (name = "user-registration", description = "User Registration endpoints - 사용자 등록 및 계정 관리 API"),
     ),
     info(

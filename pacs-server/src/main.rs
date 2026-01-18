@@ -962,7 +962,11 @@ async fn main() -> std::io::Result<()> {
                     // ========================================
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
-                            subject_controller::configure_routes(cfg, subject_service.clone())
+                            subject_controller::configure_routes(
+                                cfg,
+                                subject_service.clone(),
+                                timepoint_service.clone(),
+                            )
                         }
                     })
                     .configure(|cfg| {

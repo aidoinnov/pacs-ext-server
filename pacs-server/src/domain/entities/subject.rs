@@ -7,6 +7,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use utoipa::ToSchema;
 
 /// Subject 엔티티
 ///
@@ -46,7 +47,7 @@ use sqlx::FromRow;
 ///     updated_at: Utc::now(),
 /// };
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Subject {
     /// 데이터베이스에서 자동 생성되는 고유 식별자
     pub id: i32,
@@ -68,7 +69,7 @@ pub struct Subject {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Subject 생성 요청 DTO
+/// Subject 생성 요청 DTO (내부용)
 ///
 /// 새로운 Subject를 생성할 때 사용하는 데이터 전송 객체입니다.
 ///
@@ -92,6 +93,22 @@ pub struct CreateSubject {
     pub patient_birth_date: Option<NaiveDate>,
 }
 
+/// Subject 생성 요청 DTO (API용 - project_id는 URL 경로에서 받음)
+///
+/// API 엔드포인트에서 사용하는 Subject 생성 요청 DTO입니다.
+/// project_id는 URL 경로에서 받으므로 포함하지 않습니다.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateSubjectRequest {
+    /// Subject 코드 (A001, B002 등)
+    pub subject_code: String,
+    /// PACS Patient ID (선택사항)
+    pub patient_id: Option<String>,
+    /// 환자 이름 (선택사항)
+    pub patient_name: Option<String>,
+    /// 환자 생년월일 (선택사항)
+    pub patient_birth_date: Option<NaiveDate>,
+}
+
 /// Subject 수정 요청 DTO
 ///
 /// 기존 Subject 정보를 수정할 때 사용하는 데이터 전송 객체입니다.
@@ -101,7 +118,7 @@ pub struct CreateSubject {
 /// - `patient_id`: PACS Patient ID (선택사항)
 /// - `patient_name`: 환자 이름 (선택사항)
 /// - `patient_birth_date`: 환자 생년월일 (선택사항)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateSubject {
     /// Subject 코드 (선택사항)
     pub subject_code: Option<String>,
@@ -121,7 +138,7 @@ pub struct UpdateSubject {
 /// - `subject`: Subject 기본 정보
 /// - `timepoint_count`: 소속 TimePoint 개수
 /// - `study_count`: 할당된 Study 개수
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SubjectDetail {
     /// Subject 기본 정보
     #[serde(flatten)]

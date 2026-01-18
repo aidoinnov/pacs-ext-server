@@ -19,7 +19,7 @@ impl SubjectRepository for SubjectRepositoryImpl {
     async fn find_by_id(&self, id: i32) -> Result<Option<Subject>, sqlx::Error> {
         sqlx::query_as::<_, Subject>(
             "SELECT id, project_id, subject_code, external_subject_key, patient_id, patient_name, patient_birth_date, created_at, updated_at
-             FROM subject
+             FROM project_subject
              WHERE id = $1",
         )
         .bind(id)
@@ -34,7 +34,7 @@ impl SubjectRepository for SubjectRepositoryImpl {
     ) -> Result<Option<Subject>, sqlx::Error> {
         sqlx::query_as::<_, Subject>(
             "SELECT id, project_id, subject_code, external_subject_key, patient_id, patient_name, patient_birth_date, created_at, updated_at
-             FROM subject
+             FROM project_subject
              WHERE project_id = $1 AND subject_code = $2",
         )
         .bind(project_id)
@@ -50,7 +50,7 @@ impl SubjectRepository for SubjectRepositoryImpl {
     ) -> Result<Option<Subject>, sqlx::Error> {
         sqlx::query_as::<_, Subject>(
             "SELECT id, project_id, subject_code, external_subject_key, patient_id, patient_name, patient_birth_date, created_at, updated_at
-             FROM subject
+             FROM project_subject
              WHERE project_id = $1 AND patient_id = $2",
         )
         .bind(project_id)
@@ -62,7 +62,7 @@ impl SubjectRepository for SubjectRepositoryImpl {
     async fn find_by_project(&self, project_id: i32) -> Result<Vec<Subject>, sqlx::Error> {
         sqlx::query_as::<_, Subject>(
             "SELECT id, project_id, subject_code, external_subject_key, patient_id, patient_name, patient_birth_date, created_at, updated_at
-             FROM subject
+             FROM project_subject
              WHERE project_id = $1
              ORDER BY created_at DESC",
         )
@@ -72,22 +72,37 @@ impl SubjectRepository for SubjectRepositoryImpl {
     }
 
     async fn find_detail_by_id(&self, id: i32) -> Result<Option<SubjectDetail>, sqlx::Error> {
-        let row = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct SubjectDetailRow {
+            id: i32,
+            project_id: i32,
+            subject_code: String,
+            external_subject_key: Option<String>,
+            patient_id: Option<String>,
+            patient_name: Option<String>,
+            patient_birth_date: Option<chrono::NaiveDate>,
+            created_at: chrono::DateTime<chrono::Utc>,
+            updated_at: chrono::DateTime<chrono::Utc>,
+            timepoint_count: Option<i64>,
+            study_count: Option<i64>,
+        }
+
+        let row = sqlx::query_as::<_, SubjectDetailRow>(
             r#"
-            SELECT 
-                s.id, s.project_id, s.subject_code, s.external_subject_key, 
-                s.patient_id, s.patient_name, s.patient_birth_date, 
+            SELECT
+                s.id, s.project_id, s.subject_code, s.external_subject_key,
+                s.patient_id, s.patient_name, s.patient_birth_date,
                 s.created_at, s.updated_at,
                 COUNT(DISTINCT tp.id) as timepoint_count,
                 COUNT(DISTINCT tps.study_id) as study_count
-            FROM subject s
-            LEFT JOIN timepoint tp ON s.id = tp.subject_id
-            LEFT JOIN timepoint_study tps ON tp.id = tps.timepoint_id
+            FROM project_subject s
+            LEFT JOIN subject_timepoint tp ON s.id = tp.subject_id
+            LEFT JOIN subject_timepoint_study_map tps ON tp.id = tps.timepoint_id
             WHERE s.id = $1
             GROUP BY s.id
-            "#,
-            id
+            "#
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -110,7 +125,7 @@ impl SubjectRepository for SubjectRepositoryImpl {
 
     async fn create(&self, new_subject: CreateSubject) -> Result<Subject, sqlx::Error> {
         sqlx::query_as::<_, Subject>(
-            "INSERT INTO subject (project_id, subject_code, patient_id, patient_name, patient_birth_date)
+            "INSERT INTO project_subject (project_id, subject_code, patient_id, patient_name, patient_birth_date)
              VALUES ($1, $2, $3, $4, $5)
              RETURNING id, project_id, subject_code, external_subject_key, patient_id, patient_name, patient_birth_date, created_at, updated_at",
         )
@@ -129,7 +144,7 @@ impl SubjectRepository for SubjectRepositoryImpl {
         update_subject: UpdateSubject,
     ) -> Result<Option<Subject>, sqlx::Error> {
         sqlx::query_as::<_, Subject>(
-            "UPDATE subject
+            "UPDATE project_subject
              SET subject_code = COALESCE($2, subject_code),
                  patient_id = COALESCE($3, patient_id),
                  patient_name = COALESCE($4, patient_name),
@@ -148,7 +163,7 @@ impl SubjectRepository for SubjectRepositoryImpl {
     }
 
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM subject WHERE id = $1")
+        let result = sqlx::query("DELETE FROM project_subject WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -162,7 +177,7 @@ impl SubjectRepository for SubjectRepositoryImpl {
     ) -> Result<Option<Subject>, sqlx::Error> {
         sqlx::query_as::<_, Subject>(
             "SELECT id, project_id, subject_code, external_subject_key, patient_id, patient_name, patient_birth_date, created_at, updated_at
-             FROM subject
+             FROM project_subject
              WHERE external_subject_key = $1",
         )
         .bind(external_key)

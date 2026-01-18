@@ -20,9 +20,21 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
         &self,
         timepoint_id: i32,
     ) -> Result<Vec<StudyInfo>, sqlx::Error> {
-        let rows = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct StudyInfoRow {
+            study_id: i32,
+            study_uid: String,
+            study_description: Option<String>,
+            study_date: Option<String>,
+            patient_id: Option<String>,
+            modality: Option<String>,
+            assigned_at: chrono::DateTime<chrono::Utc>,
+            assigned_by: i32,
+        }
+
+        let rows = sqlx::query_as::<_, StudyInfoRow>(
             r#"
-            SELECT 
+            SELECT
                 pds.id as study_id,
                 pds.study_uid,
                 pds.study_description,
@@ -31,13 +43,13 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
                 NULL::text as modality,
                 tps.assigned_at,
                 tps.assigned_by
-            FROM timepoint_study tps
+            FROM subject_timepoint_study_map tps
             JOIN project_data_study pds ON tps.study_id = pds.id
             WHERE tps.timepoint_id = $1
             ORDER BY pds.study_date DESC
-            "#,
-            timepoint_id
+            "#
         )
+        .bind(timepoint_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -60,9 +72,19 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
         &self,
         subject_id: i32,
     ) -> Result<Vec<StudyInfo>, sqlx::Error> {
-        let rows = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct UnassignedStudyRow {
+            study_id: i32,
+            study_uid: String,
+            study_description: Option<String>,
+            study_date: Option<String>,
+            patient_id: Option<String>,
+            modality: Option<String>,
+        }
+
+        let rows = sqlx::query_as::<_, UnassignedStudyRow>(
             r#"
-            SELECT 
+            SELECT
                 pds.id as study_id,
                 pds.study_uid,
                 pds.study_description,
@@ -70,16 +92,16 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
                 pds.patient_id,
                 NULL::text as modality
             FROM project_data_study pds
-            JOIN subject s ON pds.patient_id = s.patient_id AND s.id = $1
+            JOIN project_subject s ON pds.patient_id = s.patient_id AND s.id = $1
             WHERE NOT EXISTS (
-                SELECT 1 FROM timepoint_study tps
-                JOIN timepoint tp ON tps.timepoint_id = tp.id
+                SELECT 1 FROM subject_timepoint_study_map tps
+                JOIN subject_timepoint tp ON tps.timepoint_id = tp.id
                 WHERE tps.study_id = pds.id AND tp.subject_id = $1
             )
             ORDER BY pds.study_date DESC
-            "#,
-            subject_id
+            "#
         )
+        .bind(subject_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -103,7 +125,7 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
         study_id: i32,
     ) -> Result<Option<i32>, sqlx::Error> {
         sqlx::query_scalar::<_, i32>(
-            "SELECT timepoint_id FROM timepoint_study WHERE study_id = $1"
+            "SELECT timepoint_id FROM subject_timepoint_study_map WHERE study_id = $1"
         )
         .bind(study_id)
         .fetch_optional(&self.pool)
@@ -117,7 +139,7 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
         user_id: i32,
     ) -> Result<i32, sqlx::Error> {
         // Delete existing assignments for these studies (MOVE semantics)
-        sqlx::query("DELETE FROM timepoint_study WHERE study_id = ANY($1)")
+        sqlx::query("DELETE FROM subject_timepoint_study_map WHERE study_id = ANY($1)")
             .bind(study_ids)
             .execute(&self.pool)
             .await?;
@@ -126,7 +148,7 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
         let mut count = 0;
         for study_id in study_ids {
             sqlx::query(
-                "INSERT INTO timepoint_study (timepoint_id, study_id, assigned_by)
+                "INSERT INTO subject_timepoint_study_map (timepoint_id, study_id, assigned_by)
                  VALUES ($1, $2, $3)
                  ON CONFLICT (study_id) DO UPDATE SET timepoint_id = $1, assigned_by = $3, assigned_at = NOW()"
             )
@@ -142,7 +164,7 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
     }
 
     async fn unassign_studies(&self, study_ids: &[i32]) -> Result<i32, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM timepoint_study WHERE study_id = ANY($1)")
+        let result = sqlx::query("DELETE FROM subject_timepoint_study_map WHERE study_id = ANY($1)")
             .bind(study_ids)
             .execute(&self.pool)
             .await?;
@@ -154,7 +176,7 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
         &self,
         timepoint_id: i32,
     ) -> Result<i32, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM timepoint_study WHERE timepoint_id = $1")
+        let result = sqlx::query("DELETE FROM subject_timepoint_study_map WHERE timepoint_id = $1")
             .bind(timepoint_id)
             .execute(&self.pool)
             .await?;
@@ -181,7 +203,7 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
         timepoint_id: i32,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM timepoint_study WHERE timepoint_id = $1"
+            "SELECT COUNT(*) FROM subject_timepoint_study_map WHERE timepoint_id = $1"
         )
         .bind(timepoint_id)
         .fetch_one(&self.pool)
@@ -196,10 +218,10 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
             r#"
             SELECT COUNT(*)
             FROM project_data_study pds
-            JOIN subject s ON pds.patient_id = s.patient_id AND s.id = $1
+            JOIN project_subject s ON pds.patient_id = s.patient_id AND s.id = $1
             WHERE NOT EXISTS (
-                SELECT 1 FROM timepoint_study tps
-                JOIN timepoint tp ON tps.timepoint_id = tp.id
+                SELECT 1 FROM subject_timepoint_study_map tps
+                JOIN subject_timepoint tp ON tps.timepoint_id = tp.id
                 WHERE tps.study_id = pds.id AND tp.subject_id = $1
             )
             "#

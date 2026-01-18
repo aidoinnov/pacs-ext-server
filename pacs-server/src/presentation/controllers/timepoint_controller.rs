@@ -3,7 +3,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::domain::entities::{
-    AssignStudies, CreateTimePoint, TimePoint, UnassignStudies, UpdateTimePoint,
+    AssignStudies, AssignmentResult, CreateTimePoint, StudyInfo, TimePoint, TimePointStudies,
+    UnassignStudies, UpdateTimePoint,
 };
 use crate::domain::services::TimePointService;
 use crate::domain::ServiceError;
@@ -37,7 +38,7 @@ pub async fn create_timepoint<T: TimePointService + 'static>(
     match timepoint_service.create_timepoint(new_timepoint).await {
         Ok(timepoint) => HttpResponse::Created().json(timepoint),
         Err(e) => {
-            let status = match e {
+            let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
                 ServiceError::AlreadyExists(_) => HttpResponse::Conflict(),
                 ServiceError::ValidationError(_) => HttpResponse::BadRequest(),
@@ -102,7 +103,7 @@ pub async fn get_timepoints_by_subject<T: TimePointService + 'static>(
     {
         Ok(timepoints) => HttpResponse::Ok().json(timepoints),
         Err(e) => {
-            let status = match e {
+            let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
                 _ => HttpResponse::InternalServerError(),
             };
@@ -142,7 +143,7 @@ pub async fn update_timepoint<T: TimePointService + 'static>(
     {
         Ok(timepoint) => HttpResponse::Ok().json(timepoint),
         Err(e) => {
-            let status = match e {
+            let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
                 ServiceError::AlreadyExists(_) => HttpResponse::Conflict(),
                 ServiceError::ValidationError(_) => HttpResponse::BadRequest(),
@@ -178,7 +179,7 @@ pub async fn delete_timepoint<T: TimePointService + 'static>(
     match timepoint_service.delete_timepoint(*id).await {
         Ok(_) => HttpResponse::NoContent().finish(),
         Err(e) => {
-            let status = match e {
+            let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
                 ServiceError::ValidationError(_) => HttpResponse::BadRequest(),
                 _ => HttpResponse::InternalServerError(),
@@ -211,13 +212,16 @@ pub async fn assign_studies<T: TimePointService + 'static>(
     id: web::Path<i32>,
     req: web::Json<AssignStudies>,
 ) -> impl Responder {
+    // TODO: Get user_id from authentication context
+    let user_id = 1; // Temporary hardcoded value
+
     match timepoint_service
-        .assign_studies(*id, req.into_inner())
+        .assign_studies(*id, req.into_inner(), user_id)
         .await
     {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
-            let status = match e {
+            let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
                 _ => HttpResponse::InternalServerError(),
             };
@@ -257,7 +261,7 @@ pub async fn unassign_studies<T: TimePointService + 'static>(
             "unassigned_count": count
         })),
         Err(e) => {
-            let status = match e {
+            let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
                 _ => HttpResponse::InternalServerError(),
             };
@@ -290,7 +294,7 @@ pub async fn get_studies_by_timepoint<T: TimePointService + 'static>(
     match timepoint_service.get_studies_by_timepoint(*id).await {
         Ok(studies) => HttpResponse::Ok().json(studies),
         Err(e) => {
-            let status = match e {
+            let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
                 _ => HttpResponse::InternalServerError(),
             };
@@ -326,7 +330,7 @@ pub async fn get_unassigned_studies_by_subject<T: TimePointService + 'static>(
     {
         Ok(studies) => HttpResponse::Ok().json(studies),
         Err(e) => {
-            let status = match e {
+            let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),
                 _ => HttpResponse::InternalServerError(),
             };
@@ -343,29 +347,31 @@ pub fn configure_routes<T: TimePointService + 'static>(
     timepoint_service: Arc<T>,
 ) {
     cfg.app_data(web::Data::new(timepoint_service))
+        // Subject의 TimePoint 관련 엔드포인트
         .service(
             web::scope("/subjects/{subject_id}")
-                .route(
-                    "/timepoints",
-                    web::post().to(create_timepoint::<T>),
+                .service(
+                    web::resource("/timepoints")
+                        .route(web::post().to(create_timepoint::<T>))
+                        .route(web::get().to(get_timepoints_by_subject::<T>)),
                 )
-                .route(
-                    "/timepoints",
-                    web::get().to(get_timepoints_by_subject::<T>),
-                )
-                .route(
-                    "/studies/unassigned",
-                    web::get().to(get_unassigned_studies_by_subject::<T>),
+                .service(
+                    web::resource("/studies/unassigned")
+                        .route(web::get().to(get_unassigned_studies_by_subject::<T>)),
                 ),
         )
+        // TimePoint 직접 관련 엔드포인트
         .service(
-            web::scope("/timepoints")
-                .route("/{id}", web::get().to(get_timepoint::<T>))
-                .route("/{id}", web::put().to(update_timepoint::<T>))
-                .route("/{id}", web::delete().to(delete_timepoint::<T>))
-                .route("/{id}/studies", web::post().to(assign_studies::<T>))
-                .route("/{id}/studies", web::delete().to(unassign_studies::<T>))
-                .route("/{id}/studies", web::get().to(get_studies_by_timepoint::<T>)),
+            web::scope("/timepoints/{id}")
+                .route("", web::get().to(get_timepoint::<T>))
+                .route("", web::put().to(update_timepoint::<T>))
+                .route("", web::delete().to(delete_timepoint::<T>))
+                .service(
+                    web::resource("/studies")
+                        .route(web::post().to(assign_studies::<T>))
+                        .route(web::delete().to(unassign_studies::<T>))
+                        .route(web::get().to(get_studies_by_timepoint::<T>)),
+                ),
         );
 }
 
