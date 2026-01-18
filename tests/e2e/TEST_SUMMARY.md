@@ -30,6 +30,7 @@ tests/e2e/
 ├── test_02_project.py                    # 프로젝트 관리 테스트
 ├── test_03_annotation.py                 # 어노테이션 CRUD 테스트
 ├── test_04_snapshot.py                   # 스냅샷 이미지 테스트
+├── test_05_subject_timepoint.py          # Subject & TimePoint 관리 테스트
 ├── test_performance_01_concurrent.py     # 동시 요청 처리 성능 테스트
 └── test_performance_02_bulk_data.py      # 대량 데이터 조회 성능 테스트
 ```
@@ -63,6 +64,39 @@ tests/e2e/
 - ✅ 스냅샷 이미지 업로드
 - ✅ 다운로드용 Signed URL 생성
 - ✅ 대량 다운로드 URL 생성
+
+#### test_05_subject_timepoint.py - Subject & TimePoint 관리
+**Subject CRUD**:
+- ✅ Subject 생성
+- ✅ Subject 조회
+- ✅ Subject 상세 조회 (통계 포함)
+- ✅ 프로젝트별 Subject 목록 조회
+- ✅ Subject 수정
+- ✅ Subject 코드 중복 검증
+
+**TimePoint CRUD**:
+- ✅ Baseline TimePoint 생성
+- ✅ Visit TimePoint 생성
+- ✅ Baseline 중복 생성 방지
+- ✅ Subject별 TimePoint 목록 조회
+- ✅ TimePoint 수정
+
+**Study 할당/해제**:
+- ✅ 미할당 Study 목록 조회
+- ✅ Study를 TimePoint에 할당
+- ✅ 할당된 Study 목록 조회
+- ✅ Study를 다른 TimePoint로 이동 (MOVE 시맨틱)
+- ✅ Study 할당 해제
+
+**CASCADE 방지**:
+- ✅ TimePoint가 있는 Subject 삭제 방지
+- ✅ TimePoint 먼저 삭제
+- ✅ TimePoint 삭제 후 Subject 삭제
+
+**에러 케이스**:
+- ✅ 존재하지 않는 Subject 조회 (404)
+- ✅ 잘못된 데이터로 Subject 생성 (400)
+- ✅ 잘못된 visit_type으로 TimePoint 생성 (400)
 
 ### 2. 성능 테스트 (Performance Tests)
 
