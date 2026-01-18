@@ -15,6 +15,9 @@ pub mod relations;
 pub mod role;
 pub mod series_user_note;
 pub mod study_list_view;
+pub mod subject;
+pub mod timepoint;
+pub mod timepoint_study;
 pub mod user;
 pub mod viewer;
 
@@ -30,4 +33,7 @@ pub use project::*;
 pub use role::*;
 pub use series_user_note::*;
 pub use study_list_view::*;
+pub use subject::*;
+pub use timepoint::*;
+pub use timepoint_study::*;
 pub use user::*;
