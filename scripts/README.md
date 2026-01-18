@@ -61,30 +61,35 @@ python scripts/migrate_subjects.py --all-projects \
 ### 동작 방식
 
 1. **프로젝트 조회**: 지정된 프로젝트 또는 모든 활성 프로젝트 조회
-2. **Study 조회**: 각 프로젝트에 할당된 Study 목록 조회 (patient_id가 있는 것만)
+2. **Study 조회**: 각 프로젝트에 할당된 모든 Study 목록 조회
 3. **Subject 확인**: Patient ID로 기존 Subject 찾기
    - 있으면 → 재사용 (로그만 출력)
    - 없으면 → 자동 생성
 4. **Subject Code 생성**:
-   - 1차: Patient ID 기반 (`P12345`)
-   - 중복 시: Suffix 추가 (`P12345_1`, `P12345_2`, ...)
-   - Fallback: 순차 번호 (`SUB001`, `SUB002`, ...)
+   - **Patient ID가 있는 경우**: Patient ID 기반 (`P12345`)
+     - 중복 시: Suffix 추가 (`P12345_1`, `P12345_2`, ...)
+   - **Patient ID가 없는 경우**: 순차 코드 생성
+     - `A-001`, `A-002`, ..., `A-999`
+     - `B-001`, `B-002`, ..., `B-999`
+     - `C-001`, ...
 
 ### 출력 예시
 
-#### Dry-run 모드
+#### Dry-run 모드 (Patient ID가 있는 경우)
 ```
-$ python scripts/migrate_subjects.py --all-projects --dry-run
+$ python scripts/migrate_subjects.py --project-id 1 --dry-run
 
 2026-01-18 13:17:19 - INFO - Database: localhost:5456/pacs_extension
 2026-01-18 13:17:19 - INFO - 🔍 DRY-RUN MODE: 실제 생성하지 않습니다
 2026-01-18 13:17:19 - INFO - ✓ Database connected
-2026-01-18 13:17:19 - INFO - Found 375 project(s) to migrate
+2026-01-18 13:17:19 - INFO - Found 1 project(s) to migrate
 
 ============================================================
 Project: Clinical Trial A (ID: 1)
 ============================================================
-2026-01-18 13:17:19 - INFO - Found 15 studies with patient_id
+2026-01-18 13:17:19 - INFO - Found 15 studies total
+2026-01-18 13:17:19 - INFO -   - With patient_id: 15
+2026-01-18 13:17:19 - INFO -   - Without patient_id: 0
 2026-01-18 13:17:19 - INFO -   [DRY-RUN] Would create Subject: P12345 (Patient: P12345)
 2026-01-18 13:17:19 - INFO -   [DRY-RUN] Would create Subject: P12346 (Patient: P12346)
 2026-01-18 13:17:19 - INFO -   ✓ Reuse Subject: P12347 (Patient: P12347)
@@ -94,6 +99,37 @@ Summary:
   - Created: 12
   - Reused: 3
   - Total: 15
+
+============================================================
+✓ Migration completed successfully
+============================================================
+```
+
+#### Dry-run 모드 (Patient ID가 없는 경우)
+```
+$ python scripts/migrate_subjects.py --project-id 2 --dry-run
+
+2026-01-18 13:26:37 - INFO - Database: localhost:5456/pacs_extension
+2026-01-18 13:26:37 - INFO - 🔍 DRY-RUN MODE: 실제 생성하지 않습니다
+2026-01-18 13:26:37 - INFO - ✓ Database connected
+2026-01-18 13:26:37 - INFO - Found 1 project(s) to migrate
+
+============================================================
+Project: AI Image Analysis Project (ID: 2)
+============================================================
+2026-01-18 13:26:37 - INFO - Found 12 studies total
+2026-01-18 13:26:37 - INFO -   - With patient_id: 0
+2026-01-18 13:26:37 - INFO -   - Without patient_id: 12
+2026-01-18 13:26:37 - INFO -   [DRY-RUN] Would create Subject: A-001 (No patient_id)
+2026-01-18 13:26:37 - INFO -   [DRY-RUN] Would create Subject: A-002 (No patient_id)
+2026-01-18 13:26:37 - INFO -   [DRY-RUN] Would create Subject: A-003 (No patient_id)
+...
+2026-01-18 13:26:37 - INFO -   [DRY-RUN] Would create Subject: A-012 (No patient_id)
+
+Summary:
+  - Created: 12
+  - Reused: 0
+  - Total: 12
 
 ============================================================
 ✓ Migration completed successfully
