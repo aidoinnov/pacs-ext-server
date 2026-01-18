@@ -269,3 +269,201 @@ interface StudyWithTimePoint {
 
 그거 던지면,
 이번엔 **테이블 + FK + 제약조건까지 포함해서** 정리해줄게.
+
+---
+
+## 10. REST API 상세 스펙
+
+### 10.1 Subject 관리 API
+
+#### 10.1.1 Subject 목록 조회
+```http
+GET /api/projects/{project_id}/subjects
+Authorization: Bearer {token}
+```
+
+**Response 200 OK:**
+```json
+{
+  "subjects": [
+    {
+      "id": 1,
+      "project_id": 1,
+      "subject_code": "A001",
+      "patient_id": "P12345",
+      "patient_name": "홍길동",
+      "patient_birth_date": "1980-01-01",
+      "created_at": "2026-01-18T10:00:00Z"
+    }
+  ]
+}
+```
+
+#### 10.1.2 Subject 생성
+```http
+POST /api/projects/{project_id}/subjects
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "subject_code": "A001",
+  "patient_id": "P12345",
+  "patient_name": "홍길동",
+  "patient_birth_date": "1980-01-01"
+}
+```
+
+**Response 201 Created:**
+```json
+{
+  "id": 1,
+  "project_id": 1,
+  "subject_code": "A001",
+  "patient_id": "P12345",
+  "patient_name": "홍길동",
+  "patient_birth_date": "1980-01-01",
+  "created_at": "2026-01-18T10:00:00Z"
+}
+```
+
+**Error 409 Conflict:**
+```json
+{
+  "error": "SUBJECT_CODE_DUPLICATE",
+  "message": "Subject code 'A001' already exists in this project"
+}
+```
+
+#### 10.1.3 Subject 상세 조회
+```http
+GET /api/subjects/{subject_id}
+Authorization: Bearer {token}
+```
+
+**Response 200 OK:**
+```json
+{
+  "id": 1,
+  "project_id": 1,
+  "subject_code": "A001",
+  "patient_id": "P12345",
+  "patient_name": "홍길동",
+  "patient_birth_date": "1980-01-01",
+  "timepoint_count": 3,
+  "study_count": 5,
+  "created_at": "2026-01-18T10:00:00Z"
+}
+```
+
+---
+
+### 10.2 TimePoint 관리 API
+
+#### 10.2.1 TimePoint 목록 조회
+```http
+GET /api/subjects/{subject_id}/timepoints
+Authorization: Bearer {token}
+```
+
+**Response 200 OK:**
+```json
+{
+  "timepoints": [
+    {
+      "id": 1,
+      "subject_id": 1,
+      "project_id": 1,
+      "name": "Baseline",
+      "visit_type": "Baseline",
+      "visit_no": null,
+      "order_index": 0,
+      "study_count": 2,
+      "created_at": "2026-01-18T10:00:00Z"
+    },
+    {
+      "id": 2,
+      "subject_id": 1,
+      "project_id": 1,
+      "name": "TP1",
+      "visit_type": "Visit",
+      "visit_no": 1,
+      "order_index": 1,
+      "study_count": 1,
+      "created_at": "2026-01-18T11:00:00Z"
+    }
+  ]
+}
+```
+
+#### 10.2.2 TimePoint 생성
+```http
+POST /api/subjects/{subject_id}/timepoints
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "name": "TP1",
+  "visit_type": "Visit",
+  "visit_no": 1,
+  "order_index": 1
+}
+```
+
+**Response 201 Created:**
+```json
+{
+  "id": 2,
+  "subject_id": 1,
+  "project_id": 1,
+  "name": "TP1",
+  "visit_type": "Visit",
+  "visit_no": 1,
+  "order_index": 1,
+  "created_at": "2026-01-18T11:00:00Z"
+}
+```
+
+**Error 409 Conflict (Baseline 중복):**
+```json
+{
+  "error": "BASELINE_ALREADY_EXISTS",
+  "message": "Subject already has a Baseline timepoint"
+}
+```
+
+#### 10.2.3 TimePoint 수정
+```http
+PUT /api/timepoints/{timepoint_id}
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "name": "TP1-Updated",
+  "visit_type": "Visit",
+  "order_index": 1
+}
+```
+
+**Response 200 OK:**
+```json
+{
+  "id": 2,
+  "subject_id": 1,
+  "project_id": 1,
+  "name": "TP1-Updated",
+  "visit_type": "Visit",
+  "visit_no": 1,
+  "order_index": 1,
+  "updated_at": "2026-01-18T12:00:00Z"
+}
+```
+
+#### 10.2.4 TimePoint 삭제
+```http
+DELETE /api/timepoints/{timepoint_id}
+Authorization: Bearer {token}
+```
+
+**Response 204 No Content**
+
+**Note:** TimePoint 삭제 시 매핑된 모든 Study는 Unassigned 상태로 변경됨 (CASCADE DELETE)
