@@ -53,7 +53,7 @@ use application::use_cases::{
 use domain::services::{
     AccessControlServiceImpl, AnnotationServiceImpl, AuthServiceImpl, MaskGroupServiceImpl,
     MaskServiceImpl, PermissionServiceImpl, ProjectService, ProjectServiceImpl,
-    SeriesUserNoteServiceImpl, UserServiceImpl,
+    SeriesUserNoteServiceImpl, SubjectServiceImpl, TimePointServiceImpl, UserServiceImpl,
 };
 
 // 인프라스트럭처 레이어 - 리포지토리 구현체들
@@ -62,7 +62,8 @@ use infrastructure::repositories::{
     AccessLogRepositoryImpl, AnnotationRepositoryImpl, CapabilityRepositoryImpl,
     MaskGroupRepositoryImpl, MaskRepositoryImpl, PermissionRepositoryImpl,
     ProjectDataAccessRepositoryImpl, ProjectDataRepositoryImpl, ProjectRepositoryImpl,
-    RoleRepositoryImpl, SeriesUserNoteRepositoryImpl, UserRepositoryImpl,
+    RoleRepositoryImpl, SeriesUserNoteRepositoryImpl, SubjectRepositoryImpl,
+    TimePointRepositoryImpl, TimePointStudyRepositoryImpl, UserRepositoryImpl,
 };
 use infrastructure::services::{
     CapabilityServiceImpl, ProjectDataServiceImpl, UserRegistrationServiceImpl,
@@ -82,7 +83,8 @@ use presentation::controllers::{
     mask_controller, mask_group_controller, project_controller, project_data_access_controller,
     project_user_controller, project_user_matrix_controller, role_controller,
     role_permission_matrix_controller, series_user_note_controller, study_list_view_controller,
-    test_controller, user_controller, user_project_matrix_controller,
+    subject_controller, test_controller, timepoint_controller, user_controller,
+    user_project_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -268,6 +270,12 @@ async fn main() -> std::io::Result<()> {
     let project_data_access_repo = Arc::new(ProjectDataAccessRepositoryImpl::new(pool.clone()));
     // Series User Note 관련 데이터 접근을 위한 리포지토리
     let series_user_note_repo = SeriesUserNoteRepositoryImpl::new(pool.clone());
+    // Subject 관련 데이터 접근을 위한 리포지토리
+    let subject_repo = SubjectRepositoryImpl::new(pool.clone());
+    // TimePoint 관련 데이터 접근을 위한 리포지토리
+    let timepoint_repo = TimePointRepositoryImpl::new(pool.clone());
+    // TimePoint-Study 관련 데이터 접근을 위한 리포지토리
+    let timepoint_study_repo = TimePointStudyRepositoryImpl::new(pool.clone());
 
     // DICOM RBAC Evaluator
     use crate::infrastructure::services::DicomRbacEvaluatorImpl;
@@ -338,6 +346,17 @@ async fn main() -> std::io::Result<()> {
         user_repo.clone(),
         project_repo.clone(),
         project_data_repo.clone(),
+    ));
+    // Subject 서비스: Subject CRUD, 비즈니스 규칙 검증 등
+    let subject_service = Arc::new(SubjectServiceImpl::new(
+        subject_repo.clone(),
+        project_repo.clone(),
+    ));
+    // TimePoint 서비스: TimePoint CRUD, Study 할당/해제 등
+    let timepoint_service = Arc::new(TimePointServiceImpl::new(
+        timepoint_repo.clone(),
+        timepoint_study_repo.clone(),
+        subject_repo.clone(),
     ));
 
     // 사용자 등록 서비스: 회원가입, 이메일 인증, 계정 삭제 등
@@ -933,6 +952,22 @@ async fn main() -> std::io::Result<()> {
                                 jwt_service.clone(),
                                 Arc::new(user_repo.clone()),
                             )
+                        }
+                    })
+                    // ========================================
+                    // 🧬 Subject & TimePoint 관리 API
+                    // - Subject CRUD
+                    // - TimePoint CRUD
+                    // - Study 할당/해제
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            subject_controller::configure_routes(cfg, subject_service.clone())
+                        }
+                    })
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            timepoint_controller::configure_routes(cfg, timepoint_service.clone())
                         }
                     })
                     // ========================================
