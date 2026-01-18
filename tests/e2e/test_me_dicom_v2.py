@@ -89,7 +89,7 @@ def main():
     print("\n" + "=" * 80)
     print("📋 Testing /me/studies endpoint (V2 Batch Query)")
     print("=" * 80)
-    
+
     result = client.get_my_studies(page=1, page_size=50)
 
     if result["status_code"] == 200:
@@ -109,6 +109,17 @@ def main():
             study = studies[0]
             study_uid = study.get("0020000D", {}).get("Value", [""])[0]
             print(f"\n📄 First study UID: {study_uid[:50]}...")
+
+            # _ext 필드 검증
+            if "_ext" in study:
+                ext = study["_ext"]
+                print(f"\n✅ _ext field present")
+                print(f"   - project: {ext.get('project', {}).get('name', 'N/A')}")
+                print(f"   - report_status: {ext.get('report_status', 'N/A')}")
+                if "review" in ext:
+                    print(f"   - review.reviewStage: {ext['review'].get('reviewStage', 'N/A')}")
+            else:
+                print(f"\n⚠️  _ext field missing")
             
             # 2. /me/series 테스트
             print("\n" + "=" * 80)
@@ -146,6 +157,41 @@ def main():
     else:
         print(f"❌ Failed: {result['status_code']}")
     
+    # 4. _ext 필드 view 파라미터 테스트
+    print("\n" + "=" * 80)
+    print("📋 Testing _ext field with different view parameters")
+    print("=" * 80)
+
+    for view in ["minimal", "default", "full"]:
+        print(f"\n🔍 Testing view={view}")
+        result = client.get_my_studies(page=1, page_size=1, view=view)
+
+        if result["status_code"] == 200:
+            data = result["data"]
+            studies = data if isinstance(data, list) else data.get("studies", [])
+
+            if studies and "_ext" in studies[0]:
+                ext = studies[0]["_ext"]
+                has_project = "project" in ext
+                has_report_status = "report_status" in ext
+                has_review = "review" in ext
+
+                print(f"   ✅ _ext present")
+                print(f"      - project: {'✓' if has_project else '✗'}")
+                print(f"      - report_status: {'✓' if has_report_status else '✗'}")
+                print(f"      - review: {'✓' if has_review else '✗'}")
+
+                # view=default일 때만 review 필드가 있어야 함
+                if view == "default":
+                    if not has_review:
+                        print(f"   ⚠️  WARNING: review field missing in default view")
+                elif has_review:
+                    print(f"   ℹ️  INFO: review field present in {view} view")
+            else:
+                print(f"   ❌ _ext field missing")
+        else:
+            print(f"   ❌ Failed: {result['status_code']}")
+
     print("\n" + "=" * 80)
     print("✅ All tests completed!")
     print("=" * 80)

@@ -148,7 +148,7 @@ class TestRecistLesionCRUD:
         subject_id = test_subject['id']
         baseline_id = baseline_timepoint['id']
 
-        response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+        response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
             "lesion_type": "TARGET",
             "baseline_timepoint_id": baseline_id,
             "organ_site": "Liver",
@@ -175,7 +175,7 @@ class TestRecistLesionCRUD:
         subject_id = test_subject['id']
         baseline_id = baseline_timepoint['id']
 
-        response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+        response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
             "lesion_type": "NON_TARGET",
             "baseline_timepoint_id": baseline_id,
             "organ_site": "Lung",
@@ -200,7 +200,7 @@ class TestRecistLesionCRUD:
         subject_id = test_subject['id']
 
         # 전체 목록 조회
-        response = admin_client.get(f"/api/subjects/{subject_id}/recist-lesions")
+        response = admin_client.get(f"/api/recist-lesions/subjects/{subject_id}")
         assert response.status_code == 200, f"Failed to list lesions: {response.text}"
         lesions = response.json()
 
@@ -208,7 +208,7 @@ class TestRecistLesionCRUD:
         logger.info(f"✓ Found {len(lesions)} lesions")
 
         # Target Lesion만 조회
-        response = admin_client.get(f"/api/subjects/{subject_id}/recist-lesions?lesion_type=target")
+        response = admin_client.get(f"/api/recist-lesions/subjects/{subject_id}?lesion_type=target")
         assert response.status_code == 200
         target_lesions = response.json()
 
@@ -222,7 +222,7 @@ class TestRecistLesionCRUD:
         subject_id = test_subject['id']
 
         # 먼저 Lesion 목록 조회
-        response = admin_client.get(f"/api/subjects/{subject_id}/recist-lesions")
+        response = admin_client.get(f"/api/recist-lesions/subjects/{subject_id}")
         lesions = response.json()
         lesion_id = lesions[0]['id']
 
@@ -246,7 +246,7 @@ class TestRecistLesionCRUD:
         subject_id = test_subject['id']
 
         # 먼저 Lesion 목록 조회
-        response = admin_client.get(f"/api/subjects/{subject_id}/recist-lesions")
+        response = admin_client.get(f"/api/recist-lesions/subjects/{subject_id}")
         lesions = response.json()
         lesion_id = lesions[0]['id']
 
@@ -273,7 +273,7 @@ class TestRecistLesionCRUD:
         baseline_id = baseline_timepoint['id']
 
         # 삭제용 Lesion 생성
-        response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+        response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
             "lesion_type": "TARGET",
             "baseline_timepoint_id": baseline_id,
             "organ_site": "Temp",
@@ -303,13 +303,13 @@ class TestRecistBusinessRules:
         baseline_id = baseline_timepoint['id']
 
         # 기존 Target Lesion 개수 확인
-        response = admin_client.get(f"/api/subjects/{subject_id}/recist-lesions?lesion_type=target")
+        response = admin_client.get(f"/api/recist-lesions/subjects/{subject_id}?lesion_type=target")
         existing_count = len(response.json())
 
         # 5개까지 생성 시도
         created_lesions = []
         for i in range(5 - existing_count):
-            response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+            response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
                 "lesion_type": "TARGET",
                 "baseline_timepoint_id": baseline_id,
                 "organ_site": f"Organ {i+1}",
@@ -319,7 +319,7 @@ class TestRecistBusinessRules:
                 created_lesions.append(response.json()['id'])
 
         # 6번째 생성 시도 (실패해야 함)
-        response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+        response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
             "lesion_type": "TARGET",
             "baseline_timepoint_id": baseline_id,
             "organ_site": "Organ 6",
@@ -346,7 +346,7 @@ class TestRecistBusinessRules:
         subject_id = test_subject['id']
 
         # Baseline TimePoint 없이 Target Lesion 생성 시도
-        response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+        response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
             "lesion_type": "TARGET",
             "baseline_timepoint_id": None,
             "organ_site": "Liver",
@@ -363,7 +363,7 @@ class TestRecistBusinessRules:
         subject_id = test_subject['id']
 
         # NEW Lesion 생성 (Baseline TimePoint 없이)
-        response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+        response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
             "lesion_type": "NEW",
             "baseline_timepoint_id": None,
             "organ_site": "Lymph Node",
@@ -392,7 +392,7 @@ class TestRecistBusinessRules:
         # 10개 Non-Target Lesion 생성 시도
         created_lesions = []
         for i in range(10):
-            response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+            response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
                 "lesion_type": "NON_TARGET",
                 "baseline_timepoint_id": baseline_id,
                 "organ_site": f"Organ {i+1}",
@@ -422,7 +422,7 @@ class TestAnnotationLinking:
         baseline_id = baseline_timepoint['id']
 
         # Lesion 생성
-        response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+        response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
             "lesion_type": "TARGET",
             "baseline_timepoint_id": baseline_id,
             "organ_site": "Liver",
@@ -488,7 +488,7 @@ class TestErrorCases:
         subject_id = test_subject['id']
         invalid_timepoint_id = 999999
 
-        response = admin_client.post(f"/api/subjects/{subject_id}/recist-lesions", json={
+        response = admin_client.post(f"/api/recist-lesions/subjects/{subject_id}", json={
             "lesion_type": "TARGET",
             "baseline_timepoint_id": invalid_timepoint_id,
             "organ_site": "Liver"

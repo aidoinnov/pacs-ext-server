@@ -115,6 +115,7 @@ pub struct CreateSubjectRequest {
 ///
 /// # 필드
 /// - `subject_code`: Subject 코드 (선택사항)
+/// - `external_subject_key`: CTIMS Subject PK (선택사항)
 /// - `patient_id`: PACS Patient ID (선택사항)
 /// - `patient_name`: 환자 이름 (선택사항)
 /// - `patient_birth_date`: 환자 생년월일 (선택사항)
@@ -122,6 +123,8 @@ pub struct CreateSubjectRequest {
 pub struct UpdateSubject {
     /// Subject 코드 (선택사항)
     pub subject_code: Option<String>,
+    /// CTIMS Subject PK (선택사항)
+    pub external_subject_key: Option<String>,
     /// PACS Patient ID (선택사항)
     pub patient_id: Option<String>,
     /// 환자 이름 (선택사항)

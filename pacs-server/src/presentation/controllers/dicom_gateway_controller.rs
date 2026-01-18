@@ -24,6 +24,8 @@ pub struct GatewayQuery {
     pub report_status: Option<String>, // "approved,unread" 형식
     #[serde(default)]
     pub view: Option<String>, // Study List View ID (e.g., "default")
+    #[serde(default)]
+    pub include_timepoint: Option<bool>, // TimePoint 정보 포함 여부 (기본값: false)
     #[serde(flatten)]
     pub extra: serde_json::Map<String, Value>,
 }
@@ -980,6 +982,12 @@ pub async fn get_all_user_studies(
         .filter_map(|s| extract_study_uid(s))
         .collect();
 
+    // Patient ID 목록 추출 (Subject 조회용)
+    let all_patient_ids: Vec<String> = paginated_studies
+        .iter()
+        .filter_map(|s| extract_patient_id(s))
+        .collect();
+
     let report_status_cache = if ext_field_keys.contains(&"report_status".to_string()) {
         ext_builder.fetch_report_status_batch(&all_study_uids, &all_project_ids).await
     } else {
@@ -992,20 +1000,54 @@ pub async fn get_all_user_studies(
         HashMap::new()
     };
 
+    // Subject 정보 배치 조회 (patient_id + project_id 기반)
+    let subject_cache = ext_builder.fetch_subjects_batch(&all_patient_ids, &all_project_ids).await;
+
+    // StudyDescription 배치 조회 (study_uid 기반)
+    let study_desc_cache = ext_builder.fetch_study_descriptions(&all_study_uids).await;
+
+    // TimePoint 정보 배치 조회 (include_timepoint=true일 때 또는 view=default일 때)
+    let should_include_timepoint = query.include_timepoint.unwrap_or(false)
+        || query.view.as_deref() == Some("default");
+
+    let timepoint_cache = if should_include_timepoint {
+        ext_builder.fetch_timepoints(&all_study_uids).await
+    } else {
+        HashMap::new()
+    };
+
     let mut enriched_studies: Vec<serde_json::Value> = Vec::with_capacity(paginated_studies.len());
 
     for mut study in paginated_studies {
         if let Some(study_uid) = extract_study_uid(&study) {
+            // StudyDescription 추가 (DICOM 태그 00081030)
+            if let Some(study_desc) = study_desc_cache.get(&study_uid) {
+                if let Some(obj) = study.as_object_mut() {
+                    obj.insert("00081030".to_string(), serde_json::json!({
+                        "vr": "LO",
+                        "Value": [study_desc]
+                    }));
+                }
+            }
+
             // _ext 객체 생성
             let mut ext = serde_json::Map::new();
 
-            // projects 정보는 항상 추가 (id, name, role_name)
+            // project 정보는 항상 추가 (첫 번째 프로젝트만)
             if let Some(project_ids) = study_project_map.get(&study_uid) {
-                let projects: Vec<ProjectInfo> = project_ids
-                    .iter()
-                    .filter_map(|id| project_info_cache.get(id).cloned())
-                    .collect();
-                ext.insert("projects".to_string(), serde_json::json!(projects));
+                // 첫 번째 프로젝트만 사용
+                if let Some(first_project_id) = project_ids.first() {
+                    if let Some(project_info) = project_info_cache.get(first_project_id) {
+                        ext.insert("project".to_string(), serde_json::json!(project_info));
+                    }
+
+                    // Subject 정보 추가 (patient_id + project_id 기반)
+                    if let Some(patient_id) = extract_patient_id(&study) {
+                        if let Some(subject_info) = subject_cache.get(&(patient_id, *first_project_id)) {
+                            ext.insert("subject".to_string(), serde_json::json!(subject_info));
+                        }
+                    }
+                }
 
                 // report_status 추가 (캐시에서 가져오기, 없으면 기본값 "unread")
                 let status = report_status_cache.get(&study_uid)
@@ -1016,6 +1058,15 @@ pub async fn get_all_user_studies(
                 // review 추가 (캐시에서 가져오기)
                 if let Some(review) = review_cache.get(&study_uid) {
                     ext.insert("review".to_string(), serde_json::json!(review));
+                }
+
+                // timepoint 추가 (include_timepoint=true일 때 또는 view=default일 때 항상 추가)
+                if should_include_timepoint {
+                    if let Some(timepoint) = timepoint_cache.get(&study_uid) {
+                        ext.insert("timepoint".to_string(), serde_json::json!(timepoint));
+                    } else {
+                        ext.insert("timepoint".to_string(), serde_json::Value::Null);
+                    }
                 }
             }
 
@@ -3627,6 +3678,17 @@ pub struct ProjectInfo {
     pub role_name: Option<String>,
 }
 
+/// Subject 정보 (id, subject_code, patient_id, external_subject_key)
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubjectInfo {
+    pub id: i32,
+    pub subject_code: String,
+    pub patient_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_subject_key: Option<String>,
+}
+
 /// Review 상태 정보
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -3634,6 +3696,16 @@ pub struct ReviewInfo {
     pub review_stage: String,
     pub available_stages: Vec<String>,
     pub annotation_summary: HashMap<String, bool>,
+}
+
+/// TimePoint 정보
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimePointInfo {
+    pub id: i32,
+    pub name: String,
+    pub visit_type: String,
+    pub visit_no: Option<i32>,
 }
 
 /// Study 확장 정보 빌더
@@ -3679,6 +3751,167 @@ impl<'a> StudyExtBuilder<'a> {
                 .collect(),
             Err(e) => {
                 tracing::warn!("Failed to fetch project info batch: {:?}", e);
+                HashMap::new()
+            }
+        }
+    }
+
+    /// Subject 정보 배치 조회 (study_id 기준, subject_timepoint_study_map 사용)
+    /// Returns: HashMap<study_id, SubjectInfo>
+    pub async fn fetch_subjects_by_study_ids(&self, study_ids: &[i32]) -> HashMap<i32, SubjectInfo> {
+        if study_ids.is_empty() {
+            return HashMap::new();
+        }
+
+        let results = sqlx::query_as::<_, (i32, i32, String, Option<String>, Option<String>)>(
+            r#"
+            SELECT DISTINCT ON (stsm.study_id)
+                stsm.study_id,
+                ps.id,
+                ps.subject_code,
+                ps.patient_id,
+                ps.external_subject_key
+            FROM subject_timepoint_study_map stsm
+            JOIN project_subject ps ON stsm.subject_id = ps.id
+            WHERE stsm.study_id = ANY($1)
+            "#
+        )
+        .bind(study_ids)
+        .fetch_all(self.pool)
+        .await;
+
+        match results {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|(study_id, id, subject_code, patient_id, external_subject_key)| {
+                    (study_id, SubjectInfo {
+                        id,
+                        subject_code,
+                        patient_id: patient_id.unwrap_or_default(),
+                        external_subject_key
+                    })
+                })
+                .collect(),
+            Err(e) => {
+                tracing::warn!("Failed to fetch subject info by study IDs: {:?}", e);
+                HashMap::new()
+            }
+        }
+    }
+
+    /// Subject 정보 배치 조회 (patient_id 기준) - 하위 호환성 유지
+    /// Returns: HashMap<(patient_id, project_id), SubjectInfo>
+    pub async fn fetch_subjects_batch(&self, patient_ids: &[String], project_ids: &[i32]) -> HashMap<(String, i32), SubjectInfo> {
+        if patient_ids.is_empty() || project_ids.is_empty() {
+            return HashMap::new();
+        }
+
+        let results = sqlx::query_as::<_, (i32, i32, String, String, Option<String>)>(
+            r#"
+            SELECT
+                ps.id,
+                ps.project_id,
+                ps.subject_code,
+                ps.patient_id,
+                ps.external_subject_key
+            FROM project_subject ps
+            WHERE ps.patient_id = ANY($1)
+              AND ps.project_id = ANY($2)
+            "#
+        )
+        .bind(patient_ids)
+        .bind(project_ids)
+        .fetch_all(self.pool)
+        .await;
+
+        match results {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|(id, project_id, subject_code, patient_id, external_subject_key)| {
+                    ((patient_id.clone(), project_id), SubjectInfo {
+                        id,
+                        subject_code,
+                        patient_id,
+                        external_subject_key
+                    })
+                })
+                .collect(),
+            Err(e) => {
+                tracing::warn!("Failed to fetch subject info batch: {:?}", e);
+                HashMap::new()
+            }
+        }
+    }
+
+    /// StudyDescription 배치 조회
+    /// Returns: HashMap<study_uid, study_description>
+    pub async fn fetch_study_descriptions(&self, study_uids: &[String]) -> HashMap<String, String> {
+        if study_uids.is_empty() {
+            return HashMap::new();
+        }
+
+        let results = sqlx::query_as::<_, (String, Option<String>)>(
+            r#"
+            SELECT study_uid, study_description
+            FROM project_data_study
+            WHERE study_uid = ANY($1)
+            "#
+        )
+        .bind(study_uids)
+        .fetch_all(self.pool)
+        .await;
+
+        match results {
+            Ok(rows) => rows
+                .into_iter()
+                .filter_map(|(uid, desc)| desc.map(|d| (uid, d)))
+                .collect(),
+            Err(e) => {
+                tracing::warn!("Failed to fetch study descriptions: {:?}", e);
+                HashMap::new()
+            }
+        }
+    }
+
+    /// TimePoint 정보 배치 조회 (study_uid 기반)
+    /// Returns: HashMap<study_uid, TimePointInfo>
+    pub async fn fetch_timepoints(&self, study_uids: &[String]) -> HashMap<String, TimePointInfo> {
+        if study_uids.is_empty() {
+            return HashMap::new();
+        }
+
+        let results = sqlx::query_as::<_, (String, i32, String, String, Option<i32>)>(
+            r#"
+            SELECT
+                pds.study_uid,
+                tp.id,
+                tp.name,
+                tp.visit_type::text,
+                tp.visit_no
+            FROM project_data_study pds
+            INNER JOIN subject_timepoint_study_map tpsm ON pds.id = tpsm.study_id
+            INNER JOIN subject_timepoint tp ON tpsm.timepoint_id = tp.id
+            WHERE pds.study_uid = ANY($1)
+            "#
+        )
+        .bind(study_uids)
+        .fetch_all(self.pool)
+        .await;
+
+        match results {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|(study_uid, id, name, visit_type, visit_no)| {
+                    (study_uid, TimePointInfo {
+                        id,
+                        name,
+                        visit_type,
+                        visit_no,
+                    })
+                })
+                .collect(),
+            Err(e) => {
+                tracing::warn!("Failed to fetch timepoints: {:?}", e);
                 HashMap::new()
             }
         }

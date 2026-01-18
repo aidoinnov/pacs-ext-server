@@ -55,12 +55,20 @@ impl SyncServiceImpl {
         &self,
         last_run: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<usize, String> {
-        // 실제 스키마 반영: patient_fk 통해 patient.patient_id 조인, study_date는 varchar(YYYYMMDD)
+        // patient_fk 통해 patient_id, patient_name 조인 (dcm4chee 정규화 구조)
         let rows = if let Some(ts) = last_run {
             sqlx::query(
-                r#"SELECT st.study_iuid, st.study_desc, NULL::text AS patient_id, st.study_date, st.updated_time
+                r#"SELECT
+                       st.study_iuid,
+                       st.study_desc,
+                       pid.pat_id AS patient_id,
+                       pn.alphabetic_name AS patient_name,
+                       st.study_date,
+                       st.updated_time
                    FROM study st
                    LEFT JOIN patient pt ON st.patient_fk = pt.pk
+                   LEFT JOIN patient_id pid ON pt.patient_id_fk = pid.pk
+                   LEFT JOIN person_name pn ON pt.pat_name_fk = pn.pk
                    WHERE st.updated_time > $1
                    ORDER BY st.updated_time ASC
                    LIMIT 500"#,
@@ -71,9 +79,17 @@ impl SyncServiceImpl {
             .map_err(|e| format!("dcm4chee select study failed: {}", e))?
         } else {
             sqlx::query(
-                r#"SELECT st.study_iuid, st.study_desc, NULL::text AS patient_id, st.study_date, st.updated_time
+                r#"SELECT
+                       st.study_iuid,
+                       st.study_desc,
+                       pid.pat_id AS patient_id,
+                       pn.alphabetic_name AS patient_name,
+                       st.study_date,
+                       st.updated_time
                    FROM study st
                    LEFT JOIN patient pt ON st.patient_fk = pt.pk
+                   LEFT JOIN patient_id pid ON pt.patient_id_fk = pid.pk
+                   LEFT JOIN person_name pn ON pt.pat_name_fk = pn.pk
                    ORDER BY st.updated_time DESC
                    LIMIT 500"#
             )
@@ -87,37 +103,33 @@ impl SyncServiceImpl {
             let uid: String = r.try_get("study_iuid").unwrap_or_default();
             let desc: Option<String> = r.try_get("study_desc").ok();
             let pid: Option<String> = r.try_get("patient_id").ok();
+            let pname: Option<String> = r.try_get("patient_name").ok();
             let sdate_raw: Option<String> = r.try_get("study_date").ok();
 
-            // upsert into project_data_study (no project_id column)
-            let study_id: i32 = sqlx::query_scalar(
-                r#"INSERT INTO project_data_study (study_uid, study_description, patient_id, study_date)
-                    VALUES ($1, $2, $3, to_date($4, 'YYYYMMDD'))
+            // upsert into project_data_study (patient_id, patient_name 포함)
+            let _study_id: i32 = sqlx::query_scalar(
+                r#"INSERT INTO project_data_study (study_uid, study_description, patient_id, patient_name, study_date)
+                    VALUES ($1, $2, $3, $4, to_date($5, 'YYYYMMDD'))
                     ON CONFLICT (study_uid)
-                    DO UPDATE SET study_description = EXCLUDED.study_description,
-                                  patient_id = EXCLUDED.patient_id,
-                                  study_date = EXCLUDED.study_date
+                    DO UPDATE SET study_description = COALESCE(EXCLUDED.study_description, project_data_study.study_description),
+                                  patient_id = COALESCE(EXCLUDED.patient_id, project_data_study.patient_id),
+                                  patient_name = COALESCE(EXCLUDED.patient_name, project_data_study.patient_name),
+                                  study_date = COALESCE(EXCLUDED.study_date, project_data_study.study_date),
+                                  updated_at = CURRENT_TIMESTAMP
                     RETURNING id"#,
             )
             .bind(&uid)
             .bind(&desc)
             .bind(&pid)
+            .bind(&pname)
             .bind(sdate_raw.unwrap_or_default())
             .fetch_one(&self.rbac_pool)
             .await
             .map_err(|e| format!("rbac upsert study failed: {}", e))?;
 
-            // Link study to project via project_data table
-            let _ = sqlx::query(
-                r#"INSERT INTO project_data (project_id, study_id, resource_level)
-                    VALUES ($1, $2, 'STUDY')
-                    ON CONFLICT (project_id, study_id, series_id, instance_id) DO NOTHING"#,
-            )
-            .bind(self.default_project_id)
-            .bind(study_id)
-            .execute(&self.rbac_pool)
-            .await
-            .map_err(|e| format!("rbac link study to project failed: {}", e))?;
+            // ❌ 프로젝트 할당 제거: 사용자가 수동으로 할당해야 함
+            // ❌ Subject 자동 생성 제거: assign_study_to_project API에서만 생성
+
             processed += 1;
         }
         Ok(processed)

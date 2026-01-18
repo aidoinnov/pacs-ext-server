@@ -355,42 +355,72 @@ erDiagram
 
 ## 13. 구현해야 할 작업 체크리스트
 
-### 13.1 DB/마이그레이션
+### 13.1 DB/마이그레이션 ✅ **완료**
 
-* [ ] project_subject 테이블 추가
-* [ ] subject_timepoint 테이블 추가
-* [ ] subject_timepoint_study_map 추가
-* [ ] recist_lesion 추가
-* [ ] recist_lesion_annotation_map 추가
-* [ ] 인덱스/제약조건 추가
+* [x] project_subject 테이블 추가 ✅
+* [x] subject_timepoint 테이블 추가 ✅
+* [x] subject_timepoint_study_map 추가 ✅
+* [x] recist_lesion 추가 ✅
+* [x] recist_lesion_annotation_map 추가 ✅
+* [x] 인덱스/제약조건 추가 ✅
 
-### 13.2 API
+**마이그레이션 파일:**
+- `migrations/20250118_01_create_subject_timepoint_tables.sql`
+- `migrations/20250118_02_create_recist_lesion_tables.sql`
 
-* [ ] Subject CRUD (최소: 목록/생성)
-* [ ] TimePoint CRUD를 subject 스코프로 변경
-* [ ] assign/remove API를 subject/timepoint 기준으로 구현
-* [ ] Annotation 생성 API에 recist payload 처리 추가
-* [ ] New lesion 생성 제한(베이스라인 금지)
+### 13.2 API ✅ **완료**
 
-### 13.3 Viewer/Frontend 연동
+* [x] Subject CRUD (최소: 목록/생성) ✅
+* [x] TimePoint CRUD를 subject 스코프로 변경 ✅
+* [x] assign/remove API를 subject/timepoint 기준으로 구현 ✅
+* [x] RECIST Lesion CRUD API 구현 ✅
+* [x] Annotation 연결 API 구현 ✅
+* [x] New lesion 생성 제한(베이스라인 금지) ✅
+
+**구현된 API 엔드포인트:**
+- `POST /api/subjects/{subject_id}/recist-lesions` - Lesion 생성
+- `GET /api/subjects/{subject_id}/recist-lesions` - Lesion 목록 조회
+- `GET /api/recist-lesions/{id}` - Lesion 상세 조회
+- `PUT /api/recist-lesions/{id}` - Lesion 수정
+- `DELETE /api/recist-lesions/{id}` - Lesion 삭제
+- `POST /api/recist-lesions/{id}/annotations` - Annotation 연결
+
+### 13.3 Testing ✅ **완료**
+
+* [x] E2E 테스트 작성 (Python) ✅
+* [x] RECIST 1.1 비즈니스 규칙 검증 테스트 ✅
+* [x] 에러 케이스 테스트 ✅
+
+**테스트 파일:**
+- `tests/e2e/test_07_recist_lesion.py` (16개 테스트 케이스)
+- `tests/e2e/run_recist_lesion.py` (테스트 실행기)
+- `tests/e2e/RECIST_LESION_TEST.md` (테스트 문서)
+
+### 13.4 Viewer/Frontend 연동 ⚠️ **보류**
 
 * [ ] Annotation 생성 요청 시 recist role 전달
 * [ ] timepoint는 UI 입력 없이 context에서 자동
 * [ ] 보드 UI에서 Study 재분류 시 서버 반영
 
-### 13.4 Report 연동(후속)
+**Note:** Frontend 연동은 백엔드 API 완성 후 진행 예정
+
+### 13.5 Report 연동(후속) ⚠️ **보류**
 
 * [ ] TimePoint별 lesion 목록 조회 API
 * [ ] Target 합산/Non-target 상태/New lesion 이벤트 반영
 
+**Note:** Report 기능은 Phase 2로 연기
+
 ---
 
-## 14. 산출물(Deliverables)
+## 14. 산출물(Deliverables) ✅ **완료**
 
 * ✅ 최종 ERD 다이어그램
 * ✅ DB DDL (Postgres)
 * ✅ API 명세서 (TimePoint + Subject + Recist role)
 * ✅ 트랜잭션 시나리오 문서 (assign / reassign / delete)
+* ✅ E2E 테스트 코드 (Python, 16개 테스트)
+* ✅ OpenAPI/Swagger 문서
 
 ---
 

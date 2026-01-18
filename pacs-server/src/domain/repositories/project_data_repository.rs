@@ -134,3 +134,152 @@ pub trait ProjectDataRepository: Send + Sync {
         patient_name_filter: Option<&str>,
     ) -> Result<i64, sqlx::Error>;
 }
+
+// Arc<T>가 ProjectDataRepository를 구현하도록 blanket implementation 추가
+#[async_trait::async_trait]
+impl<T: ProjectDataRepository + ?Sized> ProjectDataRepository for std::sync::Arc<T> {
+    async fn create(&self, new_data: &NewProjectData) -> Result<ProjectData, sqlx::Error> {
+        (**self).create(new_data).await
+    }
+
+    async fn find_by_id(&self, id: i32) -> Result<Option<ProjectData>, sqlx::Error> {
+        (**self).find_by_id(id).await
+    }
+
+    async fn find_by_project_id(
+        &self,
+        project_id: i32,
+        page: i32,
+        page_size: i32,
+    ) -> Result<Vec<ProjectData>, sqlx::Error> {
+        (**self).find_by_project_id(project_id, page, page_size).await
+    }
+
+    async fn count_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error> {
+        (**self).count_by_project_id(project_id).await
+    }
+
+    async fn find_by_study_uid(
+        &self,
+        project_id: i32,
+        study_uid: &str,
+    ) -> Result<Option<ProjectData>, sqlx::Error> {
+        (**self).find_by_study_uid(project_id, study_uid).await
+    }
+
+    async fn search_by_project_id(
+        &self,
+        project_id: i32,
+        search_term: &str,
+        page: i32,
+        page_size: i32,
+    ) -> Result<Vec<ProjectData>, sqlx::Error> {
+        (**self).search_by_project_id(project_id, search_term, page, page_size).await
+    }
+
+    async fn count_search_results(
+        &self,
+        project_id: i32,
+        search_term: &str,
+    ) -> Result<i64, sqlx::Error> {
+        (**self).count_search_results(project_id, search_term).await
+    }
+
+    async fn update(&self, id: i32, update: &UpdateProjectData) -> Result<Option<ProjectData>, sqlx::Error> {
+        (**self).update(id, update).await
+    }
+
+    async fn delete(&self, id: i32) -> Result<bool, sqlx::Error> {
+        (**self).delete(id).await
+    }
+
+    fn pool(&self) -> &sqlx::PgPool {
+        (**self).pool()
+    }
+
+    async fn find_study_by_id(&self, id: i32) -> Result<Option<ProjectDataStudy>, sqlx::Error> {
+        (**self).find_study_by_id(id).await
+    }
+
+    async fn find_study_by_uid(
+        &self,
+        project_id: i32,
+        study_uid: &str,
+    ) -> Result<Option<ProjectDataStudy>, sqlx::Error> {
+        (**self).find_study_by_uid(project_id, study_uid).await
+    }
+
+    async fn find_studies_by_project_id(
+        &self,
+        project_id: i32,
+        page: i32,
+        page_size: i32,
+    ) -> Result<Vec<ProjectDataStudy>, sqlx::Error> {
+        (**self).find_studies_by_project_id(project_id, page, page_size).await
+    }
+
+    async fn count_studies_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error> {
+        (**self).count_studies_by_project_id(project_id).await
+    }
+
+    async fn find_series_by_id(&self, id: i32) -> Result<Option<ProjectDataSeries>, sqlx::Error> {
+        (**self).find_series_by_id(id).await
+    }
+
+    async fn find_series_by_study_id(
+        &self,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
+        (**self).find_series_by_study_id(study_id).await
+    }
+
+    async fn count_series_by_study_id(&self, study_id: i32) -> Result<i64, sqlx::Error> {
+        (**self).count_series_by_study_id(study_id).await
+    }
+
+    async fn find_series_by_project_and_study_id(
+        &self,
+        project_id: i32,
+        study_id: i32,
+    ) -> Result<Vec<ProjectDataSeries>, sqlx::Error> {
+        (**self).find_series_by_project_and_study_id(project_id, study_id).await
+    }
+
+    async fn find_instance_by_id(
+        &self,
+        id: i32,
+    ) -> Result<Option<ProjectDataInstance>, sqlx::Error> {
+        (**self).find_instance_by_id(id).await
+    }
+
+    async fn find_instances_by_series_id(
+        &self,
+        series_id: i32,
+    ) -> Result<Vec<ProjectDataInstance>, sqlx::Error> {
+        (**self).find_instances_by_series_id(series_id).await
+    }
+
+    async fn count_instances_by_series_id(&self, series_id: i32) -> Result<i64, sqlx::Error> {
+        (**self).count_instances_by_series_id(series_id).await
+    }
+
+    async fn find_patients_by_project(
+        &self,
+        project_id: i32,
+        patient_id_filter: Option<&str>,
+        patient_name_filter: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<ProjectDataPatient>, sqlx::Error> {
+        (**self).find_patients_by_project(project_id, patient_id_filter, patient_name_filter, limit, offset).await
+    }
+
+    async fn count_patients_by_project(
+        &self,
+        project_id: i32,
+        patient_id_filter: Option<&str>,
+        patient_name_filter: Option<&str>,
+    ) -> Result<i64, sqlx::Error> {
+        (**self).count_patients_by_project(project_id, patient_id_filter, patient_name_filter).await
+    }
+}

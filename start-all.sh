@@ -155,6 +155,9 @@ if [ ! -f ".env" ]; then
     exit 1
 fi
 
+# Cargo PATH 설정
+export PATH="$HOME/.cargo/bin:$PATH"
+
 # 백엔드 빌드
 log_info "Rust 백엔드 빌드 중..."
 cargo build --bin pacs_server 2>&1 | tee -a "$BACKEND_LOG"

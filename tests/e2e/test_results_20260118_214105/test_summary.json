@@ -1,0 +1,14 @@
+{
+  "timestamp": "20260118_214105",
+  "total": 6,
+  "passed": 0,
+  "failed": 6,
+  "results": {
+    "test_01_auth.py": "FAILED",
+    "test_02_project.py": "FAILED",
+    "test_03_annotation.py": "FAILED",
+    "test_04_snapshot.py": "FAILED",
+    "test_performance_01_concurrent.py": "FAILED",
+    "test_performance_02_bulk_data.py": "FAILED"
+  }
+}

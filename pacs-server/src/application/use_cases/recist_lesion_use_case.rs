@@ -36,9 +36,9 @@ impl<R: RecistLesionRepository, S: SubjectRepository, T: TimePointRepository>
     /// - Non-Target Lesion은 제한 없음
     pub async fn create_lesion(
         &self,
-        new_lesion: CreateRecistLesion,
+        mut new_lesion: CreateRecistLesion,
     ) -> Result<RecistLesion, ServiceError> {
-        // 1. Subject 존재 확인
+        // 1. Subject 존재 확인 및 project_id 설정
         let subject = self
             .subject_repo
             .find_by_id(new_lesion.subject_id)
@@ -46,7 +46,20 @@ impl<R: RecistLesionRepository, S: SubjectRepository, T: TimePointRepository>
             .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
             .ok_or_else(|| ServiceError::NotFound("Subject not found".to_string()))?;
 
-        // 2. Baseline TimePoint 존재 확인 (Optional)
+        // Subject의 project_id로 설정
+        new_lesion.project_id = subject.project_id;
+
+        // 2. Target/Non-Target Lesion은 Baseline TimePoint 필수
+        if new_lesion.lesion_type == RecistLesionType::Target
+            || new_lesion.lesion_type == RecistLesionType::NonTarget {
+            if new_lesion.baseline_timepoint_id.is_none() {
+                return Err(ServiceError::ValidationError(
+                    "Baseline TimePoint is required for Target and Non-Target Lesions".to_string(),
+                ));
+            }
+        }
+
+        // 3. Baseline TimePoint 존재 확인 (Optional)
         if let Some(baseline_tp_id) = new_lesion.baseline_timepoint_id {
             self.timepoint_repo
                 .find_by_id(baseline_tp_id)
@@ -55,7 +68,7 @@ impl<R: RecistLesionRepository, S: SubjectRepository, T: TimePointRepository>
                 .ok_or_else(|| ServiceError::NotFound("Baseline TimePoint not found".to_string()))?;
         }
 
-        // 3. Target Lesion 개수 제한 확인 (최대 5개)
+        // 4. Target Lesion 개수 제한 확인 (최대 5개)
         if new_lesion.lesion_type == RecistLesionType::Target {
             let existing_targets = self
                 .lesion_repo
@@ -70,7 +83,7 @@ impl<R: RecistLesionRepository, S: SubjectRepository, T: TimePointRepository>
             }
         }
 
-        // 4. Lesion 생성 (lesion_number는 Repository에서 자동 생성)
+        // 5. Lesion 생성 (lesion_number는 Repository에서 자동 생성)
         self.lesion_repo
             .create(new_lesion)
             .await

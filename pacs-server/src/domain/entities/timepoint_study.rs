@@ -56,11 +56,20 @@ pub struct TimePointStudy {
 /// Study를 TimePoint에 할당할 때 사용하는 데이터 전송 객체입니다.
 ///
 /// # 필드
-/// - `study_ids`: 할당할 Study ID 목록
+/// - `study_ids`: 할당할 Study ID 목록 (내부 DB ID)
+/// - `study_instance_uids`: 할당할 Study Instance UID 목록 (DICOM UID)
+///
+/// # 참고
+/// - `study_ids`와 `study_instance_uids` 중 하나만 제공하면 됩니다.
+/// - 둘 다 제공된 경우 `study_ids`가 우선됩니다.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AssignStudies {
-    /// 할당할 Study ID 목록
-    pub study_ids: Vec<i32>,
+    /// 할당할 Study ID 목록 (내부 DB ID)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub study_ids: Option<Vec<i32>>,
+    /// 할당할 Study Instance UID 목록 (DICOM UID)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub study_instance_uids: Option<Vec<String>>,
 }
 
 /// Study 할당 해제 요청 DTO
@@ -68,11 +77,20 @@ pub struct AssignStudies {
 /// Study를 TimePoint에서 해제할 때 사용하는 데이터 전송 객체입니다.
 ///
 /// # 필드
-/// - `study_ids`: 해제할 Study ID 목록
+/// - `study_ids`: 해제할 Study ID 목록 (내부 DB ID)
+/// - `study_instance_uids`: 해제할 Study Instance UID 목록 (DICOM UID)
+///
+/// # 참고
+/// - `study_ids`와 `study_instance_uids` 중 하나만 제공하면 됩니다.
+/// - 둘 다 제공된 경우 `study_ids`가 우선됩니다.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UnassignStudies {
-    /// 해제할 Study ID 목록
-    pub study_ids: Vec<i32>,
+    /// 해제할 Study ID 목록 (내부 DB ID)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub study_ids: Option<Vec<i32>>,
+    /// 해제할 Study Instance UID 목록 (DICOM UID)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub study_instance_uids: Option<Vec<String>>,
 }
 
 /// Study 할당 결과 DTO

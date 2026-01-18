@@ -361,6 +361,7 @@ async fn main() -> std::io::Result<()> {
         timepoint_repo.clone(),
         timepoint_study_repo.clone(),
         subject_repo.clone(),
+        project_data_repo.clone(),
     ));
     // RECIST Lesion Use Case: Lesion CRUD, 비즈니스 규칙 검증 등
     let recist_lesion_use_case = Arc::new(RecistLesionUseCase::new(
@@ -969,6 +970,18 @@ async fn main() -> std::io::Result<()> {
                         }
                     })
                     // ========================================
+                    // 📊 RECIST Lesion API (먼저 등록 - 더 구체적인 경로)
+                    // - RECIST 1.1 기준 병변 관리
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            subject_controller::configure_recist_lesion_routes(
+                                cfg,
+                                recist_lesion_use_case.clone(),
+                            )
+                        }
+                    })
+                    // ========================================
                     // 🧬 Subject & TimePoint 관리 API
                     // - Subject CRUD
                     // - TimePoint CRUD
@@ -986,18 +999,6 @@ async fn main() -> std::io::Result<()> {
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
                             timepoint_controller::configure_routes(cfg, timepoint_service.clone())
-                        }
-                    })
-                    // ========================================
-                    // 📊 RECIST Lesion API
-                    // - RECIST 1.1 기준 병변 관리
-                    // ========================================
-                    .configure(|cfg| {
-                        if settings.server.mode != ServerMode::SyncOnly {
-                            subject_controller::configure_recist_lesion_routes(
-                                cfg,
-                                recist_lesion_use_case.clone(),
-                            )
                         }
                     })
                     // ========================================

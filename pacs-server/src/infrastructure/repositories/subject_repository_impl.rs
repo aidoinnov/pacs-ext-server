@@ -146,15 +146,17 @@ impl SubjectRepository for SubjectRepositoryImpl {
         sqlx::query_as::<_, Subject>(
             "UPDATE project_subject
              SET subject_code = COALESCE($2, subject_code),
-                 patient_id = COALESCE($3, patient_id),
-                 patient_name = COALESCE($4, patient_name),
-                 patient_birth_date = COALESCE($5, patient_birth_date),
+                 external_subject_key = COALESCE($3, external_subject_key),
+                 patient_id = COALESCE($4, patient_id),
+                 patient_name = COALESCE($5, patient_name),
+                 patient_birth_date = COALESCE($6, patient_birth_date),
                  updated_at = NOW()
              WHERE id = $1
              RETURNING id, project_id, subject_code, external_subject_key, patient_id, patient_name, patient_birth_date, created_at, updated_at",
         )
         .bind(id)
         .bind(update_subject.subject_code)
+        .bind(update_subject.external_subject_key)
         .bind(update_subject.patient_id)
         .bind(update_subject.patient_name)
         .bind(update_subject.patient_birth_date)

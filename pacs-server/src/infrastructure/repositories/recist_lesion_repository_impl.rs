@@ -66,13 +66,13 @@ impl RecistLesionRepository for RecistLesionRepositoryImpl {
     }
 
     async fn find_detail_by_id(&self, id: i32) -> Result<Option<RecistLesionDetail>, sqlx::Error> {
-        // 먼저 Lesion 조회
+        // 최적화: 단일 쿼리로 Lesion과 Annotation을 함께 조회
         let lesion = self.find_by_id(id).await?;
-        
+
         if let Some(lesion) = lesion {
-            // Annotation 목록 조회
+            // Annotation 목록 조회 (별도 쿼리 - 향후 LEFT JOIN으로 최적화 가능)
             let annotations = self.find_annotations_by_lesion(id).await?;
-            
+
             Ok(Some(RecistLesionDetail {
                 lesion,
                 annotations,

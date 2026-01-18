@@ -138,20 +138,31 @@ impl TimePointStudyRepository for TimePointStudyRepositoryImpl {
         study_ids: &[i32],
         user_id: i32,
     ) -> Result<i32, sqlx::Error> {
+        // Get subject_id and project_id from timepoint
+        let (subject_id, project_id) = sqlx::query_as::<_, (i32, i32)>(
+            "SELECT subject_id, project_id FROM subject_timepoint WHERE id = $1"
+        )
+        .bind(timepoint_id)
+        .fetch_one(&self.pool)
+        .await?;
+
         // Delete existing assignments for these studies (MOVE semantics)
         sqlx::query("DELETE FROM subject_timepoint_study_map WHERE study_id = ANY($1)")
             .bind(study_ids)
             .execute(&self.pool)
             .await?;
 
-        // Insert new assignments
+        // Insert new assignments with all required fields
         let mut count = 0;
         for study_id in study_ids {
             sqlx::query(
-                "INSERT INTO subject_timepoint_study_map (timepoint_id, study_id, assigned_by)
-                 VALUES ($1, $2, $3)
-                 ON CONFLICT (study_id) DO UPDATE SET timepoint_id = $1, assigned_by = $3, assigned_at = NOW()"
+                "INSERT INTO subject_timepoint_study_map (project_id, subject_id, timepoint_id, study_id, assigned_by)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (subject_id, study_id) DO UPDATE
+                 SET timepoint_id = $3, assigned_by = $5, assigned_at = NOW()"
             )
+            .bind(project_id)
+            .bind(subject_id)
             .bind(timepoint_id)
             .bind(study_id)
             .bind(user_id)

@@ -212,6 +212,37 @@ cargo build
 - ✅ **JWT 인증**: 개발 모드 + 프로덕션 JWT 인증
 - ✅ **Keycloak 통합**: 외부 인증 시스템 연동
 - ✅ **DICOM 지원**: 의료 영상 표준 프로토콜
+- ✅ **RECIST 1.1 Lesion 관리**: 종양 평가 기준 준수 병변 관리 시스템
+
+### 🎯 RECIST Lesion 관리 (NEW!)
+
+**RECIST 1.1 기준 병변 관리 시스템**이 완전히 구현되었습니다!
+
+**주요 기능:**
+- Target Lesion: 최대 5개 제한
+- Non-Target Lesion: 무제한
+- NEW Lesion: Follow-up에서만 생성
+- TimePoint별 Annotation 추적
+- 자동 Lesion Number 생성
+
+**API 엔드포인트:**
+- `POST /api/subjects/{subject_id}/recist-lesions` - Lesion 생성
+- `GET /api/subjects/{subject_id}/recist-lesions` - Lesion 목록 조회
+- `GET /api/recist-lesions/{id}` - Lesion 상세 조회
+- `PUT /api/recist-lesions/{id}` - Lesion 수정
+- `DELETE /api/recist-lesions/{id}` - Lesion 삭제
+- `POST /api/recist-lesions/{id}/annotations` - Annotation 연결
+
+**문서:**
+- 📘 [구현 계획](./docs/target-lesion/plan.md)
+- 📊 [구현 요약](./docs/target-lesion/IMPLEMENTATION_SUMMARY.md)
+- 🧪 [E2E 테스트](./tests/e2e/RECIST_LESION_TEST.md)
+
+**테스트 실행:**
+```bash
+cd tests/e2e
+python run_recist_lesion.py
+```
 
 ---
 

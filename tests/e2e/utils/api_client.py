@@ -72,11 +72,12 @@ class APIClient:
         )
         return response
     
-    def delete(self, path: str) -> requests.Response:
+    def delete(self, path: str, json: Optional[Dict[str, Any]] = None) -> requests.Response:
         """DELETE 요청"""
         url = f"{self.base_url}{path}"
         response = self.session.delete(
             url,
+            json=json,
             headers=self._get_headers(),
             timeout=self.timeout
         )

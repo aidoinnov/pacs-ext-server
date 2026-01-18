@@ -3,9 +3,9 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::domain::entities::{
-    CreateRecistLesion, CreateRecistLesionAnnotationMap, CreateSubject, CreateSubjectRequest,
-    CreateTimePoint, RecistLesion, RecistLesionDetail, RecistLesionType, StudyInfo, Subject,
-    SubjectDetail, TimePoint, UpdateRecistLesion, UpdateSubject,
+    CreateRecistLesion, CreateRecistLesionAnnotationMap, CreateRecistLesionRequest, CreateSubject,
+    CreateSubjectRequest, CreateTimePoint, RecistLesion, RecistLesionDetail, RecistLesionType,
+    StudyInfo, Subject, SubjectDetail, TimePoint, UpdateRecistLesion, UpdateSubject,
 };
 use crate::domain::services::{SubjectService, TimePointService};
 use crate::domain::ServiceError;
@@ -297,7 +297,9 @@ async fn get_unassigned_studies_wrapper<T: TimePointService + 'static>(
 // 라우트 설정
 // ============================================================================
 
-/// 라우트 설정
+/// 라우트 설정 (Subject + TimePoint)
+///
+/// Note: RECIST Lesion 라우트는 별도의 configure_recist_lesion_routes 함수로 분리되어 있습니다.
 pub fn configure_routes<S: SubjectService + 'static, T: TimePointService + 'static>(
     cfg: &mut web::ServiceConfig,
     subject_service: Arc<S>,
@@ -330,7 +332,7 @@ pub fn configure_routes<S: SubjectService + 'static, T: TimePointService + 'stat
 /// Subject의 RECIST Lesion 목록 조회
 #[utoipa::path(
     get,
-    path = "/api/subjects/{subject_id}/recist-lesions",
+    path = "/api/recist-lesions/subjects/{subject_id}",
     tag = "recist-lesions",
     params(
         ("subject_id" = i32, Path, description = "Subject ID"),
@@ -378,12 +380,12 @@ where
 /// RECIST Lesion 생성
 #[utoipa::path(
     post,
-    path = "/api/subjects/{subject_id}/recist-lesions",
+    path = "/api/recist-lesions/subjects/{subject_id}",
     tag = "recist-lesions",
     params(
         ("subject_id" = i32, Path, description = "Subject ID")
     ),
-    request_body = CreateRecistLesion,
+    request_body = CreateRecistLesionRequest,
     responses(
         (status = 201, description = "Lesion created successfully", body = RecistLesion),
         (status = 400, description = "Validation error (e.g., max 5 Target Lesions)"),
@@ -393,15 +395,25 @@ where
 pub async fn create_lesion<R, S, T>(
     lesion_use_case: web::Data<Arc<RecistLesionUseCase<R, S, T>>>,
     subject_id: web::Path<i32>,
-    req: web::Json<CreateRecistLesion>,
+    req: web::Json<CreateRecistLesionRequest>,
 ) -> impl Responder
 where
     R: crate::domain::repositories::RecistLesionRepository + 'static,
     S: crate::domain::repositories::SubjectRepository + 'static,
     T: crate::domain::repositories::TimePointRepository + 'static,
 {
-    let mut new_lesion = req.into_inner();
-    new_lesion.subject_id = *subject_id;
+    let request = req.into_inner();
+
+    // CreateRecistLesionRequest를 CreateRecistLesion으로 변환
+    // project_id는 Use Case에서 Subject 조회 시 검증됨
+    let new_lesion = CreateRecistLesion {
+        project_id: 0, // Use Case에서 Subject 조회 후 검증됨
+        subject_id: *subject_id,
+        lesion_type: request.lesion_type,
+        baseline_timepoint_id: request.baseline_timepoint_id,
+        organ_site: request.organ_site,
+        description: request.description,
+    };
 
     match lesion_use_case.create_lesion(new_lesion).await {
         Ok(lesion) => HttpResponse::Created().json(lesion),
@@ -560,6 +572,11 @@ where
 }
 
 /// RECIST Lesion 라우트 설정
+///
+/// Note: 이 함수는 별도로 호출되어야 하며, configure_routes와 독립적입니다.
+/// main.rs에서 별도의 .configure() 블록으로 등록됩니다.
+///
+/// 라우트 충돌 방지를 위해 명시적으로 web::scope를 사용합니다.
 pub fn configure_recist_lesion_routes<R, S, T>(
     cfg: &mut web::ServiceConfig,
     lesion_use_case: Arc<RecistLesionUseCase<R, S, T>>,
@@ -569,17 +586,27 @@ where
     S: crate::domain::repositories::SubjectRepository + 'static,
     T: crate::domain::repositories::TimePointRepository + 'static,
 {
-    cfg.app_data(web::Data::new(lesion_use_case))
-        .service(
-            web::scope("/subjects/{subject_id}/recist-lesions")
-                .route("", web::get().to(list_lesions::<R, S, T>))
-                .route("", web::post().to(create_lesion::<R, S, T>)),
-        )
+    cfg.app_data(web::Data::new(lesion_use_case.clone()))
+        // RECIST Lesion 전용 스코프 - Subject 스코프와 완전히 분리
         .service(
             web::scope("/recist-lesions")
-                .route("/{id}", web::get().to(get_lesion_detail::<R, S, T>))
-                .route("/{id}", web::put().to(update_lesion::<R, S, T>))
-                .route("/{id}", web::delete().to(delete_lesion::<R, S, T>))
-                .route("/{id}/annotations", web::post().to(link_annotation::<R, S, T>)),
+                // Subject의 Lesion 목록 조회 및 생성
+                .service(
+                    web::resource("/subjects/{subject_id}")
+                        .route(web::get().to(list_lesions::<R, S, T>))
+                        .route(web::post().to(create_lesion::<R, S, T>)),
+                )
+                // Lesion 상세 조회, 수정, 삭제
+                .service(
+                    web::resource("/{id}")
+                        .route(web::get().to(get_lesion_detail::<R, S, T>))
+                        .route(web::put().to(update_lesion::<R, S, T>))
+                        .route(web::delete().to(delete_lesion::<R, S, T>)),
+                )
+                // Annotation 연결
+                .service(
+                    web::resource("/{id}/annotations")
+                        .route(web::post().to(link_annotation::<R, S, T>)),
+                ),
         );
 }

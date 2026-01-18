@@ -3,10 +3,11 @@ use crate::domain::entities::{
     UnassignStudies, UpdateTimePoint, VisitType,
 };
 use crate::domain::repositories::{
-    SubjectRepository, TimePointRepository, TimePointStudyRepository,
+    ProjectDataRepository, SubjectRepository, TimePointRepository, TimePointStudyRepository,
 };
 use crate::domain::ServiceError;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 /// TimePoint 관리 도메인 서비스
 ///
@@ -149,42 +150,48 @@ pub trait TimePointService: Send + Sync {
 
 /// TimePoint 서비스 구현체
 #[derive(Clone)]
-pub struct TimePointServiceImpl<T, TS, S>
+pub struct TimePointServiceImpl<T, TS, S, PD>
 where
     T: TimePointRepository,
     TS: TimePointStudyRepository,
     S: SubjectRepository,
+    PD: ProjectDataRepository,
 {
     timepoint_repository: T,
     timepoint_study_repository: TS,
     subject_repository: S,
+    project_data_repository: Arc<PD>,
 }
 
-impl<T, TS, S> TimePointServiceImpl<T, TS, S>
+impl<T, TS, S, PD> TimePointServiceImpl<T, TS, S, PD>
 where
     T: TimePointRepository,
     TS: TimePointStudyRepository,
     S: SubjectRepository,
+    PD: ProjectDataRepository,
 {
     pub fn new(
         timepoint_repository: T,
         timepoint_study_repository: TS,
         subject_repository: S,
+        project_data_repository: Arc<PD>,
     ) -> Self {
         Self {
             timepoint_repository,
             timepoint_study_repository,
             subject_repository,
+            project_data_repository,
         }
     }
 }
 
 #[async_trait]
-impl<T, TS, S> TimePointService for TimePointServiceImpl<T, TS, S>
+impl<T, TS, S, PD> TimePointService for TimePointServiceImpl<T, TS, S, PD>
 where
     T: TimePointRepository,
     TS: TimePointStudyRepository,
     S: SubjectRepository,
+    PD: ProjectDataRepository,
 {
     async fn create_timepoint(
         &self,
@@ -336,22 +343,55 @@ where
         assign_studies: AssignStudies,
         user_id: i32,
     ) -> Result<AssignmentResult, ServiceError> {
-        // 1. TimePoint 존재 확인
+        // 1. TimePoint 존재 확인 및 Subject 조회
         let timepoint = self
             .timepoint_repository
             .find_by_id(timepoint_id)
             .await?
             .ok_or_else(|| ServiceError::NotFound("TimePoint not found".into()))?;
 
-        // 2. Study 할당 (MOVE 시맨틱)
+        // 2. Subject 조회 (project_id 필요)
+        let subject = self
+            .subject_repository
+            .find_by_id(timepoint.subject_id)
+            .await?
+            .ok_or_else(|| ServiceError::NotFound("Subject not found".into()))?;
+
+        // 3. study_instance_uids를 study_ids로 변환 (필요한 경우)
+        let study_ids = if let Some(ids) = assign_studies.study_ids {
+            // study_ids가 제공된 경우 그대로 사용
+            ids
+        } else if let Some(uids) = assign_studies.study_instance_uids {
+            // study_instance_uids가 제공된 경우 변환
+            let mut ids = Vec::new();
+            for uid in &uids {
+                let study = self
+                    .project_data_repository
+                    .as_ref()
+                    .find_study_by_uid(subject.project_id, uid)
+                    .await
+                    .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
+                    .ok_or_else(|| {
+                        ServiceError::NotFound(format!("Study with UID {} not found", uid))
+                    })?;
+                ids.push(study.id);
+            }
+            ids
+        } else {
+            return Err(ServiceError::ValidationError(
+                "Either study_ids or study_instance_uids must be provided".into(),
+            ));
+        };
+
+        // 4. Study 할당 (MOVE 시맨틱)
         let assigned_count = self
             .timepoint_study_repository
-            .assign_studies(timepoint_id, &assign_studies.study_ids, user_id)
+            .assign_studies(timepoint_id, &study_ids, user_id)
             .await?;
 
         Ok(AssignmentResult {
             affected_count: assigned_count,
-            study_ids: assign_studies.study_ids,
+            study_ids,
         })
     }
 
@@ -360,16 +400,50 @@ where
         timepoint_id: i32,
         unassign_studies: UnassignStudies,
     ) -> Result<i64, ServiceError> {
-        // 1. TimePoint 존재 확인
-        self.timepoint_repository
+        // 1. TimePoint 존재 확인 및 Subject 조회
+        let timepoint = self
+            .timepoint_repository
             .find_by_id(timepoint_id)
             .await?
             .ok_or_else(|| ServiceError::NotFound("TimePoint not found".into()))?;
 
-        // 2. Study 해제
+        // 2. Subject 조회 (project_id 필요)
+        let subject = self
+            .subject_repository
+            .find_by_id(timepoint.subject_id)
+            .await?
+            .ok_or_else(|| ServiceError::NotFound("Subject not found".into()))?;
+
+        // 3. study_instance_uids를 study_ids로 변환 (필요한 경우)
+        let study_ids = if let Some(ids) = unassign_studies.study_ids {
+            // study_ids가 제공된 경우 그대로 사용
+            ids
+        } else if let Some(uids) = unassign_studies.study_instance_uids {
+            // study_instance_uids가 제공된 경우 변환
+            let mut ids = Vec::new();
+            for uid in &uids {
+                let study = self
+                    .project_data_repository
+                    .as_ref()
+                    .find_study_by_uid(subject.project_id, uid)
+                    .await
+                    .map_err(|e| ServiceError::DatabaseError(e.to_string()))?
+                    .ok_or_else(|| {
+                        ServiceError::NotFound(format!("Study with UID {} not found", uid))
+                    })?;
+                ids.push(study.id);
+            }
+            ids
+        } else {
+            return Err(ServiceError::ValidationError(
+                "Either study_ids or study_instance_uids must be provided".into(),
+            ));
+        };
+
+        // 4. Study 해제
         Ok(self
             .timepoint_study_repository
-            .unassign_studies(&unassign_studies.study_ids)
+            .unassign_studies(&study_ids)
             .await? as i64)
     }
 
