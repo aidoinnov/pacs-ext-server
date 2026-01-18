@@ -1,8 +1,8 @@
 # 📘 Subject & TimePoint 관리 API - 구현 문서
 
-> **작성일**: 2026-01-18  
-> **버전**: 1.0.0  
-> **상태**: ✅ 구현 완료 (18개 E2E 테스트 통과)
+> **작성일**: 2026-01-18
+> **버전**: 2.0.0
+> **상태**: ✅ 구현 완료 + Subject 자동 생성 기능 추가
 
 ---
 
@@ -27,8 +27,9 @@
 ### 1.2 핵심 기능
 
 - **Subject 관리**: 임상시험 피험자 정보 관리
+- **Subject 자동 생성**: Study 할당 시 Subject 자동 생성 (v2.0 신규)
 - **TimePoint 관리**: 평가 시점(Baseline, TP1, TP2 등) 관리
-- **Study 할당**: DICOM Study를 TimePoint에 매핑
+- **Study 할당**: DICOM Study를 프로젝트 및 TimePoint에 매핑
 
 ### 1.3 설계 원칙
 
@@ -50,6 +51,8 @@
 - [x] Subject 삭제 (TimePoint 보호)
 - [x] Subject Code 중복 방지 (프로젝트 내)
 - [x] Patient ID 중복 방지 (프로젝트 내)
+- [x] **Subject 자동 생성** (Study 할당 시, v2.0 신규)
+- [x] **Subject Code 자동 생성** (A-001, A-002, ..., v2.0 신규)
 
 #### TimePoint 관리
 - [x] TimePoint 생성 (Subject별)

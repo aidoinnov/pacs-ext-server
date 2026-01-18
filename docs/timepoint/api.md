@@ -359,7 +359,7 @@ Authorization: Bearer {token}
 
 ### 10.2 TimePoint 관리 API
 
-#### 10.2.1 TimePoint 목록 조회
+#### 10.2.1 Subject의 TimePoint 목록 조회
 ```http
 GET /api/subjects/{subject_id}/timepoints
 Authorization: Bearer {token}
@@ -367,35 +367,64 @@ Authorization: Bearer {token}
 
 **Response 200 OK:**
 ```json
+[
+  {
+    "id": 1,
+    "subject_id": 1,
+    "project_id": 1,
+    "name": "Baseline",
+    "visit_type": "Baseline",
+    "visit_no": null,
+    "order_index": 0,
+    "external_key": null,
+    "created_at": "2026-01-18T10:00:00Z",
+    "updated_at": "2026-01-18T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "subject_id": 1,
+    "project_id": 1,
+    "name": "TP1",
+    "visit_type": "Visit",
+    "visit_no": 1,
+    "order_index": 1,
+    "external_key": null,
+    "created_at": "2026-01-18T11:00:00Z",
+    "updated_at": "2026-01-18T11:00:00Z"
+  }
+]
+```
+
+#### 10.2.2 TimePoint 단일 조회
+```http
+GET /api/timepoints/{timepoint_id}
+Authorization: Bearer {token}
+```
+
+**Response 200 OK:**
+```json
 {
-  "timepoints": [
-    {
-      "id": 1,
-      "subject_id": 1,
-      "project_id": 1,
-      "name": "Baseline",
-      "visit_type": "Baseline",
-      "visit_no": null,
-      "order_index": 0,
-      "study_count": 2,
-      "created_at": "2026-01-18T10:00:00Z"
-    },
-    {
-      "id": 2,
-      "subject_id": 1,
-      "project_id": 1,
-      "name": "TP1",
-      "visit_type": "Visit",
-      "visit_no": 1,
-      "order_index": 1,
-      "study_count": 1,
-      "created_at": "2026-01-18T11:00:00Z"
-    }
-  ]
+  "id": 1,
+  "subject_id": 1,
+  "project_id": 1,
+  "name": "Baseline",
+  "visit_type": "Baseline",
+  "visit_no": null,
+  "order_index": 0,
+  "external_key": null,
+  "created_at": "2026-01-18T10:00:00Z",
+  "updated_at": "2026-01-18T10:00:00Z"
 }
 ```
 
-#### 10.2.2 TimePoint 생성
+**Error 404 Not Found:**
+```json
+{
+  "error": "TimePoint not found"
+}
+```
+
+#### 10.2.3 TimePoint 생성
 ```http
 POST /api/subjects/{subject_id}/timepoints
 Authorization: Bearer {token}
@@ -409,6 +438,13 @@ Content-Type: application/json
 }
 ```
 
+**Request Body:**
+- `name` (required): TimePoint 이름 (예: "Baseline", "TP1", "TP2")
+- `visit_type` (required): Visit 타입 ("Baseline" | "Visit" | "EOT" | "USV")
+- `visit_no` (optional): CTIMS Visit Number
+- `order_index` (required): 정렬 순서 (0부터 시작)
+- `subject_id`: URL 경로에서 자동 설정됨
+
 **Response 201 Created:**
 ```json
 {
@@ -419,19 +455,41 @@ Content-Type: application/json
   "visit_type": "Visit",
   "visit_no": 1,
   "order_index": 1,
-  "created_at": "2026-01-18T11:00:00Z"
+  "external_key": null,
+  "created_at": "2026-01-18T11:00:00Z",
+  "updated_at": "2026-01-18T11:00:00Z"
+}
+```
+
+**Error 400 Bad Request (유효성 검증 실패):**
+```json
+{
+  "error": "Invalid visit_type: InvalidType"
+}
+```
+
+**Error 404 Not Found (Subject 없음):**
+```json
+{
+  "error": "Subject not found"
 }
 ```
 
 **Error 409 Conflict (Baseline 중복):**
 ```json
 {
-  "error": "BASELINE_ALREADY_EXISTS",
-  "message": "Subject already has a Baseline timepoint"
+  "error": "Subject already has a Baseline timepoint"
 }
 ```
 
-#### 10.2.3 TimePoint 수정
+**Error 409 Conflict (이름 중복):**
+```json
+{
+  "error": "TimePoint name 'TP1' already exists for this subject"
+}
+```
+
+#### 10.2.4 TimePoint 수정
 ```http
 PUT /api/timepoints/{timepoint_id}
 Authorization: Bearer {token}
@@ -444,6 +502,12 @@ Content-Type: application/json
 }
 ```
 
+**Request Body (모든 필드 optional):**
+- `name`: TimePoint 이름
+- `visit_type`: Visit 타입
+- `visit_no`: CTIMS Visit Number
+- `order_index`: 정렬 순서
+
 **Response 200 OK:**
 ```json
 {
@@ -454,11 +518,27 @@ Content-Type: application/json
   "visit_type": "Visit",
   "visit_no": 1,
   "order_index": 1,
+  "external_key": null,
+  "created_at": "2026-01-18T11:00:00Z",
   "updated_at": "2026-01-18T12:00:00Z"
 }
 ```
 
-#### 10.2.4 TimePoint 삭제
+**Error 404 Not Found:**
+```json
+{
+  "error": "TimePoint not found"
+}
+```
+
+**Error 409 Conflict (Baseline 중복):**
+```json
+{
+  "error": "Subject already has a Baseline timepoint"
+}
+```
+
+#### 10.2.5 TimePoint 삭제
 ```http
 DELETE /api/timepoints/{timepoint_id}
 Authorization: Bearer {token}
@@ -466,4 +546,280 @@ Authorization: Bearer {token}
 
 **Response 204 No Content**
 
-**Note:** TimePoint 삭제 시 매핑된 모든 Study는 Unassigned 상태로 변경됨 (CASCADE DELETE)
+**Error 404 Not Found:**
+```json
+{
+  "error": "TimePoint not found"
+}
+```
+
+**Note:**
+- TimePoint 삭제 시 매핑된 모든 Study는 자동으로 할당 해제됨 (project_timepoint_study 레코드 삭제)
+- Subject는 삭제되지 않음
+
+---
+
+### 10.3 Study 할당 관리 API
+
+#### 10.3.1 Subject의 미할당 Study 목록 조회
+```http
+GET /api/subjects/{subject_id}/studies/unassigned
+Authorization: Bearer {token}
+```
+
+**Response 200 OK:**
+```json
+[
+  {
+    "study_instance_uid": "1.2.840.113619.2.55.3.123456789.1",
+    "study_date": "20260115",
+    "study_time": "143000",
+    "study_description": "CT CHEST",
+    "modality": "CT",
+    "patient_id": "P12345",
+    "patient_name": "홍길동"
+  },
+  {
+    "study_instance_uid": "1.2.840.113619.2.55.3.123456789.2",
+    "study_date": "20260116",
+    "study_time": "100000",
+    "study_description": "CT ABDOMEN",
+    "modality": "CT",
+    "patient_id": "P12345",
+    "patient_name": "홍길동"
+  }
+]
+```
+
+**Error 404 Not Found:**
+```json
+{
+  "error": "Subject not found"
+}
+```
+
+#### 10.3.2 TimePoint에 할당된 Study 목록 조회
+```http
+GET /api/timepoints/{timepoint_id}/studies
+Authorization: Bearer {token}
+```
+
+**Response 200 OK:**
+```json
+[
+  {
+    "study_instance_uid": "1.2.840.113619.2.55.3.123456789.3",
+    "study_date": "20260117",
+    "study_time": "090000",
+    "study_description": "CT CHEST",
+    "modality": "CT",
+    "patient_id": "P12345",
+    "patient_name": "홍길동"
+  }
+]
+```
+
+**Error 404 Not Found:**
+```json
+{
+  "error": "TimePoint not found"
+}
+```
+
+#### 10.3.3 Study를 TimePoint에 할당
+```http
+POST /api/timepoints/{timepoint_id}/studies
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "study_instance_uids": [
+    "1.2.840.113619.2.55.3.123456789.1",
+    "1.2.840.113619.2.55.3.123456789.2"
+  ]
+}
+```
+
+**Request Body:**
+- `study_instance_uids` (required): 할당할 Study UID 배열
+
+**Response 200 OK:**
+```json
+{
+  "assigned": [
+    "1.2.840.113619.2.55.3.123456789.1",
+    "1.2.840.113619.2.55.3.123456789.2"
+  ],
+  "reassigned": [],
+  "failed": []
+}
+```
+
+**Response 200 OK (일부 재할당):**
+```json
+{
+  "assigned": [
+    "1.2.840.113619.2.55.3.123456789.1"
+  ],
+  "reassigned": [
+    "1.2.840.113619.2.55.3.123456789.2"
+  ],
+  "failed": []
+}
+```
+
+**설명:**
+- `assigned`: 새로 할당된 Study 목록
+- `reassigned`: 다른 TimePoint에서 이동된 Study 목록
+- `failed`: 할당 실패한 Study 목록 (존재하지 않거나 권한 없음)
+
+**Error 404 Not Found:**
+```json
+{
+  "error": "TimePoint not found"
+}
+```
+
+**Error 400 Bad Request:**
+```json
+{
+  "error": "study_instance_uids is required and must be a non-empty array"
+}
+```
+
+#### 10.3.4 Study 할당 해제
+```http
+DELETE /api/timepoints/{timepoint_id}/studies
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "study_instance_uids": [
+    "1.2.840.113619.2.55.3.123456789.1"
+  ]
+}
+```
+
+**Request Body:**
+- `study_instance_uids` (required): 할당 해제할 Study UID 배열
+
+**Response 200 OK:**
+```json
+{
+  "unassigned": [
+    "1.2.840.113619.2.55.3.123456789.1"
+  ],
+  "not_found": []
+}
+```
+
+**설명:**
+- `unassigned`: 할당 해제된 Study 목록
+- `not_found`: 해당 TimePoint에 할당되지 않았던 Study 목록
+
+**Error 404 Not Found:**
+```json
+{
+  "error": "TimePoint not found"
+}
+```
+
+**Error 400 Bad Request:**
+```json
+{
+  "error": "study_instance_uids is required and must be a non-empty array"
+}
+```
+
+---
+
+### 10.4 Subject 삭제 보호
+
+Subject를 삭제하려면 먼저 모든 TimePoint를 삭제해야 합니다.
+
+```http
+DELETE /api/subjects/{subject_id}
+Authorization: Bearer {token}
+```
+
+**Error 409 Conflict (TimePoint 존재):**
+```json
+{
+  "error": "Cannot delete subject with existing timepoints. Delete all timepoints first."
+}
+```
+
+**Response 204 No Content** (TimePoint가 없는 경우)
+
+---
+
+## 11. 구현 상태
+
+### 11.1 완료된 기능 ✅
+
+- [x] Subject CRUD 작업
+  - [x] Subject 생성 (프로젝트별)
+  - [x] Subject 조회 (단일/목록)
+  - [x] Subject 상세 조회 (TimePoint/Study 카운트 포함)
+  - [x] Subject 수정
+  - [x] Subject 삭제 (TimePoint 보호)
+  - [x] Subject Code 중복 방지 (프로젝트 내)
+  - [x] Patient ID 중복 방지 (프로젝트 내)
+
+- [x] TimePoint CRUD 작업
+  - [x] TimePoint 생성 (Subject별)
+  - [x] TimePoint 조회 (단일/목록)
+  - [x] TimePoint 수정
+  - [x] TimePoint 삭제 (Study 자동 할당 해제)
+  - [x] Baseline 중복 방지 (Subject당 1개)
+  - [x] TimePoint 이름 중복 방지 (Subject 내)
+
+- [x] Study 할당 관리
+  - [x] 미할당 Study 목록 조회
+  - [x] TimePoint별 Study 목록 조회
+  - [x] Study 할당 (단일/다중)
+  - [x] Study 재할당 (TimePoint 간 이동)
+  - [x] Study 할당 해제
+
+- [x] E2E 테스트
+  - [x] Subject 관리 테스트 (6개)
+  - [x] TimePoint 관리 테스트 (5개)
+  - [x] Study 할당 테스트 (5개)
+  - [x] Cascade 보호 테스트 (3개)
+  - [x] 에러 케이스 테스트 (3개)
+  - [x] **총 18개 테스트 통과**
+
+### 11.2 향후 확장 계획 🔮
+
+- [ ] CTIMS 연동
+  - [ ] TimePoint/Visit 정보 동기화
+  - [ ] External Key 매핑
+  - [ ] Read-only 모드 전환
+
+- [ ] UI 개선
+  - [ ] 드래그 앤 드롭 지원
+  - [ ] 대량 할당 UI
+  - [ ] TimePoint 순서 변경 UI
+
+- [ ] 성능 최적화
+  - [ ] Study 목록 페이지네이션
+  - [ ] 캐싱 전략
+  - [ ] 인덱스 최적화
+
+---
+
+## 12. 기술 스택
+
+- **Backend**: Rust + Actix-web
+- **Database**: PostgreSQL
+- **ORM**: SQLx
+- **API Documentation**: OpenAPI 3.0 (utoipa)
+- **Testing**: pytest (E2E)
+
+---
+
+## 13. 참고 문서
+
+- [ERD 설계 문서](./erd.md)
+- [데이터베이스 스키마](../../pacs-server/migrations/023_refactor_project_data_hierarchy.sql)
+- [E2E 테스트](../../tests/e2e/test_05_subject_timepoint.py)
