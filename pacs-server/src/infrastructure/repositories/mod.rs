@@ -14,6 +14,9 @@ mod project_repository_impl;
 mod role_repository_impl;
 mod series_user_note_repository_impl;
 mod study_list_view_repository_impl;
+mod subject_repository_impl;
+mod timepoint_repository_impl;
+mod timepoint_study_repository_impl;
 mod user_repository_impl;
 
 pub use access_condition_repository_impl::*;
@@ -31,4 +34,7 @@ pub use project_repository_impl::*;
 pub use role_repository_impl::*;
 pub use series_user_note_repository_impl::*;
 pub use study_list_view_repository_impl::*;
+pub use subject_repository_impl::*;
+pub use timepoint_repository_impl::*;
+pub use timepoint_study_repository_impl::*;
 pub use user_repository_impl::*;
