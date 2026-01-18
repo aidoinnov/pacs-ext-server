@@ -572,7 +572,7 @@ impl ProjectDataAccessUseCase {
     /// 유일한 Subject Code 생성
     ///
     /// Patient ID 기반으로 Subject Code를 생성하되, 중복 시 suffix를 추가합니다.
-    /// Patient ID가 너무 길거나 유효하지 않으면 순차 번호를 사용합니다.
+    /// Patient ID가 너무 길거나 유효하지 않으면 순차 코드를 사용합니다 (A-001, A-002, ..., A-999, B-001, ...).
     async fn generate_unique_subject_code(
         &self,
         project_id: i32,
@@ -618,7 +618,7 @@ impl ProjectDataAccessUseCase {
             }
         }
 
-        // Patient ID 기반 생성 실패 시 순차 번호 사용
+        // Patient ID 기반 생성 실패 시 순차 코드 사용 (A-001, A-002, ..., A-999, B-001, ...)
         let count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM project_subject WHERE project_id = $1",
         )
@@ -627,11 +627,17 @@ impl ProjectDataAccessUseCase {
         .await
         .map_err(|e| ServiceError::DatabaseError(e.to_string()))?;
 
-        let mut candidate = format!("SUB{:03}", count + 1);
-        let mut offset = 1;
+        let mut offset = 0;
 
         // 순차 번호도 중복 체크 (동시성 이슈 대비)
         loop {
+            // A-001 ~ A-999, B-001 ~ B-999, ...
+            let total_num = count + offset;
+            let prefix = char::from_u32(65 + (total_num / 999) as u32)
+                .unwrap_or('A');
+            let number = (total_num % 999) + 1;
+            let candidate = format!("{}-{:03}", prefix, number);
+
             let exists: bool = sqlx::query_scalar(
                 "SELECT EXISTS(SELECT 1 FROM project_subject WHERE project_id = $1 AND subject_code = $2)",
             )
@@ -646,10 +652,9 @@ impl ProjectDataAccessUseCase {
             }
 
             offset += 1;
-            candidate = format!("SUB{:03}", count + offset);
 
             // 무한 루프 방지
-            if offset > 1000 {
+            if offset > 10000 {
                 return Err(ServiceError::DatabaseError(
                     "Failed to generate unique subject code".to_string(),
                 ));
