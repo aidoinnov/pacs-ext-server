@@ -39,13 +39,13 @@ class APIClient:
             headers.update(extra_headers)
         return headers
     
-    def get(self, path: str, params: Optional[Dict[str, Any]] = None) -> requests.Response:
+    def get(self, path: str, params: Optional[Dict[str, Any]] = None, extra_headers: Optional[Dict[str, str]] = None) -> requests.Response:
         """GET 요청"""
         url = f"{self.base_url}{path}"
         response = self.session.get(
             url,
             params=params,
-            headers=self._get_headers(),
+            headers=self._get_headers(extra_headers),
             timeout=self.timeout
         )
         return response
