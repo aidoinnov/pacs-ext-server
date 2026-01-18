@@ -3,11 +3,13 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::domain::entities::{
-    CreateSubject, CreateSubjectRequest, CreateTimePoint, StudyInfo, Subject, SubjectDetail,
-    TimePoint, UpdateSubject,
+    CreateRecistLesion, CreateRecistLesionAnnotationMap, CreateSubject, CreateSubjectRequest,
+    CreateTimePoint, RecistLesion, RecistLesionDetail, RecistLesionType, StudyInfo, Subject,
+    SubjectDetail, TimePoint, UpdateRecistLesion, UpdateSubject,
 };
 use crate::domain::services::{SubjectService, TimePointService};
 use crate::domain::ServiceError;
+use crate::application::use_cases::RecistLesionUseCase;
 
 /// Subject 생성
 ///
@@ -321,4 +323,263 @@ pub fn configure_routes<S: SubjectService + 'static, T: TimePointService + 'stat
         );
 }
 
+// ============================================================================
+// RECIST Lesion Endpoints
+// ============================================================================
 
+/// Subject의 RECIST Lesion 목록 조회
+#[utoipa::path(
+    get,
+    path = "/api/subjects/{subject_id}/recist-lesions",
+    tag = "recist-lesions",
+    params(
+        ("subject_id" = i32, Path, description = "Subject ID"),
+        ("lesion_type" = Option<String>, Query, description = "Lesion type filter (target/non_target)")
+    ),
+    responses(
+        (status = 200, description = "Lesion list retrieved successfully", body = Vec<RecistLesion>),
+        (status = 404, description = "Subject not found"),
+    )
+)]
+pub async fn list_lesions<R, S, T>(
+    lesion_use_case: web::Data<Arc<RecistLesionUseCase<R, S, T>>>,
+    subject_id: web::Path<i32>,
+    query: web::Query<serde_json::Value>,
+) -> impl Responder
+where
+    R: crate::domain::repositories::RecistLesionRepository + 'static,
+    S: crate::domain::repositories::SubjectRepository + 'static,
+    T: crate::domain::repositories::TimePointRepository + 'static,
+{
+    let lesion_type = query
+        .get("lesion_type")
+        .and_then(|v| v.as_str())
+        .and_then(|s| match s.to_lowercase().as_str() {
+            "target" => Some(RecistLesionType::Target),
+            "non_target" => Some(RecistLesionType::NonTarget),
+            _ => None,
+        });
+
+    match lesion_use_case
+        .list_lesions_by_subject(*subject_id, lesion_type)
+        .await
+    {
+        Ok(lesions) => HttpResponse::Ok().json(lesions),
+        Err(e) => {
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            status.json(json!({"error": format!("{}", e)}))
+        }
+    }
+}
+
+/// RECIST Lesion 생성
+#[utoipa::path(
+    post,
+    path = "/api/subjects/{subject_id}/recist-lesions",
+    tag = "recist-lesions",
+    params(
+        ("subject_id" = i32, Path, description = "Subject ID")
+    ),
+    request_body = CreateRecistLesion,
+    responses(
+        (status = 201, description = "Lesion created successfully", body = RecistLesion),
+        (status = 400, description = "Validation error (e.g., max 5 Target Lesions)"),
+        (status = 404, description = "Subject or Baseline TimePoint not found"),
+    )
+)]
+pub async fn create_lesion<R, S, T>(
+    lesion_use_case: web::Data<Arc<RecistLesionUseCase<R, S, T>>>,
+    subject_id: web::Path<i32>,
+    req: web::Json<CreateRecistLesion>,
+) -> impl Responder
+where
+    R: crate::domain::repositories::RecistLesionRepository + 'static,
+    S: crate::domain::repositories::SubjectRepository + 'static,
+    T: crate::domain::repositories::TimePointRepository + 'static,
+{
+    let mut new_lesion = req.into_inner();
+    new_lesion.subject_id = *subject_id;
+
+    match lesion_use_case.create_lesion(new_lesion).await {
+        Ok(lesion) => HttpResponse::Created().json(lesion),
+        Err(e) => {
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                ServiceError::ValidationError(_) => HttpResponse::BadRequest(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            status.json(json!({"error": format!("{}", e)}))
+        }
+    }
+}
+
+/// RECIST Lesion 상세 조회
+#[utoipa::path(
+    get,
+    path = "/api/recist-lesions/{id}",
+    tag = "recist-lesions",
+    params(
+        ("id" = i32, Path, description = "Lesion ID")
+    ),
+    responses(
+        (status = 200, description = "Lesion detail retrieved successfully", body = RecistLesionDetail),
+        (status = 404, description = "Lesion not found"),
+    )
+)]
+pub async fn get_lesion_detail<R, S, T>(
+    lesion_use_case: web::Data<Arc<RecistLesionUseCase<R, S, T>>>,
+    id: web::Path<i32>,
+) -> impl Responder
+where
+    R: crate::domain::repositories::RecistLesionRepository + 'static,
+    S: crate::domain::repositories::SubjectRepository + 'static,
+    T: crate::domain::repositories::TimePointRepository + 'static,
+{
+    match lesion_use_case.get_lesion_detail(*id).await {
+        Ok(detail) => HttpResponse::Ok().json(detail),
+        Err(e) => {
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            status.json(json!({"error": format!("{}", e)}))
+        }
+    }
+}
+
+/// RECIST Lesion 수정
+#[utoipa::path(
+    put,
+    path = "/api/recist-lesions/{id}",
+    tag = "recist-lesions",
+    params(
+        ("id" = i32, Path, description = "Lesion ID")
+    ),
+    request_body = UpdateRecistLesion,
+    responses(
+        (status = 200, description = "Lesion updated successfully", body = RecistLesion),
+        (status = 404, description = "Lesion not found"),
+    )
+)]
+pub async fn update_lesion<R, S, T>(
+    lesion_use_case: web::Data<Arc<RecistLesionUseCase<R, S, T>>>,
+    id: web::Path<i32>,
+    req: web::Json<UpdateRecistLesion>,
+) -> impl Responder
+where
+    R: crate::domain::repositories::RecistLesionRepository + 'static,
+    S: crate::domain::repositories::SubjectRepository + 'static,
+    T: crate::domain::repositories::TimePointRepository + 'static,
+{
+    match lesion_use_case.update_lesion(*id, req.into_inner()).await {
+        Ok(lesion) => HttpResponse::Ok().json(lesion),
+        Err(e) => {
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            status.json(json!({"error": format!("{}", e)}))
+        }
+    }
+}
+
+/// RECIST Lesion 삭제
+#[utoipa::path(
+    delete,
+    path = "/api/recist-lesions/{id}",
+    tag = "recist-lesions",
+    params(
+        ("id" = i32, Path, description = "Lesion ID")
+    ),
+    responses(
+        (status = 204, description = "Lesion deleted successfully"),
+        (status = 404, description = "Lesion not found"),
+    )
+)]
+pub async fn delete_lesion<R, S, T>(
+    lesion_use_case: web::Data<Arc<RecistLesionUseCase<R, S, T>>>,
+    id: web::Path<i32>,
+) -> impl Responder
+where
+    R: crate::domain::repositories::RecistLesionRepository + 'static,
+    S: crate::domain::repositories::SubjectRepository + 'static,
+    T: crate::domain::repositories::TimePointRepository + 'static,
+{
+    match lesion_use_case.delete_lesion(*id).await {
+        Ok(_) => HttpResponse::NoContent().finish(),
+        Err(e) => {
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            status.json(json!({"error": format!("{}", e)}))
+        }
+    }
+}
+
+/// Lesion에 Annotation 연결
+#[utoipa::path(
+    post,
+    path = "/api/recist-lesions/{id}/annotations",
+    tag = "recist-lesions",
+    params(
+        ("id" = i32, Path, description = "Lesion ID")
+    ),
+    request_body = CreateRecistLesionAnnotationMap,
+    responses(
+        (status = 201, description = "Annotation linked successfully"),
+        (status = 404, description = "Lesion or TimePoint not found"),
+    )
+)]
+pub async fn link_annotation<R, S, T>(
+    lesion_use_case: web::Data<Arc<RecistLesionUseCase<R, S, T>>>,
+    id: web::Path<i32>,
+    req: web::Json<CreateRecistLesionAnnotationMap>,
+) -> impl Responder
+where
+    R: crate::domain::repositories::RecistLesionRepository + 'static,
+    S: crate::domain::repositories::SubjectRepository + 'static,
+    T: crate::domain::repositories::TimePointRepository + 'static,
+{
+    let mut mapping = req.into_inner();
+    mapping.lesion_id = *id;
+
+    match lesion_use_case.link_annotation(mapping).await {
+        Ok(_) => HttpResponse::Created().json(json!({"message": "Annotation linked successfully"})),
+        Err(e) => {
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            status.json(json!({"error": format!("{}", e)}))
+        }
+    }
+}
+
+/// RECIST Lesion 라우트 설정
+pub fn configure_recist_lesion_routes<R, S, T>(
+    cfg: &mut web::ServiceConfig,
+    lesion_use_case: Arc<RecistLesionUseCase<R, S, T>>,
+)
+where
+    R: crate::domain::repositories::RecistLesionRepository + 'static,
+    S: crate::domain::repositories::SubjectRepository + 'static,
+    T: crate::domain::repositories::TimePointRepository + 'static,
+{
+    cfg.app_data(web::Data::new(lesion_use_case))
+        .service(
+            web::scope("/subjects/{subject_id}/recist-lesions")
+                .route("", web::get().to(list_lesions::<R, S, T>))
+                .route("", web::post().to(create_lesion::<R, S, T>)),
+        )
+        .service(
+            web::scope("/recist-lesions")
+                .route("/{id}", web::get().to(get_lesion_detail::<R, S, T>))
+                .route("/{id}", web::put().to(update_lesion::<R, S, T>))
+                .route("/{id}", web::delete().to(delete_lesion::<R, S, T>))
+                .route("/{id}/annotations", web::post().to(link_annotation::<R, S, T>)),
+        );
+}

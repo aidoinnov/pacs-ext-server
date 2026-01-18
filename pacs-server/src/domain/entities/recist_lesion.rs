@@ -103,7 +103,7 @@ pub struct RecistLesion {
 /// - `baseline_timepoint_id`: Baseline TimePoint ID (TARGET/NON_TARGET 필수)
 /// - `organ_site`: 병변 위치 (선택사항)
 /// - `description`: 병변 상세 설명 (선택사항)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateRecistLesion {
     /// 소속 프로젝트 ID
     pub project_id: i32,
@@ -195,7 +195,7 @@ pub struct RecistLesionAnnotationMap {
 /// - `annotation_id`: Annotation ID
 /// - `timepoint_id`: TimePoint ID
 /// - `measured_length_mm`: 측정된 병변 길이 (mm, 선택사항)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateRecistLesionAnnotationMap {
     /// RECIST Lesion ID
     pub lesion_id: i32,
