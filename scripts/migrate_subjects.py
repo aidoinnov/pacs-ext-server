@@ -216,12 +216,22 @@ class SubjectMigrator:
 
 def get_default_db_url() -> str:
     """기본 DB URL 가져오기 (.env 파일 또는 환경 변수)"""
-    # 환경 변수에서 읽기
-    db_url = os.getenv('DATABASE_URL')
+    # 1순위: APP_DATABASE_URL (실제 사용 중인 URL)
+    db_url = os.getenv('APP_DATABASE_URL')
     if db_url:
+        # postgres:// -> postgresql:// 변환
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
         return db_url
 
-    # .env 파일에서 개별 변수 읽기
+    # 2순위: DATABASE_URL
+    db_url = os.getenv('DATABASE_URL')
+    if db_url:
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        return db_url
+
+    # 3순위: 개별 환경 변수에서 조합
     db_user = os.getenv('POSTGRES_USER', 'postgres')
     db_pass = os.getenv('POSTGRES_PASSWORD', 'postgres')
     db_host = os.getenv('DATABASE_HOST', 'localhost')
