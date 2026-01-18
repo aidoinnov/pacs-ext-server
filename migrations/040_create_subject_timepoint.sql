@@ -29,9 +29,7 @@ CREATE TABLE project_subject (
     
     -- 제약 조건
     CONSTRAINT uq_project_subject_code UNIQUE (project_id, subject_code),
-    CONSTRAINT uq_project_patient_id UNIQUE (project_id, patient_id),
-    CONSTRAINT uq_external_subject_key UNIQUE (external_subject_key) 
-        WHERE external_subject_key IS NOT NULL
+    CONSTRAINT uq_project_patient_id UNIQUE (project_id, patient_id)
 );
 
 -- Subject별 TimePoint 관리
@@ -48,9 +46,7 @@ CREATE TABLE subject_timepoint (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
     -- 제약 조건
-    CONSTRAINT uq_subject_timepoint_name UNIQUE (subject_id, name),
-    CONSTRAINT uq_external_timepoint_key UNIQUE (external_key) 
-        WHERE external_key IS NOT NULL
+    CONSTRAINT uq_subject_timepoint_name UNIQUE (subject_id, name)
 );
 
 -- TimePoint ↔ Study 매핑 (보드 UX 핵심 테이블)
