@@ -9,7 +9,9 @@ pub mod permission_service;
 pub mod project_data_service;
 pub mod project_service;
 pub mod series_user_note_service;
+pub mod subject_service;
 pub mod sync_service;
+pub mod timepoint_service;
 pub mod user_registration_service;
 pub mod user_service;
 
@@ -24,6 +26,8 @@ pub use permission_service::{PermissionService, PermissionServiceImpl};
 pub use project_data_service::*;
 pub use project_service::{ProjectService, ProjectServiceImpl};
 pub use series_user_note_service::{SeriesUserNoteService, SeriesUserNoteServiceImpl};
+pub use subject_service::{SubjectService, SubjectServiceImpl};
 pub use sync_service::*;
+pub use timepoint_service::{TimePointService, TimePointServiceImpl};
 pub use user_registration_service::*;
 pub use user_service::{UserService, UserServiceImpl};
