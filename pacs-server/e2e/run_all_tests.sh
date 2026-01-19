@@ -48,11 +48,41 @@ run_test() {
 # 각 테스트 실행 (실패해도 계속 진행)
 set +e  # 에러 발생해도 계속 진행
 
+echo ""
+echo "=========================================="
+echo "📦 Annotation 테스트"
+echo "=========================================="
 run_test "test_annotation_head_request.py" "HEAD 요청 및 캐시 검증"
 run_test "test_annotation_level_filtering.py" "레벨 필터링 (Study/Series/Instance)"
 run_test "test_annotation_version_conflict.py" "버전 충돌 (Optimistic Locking)"
 run_test "test_annotation_permission_filtering.py" "권한 기반 필터링"
 run_test "test_annotation_snapshot_e2e.py" "스냅샷 업로드"
+
+echo ""
+echo "=========================================="
+echo "🏥 DICOM Gateway 테스트"
+echo "=========================================="
+run_test "test_dicom_gateway_study_series_e2e.py" "DICOM Gateway Study/Series"
+run_test "test_dicom_gateway_report_status_filter_e2e.py" "DICOM Gateway Report Status Filter"
+run_test "test_qido_enhanced_e2e.py" "QIDO Enhanced"
+
+echo ""
+echo "=========================================="
+echo "📊 Series 테스트"
+echo "=========================================="
+run_test "test_series_note_e2e.py" "Series Note"
+run_test "test_series_report_e2e.py" "Series Report"
+run_test "test_series_resource_level_e2e.py" "Series Resource Level"
+run_test "test_series_uid_api_e2e.py" "Series UID API"
+run_test "test_series_user_report_api_e2e.py" "Series User Report API"
+
+echo ""
+echo "=========================================="
+echo "🖥️ Viewer 테스트"
+echo "=========================================="
+run_test "test_viewer_api_e2e.py" "Viewer API"
+run_test "test_view_selection_e2e.py" "View Selection"
+run_test "test_study_list_view_e2e.py" "Study List View"
 
 # 최종 결과 출력
 echo ""

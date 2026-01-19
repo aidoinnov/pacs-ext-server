@@ -2,14 +2,18 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
+use crate::application::dto::annotation_dto::AnnotationResponse;
 use crate::domain::entities::{
     CreateRecistLesion, CreateRecistLesionAnnotationMap, CreateRecistLesionRequest, CreateSubject,
     CreateSubjectRequest, CreateTimePoint, RecistLesion, RecistLesionDetail, RecistLesionType,
-    StudyInfo, Subject, SubjectDetail, TimePoint, UpdateRecistLesion, UpdateSubject,
+    StudyInfo, Subject, SubjectDetail, TimePoint, TimePointsWithStudiesResponse,
+    UpdateRecistLesion, UpdateSubject,
 };
+use crate::domain::repositories::AnnotationRepository;
 use crate::domain::services::{SubjectService, TimePointService};
 use crate::domain::ServiceError;
 use crate::application::use_cases::RecistLesionUseCase;
+use crate::presentation::controllers::timepoint_controller;
 
 /// Subject 생성
 ///
@@ -293,13 +297,63 @@ async fn get_unassigned_studies_wrapper<T: TimePointService + 'static>(
     }
 }
 
+/// Subject의 TimePoint와 Study 목록 조회 (X축 API)
+///
+/// Subject의 모든 TimePoint와 각 TimePoint에 할당된 Study 목록,
+/// 그리고 선택적으로 Unassigned Study 목록을 조회합니다.
+#[utoipa::path(
+    get,
+    path = "/api/subjects/{subject_id}/timepoints-with-studies",
+    tag = "subjects",
+    params(
+        ("subject_id" = i32, Path, description = "Subject ID"),
+        ("include_unassigned" = Option<bool>, Query, description = "Include unassigned studies (default: true)")
+    ),
+    responses(
+        (status = 200, description = "TimePoints with studies retrieved successfully", body = TimePointsWithStudiesResponse),
+        (status = 404, description = "Subject not found"),
+    )
+)]
+pub async fn get_timepoints_with_studies<T: TimePointService + 'static>(
+    timepoint_service: web::Data<Arc<T>>,
+    subject_id: web::Path<i32>,
+    query: web::Query<serde_json::Value>,
+) -> impl Responder {
+    let include_unassigned = query
+        .get("include_unassigned")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+
+    match timepoint_service
+        .get_timepoints_with_studies(*subject_id, include_unassigned)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            status.json(json!({
+                "error": format!("{}", e)
+            }))
+        }
+    }
+}
+
+// Note: get_annotations_by_timepoint 함수는 timepoint_controller.rs로 이동되었습니다.
+// SignedUrlService를 사용하여 snapshot_image_url을 생성합니다.
+
 // ============================================================================
 // 라우트 설정
 // ============================================================================
 
-/// 라우트 설정 (Subject + TimePoint)
+/// 라우트 설정 (Subject + TimePoint with Studies)
 ///
-/// Note: RECIST Lesion 라우트는 별도의 configure_recist_lesion_routes 함수로 분리되어 있습니다.
+/// Note:
+/// - TimePoint CRUD는 timepoint_controller에서 관리됩니다.
+/// - TimePoint Annotations는 timepoint_controller에서 관리됩니다.
+/// - RECIST Lesion 라우트는 별도의 configure_recist_lesion_routes 함수로 분리되어 있습니다.
 pub fn configure_routes<S: SubjectService + 'static, T: TimePointService + 'static>(
     cfg: &mut web::ServiceConfig,
     subject_service: Arc<S>,
@@ -313,16 +367,17 @@ pub fn configure_routes<S: SubjectService + 'static, T: TimePointService + 'stat
                 .route("", web::get().to(get_subjects_by_project::<S>)),
         )
         .service(
-            web::scope("/subjects")
-                .route("/{id}", web::get().to(get_subject::<S>))
-                .route("/{id}/detail", web::get().to(get_subject_detail::<S>))
-                .route("/{id}", web::put().to(update_subject::<S>))
-                .route("/{id}", web::delete().to(delete_subject::<S>))
-                // TimePoint 관련 라우트 추가 (래퍼 함수 사용)
-                .route("/{id}/timepoints", web::post().to(create_timepoint_wrapper::<T>))
-                .route("/{id}/timepoints", web::get().to(get_timepoints_wrapper::<T>))
-                .route("/{id}/studies/unassigned", web::get().to(get_unassigned_studies_wrapper::<T>)),
+            web::scope("/subjects/{id}")
+                .route("", web::get().to(get_subject::<S>))
+                .route("/detail", web::get().to(get_subject_detail::<S>))
+                .route("", web::put().to(update_subject::<S>))
+                .route("", web::delete().to(delete_subject::<S>))
+                .route("/timepoints", web::post().to(timepoint_controller::create_timepoint::<T>))
+                .route("/timepoints", web::get().to(timepoint_controller::get_timepoints_by_subject::<T>))
+                .route("/timepoints-with-studies", web::get().to(get_timepoints_with_studies::<T>))
+                .route("/studies/unassigned", web::get().to(timepoint_controller::get_unassigned_studies_by_subject::<T>)),
         );
+    // Note: /timepoints/{timepoint_id}/annotations 라우트는 timepoint_controller에서 관리됩니다.
 }
 
 // ============================================================================

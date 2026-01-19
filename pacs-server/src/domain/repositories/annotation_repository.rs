@@ -59,6 +59,8 @@ pub trait AnnotationRepository: Send + Sync {
         is_shared: bool,
         measurement_values: Option<serde_json::Value>,
         label: Option<String>,
+        lesion_type: Option<String>,
+        lesion_number: Option<i32>,
     ) -> Result<Option<Annotation>, sqlx::Error>;
     /// 버전 검증을 포함한 업데이트 (Optimistic Locking)
     /// 클라이언트가 제공한 base_version과 현재 버전이 일치할 때만 업데이트 수행
@@ -70,6 +72,8 @@ pub trait AnnotationRepository: Send + Sync {
         is_shared: bool,
         measurement_values: Option<serde_json::Value>,
         label: Option<String>,
+        lesion_type: Option<String>,
+        lesion_number: Option<i32>,
     ) -> Result<Option<Annotation>, sqlx::Error>;
 
     async fn update_snapshot(
@@ -107,6 +111,16 @@ pub trait AnnotationRepository: Send + Sync {
         page: i32,
         limit: i32,
     ) -> Result<Vec<Annotation>, sqlx::Error>;
+
+    /// TimePoint에 속한 모든 Study의 Annotation 조회
+    ///
+    /// # Arguments
+    /// * `timepoint_id` - TimePoint ID
+    ///
+    /// # Returns
+    /// * `Ok(Vec<Annotation>)` - Annotation 목록
+    /// * `Err(sqlx::Error)` - 데이터베이스 오류
+    async fn find_by_timepoint(&self, timepoint_id: i32) -> Result<Vec<Annotation>, sqlx::Error>;
 
     fn pool(&self) -> &PgPool;
 }

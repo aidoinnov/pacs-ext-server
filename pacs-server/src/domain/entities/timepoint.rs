@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use utoipa::ToSchema;
 
+use super::StudyInfo;
+
 /// Visit 타입 열거형
 ///
 /// 임상시험 프로토콜 상의 방문 의미를 나타냅니다.
@@ -150,5 +152,33 @@ pub struct UpdateTimePoint {
     pub visit_type: Option<VisitType>,
     /// TimePoint 정렬 순서 (선택사항)
     pub order_index: Option<i32>,
+}
+
+/// TimePoint with Studies 응답 DTO
+///
+/// TimePoint와 해당 TimePoint에 할당된 Study 목록을 포함합니다.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TimePointWithStudies {
+    /// TimePoint 정보
+    #[serde(flatten)]
+    pub timepoint: TimePoint,
+    /// 할당된 Study 목록
+    pub studies: Vec<StudyInfo>,
+}
+
+/// Subject의 TimePoints with Studies 응답 DTO
+///
+/// Subject의 모든 TimePoint와 각 TimePoint에 할당된 Study 목록,
+/// 그리고 Unassigned Study 목록을 포함합니다.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TimePointsWithStudiesResponse {
+    /// Subject ID
+    pub subject_id: i32,
+    /// Subject Code
+    pub subject_code: String,
+    /// TimePoint 목록 (Study 포함)
+    pub timepoints: Vec<TimePointWithStudies>,
+    /// Unassigned Study 목록
+    pub unassigned_studies: Vec<StudyInfo>,
 }
 

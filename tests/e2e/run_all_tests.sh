@@ -83,6 +83,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 run_test "demo_test.py" "데모 테스트"
 run_test "test_01_auth.py" "인증 테스트"
 run_test "test_snapshot_url.py" "스냅샷 URL 테스트"
+run_test "test_11_lesion_assignment.py" "RECIST Lesion Assignment 테스트"
+run_test "test_12_timepoint_with_studies.py" "TimePoint with Studies 테스트"
 run_test "test_performance_01_concurrent.py" "성능 테스트 (동시성)"
 
 # 결과 요약

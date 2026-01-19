@@ -3,6 +3,13 @@
 ## 📋 개요
 PACS (Picture Archiving and Communication System) Extension Server는 의료 영상 어노테이션 및 마스크 업로드 기능을 제공하는 Rust 기반 웹 서버입니다.
 
+## 🚀 빠른 시작
+
+- **[실행 가이드](./RUN.md)** - 서버 실행 및 설정 방법
+- **[테스트 가이드](./TESTING.md)** - E2E 테스트 및 개발 테스트 실행 방법
+- **[도구 스크립트 가이드](./TOOLS.md)** - 개발/디버깅 스크립트 사용법
+- **[API 문서](../docs/api/)** - REST API 상세 문서
+
 ## ✨ 주요 기능
 
 ### 🏷️ 어노테이션 시스템

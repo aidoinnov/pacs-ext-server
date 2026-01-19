@@ -984,8 +984,7 @@ async fn main() -> std::io::Result<()> {
                     // ========================================
                     // 🧬 Subject & TimePoint 관리 API
                     // - Subject CRUD
-                    // - TimePoint CRUD
-                    // - Study 할당/해제
+                    // - TimePoint with Studies 조회 (X축 API)
                     // ========================================
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
@@ -996,9 +995,19 @@ async fn main() -> std::io::Result<()> {
                             )
                         }
                     })
+                    // ========================================
+                    // 📅 TimePoint CRUD API
+                    // - TimePoint 생성/수정/삭제
+                    // - Study 할당/해제
+                    // ========================================
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
-                            timepoint_controller::configure_routes(cfg, timepoint_service.clone())
+                            timepoint_controller::configure_routes(
+                                cfg,
+                                timepoint_service.clone(),
+                                annotation_repo.clone(),
+                                signed_url_service.clone(),
+                            )
                         }
                     })
                     // ========================================

@@ -23,7 +23,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE id = $1",
         )
@@ -38,7 +39,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE project_id = $1
              ORDER BY created_at DESC",
@@ -54,7 +56,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE user_id = $1
              ORDER BY created_at DESC",
@@ -70,7 +73,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE study_uid = $1
              ORDER BY created_at DESC",
@@ -86,7 +90,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE series_uid = $1
              ORDER BY created_at DESC",
@@ -105,7 +110,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE instance_uid = $1
              ORDER BY created_at DESC",
@@ -125,7 +131,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE project_id = $1 AND study_uid = $2
              ORDER BY created_at DESC",
@@ -146,7 +153,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE project_id = $1 AND series_uid = $2
              ORDER BY created_at DESC",
@@ -166,7 +174,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE project_id = $1 AND is_shared = true
              ORDER BY created_at DESC",
@@ -183,13 +192,15 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         let annotation = sqlx::query_as::<_, Annotation>(
             "INSERT INTO annotation_annotation (project_id, user_id, study_uid, series_uid, instance_uid,
                                                tool_name, tool_version, data, is_shared, viewer_software, description,
-                                               measurement_values, label, snapshot_image_key, snapshot_status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                                               measurement_values, label, snapshot_image_key, snapshot_status,
+                                               lesion_type, lesion_number)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
              RETURNING id, project_id, user_id, study_uid, series_uid, instance_uid,
                        tool_name, tool_version, data, is_shared,
                        snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                        created_at, updated_at, version,
-                       viewer_software, description, measurement_values, label"
+                       viewer_software, description, measurement_values, label,
+                       lesion_type, lesion_number"
         )
         .bind(new_annotation.project_id)
         .bind(new_annotation.user_id)
@@ -206,6 +217,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         .bind(new_annotation.label)
         .bind(new_annotation.snapshot_image_key)
         .bind(new_annotation.snapshot_status)
+        .bind(new_annotation.lesion_type)
+        .bind(new_annotation.lesion_number)
         .fetch_one(&mut *tx)
         .await?;
 
@@ -241,7 +254,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation WHERE id = $1",
         )
         .bind(id)
@@ -260,7 +274,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                        tool_name, tool_version, data, is_shared,
                        snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                        created_at, updated_at, version,
-                       viewer_software, description, measurement_values, label",
+                       viewer_software, description, measurement_values, label,
+                       lesion_type, lesion_number",
         )
         .bind(id)
         .bind(data)
@@ -295,6 +310,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         is_shared: bool,
         measurement_values: Option<serde_json::Value>,
         label: Option<String>,
+        lesion_type: Option<String>,
+        lesion_number: Option<i32>,
     ) -> Result<Option<Annotation>, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
@@ -304,7 +321,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation WHERE id = $1",
         )
         .bind(id)
@@ -314,22 +332,27 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         let old_data = old_annotation.as_ref().map(|a| a.data.clone());
         let user_id = old_annotation.as_ref().map(|a| a.user_id).unwrap_or(0);
 
-        // annotation 업데이트 (measurement_values, label 포함)
+        // annotation 업데이트 (measurement_values, label, lesion_type, lesion_number 포함)
         let updated_annotation = sqlx::query_as::<_, Annotation>(
             "UPDATE annotation_annotation
-             SET data = $2, is_shared = $3, measurement_values = $4, label = $5, version = version + 1, updated_at = CURRENT_TIMESTAMP
+             SET data = $2, is_shared = $3, measurement_values = $4, label = $5,
+                 lesion_type = $6, lesion_number = $7,
+                 version = version + 1, updated_at = CURRENT_TIMESTAMP
              WHERE id = $1
              RETURNING id, project_id, user_id, study_uid, series_uid, instance_uid,
                        tool_name, tool_version, data, is_shared,
                        snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                        created_at, updated_at, version,
-                       viewer_software, description, measurement_values, label",
+                       viewer_software, description, measurement_values, label,
+                       lesion_type, lesion_number",
         )
         .bind(id)
         .bind(data)
         .bind(is_shared)
         .bind(measurement_values)
         .bind(label)
+        .bind(lesion_type)
+        .bind(lesion_number)
         .fetch_optional(&mut *tx)
         .await?;
 
@@ -361,6 +384,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         is_shared: bool,
         measurement_values: Option<serde_json::Value>,
         label: Option<String>,
+        lesion_type: Option<String>,
+        lesion_number: Option<i32>,
     ) -> Result<Option<Annotation>, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
@@ -370,7 +395,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation WHERE id = $1",
         )
         .bind(id)
@@ -394,19 +420,23 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         let updated_annotation = sqlx::query_as::<_, Annotation>(
             "UPDATE annotation_annotation
              SET data = $2, is_shared = $3, measurement_values = $4, label = $5,
+                 lesion_type = $6, lesion_number = $7,
                  version = version + 1, updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1 AND version = $6
+             WHERE id = $1 AND version = $8
              RETURNING id, project_id, user_id, study_uid, series_uid, instance_uid,
                        tool_name, tool_version, data, is_shared,
                        snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                        created_at, updated_at, version,
-                       viewer_software, description, measurement_values, label"
+                       viewer_software, description, measurement_values, label,
+                       lesion_type, lesion_number"
         )
         .bind(id)
         .bind(&data)
         .bind(is_shared)
         .bind(&measurement_values)
         .bind(&label)
+        .bind(&lesion_type)
+        .bind(&lesion_number)
         .bind(base_version)
         .fetch_optional(&mut *tx)
         .await?;
@@ -452,7 +482,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                        tool_name, tool_version, data, is_shared,
                        snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                        created_at, updated_at, version,
-                       viewer_software, description, measurement_values, label"
+                       viewer_software, description, measurement_values, label,
+                       lesion_type, lesion_number"
         )
         .bind(id)
         .bind(&snapshot_image_key)
@@ -474,7 +505,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation WHERE id = $1",
         )
         .bind(id)
@@ -557,7 +589,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                             tool_name, tool_version, data, is_shared,
                             snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                             created_at, updated_at, version,
-                            viewer_software, description, measurement_values, label
+                            viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
                      FROM annotation_annotation
                      WHERE user_id = $1 AND viewer_software = $2
                      ORDER BY created_at DESC",
@@ -573,7 +606,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                             tool_name, tool_version, data, is_shared,
                             snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                             created_at, updated_at, version,
-                            viewer_software, description, measurement_values, label
+                            viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
                      FROM annotation_annotation
                      WHERE user_id = $1
                      ORDER BY created_at DESC",
@@ -597,7 +631,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                             tool_name, tool_version, data, is_shared,
                             snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                             created_at, updated_at, version,
-                            viewer_software, description, measurement_values, label
+                            viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
                      FROM annotation_annotation
                      WHERE project_id = $1 AND viewer_software = $2
                      ORDER BY created_at DESC",
@@ -613,7 +648,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                             tool_name, tool_version, data, is_shared,
                             snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                             created_at, updated_at, version,
-                            viewer_software, description, measurement_values, label
+                            viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
                      FROM annotation_annotation
                      WHERE project_id = $1
                      ORDER BY created_at DESC",
@@ -637,7 +673,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                             tool_name, tool_version, data, is_shared,
                             snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                             created_at, updated_at, version,
-                            viewer_software, description, measurement_values, label
+                            viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
                      FROM annotation_annotation
                      WHERE study_uid = $1 AND viewer_software = $2
                      ORDER BY created_at DESC",
@@ -653,7 +690,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                             tool_name, tool_version, data, is_shared,
                             snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                             created_at, updated_at, version,
-                            viewer_software, description, measurement_values, label
+                            viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
                      FROM annotation_annotation
                      WHERE study_uid = $1
                      ORDER BY created_at DESC",
@@ -702,7 +740,8 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
                     tool_name, tool_version, data, is_shared,
                     snapshot_image_key, snapshot_status, snapshot_uploaded_at,
                     created_at, updated_at, version,
-                    viewer_software, description, measurement_values, label
+                    viewer_software, description, measurement_values, label,
+                    lesion_type, lesion_number
              FROM annotation_annotation
              WHERE project_id = $1 AND series_uid = $2
              ORDER BY created_at DESC
@@ -712,6 +751,25 @@ impl AnnotationRepository for AnnotationRepositoryImpl {
         .bind(series_uid)
         .bind(limit)
         .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    async fn find_by_timepoint(&self, timepoint_id: i32) -> Result<Vec<Annotation>, sqlx::Error> {
+        sqlx::query_as::<_, Annotation>(
+            "SELECT DISTINCT a.id, a.project_id, a.user_id, a.study_uid, a.series_uid, a.instance_uid,
+                    a.tool_name, a.tool_version, a.data, a.is_shared,
+                    a.snapshot_image_key, a.snapshot_status, a.snapshot_uploaded_at,
+                    a.created_at, a.updated_at, a.version,
+                    a.viewer_software, a.description, a.measurement_values, a.label,
+                    a.lesion_type, a.lesion_number
+             FROM annotation_annotation a
+             JOIN project_data_study pds ON pds.study_uid = a.study_uid
+             JOIN subject_timepoint_study_map m ON m.study_id = pds.id
+             WHERE m.timepoint_id = $1
+             ORDER BY a.lesion_type, a.lesion_number, a.created_at",
+        )
+        .bind(timepoint_id)
         .fetch_all(&self.pool)
         .await
     }

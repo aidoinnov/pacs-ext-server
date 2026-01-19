@@ -2,10 +2,12 @@ use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::sync::Arc;
 
+use crate::application::dto::annotation_dto::AnnotationResponse;
 use crate::domain::entities::{
     AssignStudies, AssignmentResult, CreateTimePoint, StudyInfo, TimePoint, TimePointStudies,
-    UnassignStudies, UpdateTimePoint,
+    TimePointsWithStudiesResponse, UnassignStudies, UpdateTimePoint,
 };
+use crate::domain::repositories::AnnotationRepository;
 use crate::domain::services::TimePointService;
 use crate::domain::ServiceError;
 
@@ -347,12 +349,163 @@ pub async fn get_unassigned_studies_by_subject<T: TimePointService + 'static>(
     }
 }
 
+/// Subject의 TimePoint와 Study 목록 조회 (X축 API)
+///
+/// Subject의 모든 TimePoint와 각 TimePoint에 할당된 Study 목록,
+/// 그리고 선택적으로 Unassigned Study 목록을 조회합니다.
+#[utoipa::path(
+    get,
+    path = "/api/subjects/{subject_id}/timepoints-with-studies",
+    tag = "timepoints",
+    params(
+        ("subject_id" = i32, Path, description = "Subject ID"),
+        ("include_unassigned" = Option<bool>, Query, description = "Include unassigned studies (default: true)")
+    ),
+    responses(
+        (status = 200, description = "TimePoints with studies retrieved successfully", body = TimePointsWithStudiesResponse),
+        (status = 404, description = "Subject not found"),
+    )
+)]
+pub async fn get_timepoints_with_studies<T: TimePointService + 'static>(
+    timepoint_service: web::Data<Arc<T>>,
+    subject_id: web::Path<i32>,
+    query: web::Query<serde_json::Value>,
+) -> impl Responder {
+    let include_unassigned = query
+        .get("include_unassigned")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+
+    match timepoint_service
+        .get_timepoints_with_studies(*subject_id, include_unassigned)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            status.json(json!({
+                "error": format!("{}", e)
+            }))
+        }
+    }
+}
+
+/// TimePoint의 Annotation 목록 조회 (Y축 API)
+///
+/// 특정 TimePoint에 속한 모든 Study의 Annotation을 조회합니다.
+#[utoipa::path(
+    get,
+    path = "/api/timepoints/{timepoint_id}/annotations",
+    tag = "timepoints",
+    params(
+        ("timepoint_id" = i32, Path, description = "TimePoint ID")
+    ),
+    responses(
+        (status = 200, description = "Annotations retrieved successfully", body = Vec<AnnotationResponse>),
+        (status = 404, description = "TimePoint not found"),
+    )
+)]
+pub async fn get_annotations_by_timepoint<A: AnnotationRepository + 'static, S: crate::application::services::SignedUrlService + 'static>(
+    annotation_repository: web::Data<A>,
+    signed_url_service: web::Data<S>,
+    timepoint_id: web::Path<i32>,
+) -> impl Responder {
+    match annotation_repository.find_by_timepoint(*timepoint_id).await {
+        Ok(annotations) => {
+            let mut responses: Vec<AnnotationResponse> = annotations
+                .into_iter()
+                .map(|a| AnnotationResponse {
+                    id: a.id,
+                    user_id: a.user_id,
+                    user_name: None, // TODO: Join with user table
+                    user_role_name: None, // TODO: Join with role table
+                    study_instance_uid: a.study_uid,
+                    series_instance_uid: a.series_uid.unwrap_or_default(),
+                    sop_instance_uid: a.instance_uid.unwrap_or_default(),
+                    annotation_data: a.data,
+                    tool_name: Some(a.tool_name),
+                    tool_version: a.tool_version,
+                    viewer_software: a.viewer_software,
+                    description: a.description,
+                    measurement_values: a.measurement_values,
+                    label: a.label,
+                    lesion_type: a.lesion_type,
+                    lesion_number: a.lesion_number,
+                    version: a.version,
+                    created_at: a.created_at,
+                    updated_at: a.updated_at,
+                    snapshot_image_key: a.snapshot_image_key.clone(),
+                    snapshot_status: a.snapshot_status.map(|s| s.to_string()),
+                    snapshot_uploaded_at: a.snapshot_uploaded_at,
+                    snapshot_image_url: None,
+                })
+                .collect();
+
+            // Snapshot signed URL 생성 (bulk)
+            let snapshot_keys: Vec<String> = responses
+                .iter()
+                .filter_map(|ann| {
+                    if ann.snapshot_status.as_deref() == Some("completed") {
+                        ann.snapshot_image_key.clone()
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            tracing::info!("TimePoint {}: Found {} snapshots to generate URLs", *timepoint_id, snapshot_keys.len());
+
+            if !snapshot_keys.is_empty() {
+                match signed_url_service.generate_download_urls_bulk(snapshot_keys.clone(), Some(3600)).await {
+                    Ok(url_map) => {
+                        tracing::info!("Successfully generated {} signed URLs", url_map.len());
+                        let url_lookup: std::collections::HashMap<String, Option<String>> =
+                            url_map.into_iter().collect();
+
+                        let mut url_added_count = 0;
+                        for ann in &mut responses {
+                            if let Some(ref key) = ann.snapshot_image_key {
+                                if let Some(url_opt) = url_lookup.get(key) {
+                                    ann.snapshot_image_url = url_opt.clone();
+                                    if url_opt.is_some() {
+                                        url_added_count += 1;
+                                    }
+                                }
+                            }
+                        }
+                        tracing::info!("Added {} snapshot URLs to annotations", url_added_count);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to generate snapshot URLs: {:?}", e);
+                    }
+                }
+            } else {
+                tracing::debug!("No snapshots to generate URLs for");
+            }
+
+            HttpResponse::Ok().json(responses)
+        }
+        Err(e) => {
+            HttpResponse::InternalServerError().json(json!({
+                "error": format!("Database error: {}", e)
+            }))
+        }
+    }
+}
+
 /// 라우트 설정
-pub fn configure_routes<T: TimePointService + 'static>(
+pub fn configure_routes<T: TimePointService + 'static, A: AnnotationRepository + 'static, S: crate::application::services::SignedUrlService + 'static>(
     cfg: &mut web::ServiceConfig,
     timepoint_service: Arc<T>,
+    annotation_repository: A,
+    signed_url_service: S,
 ) {
     cfg.app_data(web::Data::new(timepoint_service))
+        .app_data(web::Data::new(annotation_repository))
+        .app_data(web::Data::new(signed_url_service))
         // Subject의 TimePoint 관련 엔드포인트
         .service(
             web::scope("/subjects/{subject_id}")
@@ -360,6 +513,10 @@ pub fn configure_routes<T: TimePointService + 'static>(
                     web::resource("/timepoints")
                         .route(web::post().to(create_timepoint::<T>))
                         .route(web::get().to(get_timepoints_by_subject::<T>)),
+                )
+                .service(
+                    web::resource("/timepoints-with-studies")
+                        .route(web::get().to(get_timepoints_with_studies::<T>)),
                 )
                 .service(
                     web::resource("/studies/unassigned")
@@ -377,6 +534,10 @@ pub fn configure_routes<T: TimePointService + 'static>(
                         .route(web::post().to(assign_studies::<T>))
                         .route(web::delete().to(unassign_studies::<T>))
                         .route(web::get().to(get_studies_by_timepoint::<T>)),
+                )
+                .service(
+                    web::resource("/annotations")
+                        .route(web::get().to(get_annotations_by_timepoint::<A, S>)),
                 ),
         );
 }

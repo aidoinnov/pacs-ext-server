@@ -1,6 +1,49 @@
-# 어노테이션 E2E 테스트
+# PACS Server E2E 테스트
 
-이 디렉토리에는 어노테이션 API의 E2E (End-to-End) 테스트가 포함되어 있습니다.
+이 디렉토리에는 PACS Server의 E2E (End-to-End) 테스트가 포함되어 있습니다.
+
+## 🚀 빠른 시작
+
+### 전체 테스트 실행
+```bash
+cd pacs-server/e2e
+./run_all_tests.sh
+```
+
+### 개별 테스트 실행
+```bash
+python3 test_dicom_gateway_study_series_e2e.py
+```
+
+## 📂 테스트 구조
+
+모든 E2E 테스트는 다음 3단계 구조를 따릅니다:
+
+```
+1. 사전준비 (Setup)
+   - 테스트 계정 생성 (또는 기존 계정 사용)
+   - 필요한 데이터 생성 (프로젝트, Study, Annotation 등)
+
+2. 본 테스트 (Test)
+   - 실제 테스트 시나리오 실행
+   - API 호출 및 응답 검증
+
+3. 클린업 (Cleanup)
+   - 생성한 데이터 정리
+   - 테스트 계정 삭제
+```
+
+### 공통 유틸리티 (`test_common.py`)
+
+모든 테스트에서 사용하는 공통 함수들:
+
+- `get_admin_token()` - 관리자 로그인
+- `create_test_user()` - 테스트 사용자 생성
+- `create_test_project()` - 테스트 프로젝트 생성
+- `add_user_to_project()` - 사용자를 프로젝트에 추가
+- `cleanup_project()` - 프로젝트 삭제
+- `cleanup_user()` - 사용자 삭제
+- `health_check()` - 서버 헬스 체크
 
 ## 🎯 새로운 테스트 작성 시 필독!
 
@@ -17,6 +60,7 @@
 2. **자동 클린업 사용** - `self.created_annotation_ids`에 추가만 하면 자동 삭제
 3. **공통 모듈 활용** - `TestConfig`, `TestAuth`, `TestPrinter`, `AnnotationFixtures`
 4. **설정 하드코딩 금지** - `TestConfig` 사용
+5. **3단계 구조 준수** - Setup → Test → Cleanup
 
 자세한 내용은 [E2E_TEST_RULES.md](./E2E_TEST_RULES.md)를 참고하세요.
 
@@ -35,6 +79,31 @@
 
 ## 📋 테스트 목록
 
+### 📦 Annotation 테스트
+- ✅ `test_annotation_level_filtering.py` - Study/Series/Instance 레벨 필터링
+- ✅ `test_annotation_version_conflict.py` - Optimistic Locking 버전 충돌
+- ✅ `test_annotation_head_request.py` - HEAD 요청 및 캐시 검증
+- ✅ `test_annotation_snapshot_e2e.py` - 스냅샷 이미지 업로드
+- ✅ `test_annotation_permission_filtering.py` - 권한 기반 필터링
+- ✅ `test_annotation_permission_management.py` - 권한 관리
+
+### 🏥 DICOM Gateway 테스트
+- ✅ `test_dicom_gateway_study_series_e2e.py` - DICOM Gateway Study/Series
+- ✅ `test_dicom_gateway_report_status_filter_e2e.py` - Report Status Filter
+- ✅ `test_qido_enhanced_e2e.py` - QIDO Enhanced
+
+### 📊 Series 테스트
+- ✅ `test_series_note_e2e.py` - Series Note
+- ✅ `test_series_report_e2e.py` - Series Report
+- ✅ `test_series_resource_level_e2e.py` - Series Resource Level
+- ✅ `test_series_uid_api_e2e.py` - Series UID API
+- ✅ `test_series_user_report_api_e2e.py` - Series User Report API
+
+### 🖥️ Viewer 테스트
+- ✅ `test_viewer_api_e2e.py` - Viewer API
+- ✅ `test_view_selection_e2e.py` - View Selection
+- ✅ `test_study_list_view_e2e.py` - Study List View
+
 ### 리팩토링 완료 (권장)
 - ✅ `test_annotation_level_filtering_refactored.py` - Study/Series/Instance 레벨 필터링
 - ✅ `test_annotation_version_conflict_refactored.py` - Optimistic Locking 버전 충돌
@@ -42,12 +111,6 @@
 - ✅ `test_annotation_snapshot_e2e_refactored.py` - 스냅샷 이미지 업로드
 - ✅ `test_annotation_permission_filtering_refactored.py` - 권한 기반 필터링
 - ✅ `test_annotation_permission_management_refactored.py` - 권한 관리
-
-### 기존 테스트 (레거시)
-- ⚠️ `test_annotation_level_filtering.py` - (리팩토링 버전 사용 권장)
-- ⚠️ `test_annotation_version_conflict.py` - (리팩토링 버전 사용 권장)
-- ⚠️ `test_annotation_head_request.py` - (리팩토링 버전 사용 권장)
-- ⚠️ `test_annotation_snapshot_e2e.py` - (리팩토링 버전 사용 권장)
 - ⚠️ `test_annotation_permission_filtering.py` - (리팩토링 버전 사용 권장)
 - ⚠️ `test_annotation_permission_management.py` - (리팩토링 버전 사용 권장)
 

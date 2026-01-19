@@ -15,7 +15,23 @@ cargo run &
 
 ## 📚 API 문서
 
-### 1. Capability API (권한 관리)
+### 🏷️ Annotation API
+- **[Annotation 목록 조회 (Lesion 정보 포함)](./annotation/annotation-list-with-lesion.md)** ⭐ NEW
+  - Lesion 정보가 포함된 Annotation 목록 조회
+  - 프로젝트별, 사용자별, Study별 조회
+- **[Lesion Assignment API](./annotation/lesion-assignment.md)** ⭐ NEW
+  - RECIST 1.1 기준 Lesion 할당 (TARGET, NON_TARGET, TARGET_NEW, NON_TARGET_NEW)
+  - Lesion 생성, 수정, 삭제, 조회
+
+### 📊 TimePoint API
+- **[TimePoints with Studies API (X축 API)](./timepoint/timepoints-with-studies.md)** ⭐ NEW
+  - Subject의 TimePoints + Studies + Unassigned Studies 조회
+  - RECIST Report X축 데이터
+- **[Annotations by TimePoint API (Y축 API)](./timepoint/annotations-by-timepoint.md)** ⭐ NEW
+  - TimePoint의 모든 Annotations 조회 (Lesion 정보 포함)
+  - RECIST Report Y축 데이터
+
+### 🔐 Capability API (권한 관리)
 - [Capability API 스펙 문서](./capability-api-specification.md)
 - [UI 구현 가이드](../ui/capability-ui-implementation-guide.md)
 
@@ -25,7 +41,7 @@ cargo run &
 - `GET /api/capabilities/{id}` - Capability 상세 조회
 - `PUT /api/roles/{role_id}/capabilities/{capability_id}` - Capability 할당/제거
 
-### 2. 기존 API들
+### 📋 기존 API들
 - **Project User Matrix API**: `/api/projects/{id}/users/matrix`
 - **Role Permission Matrix API**: `/api/roles/global/permissions/matrix`
 - **Project Data Access API**: `/api/projects/{id}/data-access`
@@ -54,6 +70,65 @@ Role → Capability → Permission
 - **PROJECT_ADMIN**: 프로젝트 관리 권한 (14개 Capability)
 - **USER**: 기본 사용자 권한 (7개 Capability)
 - **VIEWER**: 읽기 전용 권한 (4개 Capability)
+
+## 📖 주요 API 사용 예시
+
+### TimePoints with Studies (X축 API)
+
+**Subject의 모든 TimePoints + Studies 조회:**
+```bash
+GET /api/subjects/{subject_id}/timepoints-with-studies?include_unassigned=true
+```
+
+**응답:**
+```json
+{
+  "subject_id": 1,
+  "subject_code": "SUBJ-001",
+  "timepoints": [
+    {
+      "id": 1,
+      "name": "Baseline",
+      "timepoint_date": "2026-01-01",
+      "studies": [...]
+    }
+  ],
+  "unassigned_studies": [...]
+}
+```
+
+**상세 문서:** [TimePoints with Studies API (X축 API)](./timepoint/timepoints-with-studies.md)
+
+---
+
+### Annotations by TimePoint (Y축 API)
+
+**TimePoint의 모든 Annotations 조회:**
+```bash
+GET /api/timepoints/{timepoint_id}/annotations
+```
+
+**응답:**
+```json
+{
+  "timepoint_id": 1,
+  "timepoint_name": "Baseline",
+  "annotations": [
+    {
+      "id": 123,
+      "lesion_type": "TARGET",
+      "lesion_number": 1,
+      "description": "Liver lesion #1",
+      "measurement_values": {"diameter": 25.5, "unit": "mm"}
+    }
+  ],
+  "total": 1
+}
+```
+
+**상세 문서:** [Annotations by TimePoint API (Y축 API)](./timepoint/annotations-by-timepoint.md)
+
+---
 
 ## 🔧 개발자 도구
 

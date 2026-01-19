@@ -11,19 +11,28 @@ GET /api/me/dicom/studies API의 확장 기능 테스트:
 6. _ext.projects 검증
 7. _ext.report_status 검증
 8. _ext.review 검증
+
+테스트 구조:
+1. 사전준비: 관리자 로그인
+2. 본 테스트: QIDO Enhanced API 테스트
+3. 클린업: N/A (데이터 생성 없음)
 """
 
 import requests
 import json
 import sys
 from typing import Optional, Dict, Any, List
-
-BASE_URL = "http://localhost:8080"
-USERNAME = "iaid-pacs-admin"
-PASSWORD = "Qlalfqjsgh1!"
+from test_common import (
+    BASE_URL, get_headers, get_admin_token, health_check
+)
 
 # 테스트 결과 추적
 test_results = {"passed": 0, "failed": 0, "total": 0}
+
+# 테스트 컨텍스트
+test_context = {
+    "admin_token": None
+}
 
 
 def print_header(text: str):
@@ -44,19 +53,44 @@ def print_result(test_name: str, passed: bool, details: str = ""):
         print(f"     → {details}")
 
 
-def get_token() -> Optional[str]:
-    """로그인하여 JWT 토큰 획득"""
-    try:
-        response = requests.post(
-            f"{BASE_URL}/api/auth/login",
-            json={"username": USERNAME, "password": PASSWORD},
-            timeout=10
-        )
-        if response.status_code == 200:
-            return response.json().get("token")
-    except Exception as e:
-        print(f"❌ 로그인 실패: {e}")
-    return None
+def setup():
+    """사전준비: 관리자 로그인"""
+    print("\n" + "=" * 70)
+    print("🔧 사전준비: 테스트 환경 설정")
+    print("=" * 70)
+
+    # 1. 헬스 체크
+    print("\n1️⃣  서버 헬스 체크...")
+    if not health_check():
+        print("❌ 서버가 응답하지 않습니다.")
+        sys.exit(1)
+    print("✅ 서버 정상")
+
+    # 2. 관리자 로그인
+    print("\n2️⃣  관리자 로그인...")
+    admin_token = get_admin_token()
+    if not admin_token:
+        print("❌ 관리자 로그인 실패")
+        sys.exit(1)
+    print("✅ 관리자 로그인 성공")
+    test_context["admin_token"] = admin_token
+
+    print("\n" + "=" * 70)
+    print("✅ 사전준비 완료!")
+    print("=" * 70)
+
+
+def cleanup():
+    """클린업: 생성한 데이터 정리"""
+    print("\n" + "=" * 70)
+    print("🧹 클린업: 테스트 데이터 정리")
+    print("=" * 70)
+
+    print("\nℹ️  데이터 생성이 없으므로 클린업할 항목이 없습니다.")
+
+    print("\n" + "=" * 70)
+    print("✅ 클린업 완료!")
+    print("=" * 70)
 
 
 def test_basic_study_list(token: str) -> bool:
@@ -312,24 +346,26 @@ def print_summary():
 def main():
     print("🚀 QIDO Enhanced API E2E 테스트 시작")
     print(f"   서버: {BASE_URL}")
-    print(f"   사용자: {USERNAME}")
 
-    # 로그인
-    token = get_token()
-    if not token:
-        print("❌ 로그인 실패. 테스트 중단.")
-        return 1
-    print(f"✅ 로그인 성공 (토큰 길이: {len(token)})")
+    try:
+        # 사전준비
+        setup()
 
-    # 테스트 실행
-    test_basic_study_list(token)
-    test_view_parameter(token)
-    test_project_filter(token)
-    test_pagination(token)
-    test_report_status_filter(token)
-    test_combined_filters(token)
+        token = test_context["admin_token"]
 
-    return print_summary()
+        # 본 테스트
+        test_basic_study_list(token)
+        test_view_parameter(token)
+        test_project_filter(token)
+        test_pagination(token)
+        test_report_status_filter(token)
+        test_combined_filters(token)
+
+        return print_summary()
+
+    finally:
+        # 클린업
+        cleanup()
 
 
 if __name__ == "__main__":

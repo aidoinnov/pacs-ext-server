@@ -2,13 +2,16 @@
 """
 Viewer Study Meta API E2E 테스트
 POST /api/viewer/studies/meta
+
+주의: 이 테스트는 실제 DICOM 데이터가 필요합니다.
+데이터가 없으면 테스트를 스킵합니다.
 """
 import requests
 import json
 import sys
 from typing import Optional, List, Dict
 
-BASE_URL = "http://localhost:8080"
+from test_common import BASE_URL, get_admin_token
 
 # 테스트 결과 추적
 test_results = {
@@ -70,15 +73,13 @@ def get_token() -> Optional[str]:
         print_error(f"로그인 에러: {e}")
         return None
 
-def get_sample_study_uids(token: str) -> List[str]:
-    """테스트용 Study UID 목록 조회"""
-    print_test("샘플 Study UID 조회")
+def get_sample_study_uids(token: str) -> Optional[List[str]]:
+    """테스트용 Study UID 목록 조회
 
-    # 먼저 하드코딩된 테스트 Study UID 사용
-    hardcoded_uids = [
-        "1.2.840.113619.2.55.3.604688433.1234",
-        "1.2.840.113619.2.55.3.604688433.5678"
-    ]
+    Returns:
+        Study UID 목록, 데이터가 없으면 None
+    """
+    print_test("샘플 Study UID 조회")
 
     try:
         # QIDO-RS를 통해 실제 Study UID 조회 시도
@@ -106,14 +107,17 @@ def get_sample_study_uids(token: str) -> List[str]:
                     print_info(f"  - {uid}")
                 return study_uids
             else:
-                print_info("QIDO-RS에서 Study를 찾을 수 없어 하드코딩된 UID 사용")
-                return hardcoded_uids
+                print_info("⚠️  QIDO-RS에서 Study를 찾을 수 없습니다")
+                print_info("실제 DICOM 데이터가 필요합니다. 테스트를 스킵합니다.")
+                return None
         else:
-            print_info(f"QIDO-RS 조회 실패 ({resp.status_code}), 하드코딩된 UID 사용")
-            return hardcoded_uids
+            print_info(f"⚠️  QIDO-RS 조회 실패 ({resp.status_code})")
+            print_info("실제 DICOM 데이터가 필요합니다. 테스트를 스킵합니다.")
+            return None
     except Exception as e:
-        print_info(f"QIDO-RS 조회 에러 ({e}), 하드코딩된 UID 사용")
-        return hardcoded_uids
+        print_info(f"⚠️  QIDO-RS 조회 에러: {e}")
+        print_info("실제 DICOM 데이터가 필요합니다. 테스트를 스킵합니다.")
+        return None
 
 def test_viewer_studies_meta(token: str, study_uids: List[str]):
     """Viewer Study Meta API 테스트"""
@@ -313,10 +317,13 @@ def main():
     if study_uids:
         test_viewer_studies_meta(token, study_uids)
         test_viewer_studies_meta(token, study_uids[:2])  # 일부만 테스트
-
-    test_empty_study_uids(token)
-    test_invalid_study_uids(token)
-    test_unauthorized_access()
+        test_empty_study_uids(token)
+        test_invalid_study_uids(token)
+        test_unauthorized_access()
+    else:
+        print_info("\n⚠️  실제 DICOM 데이터가 없어 테스트를 스킵합니다.")
+        print_info("DICOM 데이터를 추가한 후 다시 실행하세요.")
+        print_success("테스트 스킵 (데이터 없음)")
 
     # 5. 결과 요약
     exit_code = print_summary()

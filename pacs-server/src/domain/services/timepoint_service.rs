@@ -1,6 +1,6 @@
 use crate::domain::entities::{
     AssignStudies, AssignmentResult, CreateTimePoint, StudyInfo, TimePoint, TimePointStudies,
-    UnassignStudies, UpdateTimePoint, VisitType,
+    TimePointsWithStudiesResponse, UnassignStudies, UpdateTimePoint, VisitType,
 };
 use crate::domain::repositories::{
     ProjectDataRepository, SubjectRepository, TimePointRepository, TimePointStudyRepository,
@@ -146,6 +146,20 @@ pub trait TimePointService: Send + Sync {
         &self,
         subject_id: i32,
     ) -> Result<Vec<StudyInfo>, ServiceError>;
+
+    /// Subject의 모든 TimePoint와 Study 목록을 조회합니다.
+    ///
+    /// # 매개변수
+    /// - `subject_id`: Subject ID
+    /// - `include_unassigned`: Unassigned Study 포함 여부
+    ///
+    /// # 반환값
+    /// - `Ok(TimePointsWithStudiesResponse)`: TimePoint와 Study 목록
+    async fn get_timepoints_with_studies(
+        &self,
+        subject_id: i32,
+        include_unassigned: bool,
+    ) -> Result<TimePointsWithStudiesResponse, ServiceError>;
 }
 
 /// TimePoint 서비스 구현체
@@ -486,5 +500,56 @@ where
             .timepoint_study_repository
             .find_unassigned_studies_by_subject(subject_id)
             .await?)
+    }
+
+    async fn get_timepoints_with_studies(
+        &self,
+        subject_id: i32,
+        include_unassigned: bool,
+    ) -> Result<TimePointsWithStudiesResponse, ServiceError> {
+        use crate::domain::entities::TimePointWithStudies;
+
+        // 1. Subject 존재 확인 및 조회
+        let subject = self
+            .subject_repository
+            .find_by_id(subject_id)
+            .await?
+            .ok_or_else(|| ServiceError::NotFound("Subject not found".into()))?;
+
+        // 2. Subject의 모든 TimePoint 조회
+        let timepoints = self
+            .timepoint_repository
+            .find_by_subject(subject_id)
+            .await?;
+
+        // 3. 각 TimePoint에 할당된 Study 목록 조회
+        let mut timepoints_with_studies = Vec::new();
+        for timepoint in timepoints {
+            let studies = self
+                .timepoint_study_repository
+                .find_studies_by_timepoint(timepoint.id)
+                .await?;
+
+            timepoints_with_studies.push(TimePointWithStudies {
+                timepoint,
+                studies,
+            });
+        }
+
+        // 4. Unassigned Study 목록 조회 (옵션)
+        let unassigned_studies = if include_unassigned {
+            self.timepoint_study_repository
+                .find_unassigned_studies_by_subject(subject_id)
+                .await?
+        } else {
+            Vec::new()
+        };
+
+        Ok(TimePointsWithStudiesResponse {
+            subject_id,
+            subject_code: subject.subject_code,
+            timepoints: timepoints_with_studies,
+            unassigned_studies,
+        })
     }
 }

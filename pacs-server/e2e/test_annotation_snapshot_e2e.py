@@ -2,39 +2,47 @@
 """
 Annotation Snapshot Upload E2E Test
 어노테이션 스냅샷 이미지 업로드 기능 전체 워크플로우 테스트
+
+테스트 구조:
+1. 사전준비: 테스트 사용자 생성, 프로젝트 생성
+2. 본 테스트: 스냅샷 업로드 및 조회
+3. 클린업: 생성한 데이터 정리
 """
 
 import requests
 import os
 import io
+import sys
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
-from test_utils import cleanup_annotations
 
-BASE_URL = "http://localhost:8080"
-USER_ID = 'iaid-pacs-admin'
-USER_PASSWORD = 'Qlalfqjsgh1!'
+# PIL 패키지 확인 및 설치 안내
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    print("❌ PIL (Pillow) 패키지가 설치되지 않았습니다.")
+    print("다음 명령어로 설치하세요:")
+    print("  pip install Pillow")
+    sys.exit(1)
 
-def login():
-    """로그인하여 JWT 토큰 획득"""
-    print("🔐 로그인 중...")
-    login_resp = requests.post(
-        f"{BASE_URL}/api/auth/login",
-        json={"username": USER_ID, "password": USER_PASSWORD},
-        timeout=5
-    )
+from test_common import (
+    BASE_URL,
+    get_headers,
+    get_admin_token,
+    create_test_user,
+    create_test_project,
+    add_user_to_project,
+    cleanup_project,
+    cleanup_user,
+    health_check
+)
 
-    if login_resp.status_code != 200:
-        print(f"❌ 로그인 실패: {login_resp.status_code}")
-        print(login_resp.text)
-        exit(1)
-
-    token = login_resp.json()["token"]
-    if token is None:
-        print("❌ 토큰이 없습니다")
-        exit(1)
-    print(f"✅ 로그인 성공 (token length: {len(token)})\n")
-    return token
+# 테스트 데이터 저장용
+test_context = {
+    "user": None,
+    "project_id": None,
+    "annotation_id": None,
+    "admin_token": None
+}
 
 def create_test_image():
     """테스트용 PNG 이미지 생성"""
@@ -71,13 +79,17 @@ def create_test_image():
     img_byte_arr.seek(0)
     
     return img_byte_arr.getvalue()
-def test_annotation_snapshot_workflow(token: str) -> int:
+def test_annotation_snapshot_workflow(project_id: int, token: str) -> int:
     """스냅샷 업로드 전체 워크플로우 테스트
+
+    Args:
+        project_id: 테스트 프로젝트 ID
+        token: JWT 토큰
 
     Returns:
         생성된 어노테이션 ID
     """
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = get_headers(token)
 
     print("=" * 70)
     print("📋 Annotation Snapshot Upload E2E Test")
@@ -86,7 +98,7 @@ def test_annotation_snapshot_workflow(token: str) -> int:
     # 1. 어노테이션 생성
     print("\n1️⃣  어노테이션 생성 중...")
     annotation_data = {
-        "project_id": 2,
+        "project_id": project_id,
         "study_instance_uid": "1.3.6.1.4.1.14519.5.2.1.6655.2359.321111757620390201880556376661",
         "series_instance_uid": "1.3.6.1.4.1.14519.5.2.1.6655.2359.260616660471925521837323152953",
         "sop_instance_uid": "1.3.6.1.4.1.14519.5.2.1.6655.2359.217230834888240455035945707219",
@@ -108,7 +120,6 @@ def test_annotation_snapshot_workflow(token: str) -> int:
         ]
     }
 
-    # 개발 모드에서 user_id 헤더 추가
     dev_headers = headers.copy()
     dev_headers["X-User-ID"] = "1"  # iaid-pacs-admin의 user_id
 
@@ -276,24 +287,109 @@ def test_annotation_snapshot_workflow(token: str) -> int:
     return annotation_id
 
 
+def setup():
+    """사전준비: 테스트 사용자 및 프로젝트 생성"""
+    print("\n" + "=" * 70)
+    print("🔧 사전준비: 테스트 환경 설정")
+    print("=" * 70)
+
+    # 1. 헬스 체크
+    print("\n1️⃣  서버 헬스 체크...")
+    if not health_check():
+        print("❌ 서버가 응답하지 않습니다.")
+        sys.exit(1)
+    print("✅ 서버 정상")
+
+    # 2. 관리자 토큰 획득
+    print("\n2️⃣  관리자 로그인...")
+    admin_token = get_admin_token()
+    if not admin_token:
+        print("❌ 관리자 로그인 실패")
+        sys.exit(1)
+    print("✅ 관리자 로그인 성공")
+    test_context["admin_token"] = admin_token
+
+    # 3. 테스트 사용자 생성
+    print("\n3️⃣  테스트 사용자 생성...")
+    user = create_test_user("snapshot_test")
+    if not user:
+        print("❌ 테스트 사용자 생성 실패")
+        sys.exit(1)
+    print(f"✅ 테스트 사용자 생성 성공: {user['username']} (ID: {user['user_id']})")
+    test_context["user"] = user
+
+    # 4. 테스트 프로젝트 생성
+    print("\n4️⃣  테스트 프로젝트 생성...")
+    project_id = create_test_project(user["token"], "snapshot_test")
+    if not project_id:
+        print("❌ 테스트 프로젝트 생성 실패")
+        sys.exit(1)
+    print(f"✅ 테스트 프로젝트 생성 성공: ID {project_id}")
+    test_context["project_id"] = project_id
+
+    # 5. 사용자를 프로젝트에 추가
+    print("\n5️⃣  사용자를 프로젝트에 추가...")
+    if not add_user_to_project(user["user_id"], project_id, user["token"]):
+        print("⚠️  사용자 추가 실패 (이미 멤버일 수 있음)")
+    else:
+        print("✅ 사용자 추가 성공")
+
+    print("\n" + "=" * 70)
+    print("✅ 사전준비 완료!")
+    print("=" * 70)
+
+
+def cleanup():
+    """클린업: 생성한 데이터 정리"""
+    print("\n" + "=" * 70)
+    print("🧹 클린업: 테스트 데이터 정리")
+    print("=" * 70)
+
+    # 1. 프로젝트 삭제
+    if test_context["project_id"] and test_context["user"]:
+        print(f"\n1️⃣  프로젝트 삭제 (ID: {test_context['project_id']})...")
+        if cleanup_project(test_context["project_id"], test_context["user"]["token"]):
+            print("✅ 프로젝트 삭제 성공")
+        else:
+            print("⚠️  프로젝트 삭제 실패")
+
+    # 2. 사용자 삭제
+    if test_context["user"] and test_context["admin_token"]:
+        print(f"\n2️⃣  사용자 삭제 (ID: {test_context['user']['user_id']})...")
+        if cleanup_user(test_context["user"]["user_id"], test_context["admin_token"]):
+            print("✅ 사용자 삭제 성공")
+        else:
+            print("⚠️  사용자 삭제 실패")
+
+    print("\n" + "=" * 70)
+    print("✅ 클린업 완료!")
+    print("=" * 70)
+
+
 if __name__ == '__main__':
-    created_ids = []
-    token = None
     try:
         print("\n🚀 Annotation Snapshot E2E Test 시작...\n")
-        token = login()
-        annotation_id = test_annotation_snapshot_workflow(token)
-        created_ids.append(annotation_id)
-        print("✅ 테스트 완료!\n")
+
+        # 사전준비
+        setup()
+
+        # 본 테스트
+        annotation_id = test_annotation_snapshot_workflow(
+            test_context["project_id"],
+            test_context["user"]["token"]
+        )
+        test_context["annotation_id"] = annotation_id
+
+        print("\n✅ 모든 테스트 통과!\n")
+
     except AssertionError as e:
         print(f"\n❌ 검증 실패: {e}\n")
-        exit(1)
+        sys.exit(1)
     except Exception as e:
         print(f"\n❌ 테스트 실패: {e}\n")
         import traceback
         traceback.print_exc()
-        exit(1)
+        sys.exit(1)
     finally:
-        # Cleanup
-        if created_ids and token:
-            cleanup_annotations(token, created_ids)
+        # 클린업
+        cleanup()

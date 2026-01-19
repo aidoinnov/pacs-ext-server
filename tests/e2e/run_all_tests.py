@@ -69,6 +69,8 @@ def main():
         "test_02_project.py",
         "test_03_annotation.py",
         "test_04_snapshot.py",
+        "test_11_lesion_assignment.py",
+        "test_12_timepoint_with_studies.py",
         "test_performance_01_concurrent.py",
         "test_performance_02_bulk_data.py",
     ]
