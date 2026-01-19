@@ -134,6 +134,8 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
             description: annotation.description,
             measurement_values: annotation.measurement_values,
             label: annotation.label,
+            lesion_type: annotation.lesion_type,
+            lesion_number: annotation.lesion_number,
             version: annotation.version,
             created_at: annotation.created_at,
             updated_at: annotation.updated_at,
@@ -252,6 +254,8 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
                     description: annotation.description,
                     measurement_values: annotation.measurement_values,
                     label: annotation.label,
+                    lesion_type: annotation.lesion_type,
+                    lesion_number: annotation.lesion_number,
                     version: annotation.version,
                     created_at: annotation.created_at,
                     updated_at: annotation.updated_at,
@@ -360,6 +364,8 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
             is_shared: false, // 기본값은 비공유
             snapshot_image_key: None, // 생성 시에는 스냅샷 없음
             snapshot_status: None,    // 생성 시에는 스냅샷 상태 없음
+            lesion_type: request.lesion_type.unwrap_or_else(|| "UNSPECIFIED".to_string()),
+            lesion_number: request.lesion_number,
         };
 
         let annotation = self
@@ -789,6 +795,8 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
             .measurement_values
             .or(current_annotation.measurement_values);
         let label = request.label.or(current_annotation.label);
+        let lesion_type = request.lesion_type.or(current_annotation.lesion_type);
+        let lesion_number = request.lesion_number.or(current_annotation.lesion_number);
 
         let updated_annotation = self
             .annotation_service
@@ -798,6 +806,8 @@ impl<A: AnnotationService, U: UserRepository, AC: AccessControlService, SUS: Sig
                 is_shared,
                 measurement_values,
                 label,
+                lesion_type,
+                lesion_number,
             )
             .await?;
 

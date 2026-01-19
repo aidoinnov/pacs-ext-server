@@ -117,6 +117,13 @@ pub struct Annotation {
     /// 어노테이션 라벨 (선택사항)
     /// 어노테이션의 분류나 카테고리를 나타내는 라벨 (예: "Tumor", "Lesion", "Normal")
     pub label: Option<String>,
+    /// RECIST Lesion 타입 (선택사항)
+    /// TARGET, NON_TARGET, TARGET_NEW, NON_TARGET_NEW, UNSPECIFIED
+    /// 기본값: UNSPECIFIED
+    pub lesion_type: Option<String>,
+    /// RECIST Lesion 번호 (선택사항)
+    /// Lesion 타입별 순번 (1, 2, 3, 4, 5)
+    pub lesion_number: Option<i32>,
 }
 
 /// 어노테이션 변경 이력을 나타내는 엔티티
@@ -231,4 +238,11 @@ pub struct NewAnnotation {
     pub snapshot_image_key: Option<String>,
     /// 스냅샷 업로드 상태 (선택사항)
     pub snapshot_status: Option<SnapshotUploadStatus>,
+    /// RECIST Lesion 타입 (필수)
+    /// TARGET, NON_TARGET, TARGET_NEW, NON_TARGET_NEW, UNSPECIFIED
+    /// 기본값: UNSPECIFIED
+    pub lesion_type: String,
+    /// RECIST Lesion 번호 (선택사항)
+    /// Lesion 타입별 순번 (1, 2, 3, 4, 5)
+    pub lesion_number: Option<i32>,
 }

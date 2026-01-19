@@ -64,6 +64,23 @@ pub struct CreateAnnotationRequest {
     /// 어노테이션의 분류나 카테고리를 나타내는 라벨
     #[schema(example = "Tumor")]
     pub label: Option<String>,
+
+    /// RECIST Lesion 타입 (선택사항)
+    /// TARGET, NON_TARGET, TARGET_NEW, NON_TARGET_NEW, UNSPECIFIED
+    /// 기본값: UNSPECIFIED
+    #[schema(example = "TARGET")]
+    #[serde(default = "default_lesion_type")]
+    pub lesion_type: Option<String>,
+
+    /// RECIST Lesion 번호 (선택사항)
+    /// Lesion 타입별 순번 (1, 2, 3, 4, 5)
+    #[schema(example = 1)]
+    pub lesion_number: Option<i32>,
+}
+
+/// lesion_type의 기본값을 반환합니다.
+fn default_lesion_type() -> Option<String> {
+    Some("UNSPECIFIED".to_string())
 }
 
 /// Annotation 업데이트 요청 DTO
@@ -111,6 +128,17 @@ pub struct UpdateAnnotationRequest {
     /// 어노테이션의 분류나 카테고리를 나타내는 라벨
     #[schema(example = "Lesion")]
     pub label: Option<String>,
+
+    /// RECIST Lesion 타입 (선택사항)
+    /// TARGET, NON_TARGET, TARGET_NEW, NON_TARGET_NEW, UNSPECIFIED
+    /// 기본값: UNSPECIFIED
+    #[schema(example = "TARGET")]
+    pub lesion_type: Option<String>,
+
+    /// RECIST Lesion 번호 (선택사항)
+    /// Lesion 타입별 순번 (1, 2, 3, 4, 5)
+    #[schema(example = 1)]
+    pub lesion_number: Option<i32>,
 }
 
 /// Annotation 응답 DTO
@@ -177,6 +205,17 @@ pub struct AnnotationResponse {
     /// 어노테이션의 분류나 카테고리를 나타내는 라벨
     #[schema(example = "Tumor")]
     pub label: Option<String>,
+
+    /// RECIST Lesion 타입 (선택사항)
+    /// TARGET, NON_TARGET, TARGET_NEW, NON_TARGET_NEW, UNSPECIFIED
+    /// 기본값: UNSPECIFIED
+    #[schema(example = "TARGET")]
+    pub lesion_type: Option<String>,
+
+    /// RECIST Lesion 번호 (선택사항)
+    /// Lesion 타입별 순번 (1, 2, 3, 4, 5)
+    #[schema(example = 1)]
+    pub lesion_number: Option<i32>,
 
     /// 버전 번호 (Optimistic Locking)
     /// 낙관적 잠금을 위한 버전 번호
