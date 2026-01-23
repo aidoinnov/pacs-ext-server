@@ -456,32 +456,83 @@ async fn main() -> std::io::Result<()> {
     ));
     
     // ViewSelection 서비스 및 UseCase 초기화
-    let view_selection_use_case = if let Some(ref redis_conn) = redis_connection {
+    use crate::infrastructure::view_selection::ViewSelectionServiceImpl;
+    use crate::application::use_cases::ViewSelectionUseCase;
+
+    // QIDO 캐시 서비스 초기화 (Redis 사용 시)
+    print!("🔄 Initializing QIDO cache service... ");
+    let qido_cache_service = if let Some(ref redis_conn) = redis_connection {
+        use crate::infrastructure::services::QidoCacheService;
+
+        let cache_ttl = settings.redis
+            .as_ref()
+            .and_then(|r| std::env::var("QIDO_CACHE_TTL_SEC").ok().and_then(|s| s.parse().ok()))
+            .unwrap_or(60); // 기본 60초
+
+        let service = Arc::new(QidoCacheService::new(
+            Arc::new(redis_conn.clone()),
+            Some(cache_ttl),
+        ));
+
+        println!("✅ Done (TTL: {}s)", cache_ttl);
+        Some(service)
+    } else {
+        println!("⏭️  Skipped (Redis not configured)");
+        None
+    };
+
+    // Redis 사용 여부에 따라 다른 타입의 UseCase 생성
+    let (view_selection_use_case_redis, view_selection_use_case_inmemory) = if let Some(ref redis_conn) = redis_connection {
+        // Redis 사용
         use crate::infrastructure::view_selection::ViewSelectionRepositoryImpl;
-        use crate::infrastructure::view_selection::ViewSelectionServiceImpl;
-        use crate::application::use_cases::ViewSelectionUseCase;
-        
+
         let view_selection_repo = Arc::new(ViewSelectionRepositoryImpl::new(
             Arc::new(redis_conn.clone()),
             None, // 기본 키 접두사 사용
         ));
-        
+
         let default_ttl = settings.redis
             .as_ref()
             .map(|r| r.view_selection_ttl_sec)
             .unwrap_or(1800); // 기본 30분
-        
+
         let view_selection_service = Arc::new(ViewSelectionServiceImpl::new(
-            view_selection_repo.clone(),
+            view_selection_repo,
             default_ttl,
         ));
-        
-        Some(Arc::new(ViewSelectionUseCase::new(
+
+        let use_case = Arc::new(ViewSelectionUseCase::new(
             view_selection_service,
             default_ttl,
-        )))
+        ));
+
+        (Some(use_case), None)
     } else {
-        None
+        // Redis 없음 → In-memory fallback 사용
+        use crate::infrastructure::view_selection::ViewSelectionInMemoryRepositoryImpl;
+
+        println!("⚠️  ========================================");
+        println!("⚠️  WARNING: Using in-memory ViewSelection storage");
+        println!("⚠️  - Data will be lost on server restart");
+        println!("⚠️  - NOT suitable for multi-server deployments");
+        println!("⚠️  - For production, configure Redis connection");
+        println!("⚠️  ========================================");
+
+        let view_selection_repo = Arc::new(ViewSelectionInMemoryRepositoryImpl::new(None));
+
+        let default_ttl = 1800; // 기본 30분
+
+        let view_selection_service = Arc::new(ViewSelectionServiceImpl::new(
+            view_selection_repo,
+            default_ttl,
+        ));
+
+        let use_case = Arc::new(ViewSelectionUseCase::new(
+            view_selection_service,
+            default_ttl,
+        ));
+
+        (None, Some(use_case))
     };
     
     // Study List View UseCase 초기화
@@ -490,6 +541,15 @@ async fn main() -> std::io::Result<()> {
 
     let study_list_view_repo = Arc::new(StudyListViewRepositoryImpl::new(pool.clone()));
     let study_list_view_use_case = Arc::new(StudyListViewUseCase::new(study_list_view_repo.clone()));
+
+    // Data Access Check UseCase 초기화
+    use crate::application::use_cases::DataAccessCheckUseCase;
+
+    let data_access_check_use_case = Arc::new(DataAccessCheckUseCase::new(
+        project_repo.clone(),
+        dicom_evaluator.clone(),
+        project_data_repo.clone(),
+    ));
 
     // Series User Report 서비스 및 UseCase 초기화 (Reporting Context)
     use crate::domain::reporting::repositories::SeriesUserReportRepository;
@@ -702,6 +762,7 @@ async fn main() -> std::io::Result<()> {
                             study_list_view_repo.clone(),
                             Arc::new(annotation_repo.clone()),
                             pool.clone(),
+                            qido_cache_service.clone(),
                         )
                     })
                     // Sync API (only in Full/SyncOnly)
@@ -812,7 +873,9 @@ async fn main() -> std::io::Result<()> {
                     // ========================================
                     .configure(|cfg| {
                         if settings.server.mode != ServerMode::SyncOnly {
-                            if let Some(ref view_selection_use_case) = view_selection_use_case {
+                            // Redis 사용 여부에 따라 다른 타입으로 등록
+                            if let Some(ref use_case) = view_selection_use_case_redis {
+                                // Redis 사용
                                 cfg.service(
                                     web::resource("/v1/view-selections")
                                         .route(web::post().to(
@@ -842,7 +905,41 @@ async fn main() -> std::io::Result<()> {
                                 );
 
                                 // App data 등록
-                                cfg.app_data(web::Data::new(view_selection_use_case.clone()));
+                                cfg.app_data(web::Data::new(use_case.clone()));
+                                cfg.app_data(web::Data::new(dicom_evaluator.clone()));
+                                cfg.app_data(web::Data::new(project_data_repo.clone()));
+                            } else if let Some(ref use_case) = view_selection_use_case_inmemory {
+                                // In-memory 사용
+                                cfg.service(
+                                    web::resource("/v1/view-selections")
+                                        .route(web::post().to(
+                                            presentation::controllers::view_selection_controller::create_view_selection::<
+                                                crate::infrastructure::view_selection::ViewSelectionServiceImpl<
+                                                    crate::infrastructure::view_selection::ViewSelectionInMemoryRepositoryImpl,
+                                                >,
+                                            >,
+                                        ))
+                                )
+                                .service(
+                                    web::resource("/v1/view-selections/{selection_id}")
+                                        .route(web::get().to(
+                                            presentation::controllers::view_selection_controller::get_view_selection::<
+                                                crate::infrastructure::view_selection::ViewSelectionServiceImpl<
+                                                    crate::infrastructure::view_selection::ViewSelectionInMemoryRepositoryImpl,
+                                                >,
+                                            >,
+                                        ))
+                                        .route(web::delete().to(
+                                            presentation::controllers::view_selection_controller::delete_view_selection::<
+                                                crate::infrastructure::view_selection::ViewSelectionServiceImpl<
+                                                    crate::infrastructure::view_selection::ViewSelectionInMemoryRepositoryImpl,
+                                                >,
+                                            >,
+                                        ))
+                                );
+
+                                // App data 등록
+                                cfg.app_data(web::Data::new(use_case.clone()));
                                 cfg.app_data(web::Data::new(dicom_evaluator.clone()));
                                 cfg.app_data(web::Data::new(project_data_repo.clone()));
                             }
@@ -937,6 +1034,17 @@ async fn main() -> std::io::Result<()> {
                                 cfg,
                                 access_control_use_case.clone(),
                             )
+                        }
+                    })
+                    // ========================================
+                    // 🔍 데이터 접근 권한 확인 API
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            presentation::controllers::data_access_check_controller::configure_routes(cfg);
+                            cfg.app_data(web::Data::new(data_access_check_use_case.clone()));
+                            cfg.app_data(web::Data::new(Arc::new(jwt_service.clone())));
+                            cfg.app_data(web::Data::new(Arc::new(user_repo.clone())));
                         }
                     })
                     .configure(|cfg| {
