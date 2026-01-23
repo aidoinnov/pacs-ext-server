@@ -57,8 +57,41 @@ impl QidoCacheService {
         key
     }
 
+    /// Studies 목록 캐시 조회
+    ///
+    /// # Arguments
+    /// * `project_id` - 프로젝트 ID
+    /// * `params_hash` - 쿼리 파라미터 해시
+    pub async fn get_studies(
+        &self,
+        project_id: Option<i32>,
+        params_hash: &str,
+    ) -> Result<Option<JsonValue>, String> {
+        let key = if let Some(pid) = project_id {
+            format!("qido:studies:p{}:h{}", pid, params_hash)
+        } else {
+            format!("qido:studies:h{}", params_hash)
+        };
+        self.get_cached_json(&key).await
+    }
+
+    /// Studies 목록 캐시 저장
+    pub async fn set_studies(
+        &self,
+        project_id: Option<i32>,
+        params_hash: &str,
+        data: &JsonValue,
+    ) -> Result<(), String> {
+        let key = if let Some(pid) = project_id {
+            format!("qido:studies:p{}:h{}", pid, params_hash)
+        } else {
+            format!("qido:studies:h{}", params_hash)
+        };
+        self.set_cached_json(&key, data).await
+    }
+
     /// Series 목록 캐시 조회
-    /// 
+    ///
     /// # Arguments
     /// * `study_uid` - Study Instance UID
     /// * `project_id` - 프로젝트 ID
@@ -107,27 +140,6 @@ impl QidoCacheService {
         data: &JsonValue,
     ) -> Result<(), String> {
         let key = Self::cache_key("instances", study_uid, Some(series_uid), project_id, params_hash);
-        self.set_cached_json(&key, data).await
-    }
-
-    /// Study 목록 캐시 조회
-    pub async fn get_studies(
-        &self,
-        project_id: Option<i32>,
-        params_hash: Option<&str>,
-    ) -> Result<Option<JsonValue>, String> {
-        let key = Self::cache_key("studies", "*", None, project_id, params_hash);
-        self.get_cached_json(&key).await
-    }
-
-    /// Study 목록 캐시 저장
-    pub async fn set_studies(
-        &self,
-        project_id: Option<i32>,
-        params_hash: Option<&str>,
-        data: &JsonValue,
-    ) -> Result<(), String> {
-        let key = Self::cache_key("studies", "*", None, project_id, params_hash);
         self.set_cached_json(&key, data).await
     }
 

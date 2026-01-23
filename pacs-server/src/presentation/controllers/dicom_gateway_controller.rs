@@ -689,6 +689,7 @@ pub async fn get_all_user_studies(
     study_list_view_repo: web::Data<Arc<StudyListViewRepositoryImpl>>,
     annotation_repo: web::Data<Arc<AnnotationRepositoryImpl>>,
     pool: web::Data<PgPool>,
+    qido_cache: web::Data<Option<Arc<QidoCacheService>>>,
     query: web::Query<GatewayQuery>,
     req: HttpRequest,
 ) -> HttpResponse {
@@ -856,6 +857,7 @@ pub async fn get_all_user_studies(
         let bearer_opt = bearer_opt.clone();
         let user_params = user_params.clone();
         let access_condition_repo = access_condition_repo.clone();
+        let qido_cache = qido_cache.clone();
 
         async move {
             // 프로젝트별 Access Condition 적용
@@ -868,10 +870,43 @@ pub async fn get_all_user_studies(
 
             tracing::debug!("Gateway /me/studies: QIDO params for project {}: {:?}", project_id, qido_params);
 
-            // QIDO 호출
-            let result = qido
-                .qido_studies_with_bearer(bearer_opt.as_deref(), qido_params)
-                .await;
+            // 캐시 키 생성
+            let params_hash = QidoCacheService::hash_params(&qido_params);
+
+            // QIDO 호출 (캐시 적용)
+            let result = if let Some(cache) = qido_cache.as_ref().as_ref() {
+                match cache.get_studies(Some(project_id), &params_hash).await {
+                    Ok(Some(cached)) => {
+                        tracing::info!("⚡ Cache HIT - studies for project={}", project_id);
+                        Ok(cached)
+                    }
+                    Ok(None) => {
+                        // 캐시 미스 - QIDO 호출
+                        match qido.qido_studies_with_bearer(bearer_opt.as_deref(), qido_params.clone()).await {
+                            Ok(json) => {
+                                // 캐시 저장 (비동기, 실패해도 무시)
+                                let cache_clone = cache.clone();
+                                let params_hash_clone = params_hash.clone();
+                                let json_clone = json.clone();
+                                tokio::spawn(async move {
+                                    if let Err(e) = cache_clone.set_studies(Some(project_id), &params_hash_clone, &json_clone).await {
+                                        tracing::warn!("Failed to cache QIDO studies response: {}", e);
+                                    }
+                                });
+                                tracing::info!("🔄 Cache MISS - studies for project={}", project_id);
+                                Ok(json)
+                            }
+                            Err(e) => Err(e)
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Cache error (fallback to QIDO): {}", e);
+                        qido.qido_studies_with_bearer(bearer_opt.as_deref(), qido_params).await
+                    }
+                }
+            } else {
+                qido.qido_studies_with_bearer(bearer_opt.as_deref(), qido_params).await
+            };
 
             (project_id, result)
         }
