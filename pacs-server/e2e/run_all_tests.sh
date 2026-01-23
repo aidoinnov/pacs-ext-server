@@ -65,6 +65,7 @@ echo "=========================================="
 run_test "test_dicom_gateway_study_series_e2e.py" "DICOM Gateway Study/Series"
 run_test "test_dicom_gateway_report_status_filter_e2e.py" "DICOM Gateway Report Status Filter"
 run_test "test_qido_enhanced_e2e.py" "QIDO Enhanced"
+run_test "test_dicom_access_check_e2e.py" "DICOM Data Access Check"
 
 echo ""
 echo "=========================================="
@@ -83,6 +84,18 @@ echo "=========================================="
 run_test "test_viewer_api_e2e.py" "Viewer API"
 run_test "test_view_selection_e2e.py" "View Selection"
 run_test "test_study_list_view_e2e.py" "Study List View"
+
+echo ""
+echo "=========================================="
+echo "⚡ HTTP Caching 테스트"
+echo "=========================================="
+run_test "test_capability_cache_e2e.py" "Capability API Cache"
+
+echo ""
+echo "=========================================="
+echo "🚀 QIDO Redis Caching 테스트"
+echo "=========================================="
+run_test "test_qido_cache_e2e.py" "QIDO Cache (Series & Studies)"
 
 # 최종 결과 출력
 echo ""
