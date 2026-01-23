@@ -15,6 +15,21 @@ cargo run &
 
 ## 📚 API 문서
 
+### ⚡ 캐싱 가이드
+- **[통합 캐싱 가이드](./caching-guide.md)** ⭐ 필독
+  - 모든 캐싱 전략 비교 및 사용법
+  - Redis 캐싱 vs HTTP 캐싱
+  - 클라이언트 구현 가이드
+- **[QIDO-RS 캐시 가이드](./qido-cache-client-guide.md)**
+  - Redis 기반 DICOM 데이터 캐싱
+  - 60초 TTL, 자동 캐싱
+- **[Capability 캐시 가이드](./capability-cache-client-guide.md)**
+  - HTTP ETag 기반 캐싱
+  - 60초 TTL, 조건부 요청
+- **[Role Assignment 캐시 가이드](./role-assignment-caching-guide.md)**
+  - HTTP ETag 기반 캐싱
+  - 1초 TTL, 중복 요청 방지
+
 ### 🏷️ Annotation API
 - **[Annotation 목록 조회 (Lesion 정보 포함)](./annotation/annotation-list-with-lesion.md)** ⭐ NEW
   - Lesion 정보가 포함된 Annotation 목록 조회
@@ -30,6 +45,18 @@ cargo run &
 - **[Annotations by TimePoint API (Y축 API)](./timepoint/annotations-by-timepoint.md)** ⭐ NEW
   - TimePoint의 모든 Annotations 조회 (Lesion 정보 포함)
   - RECIST Report Y축 데이터
+
+### 🩺 DICOM API
+- **[DICOM Data Access Check API](./dicom/data-access-check-api.md)** ⭐ NEW
+  - Study/Series 접근 권한 확인
+  - 프로젝트별 접근 권한 확인
+  - RBAC 기반 권한 평가
+- **[시리즈/인스턴스 조회 API](./dicom/시리즈-인스턴스-조회-API.md)**
+  - Series 및 Instance 조회
+  - WADO-RS 썸네일 URL 포함
+- **[DICOM Gateway API](./dicom/dicom-gateway-api.md)**
+  - QIDO-RS 프록시
+  - RBAC 필터링
 
 ### 🔐 Capability API (권한 관리)
 - [Capability API 스펙 문서](./capability-api-specification.md)
