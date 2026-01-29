@@ -898,9 +898,12 @@ pub async fn get_all_user_studies(
                                 let cache_clone = cache.clone();
                                 let params_hash_clone = params_hash.clone();
                                 let json_clone = json.clone();
+                                // 백그라운드 캐시 저장 (실패해도 메인 로직에 영향 없음)
                                 tokio::spawn(async move {
                                     if let Err(e) = cache_clone.set_studies(Some(project_id), &params_hash_clone, &json_clone).await {
-                                        tracing::warn!("Failed to cache QIDO studies response: {}", e);
+                                        tracing::error!("Background cache storage failed for studies (project={}): {}", project_id, e);
+                                    } else {
+                                        tracing::debug!("Background cache storage succeeded for studies (project={})", project_id);
                                     }
                                 });
                                 tracing::info!("🔄 Cache MISS - studies for project={}", project_id);
@@ -1359,9 +1362,12 @@ pub async fn get_series(
                         let study_uid_clone = study_uid.clone();
                         let params_hash_clone = params_hash.clone();
                         let json_clone = json.clone();
+                        // 백그라운드 캐시 저장 (실패해도 메인 로직에 영향 없음)
                         tokio::spawn(async move {
                             if let Err(e) = cache_clone.set_series(&study_uid_clone, project_id_opt, params_hash_clone.as_deref(), &json_clone).await {
-                                tracing::warn!("Failed to cache QIDO response: {}", e);
+                                tracing::error!("Background cache storage failed for series (study={}): {}", study_uid_clone, e);
+                            } else {
+                                tracing::debug!("Background cache storage succeeded for series (study={})", study_uid_clone);
                             }
                         });
 
@@ -1678,9 +1684,12 @@ pub async fn get_user_study_series(
                             let params_hash_clone = params_hash.clone();
                             let json_clone = json.clone();
                             let pid = *project_id;
+                            // 백그라운드 캐시 저장 (실패해도 메인 로직에 영향 없음)
                             tokio::spawn(async move {
                                 if let Err(e) = cache_clone.set_series(&study_uid_clone, Some(pid), params_hash_clone.as_deref(), &json_clone).await {
-                                    tracing::warn!("Failed to cache QIDO response: {}", e);
+                                    tracing::error!("Background cache storage failed for series (study={}, project={}): {}", study_uid_clone, pid, e);
+                                } else {
+                                    tracing::debug!("Background cache storage succeeded for series (study={}, project={})", study_uid_clone, pid);
                                 }
                             });
                             tracing::info!("🔄 Cache MISS - study={}, project={}", study_uid, project_id);
@@ -2085,9 +2094,12 @@ pub async fn get_instances(
                         let series_uid_clone = series_uid.clone();
                         let params_hash_clone = params_hash.clone();
                         let json_clone = json.clone();
+                        // 백그라운드 캐시 저장 (실패해도 메인 로직에 영향 없음)
                         tokio::spawn(async move {
                             if let Err(e) = cache_clone.set_instances(&study_uid_clone, &series_uid_clone, project_id_opt, params_hash_clone.as_deref(), &json_clone).await {
-                                tracing::warn!("Failed to cache QIDO instances response: {}", e);
+                                tracing::error!("Background cache storage failed for instances (study={}, series={}): {}", study_uid_clone, series_uid_clone, e);
+                            } else {
+                                tracing::debug!("Background cache storage succeeded for instances (study={}, series={})", study_uid_clone, series_uid_clone);
                             }
                         });
 
