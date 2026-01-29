@@ -14,9 +14,11 @@
   annotation 목록 출력
   ```
 
-### 원인 분석
+### 원인 분석 (2단계 조사)
 
-#### 1. 데이터베이스 연결 풀 설정 부족 ⚠️
+#### 1차 조사: 연결 풀 설정 부족
+
+##### 1-1. 데이터베이스 연결 풀 설정 부족 ⚠️
 **문제:**
 - `max_connections`: 10 (기본값)
 - `acquire_timeout`: 설정 없음 → 무한 대기 가능
@@ -29,7 +31,7 @@
 - 끊어진 연결 사용 시 에러 발생
 - 연결 누수 시 복구 불가능
 
-#### 2. HTTP 클라이언트 연결 풀 설정 부족 ⚠️
+##### 1-2. HTTP 클라이언트 연결 풀 설정 부족 ⚠️
 **문제:**
 - `reqwest::Client::new()` 기본 설정 사용
 - 연결 풀 크기 제한 없음
@@ -41,13 +43,45 @@
 - 유휴 연결이 계속 유지됨
 - 호스트당 연결 수 제한 없음
 
-#### 3. 비동기 작업 누적 ⚠️
+#### 2차 조사: 연결 누수 및 병렬 처리 문제
+
+##### 2-1. Redis 연결 누수 ⚠️⚠️⚠️ (심각)
 **문제:**
-- `tokio::spawn`으로 생성된 작업 추적 안 됨
-- 에러 무시 (`let _`)
+```rust
+// 기존 코드
+pub async fn get_connection(&self) -> Result<...> {
+    self.client.get_multiplexed_async_connection().await  // ❌ 매번 새 연결 생성!
+}
+```
 
 **영향:**
-- View Selection TTL 연장 작업 누적
+- View Selection 조회 1회 = Redis 연결 1개 생성
+- View Selection 저장 1회 = Redis 연결 1개 생성
+- TTL 연장 1회 = Redis 연결 2개 생성 (조회 + 저장)
+- **10회 반복 시 40개 연결 생성** → 메모리 누수
+
+##### 2-2. 무제한 병렬 QIDO 호출 ⚠️⚠️ (심각)
+**문제:**
+```rust
+// 기존 코드
+let qido_results = join_all(qido_futures).await;  // ❌ 모든 프로젝트 동시 호출!
+```
+
+**영향:**
+- 사용자가 10개 프로젝트에 속한 경우 → **10개 QIDO 호출 동시 실행**
+- 각 QIDO 호출이 DB 연결 + HTTP 연결 사용
+- DB 연결 10개 + HTTP 연결 10개 = **총 20개 연결 동시 사용**
+- 연결 풀 고갈 가능성 높음
+
+##### 2-3. Annotation N+1 쿼리 패턴 ⚠️
+**문제:**
+- Annotation 조회 시 권한 체크를 위해 여러 DB 쿼리 실행
+- `is_project_member()` → DB 쿼리
+- `check_permission()` → DB 쿼리 (캐시 미스 시)
+- `find_by_project_id_with_viewer()` → DB 쿼리
+
+**영향:**
+- 배치 작업 시 연결 누적 가능
 - Redis 연결 에러 무시
 
 ---
