@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use sqlx::PgPool;
 use futures::future::join_all;
+use futures::stream::{self, StreamExt};
 
 use crate::domain::entities::access_condition::AccessCondition;
 use crate::domain::repositories::{AccessConditionRepository, ProjectDataRepository, UserRepository, StudyListViewRepository, AnnotationRepository};
@@ -919,9 +920,13 @@ pub async fn get_all_user_studies(
 
             (project_id, result)
         }
-    }).collect();
+    }).collect::<Vec<_>>();
 
-    let qido_results = join_all(qido_futures).await;
+    // 병렬 호출 제한: 최대 5개씩만 동시 실행하여 연결 풀 고갈 방지
+    let qido_results = stream::iter(qido_futures)
+        .buffer_unordered(5)
+        .collect::<Vec<_>>()
+        .await;
 
     // 결과 처리 - V2: 배치 권한 확인 사용
     for (project_id, result) in qido_results {
@@ -2852,8 +2857,10 @@ pub async fn get_all_user_series(
         }));
     }
 
-    // 모든 QIDO 호출 완료 대기
-    let qido_results: Vec<_> = futures::future::join_all(qido_futures)
+    // 모든 QIDO 호출 완료 대기 (병렬 호출 제한: 최대 5개씩)
+    let qido_results: Vec<_> = stream::iter(qido_futures)
+        .buffer_unordered(5)
+        .collect::<Vec<_>>()
         .await
         .into_iter()
         .filter_map(|r| {
