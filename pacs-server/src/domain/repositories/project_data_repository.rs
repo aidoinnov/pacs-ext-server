@@ -82,6 +82,9 @@ pub trait ProjectDataRepository: Send + Sync {
     /// 프로젝트별 Study 총 개수
     async fn count_studies_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error>;
 
+    /// 프로젝트별 Study 목록 최종 수정 시간 조회 (ETag 캐싱용)
+    async fn get_studies_updated_at(&self, project_id: i32) -> Result<chrono::DateTime<chrono::Utc>, sqlx::Error>;
+
     /// Series 조회 (by ID)
     async fn find_series_by_id(&self, id: i32) -> Result<Option<ProjectDataSeries>, sqlx::Error>;
 
@@ -220,6 +223,10 @@ impl<T: ProjectDataRepository + ?Sized> ProjectDataRepository for std::sync::Arc
 
     async fn count_studies_by_project_id(&self, project_id: i32) -> Result<i64, sqlx::Error> {
         (**self).count_studies_by_project_id(project_id).await
+    }
+
+    async fn get_studies_updated_at(&self, project_id: i32) -> Result<chrono::DateTime<chrono::Utc>, sqlx::Error> {
+        (**self).get_studies_updated_at(project_id).await
     }
 
     async fn find_series_by_id(&self, id: i32) -> Result<Option<ProjectDataSeries>, sqlx::Error> {

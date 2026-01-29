@@ -1,6 +1,7 @@
 pub mod access_control_controller;
 pub mod annotation_controller;
 pub mod auth_controller;
+pub mod data_access_check_controller;
 pub mod dicom_gateway_controller;
 pub mod e2e_controller;
 pub mod mask_controller;
@@ -21,5 +22,6 @@ pub mod test_controller;
 pub mod timepoint_controller;
 pub mod user_controller;
 pub mod user_project_matrix_controller;
+pub mod user_registration_controller;
 pub mod view_selection_controller;
 pub mod viewer_controller;

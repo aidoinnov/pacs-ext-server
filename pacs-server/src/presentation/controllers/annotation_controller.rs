@@ -1474,6 +1474,23 @@ pub fn configure_routes(
                         crate::application::services::SignedUrlServiceImpl,
                     >),
                 )
+                // ⚠️ IMPORTANT: /stats must come BEFORE /{mask_id} to avoid path parameter collision
+                .route(
+                    "/{annotation_id}/mask-groups/{group_id}/masks/stats",
+                    web::get().to(crate::presentation::controllers::mask_controller::get_mask_stats::<
+                        crate::domain::services::MaskServiceImpl<
+                            crate::infrastructure::repositories::MaskRepositoryImpl,
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
+                        >,
+                        crate::domain::services::MaskGroupServiceImpl<
+                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
+                            crate::infrastructure::repositories::AnnotationRepositoryImpl,
+                            crate::infrastructure::repositories::UserRepositoryImpl,
+                        >,
+                        crate::application::services::SignedUrlServiceImpl,
+                    >),
+                )
                 .route(
                     "/{annotation_id}/mask-groups/{group_id}/masks/{mask_id}",
                     web::get().to(crate::presentation::controllers::mask_controller::get_mask::<
@@ -1538,22 +1555,7 @@ pub fn configure_routes(
                         crate::application::services::SignedUrlServiceImpl,
                     >),
                 )
-                .route(
-                    "/{annotation_id}/mask-groups/{group_id}/masks/stats",
-                    web::get().to(crate::presentation::controllers::mask_controller::get_mask_stats::<
-                        crate::domain::services::MaskServiceImpl<
-                            crate::infrastructure::repositories::MaskRepositoryImpl,
-                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
-                            crate::infrastructure::repositories::UserRepositoryImpl,
-                        >,
-                        crate::domain::services::MaskGroupServiceImpl<
-                            crate::infrastructure::repositories::MaskGroupRepositoryImpl,
-                            crate::infrastructure::repositories::AnnotationRepositoryImpl,
-                            crate::infrastructure::repositories::UserRepositoryImpl,
-                        >,
-                        crate::application::services::SignedUrlServiceImpl,
-                    >),
-                )
+                // /stats route moved above /{mask_id} to avoid path collision
                 .route(
                     "/{annotation_id}/snapshot/upload-url",
                     web::post().to(

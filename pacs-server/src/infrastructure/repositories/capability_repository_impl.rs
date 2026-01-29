@@ -1,6 +1,7 @@
 use crate::domain::entities::{Capability, NewCapability, Permission, Role, UpdateCapability};
 use crate::domain::repositories::CapabilityRepository;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[derive(Clone)]
@@ -472,6 +473,77 @@ impl CapabilityRepository for CapabilityRepositoryImpl {
         .await?;
 
         Ok((roles, capabilities, assignments))
+    }
+
+    async fn get_matrix_updated_at(&self) -> Result<DateTime<Utc>, sqlx::Error> {
+        // 전체 매트릭스의 최신 변경 시점 조회
+        // security_role, security_capability, security_role_capability 중 가장 최근 updated_at
+        // security_role_capability는 created_at도 함께 고려 (INSERT/DELETE 감지)
+        let updated_at: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT GREATEST(
+                COALESCE((SELECT MAX(updated_at) FROM security_role), '1970-01-01'::timestamptz),
+                COALESCE((SELECT MAX(updated_at) FROM security_capability), '1970-01-01'::timestamptz),
+                COALESCE((SELECT MAX(updated_at) FROM security_role_capability), '1970-01-01'::timestamptz),
+                COALESCE((SELECT MAX(created_at) FROM security_role_capability), '1970-01-01'::timestamptz)
+             ) as matrix_updated_at"
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at)
+    }
+
+    async fn get_all_capabilities_updated_at(&self) -> Result<DateTime<Utc>, sqlx::Error> {
+        // 모든 활성 Capability의 최신 변경 시점 조회
+        let updated_at: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(updated_at), '1970-01-01'::timestamptz) as updated_at
+             FROM security_capability
+             WHERE is_active = true"
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at)
+    }
+
+    async fn get_capability_detail_updated_at(
+        &self,
+        capability_id: i32,
+    ) -> Result<DateTime<Utc>, sqlx::Error> {
+        // Capability 상세의 최신 변경 시점 조회
+        // Capability.updated_at + Capability-Permission 매핑의 created_at 중 최신값
+        let updated_at: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT GREATEST(
+                c.updated_at,
+                COALESCE(MAX(cm.created_at), c.updated_at)
+             ) as updated_at
+             FROM security_capability c
+             LEFT JOIN security_capability_mapping cm ON c.id = cm.capability_id
+             WHERE c.id = $1
+             GROUP BY c.id, c.updated_at"
+        )
+        .bind(capability_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at)
+    }
+
+    async fn get_capabilities_by_category_updated_at(
+        &self,
+        category: &str,
+    ) -> Result<DateTime<Utc>, sqlx::Error> {
+        // 특정 카테고리의 Capability 최신 변경 시점 조회
+        let updated_at: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(updated_at), '1970-01-01'::timestamptz) as updated_at
+             FROM security_capability
+             WHERE category = $1 AND is_active = true"
+        )
+        .bind(category)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at)
     }
 
     fn pool(&self) -> &PgPool {

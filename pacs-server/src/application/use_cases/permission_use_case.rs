@@ -7,6 +7,7 @@ use crate::application::dto::{
 use crate::domain::entities::RoleScope;
 use crate::domain::services::PermissionService;
 use crate::domain::ServiceError;
+use chrono::{DateTime, Utc};
 
 /// 권한 관리 유스케이스
 pub struct PermissionUseCase<P: PermissionService> {
@@ -231,6 +232,46 @@ impl<P: PermissionService> PermissionUseCase<P> {
             resource_type: resource_type.to_string(),
             permissions: permission_responses,
         })
+    }
+
+    /// 모든 권한 조회
+    pub async fn get_all_permissions(&self) -> Result<Vec<PermissionResponse>, ServiceError> {
+        let permissions = self.permission_service.get_all_permissions().await?;
+
+        let permission_responses = permissions
+            .into_iter()
+            .map(|p| PermissionResponse {
+                id: p.id,
+                resource_type: p.resource_type,
+                action: p.action,
+            })
+            .collect();
+
+        Ok(permission_responses)
+    }
+
+    /// 모든 권한의 최신 변경 시점 조회 (ETag 생성용)
+    pub async fn get_all_permissions_updated_at(&self) -> Result<DateTime<Utc>, ServiceError> {
+        Ok(self
+            .permission_service
+            .get_all_permissions_updated_at()
+            .await?)
+    }
+
+    /// Global 역할의 최신 변경 시점 조회 (ETag 생성용)
+    pub async fn get_global_roles_updated_at(&self) -> Result<DateTime<Utc>, ServiceError> {
+        Ok(self
+            .permission_service
+            .get_global_roles_updated_at()
+            .await?)
+    }
+
+    /// Project 역할의 최신 변경 시점 조회 (ETag 생성용)
+    pub async fn get_project_roles_updated_at(&self) -> Result<DateTime<Utc>, ServiceError> {
+        Ok(self
+            .permission_service
+            .get_project_roles_updated_at()
+            .await?)
     }
 
     /// Global 역할 목록 조회 (권한 정보 포함, 페이지네이션)

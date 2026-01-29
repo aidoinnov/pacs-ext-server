@@ -1,9 +1,9 @@
 use actix_web::{test, web, App};
 use pacs_server::application::use_cases::project_user_use_case::ProjectUserUseCase;
-use pacs_server::domain::services::{ProjectServiceImpl, UserServiceImpl};
+use pacs_server::domain::services::{ProjectServiceImpl, SubjectServiceImpl, UserServiceImpl};
 use pacs_server::infrastructure::repositories::{
     ProjectDataAccessRepositoryImpl, ProjectDataRepositoryImpl, ProjectRepositoryImpl,
-    RoleRepositoryImpl, UserRepositoryImpl,
+    RoleRepositoryImpl, SubjectRepositoryImpl, UserRepositoryImpl,
 };
 use pacs_server::infrastructure::services::ProjectDataServiceImpl;
 use pacs_server::presentation::controllers::project_user_controller;
@@ -50,6 +50,9 @@ async fn test_assign_role_to_unassigned_user() {
         project_data_access_repo.clone(),
     ));
 
+    let subject_repo = Arc::new(SubjectRepositoryImpl::new(pool.clone()));
+    let subject_service = Arc::new(SubjectServiceImpl::new(subject_repo));
+
     let user_service = Arc::new(UserServiceImpl::new(user_repo1, project_repo1));
     let project_service = Arc::new(ProjectServiceImpl::new(project_repo2, user_repo2, role_repo));
 
@@ -67,6 +70,7 @@ async fn test_assign_role_to_unassigned_user() {
                 pacs_server::application::use_cases::project_data_access_use_case::ProjectDataAccessUseCase::new(
                     project_data_service.clone(),
                     project_service.clone(),
+                    subject_service.clone(),
                 ),
             ))
             .service(web::scope("/api").configure(|cfg| {
@@ -80,6 +84,7 @@ async fn test_assign_role_to_unassigned_user() {
                                 project_data_access_repo.clone(),
                             )),
                             project_service.clone(),
+                            subject_service.clone(),
                         ),
                     ),
                 )
@@ -175,6 +180,9 @@ async fn test_assign_role_to_non_member_user() {
         project_data_access_repo.clone(),
     ));
 
+    let subject_repo = Arc::new(SubjectRepositoryImpl::new(pool.clone()));
+    let subject_service = Arc::new(SubjectServiceImpl::new(subject_repo));
+
     let user_service = Arc::new(UserServiceImpl::new(user_repo1, project_repo1));
     let project_service = Arc::new(ProjectServiceImpl::new(project_repo2, user_repo2, role_repo));
 
@@ -192,6 +200,7 @@ async fn test_assign_role_to_non_member_user() {
                 pacs_server::application::use_cases::project_data_access_use_case::ProjectDataAccessUseCase::new(
                     project_data_service.clone(),
                     project_service.clone(),
+                    subject_service.clone(),
                 ),
             ))
             .service(web::scope("/api").configure(|cfg| {
@@ -205,6 +214,7 @@ async fn test_assign_role_to_non_member_user() {
                                 project_data_access_repo.clone(),
                             )),
                             project_service.clone(),
+                            subject_service.clone(),
                         ),
                     ),
                 )

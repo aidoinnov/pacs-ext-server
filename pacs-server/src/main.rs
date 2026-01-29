@@ -281,10 +281,6 @@ async fn main() -> std::io::Result<()> {
     // RECIST Lesion 관련 데이터 접근을 위한 리포지토리
     let recist_lesion_repo = RecistLesionRepositoryImpl::new(pool.clone());
 
-    // DICOM RBAC Evaluator
-    use crate::infrastructure::services::DicomRbacEvaluatorImpl;
-    let dicom_evaluator = Arc::new(DicomRbacEvaluatorImpl::new(pool.clone()));
-
     println!("✅ Done");
 
     // JWT(JSON Web Token) 서비스 초기화
@@ -417,11 +413,40 @@ async fn main() -> std::io::Result<()> {
         mask_group_service.clone(),
         signed_url_service.clone(),
     ));
-    let project_user_use_case = Arc::new(ProjectUserUseCase::new(
-        Arc::new(project_service.clone()),
-        Arc::new(user_service.clone()),
-        project_data_service.clone(),
-    ));
+
+    // Membership 캐시 서비스 초기화 (Redis 사용 시)
+    print!("🔄 Initializing Membership cache service... ");
+    let membership_cache_service = if let Some(ref redis_conn) = redis_connection {
+        use crate::infrastructure::services::MembershipCacheService;
+
+        let cache_ttl = std::env::var("MEMBERSHIP_CACHE_TTL_SEC")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(180); // 기본 180초 (3분)
+
+        let service = MembershipCacheService::new(redis_conn.clone());
+
+        println!("✅ Done (TTL: {}s)", cache_ttl);
+        Some(service)
+    } else {
+        println!("⏭️  Skipped (Redis not configured)");
+        None
+    };
+
+    let project_user_use_case = Arc::new(if let Some(ref membership_cache) = membership_cache_service {
+        ProjectUserUseCase::with_membership_cache(
+            Arc::new(project_service.clone()),
+            Arc::new(user_service.clone()),
+            project_data_service.clone(),
+            membership_cache.clone(),
+        )
+    } else {
+        ProjectUserUseCase::new(
+            Arc::new(project_service.clone()),
+            Arc::new(user_service.clone()),
+            project_data_service.clone(),
+        )
+    });
     let project_user_matrix_use_case = Arc::new(ProjectUserMatrixUseCase::new(
         Arc::new(project_service.clone()),
         Arc::new(user_service.clone()),
@@ -480,6 +505,16 @@ async fn main() -> std::io::Result<()> {
         println!("⏭️  Skipped (Redis not configured)");
         None
     };
+
+    // DICOM RBAC Evaluator (Membership 캐시 적용)
+    print!("🔐 Initializing DICOM RBAC Evaluator... ");
+    use crate::infrastructure::services::DicomRbacEvaluatorImpl;
+    let dicom_evaluator = Arc::new(if let Some(ref membership_cache) = membership_cache_service {
+        DicomRbacEvaluatorImpl::with_membership_cache(pool.clone(), membership_cache.clone())
+    } else {
+        DicomRbacEvaluatorImpl::new(pool.clone())
+    });
+    println!("✅ Done");
 
     // Redis 사용 여부에 따라 다른 타입의 UseCase 생성
     let (view_selection_use_case_redis, view_selection_use_case_inmemory) = if let Some(ref redis_conn) = redis_connection {

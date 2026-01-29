@@ -347,6 +347,11 @@ impl ProjectDataAccessUseCase {
             .await
     }
 
+    /// 프로젝트별 Study 목록 최종 수정 시간 조회 (ETag 캐싱용)
+    pub async fn get_studies_updated_at(&self, project_id: i32) -> Result<chrono::DateTime<chrono::Utc>, ServiceError> {
+        self.project_data_service.get_studies_updated_at(project_id).await
+    }
+
     /// Series 조회 (by ID)
     pub async fn get_series(&self, series_id: i32) -> Result<ProjectDataSeries, ServiceError> {
         self.project_data_service.get_series_by_id(series_id).await
@@ -766,13 +771,23 @@ impl ProjectDataAccessUseCase {
     pub async fn unassign_study_from_project(
         &self,
         project_id: i32,
-        study_id: i32,
+        study_uid: &str,
     ) -> Result<UnassignStudyFromProjectResponse, ServiceError> {
         // 1. 프로젝트 존재 확인
         self.project_service.get_project(project_id).await?;
 
-        // 2. project_data에서 Study 매핑 삭제
         let pool = self.project_data_service.pool();
+
+        // 2. Study UID로 Study ID 조회
+        let study_id: i32 = sqlx::query_scalar(
+            "SELECT id FROM project_data_study WHERE study_uid = $1"
+        )
+        .bind(study_uid)
+        .fetch_one(pool)
+        .await
+        .map_err(|_| ServiceError::NotFound(format!("Study with UID {} not found", study_uid)))?;
+
+        // 3. project_data에서 Study 매핑 삭제
         let result = sqlx::query(
             "DELETE FROM project_data
              WHERE project_id = $1
@@ -787,13 +802,13 @@ impl ProjectDataAccessUseCase {
 
         if result.rows_affected() == 0 {
             return Err(ServiceError::NotFound(
-                "Study not assigned to this project".to_string(),
+                format!("Study {} not assigned to this project", study_uid),
             ));
         }
 
         Ok(UnassignStudyFromProjectResponse {
             success: true,
-            message: format!("Study {} unassigned from project successfully", study_id),
+            message: format!("Study {} unassigned from project successfully", study_uid),
         })
     }
 }

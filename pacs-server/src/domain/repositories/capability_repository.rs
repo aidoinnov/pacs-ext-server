@@ -1,5 +1,6 @@
 use crate::domain::entities::{Capability, NewCapability, Permission, Role, UpdateCapability};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[async_trait]
@@ -79,6 +80,24 @@ pub trait CapabilityRepository: Send + Sync {
         &self,
         project_id: i32,
     ) -> Result<(Vec<Role>, Vec<Capability>, Vec<(i32, i32)>), sqlx::Error>;
+
+    /// Role-Capability 매트릭스의 최신 변경 시점 조회 (ETag용)
+    async fn get_matrix_updated_at(&self) -> Result<DateTime<Utc>, sqlx::Error>;
+
+    /// 모든 Capability 목록의 최신 변경 시점 조회 (ETag용)
+    async fn get_all_capabilities_updated_at(&self) -> Result<DateTime<Utc>, sqlx::Error>;
+
+    /// 특정 Capability 상세의 최신 변경 시점 조회 (ETag용)
+    async fn get_capability_detail_updated_at(
+        &self,
+        capability_id: i32,
+    ) -> Result<DateTime<Utc>, sqlx::Error>;
+
+    /// 카테고리별 Capability 목록의 최신 변경 시점 조회 (ETag용)
+    async fn get_capabilities_by_category_updated_at(
+        &self,
+        category: &str,
+    ) -> Result<DateTime<Utc>, sqlx::Error>;
 
     /// 데이터베이스 연결 풀 반환
     fn pool(&self) -> &PgPool;

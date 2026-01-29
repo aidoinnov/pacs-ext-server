@@ -1,5 +1,6 @@
 use crate::domain::entities::{NewPermission, Permission};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[async_trait]
@@ -17,5 +18,6 @@ pub trait PermissionRepository: Send + Sync {
     ) -> Result<Vec<Permission>, sqlx::Error>;
     async fn create(&self, new_permission: NewPermission) -> Result<Permission, sqlx::Error>;
     async fn delete(&self, id: i32) -> Result<bool, sqlx::Error>;
+    async fn get_all_permissions_updated_at(&self) -> Result<DateTime<Utc>, sqlx::Error>;
     fn pool(&self) -> &PgPool;
 }

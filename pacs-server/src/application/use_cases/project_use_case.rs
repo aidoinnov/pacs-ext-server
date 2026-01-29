@@ -11,6 +11,7 @@ use crate::domain::{
     entities::project::{NewProject, ProjectStatus, UpdateProject},
     ServiceError,
 };
+use chrono::{DateTime, Utc};
 
 /// 프로젝트 관리 유스케이스
 pub struct ProjectUseCase<P: ProjectService> {
@@ -280,5 +281,25 @@ impl<P: ProjectService> ProjectUseCase<P> {
         ProjectMetaResponse {
             available_statuses,
         }
+    }
+
+    // === ETag 캐싱을 위한 updated_at + count 조회 ===
+
+    /// 필터링된 프로젝트들의 MAX(updated_at) + COUNT(*) 조회
+    pub async fn get_projects_etag_data(
+        &self,
+        query: &ProjectListQuery,
+    ) -> Result<(DateTime<Utc>, i64), ServiceError> {
+        self.project_service.get_projects_etag_data(query).await
+    }
+
+    /// 특정 프로젝트의 updated_at 조회
+    pub async fn get_project_updated_at(&self, id: i32) -> Result<DateTime<Utc>, ServiceError> {
+        self.project_service.get_project_updated_at(id).await
+    }
+
+    /// 활성 프로젝트들의 MAX(updated_at) + COUNT(*) 조회
+    pub async fn get_active_projects_etag_data(&self) -> Result<(DateTime<Utc>, i64), ServiceError> {
+        self.project_service.get_active_projects_etag_data().await
     }
 }

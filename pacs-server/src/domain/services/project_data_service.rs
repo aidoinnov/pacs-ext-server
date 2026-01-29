@@ -138,6 +138,9 @@ pub trait ProjectDataService: Send + Sync {
         page_size: i32,
     ) -> Result<(Vec<ProjectDataStudy>, i64), ServiceError>;
 
+    /// 프로젝트별 Study 목록 최종 수정 시간 조회 (ETag 캐싱용)
+    async fn get_studies_updated_at(&self, project_id: i32) -> Result<chrono::DateTime<chrono::Utc>, ServiceError>;
+
     /// Series 조회 (by ID)
     async fn get_series_by_id(&self, id: i32) -> Result<ProjectDataSeries, ServiceError>;
 

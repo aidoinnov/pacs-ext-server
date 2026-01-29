@@ -52,6 +52,22 @@ where
         Ok(ViewListResponse { items, total })
     }
 
+    /// View 목록 최종 수정 시간 조회 (ETag 캐싱용)
+    pub async fn get_views_updated_at(
+        &self,
+        query: &ViewListQuery,
+        current_user_id: Option<&str>,
+    ) -> Result<chrono::DateTime<chrono::Utc>, ServiceError> {
+        let filter = ViewListFilter {
+            scope_type: query.scope_type.clone(),
+            scope_id: query.scope_id.clone(),
+            owner_user_id: current_user_id.map(|s| s.to_string()),
+            include_system: true,
+        };
+
+        Ok(self.repository.get_views_updated_at(&filter).await?)
+    }
+
     /// View 상세 조회
     pub async fn get_view(&self, view_id: &str) -> Result<ViewDetailResponse, ServiceError> {
         let view = self

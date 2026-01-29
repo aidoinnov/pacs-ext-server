@@ -45,10 +45,12 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .await?;
 
         // Step 2: Create project_data mapping (project → study)
+        // Use ON CONFLICT ... DO UPDATE to always return a row (for idempotency)
         let project_data = sqlx::query!(
             "INSERT INTO project_data (project_id, resource_level, study_id)
              VALUES ($1, 'STUDY', $2)
-             ON CONFLICT (project_id, study_id, series_id, instance_id) DO NOTHING
+             ON CONFLICT (project_id, study_id, series_id, instance_id)
+             DO UPDATE SET updated_at = CURRENT_TIMESTAMP
              RETURNING id, project_id, created_at",
             new_data.project_id,
             study.id
@@ -650,5 +652,21 @@ impl ProjectDataRepository for ProjectDataRepositoryImpl {
         .await?;
 
         Ok(count)
+    }
+
+    async fn get_studies_updated_at(&self, project_id: i32) -> Result<chrono::DateTime<chrono::Utc>, sqlx::Error> {
+        // 프로젝트의 Study 중 가장 최근 updated_at 조회
+        // project_data 테이블에서 직접 조회
+        let updated_at = sqlx::query_scalar::<_, chrono::DateTime<chrono::Utc>>(
+            "SELECT COALESCE(MAX(pds.updated_at), '1970-01-01'::timestamptz)
+             FROM project_data_study pds
+             INNER JOIN project_data pd ON pd.study_id = pds.id
+             WHERE pd.project_id = $1"
+        )
+        .bind(project_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at)
     }
 }

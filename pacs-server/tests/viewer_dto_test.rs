@@ -134,12 +134,14 @@ fn test_viewer_study_meta_request_serialization() {
             "1.2.840.113619.2.55.3.604688433.1234".to_string(),
             "1.2.840.113619.2.55.3.604688433.5678".to_string(),
         ],
-        max_count: Some(20),
+        page: Some(1),
+        page_size: Some(20),
     };
 
     let json = serde_json::to_value(&request).unwrap();
     assert_eq!(json["study_uids"].as_array().unwrap().len(), 2);
-    assert_eq!(json["max_count"], 20);
+    assert_eq!(json["page"], 1);
+    assert_eq!(json["page_size"], 20);
 }
 
 #[test]
@@ -151,22 +153,27 @@ fn test_viewer_series_meta_request_serialization() {
             SeriesQuery {
                 study_uid: "1.2.840.113619.2.55.3.604688433.1234".to_string(),
                 series_uid: "1.2.840.113619.2.55.3.604688433.1234.1".to_string(),
+                study_description: Some("Chest CT".to_string()),
             },
             SeriesQuery {
                 study_uid: "1.2.840.113619.2.55.3.604688433.1234".to_string(),
                 series_uid: "1.2.840.113619.2.55.3.604688433.1234.2".to_string(),
+                study_description: None,
             },
         ],
-        max_count: Some(50),
+        page: Some(1),
+        page_size: Some(50),
     };
 
     let json = serde_json::to_value(&request).unwrap();
     assert_eq!(json["series_queries"].as_array().unwrap().len(), 2);
-    assert_eq!(json["max_count"], 50);
+    assert_eq!(json["page"], 1);
+    assert_eq!(json["page_size"], 50);
 
     // 첫 번째 쿼리 검증
     let first_query = &json["series_queries"][0];
     assert_eq!(first_query["study_uid"], "1.2.840.113619.2.55.3.604688433.1234");
     assert_eq!(first_query["series_uid"], "1.2.840.113619.2.55.3.604688433.1234.1");
+    assert_eq!(first_query["study_description"], "Chest CT");
 }
 

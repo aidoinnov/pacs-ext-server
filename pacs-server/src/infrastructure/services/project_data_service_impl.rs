@@ -433,4 +433,11 @@ where
     fn pool(&self) -> &sqlx::PgPool {
         self.project_data_repository.pool()
     }
+
+    async fn get_studies_updated_at(&self, project_id: i32) -> Result<chrono::DateTime<chrono::Utc>, ServiceError> {
+        self.project_data_repository
+            .get_studies_updated_at(project_id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))
+    }
 }

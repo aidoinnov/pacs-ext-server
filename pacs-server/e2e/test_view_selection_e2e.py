@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-View Selection API E2E 시나리오 테스트 스크립트
+View Selection API E2E 통합 테스트 스크립트
 
-이 스크립트는 Viewer Session 기반 멀티-Study/Series 뷰잉 기능을 테스트합니다:
+이 스크립트는 Viewer Selection 기능을 종합적으로 테스트합니다:
 1. Selection 생성 (POST /api/v1/view-selections)
 2. Selection 조회 (GET /api/v1/view-selections/{selection_id})
 3. Selection 삭제 (DELETE /api/v1/view-selections/{selection_id})
-4. 멀티 Study/Series 선택 시나리오
-5. TTL 자동 연장 (조회 시)
-6. 만료된 Selection 처리
-7. 빈 Series 목록 검증
-8. 존재하지 않는 Selection 조회
+4. Layout + Initial Views 기능 테스트
+5. 멀티 Study/Series 선택 시나리오
+6. TTL 자동 연장 (조회 시)
+7. 유효성 검증 테스트
+8. 실제 사용 시나리오 테스트
 """
 
 import requests
@@ -18,6 +18,7 @@ import json
 import time
 import sys
 from typing import Optional, Dict, Any, List
+from test_base import BaseE2ETest, TestConfig, TestPrinter
 
 BASE_URL = "http://localhost:8080"
 
@@ -726,7 +727,7 @@ def scenario_multi_user_selection(token: str):
 def scenario_url_sharing(token: str):
     """시나리오: URL 공유 (Selection ID를 통한 상태 재현)"""
     print_test("시나리오: URL 공유 및 상태 재현")
-    
+
     series = [
         {
             "study_uid": "1.2.840.113619.2.1.1.123",
@@ -737,16 +738,16 @@ def scenario_url_sharing(token: str):
             "series_uid": "1.2.840.113619.2.1.2.126"
         }
     ]
-    
+
     # Selection 생성
     selection_id = create_view_selection(token, series)
     if not selection_id:
         print_error("시나리오 실패: Selection 생성 실패")
         return False
-    
+
     print_info(f"생성된 Selection ID: {selection_id}")
     print_info(f"공유 가능한 URL: /viewer/selections/{selection_id}")
-    
+
     # URL을 통해 Selection 조회 (상태 재현)
     print_info("URL을 통한 상태 재현 테스트...")
     selection = get_view_selection(token, selection_id)
@@ -760,56 +761,352 @@ def scenario_url_sharing(token: str):
         print_error("시나리오 실패: 상태 재현 실패")
         delete_view_selection(token, selection_id)
         return False
-    
+
     # 정리
     delete_view_selection(token, selection_id)
     return True
 
+def test_layout_and_initial_views(token: str):
+    """Layout + Initial Views 기능 테스트"""
+    print_test("Layout + Initial Views 기능 테스트")
+
+    series = [
+        {
+            "study_uid": "1.2.840.113619.2.1.1.100",
+            "series_uid": "1.2.840.113619.2.1.2.101"
+        },
+        {
+            "study_uid": "1.2.840.113619.2.1.1.100",
+            "series_uid": "1.2.840.113619.2.1.2.102"
+        },
+        {
+            "study_uid": "1.2.840.113619.2.1.1.200",
+            "series_uid": "1.2.840.113619.2.1.2.201"
+        }
+    ]
+
+    # Layout + Initial Views 포함
+    request_data = {
+        "series": series,
+        "layout": {
+            "rows": 2,
+            "cols": 2
+        },
+        "initial_views": [
+            {
+                "row": 0,
+                "col": 0,
+                "study_uid": "1.2.840.113619.2.1.1.100",
+                "series_uid": "1.2.840.113619.2.1.2.101",
+                "sop_uid": "1.2.840.113619.2.1.3.103"
+            },
+            {
+                "row": 0,
+                "col": 1,
+                "study_uid": "1.2.840.113619.2.1.1.100",
+                "series_uid": "1.2.840.113619.2.1.2.102",
+                "frame_index": 5
+            },
+            {
+                "row": 1,
+                "col": 0,
+                "study_uid": "1.2.840.113619.2.1.1.200",
+                "series_uid": "1.2.840.113619.2.1.2.201"
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(
+            f"{BASE_URL}/api/v1/view-selections",
+            json=request_data,
+            headers=get_headers(token)
+        )
+
+        if response.status_code == 201:
+            result = response.json()
+            selection_id = result.get("selection_id")
+            print_success(f"Layout + Initial Views Selection 생성 성공: {selection_id}")
+
+            # 조회하여 검증
+            selection = get_view_selection(token, selection_id)
+            if selection:
+                # Layout 검증
+                assert "layout" in selection, "Layout should be present"
+                assert selection["layout"]["rows"] == 2, "Rows should be 2"
+                assert selection["layout"]["cols"] == 2, "Cols should be 2"
+                print_success("Layout 검증 성공")
+
+                # Initial Views 검증
+                assert "initial_views" in selection, "Initial views should be present"
+                assert len(selection["initial_views"]) == 3, "Should have 3 initial views"
+
+                # 첫 번째 viewport 검증
+                view1 = selection["initial_views"][0]
+                assert view1["row"] == 0 and view1["col"] == 0
+                assert view1["study_uid"] == "1.2.840.113619.2.1.1.100"
+                assert view1["series_uid"] == "1.2.840.113619.2.1.2.101"
+                assert view1.get("sop_uid") == "1.2.840.113619.2.1.3.103"
+
+                # 두 번째 viewport 검증 (frame_index)
+                view2 = selection["initial_views"][1]
+                assert view2.get("frame_index") == 5
+
+                print_success("Initial Views 검증 성공")
+
+                # 정리
+                delete_view_selection(token, selection_id)
+            else:
+                print_error("Selection 조회 실패")
+        else:
+            print_error(f"Selection 생성 실패: {response.status_code} - {response.text}")
+    except Exception as e:
+        print_error(f"Test error: {e}")
+
+def test_layout_validation_errors(token: str):
+    """Layout 유효성 검증 에러 테스트"""
+    print_test("Layout 유효성 검증 에러 테스트")
+
+    series = [
+        {
+            "study_uid": "1.2.840.113619.2.1.1.100",
+            "series_uid": "1.2.840.113619.2.1.2.101"
+        }
+    ]
+
+    # Test 1: initial_views만 있고 layout 없음 (400 예상)
+    print_info("Test 1: initial_views without layout (should fail)")
+    request_data = {
+        "series": series,
+        "initial_views": [
+            {
+                "row": 0,
+                "col": 0,
+                "study_uid": "1.2.840.113619.2.1.1.100",
+                "series_uid": "1.2.840.113619.2.1.2.101"
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(
+            f"{BASE_URL}/api/v1/view-selections",
+            json=request_data,
+            headers=get_headers(token)
+        )
+
+        if response.status_code == 400:
+            print_success("Correctly rejected initial_views without layout")
+        else:
+            print_error(f"Expected 400, got {response.status_code}")
+    except Exception as e:
+        print_error(f"Test error: {e}")
+
+    # Test 2: viewport 위치가 layout 범위 초과 (400 예상)
+    print_info("Test 2: viewport position out of bounds (should fail)")
+    request_data = {
+        "series": series,
+        "layout": {
+            "rows": 2,
+            "cols": 2
+        },
+        "initial_views": [
+            {
+                "row": 2,  # rows=2이므로 row는 0-1만 가능
+                "col": 0,
+                "study_uid": "1.2.840.113619.2.1.1.100",
+                "series_uid": "1.2.840.113619.2.1.2.101"
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(
+            f"{BASE_URL}/api/v1/view-selections",
+            json=request_data,
+            headers=get_headers(token)
+        )
+
+        if response.status_code == 400:
+            print_success("Correctly rejected out-of-bounds viewport position")
+        else:
+            print_error(f"Expected 400, got {response.status_code}")
+    except Exception as e:
+        print_error(f"Test error: {e}")
+
+def test_backward_compatibility(token: str):
+    """하위 호환성 테스트 (layout/initial_views 없이도 동작)"""
+    print_test("하위 호환성 테스트")
+
+    # layout/initial_views 없이 기존 방식으로 생성
+    series = [
+        {
+            "study_uid": "1.2.840.113619.2.1.1.123",
+            "series_uid": "1.2.840.113619.2.1.2.124"
+        }
+    ]
+
+    selection_id = create_view_selection(token, series)
+    if selection_id:
+        selection = get_view_selection(token, selection_id)
+        if selection:
+            # layout과 initial_views가 없거나 null이어야 함
+            layout = selection.get("layout")
+            initial_views = selection.get("initial_views")
+
+            if layout is None and initial_views is None:
+                print_success("하위 호환성 유지: layout/initial_views 없이 정상 동작")
+            else:
+                print_error(f"Unexpected fields: layout={layout}, initial_views={initial_views}")
+
+            # 정리
+            delete_view_selection(token, selection_id)
+        else:
+            print_error("Selection 조회 실패")
+    else:
+        print_error("Selection 생성 실패")
+
+def test_with_real_dicom_data(token: str):
+    """실제 DICOM 데이터를 사용한 테스트 (TestConfig의 UIDs 사용)"""
+    print_test("실제 DICOM 데이터 테스트")
+
+    # TestConfig에서 정의된 실제 DICOM UIDs 사용
+    series = [
+        {
+            "study_uid": TestConfig.STUDY_UID,
+            "series_uid": TestConfig.SERIES_UID
+        },
+        {
+            "study_uid": TestConfig.SNAPSHOT_STUDY_UID,
+            "series_uid": TestConfig.SNAPSHOT_SERIES_UID
+        }
+    ]
+
+    # Layout + Initial Views 포함
+    request_data = {
+        "series": series,
+        "layout": {
+            "rows": 1,
+            "cols": 2
+        },
+        "initial_views": [
+            {
+                "row": 0,
+                "col": 0,
+                "study_uid": TestConfig.STUDY_UID,
+                "series_uid": TestConfig.SERIES_UID,
+                "sop_uid": TestConfig.INSTANCE_UID
+            },
+            {
+                "row": 0,
+                "col": 1,
+                "study_uid": TestConfig.SNAPSHOT_STUDY_UID,
+                "series_uid": TestConfig.SNAPSHOT_SERIES_UID,
+                "sop_uid": TestConfig.SNAPSHOT_INSTANCE_UID
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(
+            f"{BASE_URL}/api/v1/view-selections",
+            json=request_data,
+            headers=get_headers(token)
+        )
+
+        if response.status_code == 201:
+            result = response.json()
+            selection_id = result.get("selection_id")
+            print_success(f"실제 DICOM 데이터로 Selection 생성 성공: {selection_id}")
+
+            # 조회하여 검증
+            selection = get_view_selection(token, selection_id)
+            if selection:
+                assert len(selection["series"]) == 2, "Should have 2 series"
+                assert len(selection["initial_views"]) == 2, "Should have 2 initial views"
+
+                # Study UIDs 검증
+                study_uids = set(s["study_uid"] for s in selection["series"])
+                assert TestConfig.STUDY_UID in study_uids
+                assert TestConfig.SNAPSHOT_STUDY_UID in study_uids
+
+                print_success("실제 DICOM 데이터 검증 성공")
+
+                # 정리
+                delete_view_selection(token, selection_id)
+            else:
+                print_error("Selection 조회 실패")
+        else:
+            print_error(f"Selection 생성 실패: {response.status_code} - {response.text}")
+    except Exception as e:
+        print_error(f"Test error: {e}")
+
 def main():
     """메인 테스트 실행"""
     print("\n" + "="*60)
-    print("🚀 View Selection API E2E 시나리오 테스트")
+    print("🚀 View Selection API E2E 통합 테스트")
     print("="*60)
-    
+
     # 헬스 체크
     if not test_health():
         print_error("Server is not available. Exiting.")
         sys.exit(1)
-    
+
     # 테스트 사용자 생성
     test_user_data = create_test_user()
-    
+
     if not test_user_data or not test_user_data.get("token"):
         print_error("Failed to create/login test user. Some tests will be skipped.")
         print_info("Running tests that don't require authentication...")
-        
+
         # 인증 불필요한 테스트만 실행
         test_unauthorized_access()
     else:
         token = test_user_data["token"]
         print_info("Running authenticated tests...")
-        
-        # 기본 시나리오 테스트
+
+        # ===== 기본 기능 테스트 =====
+        print("\n" + "="*60)
+        print("📋 기본 기능 테스트")
+        print("="*60)
         test_create_selection_success(token)
         test_create_selection_empty_series(token)
         test_get_selection_not_found(token)
         test_selection_id_format(token)
-        
-        # 고급 시나리오 테스트
+
+        # ===== Layout + Initial Views 테스트 =====
+        print("\n" + "="*60)
+        print("🎨 Layout + Initial Views 테스트")
+        print("="*60)
+        test_layout_and_initial_views(token)
+        test_layout_validation_errors(token)
+        test_backward_compatibility(token)
+        test_with_real_dicom_data(token)
+
+        # ===== 고급 시나리오 테스트 =====
+        print("\n" + "="*60)
+        print("🔧 고급 시나리오 테스트")
+        print("="*60)
         test_multi_study_series_selection(token)
         test_full_workflow(token)
         test_large_series_list(token)
         test_selection_persistence(token)
         test_real_world_scenario(token)
-        
-        # 실제 사용 시나리오 테스트
+
+        # ===== 실제 사용 시나리오 테스트 =====
+        print("\n" + "="*60)
+        print("🎬 실제 사용 시나리오 테스트")
+        print("="*60)
         scenario_viewer_session_workflow(token)
         scenario_multi_user_selection(token)
         scenario_url_sharing(token)
-        
-        # 인증 테스트
+
+        # ===== 인증 테스트 =====
+        print("\n" + "="*60)
+        print("🔐 인증 테스트")
+        print("="*60)
         test_unauthorized_access()
-    
+
     # 결과 요약
     print("\n" + "="*60)
     print("📊 테스트 결과 요약")
@@ -817,7 +1114,7 @@ def main():
     print(f"✅ 통과: {test_results['passed']}")
     print(f"❌ 실패: {test_results['failed']}")
     print(f"📝 총계: {test_results['total']}")
-    
+
     if test_results['failed'] == 0:
         print("\n🎉 모든 테스트 통과!")
         return 0

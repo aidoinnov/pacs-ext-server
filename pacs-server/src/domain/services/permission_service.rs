@@ -2,6 +2,7 @@ use crate::domain::entities::{Permission, Role, RoleScope};
 use crate::domain::repositories::{PermissionRepository, RoleRepository};
 use crate::domain::ServiceError;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 
 /// 권한 관리 도메인 서비스
 #[async_trait]
@@ -89,6 +90,9 @@ pub trait PermissionService: Send + Sync {
         project_id: i32,
     ) -> Result<Vec<Permission>, ServiceError>;
 
+    /// 모든 권한 조회
+    async fn get_all_permissions(&self) -> Result<Vec<Permission>, ServiceError>;
+
     // === 매트릭스 API 지원 ===
 
     /// 글로벌 역할-권한 매트릭스 조회
@@ -101,6 +105,18 @@ pub trait PermissionService: Send + Sync {
         &self,
         project_id: i32,
     ) -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError>;
+
+    /// 역할-권한 매트릭스 최종 수정 시간 조회 (ETag 캐싱용)
+    async fn get_matrix_updated_at(&self) -> Result<chrono::NaiveDateTime, ServiceError>;
+
+    /// 모든 권한의 최신 변경 시점 조회 (ETag 생성용)
+    async fn get_all_permissions_updated_at(&self) -> Result<DateTime<Utc>, ServiceError>;
+
+    /// Global 역할의 최신 변경 시점 조회 (ETag 생성용)
+    async fn get_global_roles_updated_at(&self) -> Result<DateTime<Utc>, ServiceError>;
+
+    /// Project 역할의 최신 변경 시점 조회 (ETag 생성용)
+    async fn get_project_roles_updated_at(&self) -> Result<DateTime<Utc>, ServiceError>;
 }
 
 #[derive(Clone)]
@@ -349,6 +365,10 @@ impl<P: PermissionRepository, R: RoleRepository> PermissionService for Permissio
         Ok(permissions)
     }
 
+    async fn get_all_permissions(&self) -> Result<Vec<Permission>, ServiceError> {
+        Ok(self.permission_repository.find_all().await?)
+    }
+
     async fn assign_permission_to_project(
         &self,
         project_id: i32,
@@ -506,5 +526,31 @@ impl<P: PermissionRepository, R: RoleRepository> PermissionService for Permissio
         .await?;
 
         Ok((roles, permissions, assignments))
+    }
+
+    async fn get_matrix_updated_at(&self) -> Result<chrono::NaiveDateTime, ServiceError> {
+        // 역할 테이블의 최신 수정 시간 조회
+        // security_permission과 security_role_permission에는 created_at이 없으므로
+        // security_role의 created_at만 사용
+        // TIMESTAMPTZ를 TIMESTAMP로 변환
+        let updated_at = sqlx::query_scalar::<_, chrono::NaiveDateTime>(
+            "SELECT COALESCE(MAX(created_at)::timestamp, '1970-01-01'::timestamp) FROM security_role"
+        )
+        .fetch_one(self.role_repository.pool())
+        .await?;
+
+        Ok(updated_at)
+    }
+
+    async fn get_all_permissions_updated_at(&self) -> Result<DateTime<Utc>, ServiceError> {
+        Ok(self.permission_repository.get_all_permissions_updated_at().await?)
+    }
+
+    async fn get_global_roles_updated_at(&self) -> Result<DateTime<Utc>, ServiceError> {
+        Ok(self.role_repository.get_roles_updated_at_by_scope("GLOBAL").await?)
+    }
+
+    async fn get_project_roles_updated_at(&self) -> Result<DateTime<Utc>, ServiceError> {
+        Ok(self.role_repository.get_roles_updated_at_by_scope("PROJECT").await?)
     }
 }

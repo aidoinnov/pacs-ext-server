@@ -3,6 +3,7 @@ use crate::domain::entities::{NewProject, Project, ProjectStatus, Role, UpdatePr
 use crate::domain::repositories::{ProjectRepository, RoleRepository, UserRepository};
 use crate::domain::ServiceError;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 
 /// 프로젝트 관리 도메인 서비스
 #[async_trait]
@@ -57,6 +58,20 @@ pub trait ProjectService: Send + Sync {
         &self,
         query: &ProjectListQuery,
     ) -> Result<i64, ServiceError>;
+
+    // === ETag 캐싱을 위한 updated_at + count 조회 ===
+
+    /// 필터링된 프로젝트들의 MAX(updated_at) + COUNT(*) 조회
+    async fn get_projects_etag_data(
+        &self,
+        query: &ProjectListQuery,
+    ) -> Result<(DateTime<Utc>, i64), ServiceError>;
+
+    /// 특정 프로젝트의 updated_at 조회
+    async fn get_project_updated_at(&self, id: i32) -> Result<DateTime<Utc>, ServiceError>;
+
+    /// 활성 프로젝트들의 MAX(updated_at) + COUNT(*) 조회
+    async fn get_active_projects_etag_data(&self) -> Result<(DateTime<Utc>, i64), ServiceError>;
 
     /// 프로젝트 활성화
     async fn activate_project(&self, id: i32) -> Result<Project, ServiceError>;
@@ -115,12 +130,14 @@ pub trait ProjectService: Send + Sync {
     >;
 
     /// 프로젝트 내 사용자에게 역할 할당
+    ///
+    /// Returns: updated_at timestamp for ETag caching
     async fn assign_user_role_in_project(
         &self,
         project_id: i32,
         user_id: i32,
         role_id: i32,
-    ) -> Result<(), ServiceError>;
+    ) -> Result<chrono::DateTime<chrono::Utc>, ServiceError>;
 
     // === 매트릭스 API 지원 ===
 
@@ -282,13 +299,28 @@ where
         Ok(self.project_repository.count_with_filter(query).await?)
     }
 
+    async fn get_projects_etag_data(
+        &self,
+        query: &ProjectListQuery,
+    ) -> Result<(DateTime<Utc>, i64), ServiceError> {
+        Ok(self.project_repository.get_projects_etag_data(query).await?)
+    }
+
+    async fn get_project_updated_at(&self, id: i32) -> Result<DateTime<Utc>, ServiceError> {
+        Ok(self.project_repository.get_project_updated_at(id).await?)
+    }
+
+    async fn get_active_projects_etag_data(&self) -> Result<(DateTime<Utc>, i64), ServiceError> {
+        Ok(self.project_repository.get_active_projects_etag_data().await?)
+    }
+
     async fn activate_project(&self, id: i32) -> Result<Project, ServiceError> {
         // RETURNING 절로 원자적 처리
         let project = sqlx::query_as::<_, Project>(
             "UPDATE security_project
              SET is_active = true
              WHERE id = $1
-             RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at",
+             RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at",
         )
         .bind(id)
         .fetch_optional(self.project_repository.pool())
@@ -304,7 +336,7 @@ where
             "UPDATE security_project
              SET is_active = false
              WHERE id = $1
-             RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at",
+             RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at",
         )
         .bind(id)
         .fetch_optional(self.project_repository.pool())
@@ -500,7 +532,7 @@ where
 
         let offset = (page - 1) * page_size;
 
-        // 프로젝트 멤버와 역할 정보를 함께 조회
+        // 프로젝트 멤버와 역할 정보를 함께 조회 (updated_at 포함)
         let users_with_roles = sqlx::query_as::<
             _,
             (
@@ -511,11 +543,13 @@ where
                 Option<i32>,
                 Option<String>,
                 Option<String>,
+                Option<chrono::DateTime<chrono::Utc>>,
             ),
         >(
-            "SELECT 
+            "SELECT
                 u.id as user_id, u.username, u.email, u.full_name,
-                r.id as role_id, r.name as role_name, r.scope as role_scope
+                r.id as role_id, r.name as role_name, r.scope as role_scope,
+                up.updated_at
              FROM security_user u
              INNER JOIN security_user_project up ON u.id = up.user_id
              LEFT JOIN security_role r ON up.role_id = r.id
@@ -542,7 +576,7 @@ where
             users_with_roles
                 .into_iter()
                 .map(
-                    |(user_id, username, email, full_name, role_id, role_name, role_scope)| {
+                    |(user_id, username, email, full_name, role_id, role_name, role_scope, updated_at)| {
                         crate::application::dto::project_user_dto::UserWithRoleResponse {
                             user_id,
                             username,
@@ -551,6 +585,7 @@ where
                             role_id,
                             role_name,
                             role_scope,
+                            updated_at,
                         }
                     },
                 )
@@ -564,7 +599,7 @@ where
         project_id: i32,
         user_id: i32,
         role_id: i32,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<chrono::DateTime<chrono::Utc>, ServiceError> {
         // 트랜잭션 시작
         let pool = self.project_repository.pool();
         let mut tx = pool.begin().await?;
@@ -617,7 +652,7 @@ where
         .fetch_one(&mut *tx)
         .await?;
 
-        if is_member {
+        let updated_at: chrono::DateTime<chrono::Utc> = if is_member {
             // 4-1. 이미 참여중인 경우: 기존 레코드의 role_id만 UPDATE
             tracing::info!(
                 "User {} is already a member of project {}. Updating role to {}",
@@ -626,23 +661,17 @@ where
                 role_id
             );
 
-            let result = sqlx::query(
+            sqlx::query_scalar(
                 "UPDATE security_user_project
                  SET role_id = $1
-                 WHERE user_id = $2 AND project_id = $3",
+                 WHERE user_id = $2 AND project_id = $3
+                 RETURNING updated_at",
             )
             .bind(role_id)
             .bind(user_id)
             .bind(project_id)
-            .execute(&mut *tx)
-            .await?;
-
-            if result.rows_affected() == 0 {
-                tx.rollback().await?;
-                return Err(ServiceError::DatabaseError(
-                    "Failed to update role for existing member".into(),
-                ));
-            }
+            .fetch_one(&mut *tx)
+            .await?
         } else {
             // 4-2. 참여중이 아닌 경우: 새로운 참여 레코드 추가 (INSERT)
             tracing::info!(
@@ -652,35 +681,30 @@ where
                 role_id
             );
 
-            let result = sqlx::query(
-                "INSERT INTO security_user_project (user_id, project_id, role_id, created_at)
-                 VALUES ($1, $2, $3, NOW())",
+            sqlx::query_scalar(
+                "INSERT INTO security_user_project (user_id, project_id, role_id, created_at, updated_at)
+                 VALUES ($1, $2, $3, NOW(), NOW())
+                 RETURNING updated_at",
             )
             .bind(user_id)
             .bind(project_id)
             .bind(role_id)
-            .execute(&mut *tx)
-            .await?;
-
-            if result.rows_affected() == 0 {
-                tx.rollback().await?;
-                return Err(ServiceError::DatabaseError(
-                    "Failed to add user to project with role".into(),
-                ));
-            }
-        }
+            .fetch_one(&mut *tx)
+            .await?
+        };
 
         // 5. 트랜잭션 커밋
         tx.commit().await?;
 
         tracing::info!(
-            "Successfully assigned role {} to user {} in project {}",
+            "Successfully assigned role {} to user {} in project {} at {}",
             role_id,
             user_id,
-            project_id
+            project_id,
+            updated_at
         );
 
-        Ok(())
+        Ok(updated_at)
     }
 
     // === 매트릭스 API 지원 구현 ===
@@ -710,7 +734,7 @@ where
 
         // 프로젝트 조회 쿼리
         let projects = sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at
              FROM security_project
              WHERE ($1::text[] IS NULL OR status::text = ANY($1))
                AND ($2::int[] IS NULL OR id = ANY($2))

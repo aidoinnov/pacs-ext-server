@@ -33,26 +33,31 @@ END $$;
 -- 사용자 계정 감사 로그 테이블은 이미 존재하므로 제외
 
 -- 성능 최적화를 위한 인덱스 생성 (이미 존재할 수 있으므로 IF NOT EXISTS 사용)
+-- security_user_audit_log 테이블이 존재하는 경우에만 인덱스 생성
 DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_user_audit_log_user_id ON security_user_audit_log(user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_audit_log_action ON security_user_audit_log(action);
-    CREATE INDEX IF NOT EXISTS idx_user_audit_log_created_at ON security_user_audit_log(created_at);
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'security_user_audit_log') THEN
+        CREATE INDEX IF NOT EXISTS idx_user_audit_log_user_id ON security_user_audit_log(user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_audit_log_action ON security_user_audit_log(action);
+        CREATE INDEX IF NOT EXISTS idx_user_audit_log_created_at ON security_user_audit_log(created_at);
+    END IF;
     CREATE INDEX IF NOT EXISTS idx_user_account_status ON security_user(account_status);
     CREATE INDEX IF NOT EXISTS idx_user_email_verified ON security_user(email_verified);
     CREATE INDEX IF NOT EXISTS idx_user_approved_by ON security_user(approved_by);
-EXCEPTION
-    WHEN duplicate_table THEN null;
 END $$;
 
--- 테이블 및 컬럼에 대한 주석 추가
-COMMENT ON TABLE security_user_audit_log IS '사용자 계정 감사 로그 - 사용자 삭제 후에도 영구 보관';
-COMMENT ON COLUMN security_user_audit_log.user_id IS '사용자 ID (삭제 후에도 NULL이 아닌 ID 유지)';
-COMMENT ON COLUMN security_user_audit_log.action IS '수행된 작업 (SIGNUP_REQUESTED, EMAIL_VERIFIED, APPROVED, DELETED 등)';
-COMMENT ON COLUMN security_user_audit_log.actor_id IS '작업을 수행한 사용자 ID (시스템 작업의 경우 NULL)';
-COMMENT ON COLUMN security_user_audit_log.keycloak_sync_status IS 'Keycloak 동기화 상태 (SUCCESS, FAILED, PENDING, ROLLED_BACK)';
-COMMENT ON COLUMN security_user_audit_log.keycloak_user_id IS 'Keycloak에서의 사용자 ID';
-COMMENT ON COLUMN security_user_audit_log.error_message IS '오류 발생 시 오류 메시지';
-COMMENT ON COLUMN security_user_audit_log.metadata IS '추가 메타데이터 (IP, User-Agent, 요청 데이터 등)';
+-- 테이블 및 컬럼에 대한 주석 추가 (테이블이 존재하는 경우에만)
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'security_user_audit_log') THEN
+        COMMENT ON TABLE security_user_audit_log IS '사용자 계정 감사 로그 - 사용자 삭제 후에도 영구 보관';
+        COMMENT ON COLUMN security_user_audit_log.user_id IS '사용자 ID (삭제 후에도 NULL이 아닌 ID 유지)';
+        COMMENT ON COLUMN security_user_audit_log.action IS '수행된 작업 (SIGNUP_REQUESTED, EMAIL_VERIFIED, APPROVED, DELETED 등)';
+        COMMENT ON COLUMN security_user_audit_log.actor_id IS '작업을 수행한 사용자 ID (시스템 작업의 경우 NULL)';
+        COMMENT ON COLUMN security_user_audit_log.keycloak_sync_status IS 'Keycloak 동기화 상태 (SUCCESS, FAILED, PENDING, ROLLED_BACK)';
+        COMMENT ON COLUMN security_user_audit_log.keycloak_user_id IS 'Keycloak에서의 사용자 ID';
+        COMMENT ON COLUMN security_user_audit_log.error_message IS '오류 발생 시 오류 메시지';
+        COMMENT ON COLUMN security_user_audit_log.metadata IS '추가 메타데이터 (IP, User-Agent, 요청 데이터 등)';
+    END IF;
+END $$;
 
 COMMENT ON COLUMN security_user.account_status IS '사용자 계정 상태';
 COMMENT ON COLUMN security_user.email_verified IS '이메일 인증 완료 여부';

@@ -1,6 +1,7 @@
 use crate::application::dto::project_dto::ProjectListQuery;
 use crate::domain::entities::{NewProject, Project, UpdateProject};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[async_trait]
@@ -40,6 +41,13 @@ pub trait ProjectRepository: Send + Sync {
     async fn count_active(&self) -> Result<i64, sqlx::Error>;
 
     async fn count_with_filter(&self, query: &ProjectListQuery) -> Result<i64, sqlx::Error>;
+
+    // ETag 캐싱을 위한 updated_at + count 조회 메서드
+    async fn get_projects_etag_data(&self, query: &ProjectListQuery) -> Result<(DateTime<Utc>, i64), sqlx::Error>;
+
+    async fn get_project_updated_at(&self, id: i32) -> Result<DateTime<Utc>, sqlx::Error>;
+
+    async fn get_active_projects_etag_data(&self) -> Result<(DateTime<Utc>, i64), sqlx::Error>;
 
     fn pool(&self) -> &PgPool;
 }

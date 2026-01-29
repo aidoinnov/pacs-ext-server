@@ -190,4 +190,17 @@ impl SubjectRepository for SubjectRepositoryImpl {
     fn pool(&self) -> &PgPool {
         &self.pool
     }
+
+    async fn get_subjects_updated_at(&self, project_id: i32) -> Result<chrono::NaiveDateTime, sqlx::Error> {
+        // 프로젝트의 Subject 중 가장 최근 updated_at 조회
+        // Subject가 없으면 고정된 기본값 사용 (1970-01-01)
+        let updated_at = sqlx::query_scalar::<_, chrono::DateTime<chrono::Utc>>(
+            "SELECT COALESCE(MAX(updated_at), '1970-01-01'::timestamptz) FROM project_subject WHERE project_id = $1"
+        )
+        .bind(project_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at.naive_utc())
+    }
 }

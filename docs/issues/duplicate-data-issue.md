@@ -1,7 +1,8 @@
 # Duplicate Data Issue in Project Data
 
-**날짜**: 2025-12-18  
-**상태**: 🟡 확인됨  
+**날짜**: 2025-12-18
+**해결 날짜**: 2026-01-24
+**상태**: ✅ 해결됨
 **우선순위**: Medium
 
 ## 📋 문제 요약
@@ -223,4 +224,104 @@ if existing.is_some() {
 - 현재 데이터는 사용 가능하지만 중복으로 인한 성능 저하 가능성 있음
 - 중복 데이터 삭제 전 백업 필수
 - 다른 프로젝트에도 동일한 문제가 있을 수 있음
+
+---
+
+## ✅ 해결 완료 (2026-01-24)
+
+### 🔍 문제 재확인
+2026-01-24 기준으로 데이터베이스를 재확인한 결과:
+- **현재 중복 데이터 없음** (9개 레코드, 9개 고유 조합)
+- UNIQUE 제약조건이 정상 작동 중
+- 과거 중복 데이터는 이미 정리된 상태
+
+### 🛠️ 구현된 해결책
+
+#### 1. Repository 레벨 수정
+**파일**: `pacs-server/src/infrastructure/repositories/project_data_repository_impl.rs`
+
+**변경 내용**:
+```rust
+// BEFORE: DO NOTHING은 충돌 시 행을 반환하지 않아 fetch_one() 실패
+ON CONFLICT (project_id, study_id, series_id, instance_id) DO NOTHING
+
+// AFTER: DO UPDATE는 충돌 시에도 행을 반환하여 idempotency 보장
+ON CONFLICT (project_id, study_id, series_id, instance_id)
+DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+RETURNING id, project_id, created_at
+```
+
+**효과**:
+- ✅ **Idempotency 보장**: 동일한 요청을 여러 번 보내도 안전
+- ✅ **항상 행 반환**: 새로 생성되거나 기존 레코드 모두 반환
+- ✅ **중복 방지**: UNIQUE 제약조건과 함께 작동
+
+#### 2. API 레벨 중복 체크
+**API**: `POST /api/projects/{project_id}/studies/assign`
+
+**동작**:
+- 첫 번째 할당: `200 OK` 또는 `201 Created` + `study_id` 반환
+- 중복 할당 시도: `409 Conflict` + "Study already assigned to this project" 메시지
+
+**장점**:
+- ✅ 명확한 에러 메시지
+- ✅ HTTP 표준 상태 코드 사용
+- ✅ 클라이언트가 중복 여부를 쉽게 판단 가능
+
+#### 3. E2E 테스트 추가
+**파일**: `pacs-server/e2e/test_project_data_duplicate_prevention.py`
+
+**테스트 시나리오**:
+1. **Test 1: Duplicate Study Assignment Prevention**
+   - 동일한 Study를 같은 프로젝트에 두 번 할당
+   - 두 번째 시도 시 409 Conflict 반환 확인
+   - 데이터베이스에 하나의 레코드만 존재 확인
+
+2. **Test 2: Concurrent Study Assignment**
+   - 5개의 동시 요청으로 동일한 Study 할당
+   - 일부는 성공(200), 일부는 충돌(409)
+   - 모든 성공 요청이 동일한 `study_id` 반환 확인
+   - 데이터베이스에 하나의 레코드만 존재 확인
+
+3. **Test 3: Same Study in Different Projects**
+   - 동일한 Study를 서로 다른 프로젝트에 할당
+   - 각 프로젝트에 별도 레코드 생성 확인
+   - 프로젝트 간 독립성 확인
+
+**테스트 결과**: 🎉 **ALL TESTS PASSED**
+
+### 📊 최종 검증
+
+#### 데이터베이스 상태
+```sql
+-- 중복 확인 쿼리 결과
+SELECT COUNT(*) as total_records,
+       COUNT(DISTINCT (project_id, study_id)) as unique_combinations
+FROM project_data
+WHERE resource_level = 'STUDY';
+
+-- 결과: 9 total_records, 9 unique_combinations (중복 없음)
+```
+
+#### UNIQUE 제약조건
+```sql
+\d project_data
+
+-- Indexes:
+--   "project_data_project_id_study_id_series_id_instance_id_key"
+--   UNIQUE CONSTRAINT, btree (project_id, study_id, series_id, instance_id)
+```
+
+### 🎯 결론
+
+1. ✅ **중복 데이터 문제 해결**: 현재 데이터베이스에 중복 없음
+2. ✅ **Repository 로직 개선**: Idempotency 보장
+3. ✅ **API 동작 개선**: 409 Conflict로 명확한 에러 처리
+4. ✅ **테스트 커버리지**: 3가지 시나리오 E2E 테스트 추가
+5. ✅ **동시성 안전**: 동시 요청에도 중복 생성 방지
+
+### 📝 관련 파일
+- `pacs-server/src/infrastructure/repositories/project_data_repository_impl.rs` (수정)
+- `pacs-server/e2e/test_project_data_duplicate_prevention.py` (신규)
+- `docs/issues/duplicate-data-issue.md` (업데이트)
 

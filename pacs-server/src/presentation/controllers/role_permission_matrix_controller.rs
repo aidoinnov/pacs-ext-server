@@ -1,4 +1,7 @@
-use actix_web::{web, HttpResponse, Result};
+use actix_web::{
+    http::header::{EntityTag, CacheControl, CacheDirective, IF_NONE_MATCH},
+    web, HttpRequest, HttpResponse, Result
+};
 use std::sync::Arc;
 
 use crate::application::dto::role_permission_matrix_dto::*;
@@ -43,15 +46,58 @@ fn handle_service_error(error: ServiceError) -> HttpResponse {
     path = "/api/roles/global/permissions/matrix",
     responses(
         (status = 200, description = "글로벌 역할-권한 매트릭스 조회 성공", body = RolePermissionMatrixResponse),
+        (status = 304, description = "Not Modified - 캐시된 데이터 사용"),
         (status = 500, description = "서버 내부 오류")
     ),
     tag = "role-permission-matrix"
 )]
 pub async fn get_global_matrix(
+    http_req: HttpRequest,
     use_case: web::Data<Arc<RolePermissionMatrixUseCase>>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    // 1. 먼저 matrix_updated_at 조회 (빠른 쿼리)
+    let matrix_updated_at = match use_case.get_matrix_updated_at().await {
+        Ok(updated_at) => updated_at,
+        Err(e) => {
+            tracing::error!("Error getting matrix_updated_at: {:?}", e);
+            return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Internal server error",
+                "message": e.to_string()
+            })));
+        }
+    };
+
+    // 2. ETag 생성
+    let etag = matrix_updated_at.timestamp().to_string();
+    let entity_tag = EntityTag::new_weak(etag.clone());
+
+    // 3. If-None-Match 헤더 확인
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag_str) = if_none_match.to_str() {
+            if let Ok(client_entity_tag) = client_etag_str.parse::<EntityTag>() {
+                if client_entity_tag.weak_eq(&entity_tag) {
+                    tracing::debug!("Cache hit for get_global_matrix (role-permission)");
+                    return Ok(HttpResponse::NotModified()
+                        .insert_header(CacheControl(vec![
+                            CacheDirective::Private,
+                            CacheDirective::MaxAge(60),
+                        ]))
+                        .insert_header(actix_web::http::header::ETag(entity_tag))
+                        .finish());
+                }
+            }
+        }
+    }
+
+    // 4. ETag 불일치 시에만 실제 데이터 조회
     match use_case.get_global_matrix().await {
-        Ok(matrix) => Ok(HttpResponse::Ok().json(matrix)),
+        Ok(matrix) => Ok(HttpResponse::Ok()
+            .insert_header(CacheControl(vec![
+                CacheDirective::Private,
+                CacheDirective::MaxAge(60),
+            ]))
+            .insert_header(actix_web::http::header::ETag(entity_tag))
+            .json(matrix)),
         Err(e) => Ok(handle_service_error(e)),
     }
 }
@@ -62,6 +108,7 @@ pub async fn get_global_matrix(
     path = "/api/projects/{project_id}/roles/permissions/matrix",
     responses(
         (status = 200, description = "프로젝트별 역할-권한 매트릭스 조회 성공", body = RolePermissionMatrixResponse),
+        (status = 304, description = "Not Modified - 캐시된 데이터 사용"),
         (status = 404, description = "프로젝트를 찾을 수 없음"),
         (status = 500, description = "서버 내부 오류")
     ),
@@ -72,11 +119,54 @@ pub async fn get_global_matrix(
 )]
 pub async fn get_project_matrix(
     path: web::Path<i32>,
+    http_req: HttpRequest,
     use_case: web::Data<Arc<RolePermissionMatrixUseCase>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let project_id = path.into_inner();
+
+    // 1. 먼저 matrix_updated_at 조회 (빠른 쿼리)
+    let matrix_updated_at = match use_case.get_matrix_updated_at().await {
+        Ok(updated_at) => updated_at,
+        Err(e) => {
+            tracing::error!("Error getting matrix_updated_at: {:?}", e);
+            return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Internal server error",
+                "message": e.to_string()
+            })));
+        }
+    };
+
+    // 2. ETag 생성
+    let etag = matrix_updated_at.timestamp().to_string();
+    let entity_tag = EntityTag::new_weak(etag.clone());
+
+    // 3. If-None-Match 헤더 확인
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag_str) = if_none_match.to_str() {
+            if let Ok(client_entity_tag) = client_etag_str.parse::<EntityTag>() {
+                if client_entity_tag.weak_eq(&entity_tag) {
+                    tracing::debug!("Cache hit for get_project_matrix (role-permission): project_id={}", project_id);
+                    return Ok(HttpResponse::NotModified()
+                        .insert_header(CacheControl(vec![
+                            CacheDirective::Private,
+                            CacheDirective::MaxAge(60),
+                        ]))
+                        .insert_header(actix_web::http::header::ETag(entity_tag))
+                        .finish());
+                }
+            }
+        }
+    }
+
+    // 4. ETag 불일치 시에만 실제 데이터 조회
     match use_case.get_project_matrix(project_id).await {
-        Ok(matrix) => Ok(HttpResponse::Ok().json(matrix)),
+        Ok(matrix) => Ok(HttpResponse::Ok()
+            .insert_header(CacheControl(vec![
+                CacheDirective::Private,
+                CacheDirective::MaxAge(60),
+            ]))
+            .insert_header(actix_web::http::header::ETag(entity_tag))
+            .json(matrix)),
         Err(e) => Ok(handle_service_error(e)),
     }
 }

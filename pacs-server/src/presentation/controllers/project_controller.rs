@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_imports, unused_variables)]
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{web, HttpRequest, HttpResponse, Responder};
+use actix_web::http::header::{CacheControl, CacheDirective, ETag, EntityTag, IF_NONE_MATCH};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -58,9 +59,49 @@ pub async fn create_project<P: ProjectService>(
 pub async fn get_project<P: ProjectService>(
     project_use_case: web::Data<Arc<ProjectUseCase<P>>>,
     project_id: web::Path<i32>,
+    http_req: HttpRequest,
 ) -> impl Responder {
-    match project_use_case.get_project(*project_id).await {
-        Ok(project) => HttpResponse::Ok().json(project),
+    let id = *project_id;
+
+    // updated_at 조회
+    let updated_at = match project_use_case.get_project_updated_at(id).await {
+        Ok(ts) => ts,
+        Err(e) => {
+            return HttpResponse::NotFound().json(json!({
+                "error": format!("Project not found: {}", e)
+            }));
+        }
+    };
+
+    // ETag 생성
+    let etag = updated_at.timestamp().to_string();
+    let etag_value = format!("W/\"{}\"", etag);  // Weak ETag 형식
+
+    // If-None-Match 헤더 확인
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag) = if_none_match.to_str() {
+            if client_etag == etag_value {
+                // 변경 없음 - 304 Not Modified
+                return HttpResponse::NotModified()
+                    .insert_header(CacheControl(vec![
+                        CacheDirective::Private,
+                        CacheDirective::MaxAge(60),
+                    ]))
+                    .insert_header(ETag(EntityTag::new_weak(etag)))
+                    .finish();
+            }
+        }
+    }
+
+    // 프로젝트 조회
+    match project_use_case.get_project(id).await {
+        Ok(project) => HttpResponse::Ok()
+            .insert_header(CacheControl(vec![
+                CacheDirective::Private,
+                CacheDirective::MaxAge(60),
+            ]))
+            .insert_header(ETag(EntityTag::new_weak(etag)))
+            .json(project),
         Err(e) => HttpResponse::NotFound().json(json!({
             "error": format!("Project not found: {}", e)
         })),
@@ -88,9 +129,50 @@ pub async fn get_project<P: ProjectService>(
 pub async fn list_projects<P: ProjectService>(
     project_use_case: web::Data<Arc<ProjectUseCase<P>>>,
     query: web::Query<ProjectListQuery>,
+    http_req: HttpRequest,
 ) -> impl Responder {
-    match project_use_case.get_all_projects(query.into_inner()).await {
-        Ok(response) => HttpResponse::Ok().json(response),
+    let query_params = query.into_inner();
+
+    // updated_at + count 조회 (삭제 감지 개선)
+    let (max_updated, count) = match project_use_case.get_projects_etag_data(&query_params).await {
+        Ok(data) => data,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to get projects etag data: {}", e)
+            }));
+        }
+    };
+
+    // ETag 생성: "timestamp-count" 형식
+    // COUNT 포함으로 중간 항목 삭제도 감지 가능
+    let etag = format!("{}-{}", max_updated.timestamp(), count);
+    let etag_value = format!("W/\"{}\"", etag);  // Weak ETag 형식
+
+    // If-None-Match 헤더 확인
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag) = if_none_match.to_str() {
+            if client_etag == etag_value {
+                // 변경 없음 - 304 Not Modified
+                return HttpResponse::NotModified()
+                    .insert_header(CacheControl(vec![
+                        CacheDirective::Private,
+                        CacheDirective::MaxAge(60),
+                    ]))
+                    .insert_header(ETag(EntityTag::new_weak(etag)))
+                    .finish();
+            }
+        }
+    }
+
+    // 프로젝트 목록 조회
+    match project_use_case.get_all_projects(query_params).await {
+        Ok(response) => HttpResponse::Ok()
+            .insert_header(CacheControl(vec![
+                CacheDirective::Private,
+                CacheDirective::MaxAge(60),
+            ]))
+            .insert_header(ETag(EntityTag::new_weak(etag)))
+            .json(response),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": format!("Failed to list projects: {}", e)
         })),
@@ -114,18 +196,57 @@ pub async fn list_projects<P: ProjectService>(
 pub async fn get_active_projects<P: ProjectService>(
     project_use_case: web::Data<Arc<ProjectUseCase<P>>>,
     query: web::Query<ProjectListQuery>,
+    http_req: HttpRequest,
 ) -> impl Responder {
-    let q = query.into_inner();
-    let page = q.page.unwrap_or(1);
-    let page_size = q.page_size.unwrap_or(20);
-    let sort_by = q.sort_by.as_deref().unwrap_or("created_at");
-    let sort_order = q.sort_order.as_deref().unwrap_or("desc");
+    let query_params = query.into_inner();
+
+    // updated_at + count 조회 (활성 프로젝트만)
+    let (max_updated, count) = match project_use_case.get_active_projects_etag_data().await {
+        Ok(data) => data,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to get active projects etag data: {}", e)
+            }));
+        }
+    };
+
+    // ETag 생성: "timestamp-count" 형식
+    let etag = format!("{}-{}", max_updated.timestamp(), count);
+    let etag_value = format!("W/\"{}\"", etag);  // Weak ETag 형식
+
+    // If-None-Match 헤더 확인
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag) = if_none_match.to_str() {
+            if client_etag == etag_value {
+                // 변경 없음 - 304 Not Modified
+                return HttpResponse::NotModified()
+                    .insert_header(CacheControl(vec![
+                        CacheDirective::Private,
+                        CacheDirective::MaxAge(60),
+                    ]))
+                    .insert_header(ETag(EntityTag::new_weak(etag)))
+                    .finish();
+            }
+        }
+    }
+
+    // 활성 프로젝트 목록 조회
+    let page = query_params.page.unwrap_or(1);
+    let page_size = query_params.page_size.unwrap_or(20);
+    let sort_by = query_params.sort_by.as_deref().unwrap_or("created_at");
+    let sort_order = query_params.sort_order.as_deref().unwrap_or("desc");
 
     match project_use_case
         .get_active_projects(page, page_size, sort_by, sort_order)
         .await
     {
-        Ok(response) => HttpResponse::Ok().json(response),
+        Ok(response) => HttpResponse::Ok()
+            .insert_header(CacheControl(vec![
+                CacheDirective::Private,
+                CacheDirective::MaxAge(60),
+            ]))
+            .insert_header(ETag(EntityTag::new_weak(etag)))
+            .json(response),
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": format!("Failed to get active projects: {}", e)
         })),

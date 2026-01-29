@@ -39,37 +39,41 @@ CREATE TABLE IF NOT EXISTS project_data_series (
 
 -- Modify existing project_data_access table to support hierarchical access control
 -- Add new columns for resource_level, study_id, series_id
-DO $$ 
+-- Skip if table doesn't exist (will be created in migration 028)
+DO $$
 BEGIN
-    -- Add resource_level column if not exists
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'project_data_access' AND column_name = 'resource_level') THEN
-        ALTER TABLE project_data_access ADD COLUMN resource_level resource_level_enum DEFAULT 'STUDY';
-    END IF;
+    -- Check if table exists
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_data_access') THEN
+        -- Add resource_level column if not exists
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'project_data_access' AND column_name = 'resource_level') THEN
+            ALTER TABLE project_data_access ADD COLUMN resource_level resource_level_enum DEFAULT 'STUDY';
+        END IF;
 
-    -- Add study_id column if not exists
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'project_data_access' AND column_name = 'study_id') THEN
-        ALTER TABLE project_data_access ADD COLUMN study_id INTEGER REFERENCES project_data_study(id) ON DELETE CASCADE;
-    END IF;
+        -- Add study_id column if not exists
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'project_data_access' AND column_name = 'study_id') THEN
+            ALTER TABLE project_data_access ADD COLUMN study_id INTEGER REFERENCES project_data_study(id) ON DELETE CASCADE;
+        END IF;
 
-    -- Add series_id column if not exists
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'project_data_access' AND column_name = 'series_id') THEN
-        ALTER TABLE project_data_access ADD COLUMN series_id INTEGER REFERENCES project_data_series(id) ON DELETE CASCADE;
-    END IF;
+        -- Add series_id column if not exists
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'project_data_access' AND column_name = 'series_id') THEN
+            ALTER TABLE project_data_access ADD COLUMN series_id INTEGER REFERENCES project_data_series(id) ON DELETE CASCADE;
+        END IF;
 
-    -- Add project_id column if not exists
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'project_data_access' AND column_name = 'project_id') THEN
-        ALTER TABLE project_data_access ADD COLUMN project_id INTEGER REFERENCES security_project(id) ON DELETE CASCADE;
-        
-        -- Update existing rows to set project_id based on project_data_id
-        -- This requires a migration script to be run separately as it depends on project_data table structure
-    END IF;
+        -- Add project_id column if not exists
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name = 'project_data_access' AND column_name = 'project_id') THEN
+            ALTER TABLE project_data_access ADD COLUMN project_id INTEGER REFERENCES security_project(id) ON DELETE CASCADE;
 
-    -- Change status default to PENDING
-    ALTER TABLE project_data_access ALTER COLUMN status SET DEFAULT 'PENDING'::data_access_status_enum;
+            -- Update existing rows to set project_id based on project_data_id
+            -- This requires a migration script to be run separately as it depends on project_data table structure
+        END IF;
+
+        -- Change status default to PENDING
+        ALTER TABLE project_data_access ALTER COLUMN status SET DEFAULT 'PENDING'::data_access_status_enum;
+    END IF;
 END $$;
 
 -- 인덱스: Study 테이블
@@ -83,16 +87,26 @@ CREATE INDEX IF NOT EXISTS idx_project_data_series_study ON project_data_series(
 CREATE INDEX IF NOT EXISTS idx_project_data_series_uid ON project_data_series(series_uid);
 CREATE INDEX IF NOT EXISTS idx_project_data_series_modality ON project_data_series(modality);
 
--- 인덱스: Access 테이블 (new columns)
-CREATE INDEX IF NOT EXISTS idx_project_data_access_project ON project_data_access(project_id) WHERE project_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_project_data_access_study ON project_data_access(study_id) WHERE study_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_project_data_access_series ON project_data_access(series_id) WHERE series_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_project_data_access_resource ON project_data_access(resource_level, study_id, series_id) WHERE resource_level IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_project_data_access_project_user ON project_data_access(project_id, user_id) WHERE project_id IS NOT NULL AND user_id IS NOT NULL;
+-- 인덱스: Access 테이블 (new columns) - 테이블이 존재하는 경우에만
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_data_access') THEN
+        CREATE INDEX IF NOT EXISTS idx_project_data_access_project ON project_data_access(project_id) WHERE project_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_project_data_access_study ON project_data_access(study_id) WHERE study_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_project_data_access_series ON project_data_access(series_id) WHERE series_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_project_data_access_resource ON project_data_access(resource_level, study_id, series_id) WHERE resource_level IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_project_data_access_project_user ON project_data_access(project_id, user_id) WHERE project_id IS NOT NULL AND user_id IS NOT NULL;
+    END IF;
+END $$;
 
 -- 코멘트 추가
 COMMENT ON TABLE project_data_study IS '프로젝트별 DICOM Study 데이터';
 COMMENT ON TABLE project_data_series IS '프로젝트별 DICOM Series 데이터';
-COMMENT ON TABLE project_data_access IS '사용자별 DICOM 데이터 접근 권한 관리';
-COMMENT ON COLUMN project_data_access.resource_level IS '접근 권한 레벨: STUDY, SERIES, INSTANCE';
-COMMENT ON COLUMN project_data_access.status IS '접근 상태: APPROVED(승인), DENIED(거부), PENDING(대기)';
+
+-- project_data_access 테이블 코멘트 (테이블이 존재하는 경우에만)
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_data_access') THEN
+        COMMENT ON TABLE project_data_access IS '사용자별 DICOM 데이터 접근 권한 관리';
+        COMMENT ON COLUMN project_data_access.resource_level IS '접근 권한 레벨: STUDY, SERIES, INSTANCE';
+        COMMENT ON COLUMN project_data_access.status IS '접근 상태: APPROVED(승인), DENIED(거부), PENDING(대기)';
+    END IF;
+END $$;

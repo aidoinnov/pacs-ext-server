@@ -374,5 +374,34 @@ impl StudyListViewRepository for StudyListViewRepositoryImpl {
 
         Ok(result.0)
     }
+
+    async fn get_views_updated_at(&self, filter: &ViewListFilter) -> Result<chrono::DateTime<chrono::Utc>, sqlx::Error> {
+        // View 목록 중 가장 최근 updated_at 조회
+        let mut query = String::from(
+            "SELECT COALESCE(MAX(updated_at), '1970-01-01'::timestamptz) FROM study_list_view WHERE 1=1"
+        );
+
+        if !filter.include_system {
+            query.push_str(" AND is_system = false");
+        }
+        if filter.scope_type.is_some() {
+            query.push_str(" AND scope_type = $1");
+        }
+        if filter.scope_id.is_some() {
+            query.push_str(" AND scope_id = $2");
+        }
+        if filter.owner_user_id.is_some() {
+            query.push_str(" AND owner_user_id = $3");
+        }
+
+        let updated_at = sqlx::query_scalar::<_, chrono::DateTime<chrono::Utc>>(&query)
+            .bind(&filter.scope_type)
+            .bind(&filter.scope_id)
+            .bind(&filter.owner_user_id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(updated_at)
+    }
 }
 

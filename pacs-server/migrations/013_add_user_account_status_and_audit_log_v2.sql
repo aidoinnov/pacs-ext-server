@@ -43,13 +43,13 @@ CREATE TABLE IF NOT EXISTS security_user_audit_log (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 성능 최적화를 위한 인덱스 생성
-CREATE INDEX idx_user_audit_log_user_id ON security_user_audit_log(user_id);
-CREATE INDEX idx_user_audit_log_action ON security_user_audit_log(action);
-CREATE INDEX idx_user_audit_log_created_at ON security_user_audit_log(created_at);
-CREATE INDEX idx_user_account_status ON security_user(account_status);
-CREATE INDEX idx_user_email_verified ON security_user(email_verified);
-CREATE INDEX idx_user_approved_by ON security_user(approved_by);
+-- 성능 최적화를 위한 인덱스 생성 (이미 존재하면 스킵)
+CREATE INDEX IF NOT EXISTS idx_user_audit_log_user_id ON security_user_audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_audit_log_action ON security_user_audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_user_audit_log_created_at ON security_user_audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_user_account_status ON security_user(account_status);
+CREATE INDEX IF NOT EXISTS idx_user_email_verified ON security_user(email_verified);
+CREATE INDEX IF NOT EXISTS idx_user_approved_by ON security_user(approved_by);
 
 -- 테이블 및 컬럼에 대한 주석 추가
 COMMENT ON TABLE security_user_audit_log IS '사용자 계정 감사 로그 - 사용자 삭제 후에도 영구 보관';

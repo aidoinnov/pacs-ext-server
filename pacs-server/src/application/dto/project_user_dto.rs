@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -11,6 +12,8 @@ pub struct UserWithRoleResponse {
     pub role_id: Option<i32>,
     pub role_name: Option<String>,
     pub role_scope: Option<String>,
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// Project with role information (for user's projects list)
@@ -35,6 +38,9 @@ pub struct ProjectMembersResponse {
     pub page: i32,
     pub page_size: i32,
     pub total_pages: i32,
+    /// 가장 최근 업데이트된 멤버의 updated_at (ETag 생성용)
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
+    pub latest_updated_at: DateTime<Utc>,
 }
 
 /// Paginated user projects response
@@ -73,6 +79,8 @@ pub struct RoleAssignmentResponse {
     pub user_id: i32,
     pub project_id: i32,
     pub role_id: i32,
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Response for successful batch role assignment
@@ -82,6 +90,8 @@ pub struct BatchRoleAssignmentResponse {
     pub project_id: i32,
     pub assigned_count: i32,
     pub failed_assignments: Vec<FailedAssignment>,
+    #[schema(value_type = String, example = "2024-01-01T00:00:00Z")]
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Information about failed role assignments

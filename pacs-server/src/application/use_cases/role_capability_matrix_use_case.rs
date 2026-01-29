@@ -1,6 +1,7 @@
 use crate::application::dto::role_capability_matrix_dto::*;
 use crate::domain::services::CapabilityService;
 use crate::domain::ServiceError;
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -388,5 +389,35 @@ impl RoleCapabilityMatrixUseCase {
         }
 
         Ok(capability_infos)
+    }
+
+    /// Role-Capability 매트릭스의 최신 변경 시점 조회 (ETag용)
+    pub async fn get_matrix_updated_at(&self) -> Result<DateTime<Utc>, ServiceError> {
+        self.capability_service.get_matrix_updated_at().await
+    }
+
+    /// 모든 Capability 목록의 최신 변경 시점 조회 (ETag용)
+    pub async fn get_all_capabilities_updated_at(&self) -> Result<DateTime<Utc>, ServiceError> {
+        self.capability_service.get_all_capabilities_updated_at().await
+    }
+
+    /// 특정 Capability 상세의 최신 변경 시점 조회 (ETag용)
+    pub async fn get_capability_detail_updated_at(
+        &self,
+        capability_id: i32,
+    ) -> Result<DateTime<Utc>, ServiceError> {
+        self.capability_service
+            .get_capability_detail_updated_at(capability_id)
+            .await
+    }
+
+    /// 카테고리별 Capability 목록의 최신 변경 시점 조회 (ETag용)
+    pub async fn get_capabilities_by_category_updated_at(
+        &self,
+        category: &str,
+    ) -> Result<DateTime<Utc>, ServiceError> {
+        self.capability_service
+            .get_capabilities_by_category_updated_at(category)
+            .await
     }
 }

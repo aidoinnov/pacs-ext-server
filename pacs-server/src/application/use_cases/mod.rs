@@ -1,6 +1,7 @@
 pub mod access_control_use_case;
 pub mod annotation_use_case;
 pub mod auth_use_case;
+pub mod data_access_check_use_case;
 pub mod mask_group_use_case;
 pub mod mask_use_case;
 pub mod permission_use_case;
@@ -21,6 +22,7 @@ pub mod view_selection_use_case;
 pub use access_control_use_case::AccessControlUseCase;
 pub use annotation_use_case::AnnotationUseCase;
 pub use auth_use_case::AuthUseCase;
+pub use data_access_check_use_case::DataAccessCheckUseCase;
 pub use mask_group_use_case::MaskGroupUseCase;
 pub use mask_use_case::MaskUseCase;
 pub use permission_use_case::PermissionUseCase;

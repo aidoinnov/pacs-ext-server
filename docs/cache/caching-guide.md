@@ -9,11 +9,15 @@ PACS 서버는 다양한 캐싱 전략을 사용하여 성능을 최적화합니
 
 ## 📊 캐싱 전략 비교
 
-| API | 캐싱 방식 | TTL | 주요 목적 | 상세 가이드 |
-|-----|----------|-----|----------|------------|
-| **QIDO-RS** | Redis (서버 사이드) | 60초 | Dcm4chee 부하 절감 | [📖 QIDO 캐시 가이드](./qido-cache-client-guide.md) |
-| **Capability** | HTTP (ETag) | 60초 | DB 조회 절감 | [📖 Capability 캐시 가이드](./capability-cache-client-guide.md) |
-| **Role Assignment** | HTTP (ETag) | 1초 | 중복 요청 방지 | [📖 Role Assignment 캐시 가이드](./role-assignment-caching-guide.md) |
+| API | 캐싱 방식 | TTL | 주요 목적 | 성능 개선 | 상세 가이드 |
+|-----|----------|-----|----------|----------|------------|
+| **QIDO-RS** | Redis (서버 사이드) | 60초 | Dcm4chee 부하 절감 | 17-36% | [📖 QIDO 캐시 가이드](./qido-cache-client-guide.md) |
+| **Membership** | Redis (서버 사이드) | 180초 | RBAC DB 쿼리 절감 | 3-60% | [📖 Membership 캐시 가이드](./membership-cache-guide.md) |
+| **Capability** | HTTP (ETag) | 60초 | DB 조회 절감 | 63% | [📖 Capability 캐시 가이드](./capability-cache-client-guide.md) |
+| **Role Assignment** | HTTP (ETag) | 1초 | 중복 요청 방지 | - | [📖 Role Assignment 캐시 가이드](./role-assignment-caching-guide.md) |
+| **Subject** | HTTP (ETag) | 60초 | DB 조회 절감 | **69.7%** ⬆️ | [📖 Subject 캐시 가이드](./subject-cache-client-guide.md) |
+| **Project Data** | HTTP (ETag) | 60초 | DB 조회 절감 | **71.3%** ⬆️ | [📖 Project Data 캐시 가이드](./project-data-cache-client-guide.md) |
+| **Study List View** | HTTP (ETag) | 60초 | DB 조회 절감 | **47.9%** ⬆️ | [📖 Study List View 캐시 가이드](./study-list-view-cache-client-guide.md) |
 
 ---
 
@@ -21,12 +25,13 @@ PACS 서버는 다양한 캐싱 전략을 사용하여 성능을 최적화합니
 
 ### 1. **Redis 캐싱 (서버 사이드)**
 
-**적용 API**: QIDO-RS (Studies, Series)
+**적용 API**: QIDO-RS (Studies, Series), Membership (RBAC)
 
 **특징**:
 - ✅ 서버에서 자동 처리 (클라이언트 투명)
 - ✅ 모든 클라이언트가 캐시 공유
 - ✅ 외부 API 호출 절감 (Dcm4chee)
+- ✅ DB 쿼리 절감 (Membership)
 - ⚠️ 캐시 무효화 불가 (TTL 만료 대기)
 
 **사용 예시**:
@@ -36,14 +41,15 @@ const series = await fetch(`/api/me/dicom/studies/${studyUid}/series?project_id=
 ```
 
 **성능 개선**:
-- Series: 0.22초 → 0.14초 (36% 개선)
-- Studies: 0.29초 → 0.24초 (17% 개선)
+- QIDO Series: 0.22초 → 0.14초 (36% 개선)
+- QIDO Studies: 0.29초 → 0.24초 (17% 개선)
+- Membership: DB 쿼리 80% 절감, 응답 시간 3-60% 개선
 
 ---
 
 ### 2. **HTTP 캐싱 (ETag)**
 
-**적용 API**: Capability, Role Assignment
+**적용 API**: Capability, Role Assignment, Subject, Project Data, Study List View
 
 **특징**:
 - ✅ 브라우저 캐시 활용
@@ -64,7 +70,11 @@ const latest = await fetch('/api/capabilities', {
 
 **성능 개선**:
 - 60초 내 중복 요청: 0ms (브라우저 캐시)
-- ETag 활용: 150ms → 55ms (63% 개선)
+- ETag 활용: 평균 47-71% 개선
+  - Subject: 69.7% (0.051s → 0.016s)
+  - Project Data: 71.3% (0.053s → 0.015s)
+  - Study List View: 47.9% (0.068s → 0.035s)
+  - Capability: 63% (0.150s → 0.055s)
 
 ---
 
@@ -168,8 +178,8 @@ const series = await fetch(
 
 ### 3. **Role Assignment API 캐싱**
 
-**캐싱 방식**: HTTP (ETag)  
-**TTL**: 1초  
+**캐싱 방식**: HTTP (ETag)
+**TTL**: 1초
 **적용 엔드포인트**:
 - `PUT /api/projects/{project_id}/users/{user_id}/role`
 - `GET /api/projects/{project_id}/users`
@@ -180,6 +190,54 @@ const series = await fetch(
 - ✅ 1초 내 중복 요청 방지
 - ✅ PUT 후 즉시 GET 시 `no-cache` 필수
 - ✅ ETag 활용으로 서버 부하 절감
+
+---
+
+### 4. **Subject API 캐싱** ⬆️ 신규
+
+**캐싱 방식**: HTTP (ETag)
+**TTL**: 60초
+**적용 엔드포인트**:
+- `GET /api/projects/{project_id}/subjects`
+
+**상세 가이드**: [📖 Subject 캐시 클라이언트 가이드](./subject-cache-client-guide.md)
+
+**핵심 포인트**:
+- ✅ 69.7% 응답 시간 단축 (0.051s → 0.016s)
+- ✅ POST/PUT/DELETE 후 `no-cache` 사용
+- ✅ 프로젝트별 캐시 격리
+
+---
+
+### 5. **Project Data Access API 캐싱** ⬆️ 신규
+
+**캐싱 방식**: HTTP (ETag)
+**TTL**: 60초
+**적용 엔드포인트**:
+- `GET /api/project-data/{project_id}/studies`
+
+**상세 가이드**: [📖 Project Data 캐시 클라이언트 가이드](./project-data-cache-client-guide.md)
+
+**핵심 포인트**:
+- ✅ 71.3% 응답 시간 단축 (0.053s → 0.015s)
+- ✅ Study 할당 후 `no-cache` 사용
+- ✅ 프로젝트별 캐시 격리
+
+---
+
+### 6. **Study List View API 캐싱** ⬆️ 신규
+
+**캐싱 방식**: HTTP (ETag)
+**TTL**: 60초
+**적용 엔드포인트**:
+- `GET /api/study-list-views?project_id={project_id}`
+
+**상세 가이드**: [📖 Study List View 캐시 클라이언트 가이드](./study-list-view-cache-client-guide.md)
+
+**핵심 포인트**:
+- ✅ 47.9% 응답 시간 단축 (0.068s → 0.035s)
+- ✅ View 생성/수정 후 `no-cache` 사용
+- ✅ 필터 파라미터별 캐시 구분
 
 ---
 

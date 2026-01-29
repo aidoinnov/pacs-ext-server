@@ -134,6 +134,8 @@ pub struct Project {
     pub status: ProjectStatus,
     /// 프로젝트가 생성된 시각
     pub created_at: DateTime<Utc>,
+    /// 프로젝트가 마지막으로 수정된 시각 (ETag 생성에 사용)
+    pub updated_at: DateTime<Utc>,
 }
 
 /// 새로운 프로젝트 생성을 위한 DTO(Data Transfer Object)

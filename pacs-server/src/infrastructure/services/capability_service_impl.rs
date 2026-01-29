@@ -210,4 +210,40 @@ where
             .await
             .map_err(|e| ServiceError::DatabaseError(e.to_string()))
     }
+
+    async fn get_matrix_updated_at(&self) -> Result<chrono::DateTime<chrono::Utc>, ServiceError> {
+        self.capability_repository
+            .get_matrix_updated_at()
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))
+    }
+
+    async fn get_all_capabilities_updated_at(
+        &self,
+    ) -> Result<chrono::DateTime<chrono::Utc>, ServiceError> {
+        self.capability_repository
+            .get_all_capabilities_updated_at()
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))
+    }
+
+    async fn get_capability_detail_updated_at(
+        &self,
+        capability_id: i32,
+    ) -> Result<chrono::DateTime<chrono::Utc>, ServiceError> {
+        self.capability_repository
+            .get_capability_detail_updated_at(capability_id)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))
+    }
+
+    async fn get_capabilities_by_category_updated_at(
+        &self,
+        category: &str,
+    ) -> Result<chrono::DateTime<chrono::Utc>, ServiceError> {
+        self.capability_repository
+            .get_capabilities_by_category_updated_at(category)
+            .await
+            .map_err(|e| ServiceError::DatabaseError(e.to_string()))
+    }
 }

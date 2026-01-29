@@ -111,8 +111,15 @@ pub trait StudyListViewRepository: Send + Sync {
     // ========================================================================
     // Count
     // ========================================================================
-    
+
     /// View 개수
     async fn count_views(&self, filter: &ViewListFilter) -> Result<i64, sqlx::Error>;
+
+    // ========================================================================
+    // ETag 캐싱
+    // ========================================================================
+
+    /// View 목록 최종 수정 시간 조회 (ETag 캐싱용)
+    async fn get_views_updated_at(&self, filter: &ViewListFilter) -> Result<chrono::DateTime<chrono::Utc>, sqlx::Error>;
 }
 

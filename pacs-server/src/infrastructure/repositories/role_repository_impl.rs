@@ -1,6 +1,7 @@
 use crate::domain::entities::{NewRole, Role, RoleScope};
 use crate::domain::repositories::RoleRepository;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[derive(Clone)]
@@ -105,6 +106,32 @@ impl RoleRepository for RoleRepositoryImpl {
             .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    /// 모든 역할의 최신 변경 시점 조회 (ETag 생성용)
+    async fn get_all_roles_updated_at(&self) -> Result<DateTime<Utc>, sqlx::Error> {
+        let updated_at: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(created_at), '1970-01-01'::timestamptz) as updated_at
+             FROM security_role"
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at)
+    }
+
+    /// 특정 scope의 역할 최신 변경 시점 조회 (ETag 생성용)
+    async fn get_roles_updated_at_by_scope(&self, scope: &str) -> Result<DateTime<Utc>, sqlx::Error> {
+        let updated_at: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(created_at), '1970-01-01'::timestamptz) as updated_at
+             FROM security_role
+             WHERE scope = $1"
+        )
+        .bind(scope)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at)
     }
 
     fn pool(&self) -> &PgPool {

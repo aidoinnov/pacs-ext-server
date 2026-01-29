@@ -23,6 +23,10 @@ cargo run &
 - **[QIDO-RS 캐시 가이드](./qido-cache-client-guide.md)**
   - Redis 기반 DICOM 데이터 캐싱
   - 60초 TTL, 자동 캐싱
+- **[Membership 캐시 가이드](./membership-cache-guide.md)** ⭐ NEW
+  - Redis 기반 프로젝트 멤버십 캐싱
+  - 180초 TTL, RBAC 성능 개선
+  - DB 쿼리 80% 절감
 - **[Capability 캐시 가이드](./capability-cache-client-guide.md)**
   - HTTP ETag 기반 캐싱
   - 60초 TTL, 조건부 요청

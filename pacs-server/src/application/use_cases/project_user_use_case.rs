@@ -5,6 +5,7 @@ use crate::application::dto::project_user_dto::{
 };
 use crate::domain::services::{ProjectDataService, ProjectService, UserService};
 use crate::domain::ServiceError;
+use crate::infrastructure::services::MembershipCacheService;
 use std::sync::Arc;
 
 /// 프로젝트-사용자 역할 관리 Use Case
@@ -17,6 +18,7 @@ where
     project_service: Arc<P>,
     user_service: Arc<U>,
     project_data_service: Arc<D>,
+    membership_cache: Option<MembershipCacheService>,
 }
 
 impl<P, U, D> ProjectUserUseCase<P, U, D>
@@ -34,6 +36,21 @@ where
             project_service,
             user_service,
             project_data_service,
+            membership_cache: None,
+        }
+    }
+
+    pub fn with_membership_cache(
+        project_service: Arc<P>,
+        user_service: Arc<U>,
+        project_data_service: Arc<D>,
+        membership_cache: MembershipCacheService,
+    ) -> Self {
+        Self {
+            project_service,
+            user_service,
+            project_data_service,
+            membership_cache: Some(membership_cache),
         }
     }
 
@@ -54,12 +71,20 @@ where
 
         let total_pages = ((total_count + page_size as i64 - 1) / page_size as i64) as i32;
 
+        // 가장 최근 updated_at 찾기 (ETag용)
+        let latest_updated_at = users
+            .iter()
+            .filter_map(|u| u.updated_at)
+            .max()
+            .unwrap_or_else(chrono::Utc::now);
+
         Ok(ProjectMembersResponse {
             members: users,
             total_count,
             page,
             page_size,
             total_pages,
+            latest_updated_at,
         })
     }
 
@@ -96,15 +121,22 @@ where
         user_id: i32,
         role_id: i32,
     ) -> Result<RoleAssignmentResponse, ServiceError> {
-        self.project_service
+        let updated_at = self
+            .project_service
             .assign_user_role_in_project(project_id, user_id, role_id)
             .await?;
+
+        // 🔥 멤버십 캐시 무효화
+        if let Some(ref cache) = self.membership_cache {
+            let _ = cache.invalidate_membership(user_id, project_id).await;
+        }
 
         Ok(RoleAssignmentResponse {
             message: "Role assigned successfully".to_string(),
             user_id,
             project_id,
             role_id,
+            updated_at,
         })
     }
 
@@ -116,6 +148,7 @@ where
     ) -> Result<BatchRoleAssignmentResponse, ServiceError> {
         let mut assigned_count = 0;
         let mut failed_assignments = Vec::new();
+        let mut latest_updated_at = chrono::Utc::now();
 
         for (user_id, role_id) in assignments {
             match self
@@ -123,8 +156,16 @@ where
                 .assign_user_role_in_project(project_id, user_id, role_id)
                 .await
             {
-                Ok(_) => {
+                Ok(updated_at) => {
                     assigned_count += 1;
+                    // 가장 최근 updated_at 추적
+                    if updated_at > latest_updated_at {
+                        latest_updated_at = updated_at;
+                    }
+                    // 🔥 멤버십 캐시 무효화
+                    if let Some(ref cache) = self.membership_cache {
+                        let _ = cache.invalidate_membership(user_id, project_id).await;
+                    }
                 }
                 Err(e) => {
                     failed_assignments.push(FailedAssignment {
@@ -145,6 +186,7 @@ where
             project_id,
             assigned_count,
             failed_assignments,
+            updated_at: latest_updated_at,
         })
     }
 
@@ -155,15 +197,22 @@ where
         user_id: i32,
     ) -> Result<RoleAssignmentResponse, ServiceError> {
         // 역할을 NULL로 설정 (제거)
-        self.project_service
+        let updated_at = self
+            .project_service
             .assign_user_role_in_project(project_id, user_id, 0) // 0은 NULL 역할을 의미
             .await?;
+
+        // 🔥 멤버십 캐시 무효화
+        if let Some(ref cache) = self.membership_cache {
+            let _ = cache.invalidate_membership(user_id, project_id).await;
+        }
 
         Ok(RoleAssignmentResponse {
             message: "User role removed successfully".to_string(),
             user_id,
             project_id,
             role_id: 0, // NULL 역할
+            updated_at,
         })
     }
 
@@ -206,6 +255,11 @@ where
             None => ("Unknown".to_string(), 0),
         };
 
+        // 🔥 멤버십 캐시 무효화 (새 멤버 추가 시 캐시 갱신)
+        if let Some(ref cache) = self.membership_cache {
+            let _ = cache.invalidate_membership(request.user_id, project_id).await;
+        }
+
         Ok(AddMemberResponse {
             message: "Member added to project successfully".to_string(),
             user_id: request.user_id,
@@ -228,6 +282,11 @@ where
         self.user_service
             .remove_user_from_project(user_id, project_id)
             .await?;
+
+        // 🔥 멤버십 캐시 무효화
+        if let Some(ref cache) = self.membership_cache {
+            let _ = cache.invalidate_membership(user_id, project_id).await;
+        }
 
         Ok(RemoveMemberResponse {
             message: "Member removed from project successfully".to_string(),

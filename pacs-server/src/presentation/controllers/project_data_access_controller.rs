@@ -1,5 +1,8 @@
 #![allow(dead_code, unused_imports, unused_variables)]
-use actix_web::{web, HttpResponse, Result};
+use actix_web::{
+    http::header::{EntityTag, CacheControl, CacheDirective, IF_NONE_MATCH},
+    web, HttpRequest, HttpResponse, Result
+};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -278,6 +281,7 @@ pub async fn get_user_access_list(
     path = "/api/project-data/{project_id}/studies",
     responses(
         (status = 200, description = "Study 목록 조회 성공", body = GetProjectStudiesResponse),
+        (status = 304, description = "Not Modified (ETag matched)"),
         (status = 404, description = "프로젝트를 찾을 수 없음"),
         (status = 500, description = "서버 내부 오류")
     ),
@@ -292,6 +296,7 @@ pub async fn get_user_access_list(
     tag = "project-data"
 )]
 pub async fn get_project_studies(
+    http_req: HttpRequest,
     path: web::Path<i32>,
     query: web::Query<GetProjectStudiesRequest>,
     use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
@@ -300,6 +305,38 @@ pub async fn get_project_studies(
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(20).min(100); // 최대 100개
 
+    // 1. 먼저 studies_updated_at 조회 (빠른 쿼리)
+    let studies_updated_at = match use_case.get_studies_updated_at(project_id).await {
+        Ok(updated_at) => updated_at,
+        Err(e) => {
+            tracing::error!("Error getting studies_updated_at: {:?}", e);
+            return Ok(handle_service_error(e));
+        }
+    };
+
+    // 2. ETag 생성
+    let etag = studies_updated_at.timestamp().to_string();
+    let entity_tag = EntityTag::new_weak(etag.clone());
+
+    // 3. If-None-Match 헤더 확인
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag_str) = if_none_match.to_str() {
+            if let Ok(client_entity_tag) = client_etag_str.parse::<EntityTag>() {
+                if client_entity_tag.weak_eq(&entity_tag) {
+                    tracing::debug!("Cache hit for get_project_studies (project_id={})", project_id);
+                    return Ok(HttpResponse::NotModified()
+                        .insert_header(CacheControl(vec![
+                            CacheDirective::Private,
+                            CacheDirective::MaxAge(60),
+                        ]))
+                        .insert_header(actix_web::http::header::ETag(entity_tag))
+                        .finish());
+                }
+            }
+        }
+    }
+
+    // 4. ETag 불일치 시에만 실제 데이터 조회
     match use_case.get_studies(project_id, page, page_size).await {
         Ok((studies, total)) => {
             let total_pages = (total as f64 / page_size as f64).ceil() as i64;
@@ -330,7 +367,13 @@ pub async fn get_project_studies(
                 },
             };
 
-            Ok(HttpResponse::Ok().json(response))
+            Ok(HttpResponse::Ok()
+                .insert_header(CacheControl(vec![
+                    CacheDirective::Private,
+                    CacheDirective::MaxAge(60),
+                ]))
+                .insert_header(actix_web::http::header::ETag(entity_tag))
+                .json(response))
         }
         Err(e) => Ok(handle_service_error(e)),
     }
@@ -582,7 +625,7 @@ pub async fn unassign_series_from_project(
 /// 프로젝트에서 Study 할당 해제
 #[utoipa::path(
     delete,
-    path = "/api/projects/{project_id}/studies/{study_id}/unassign",
+    path = "/api/projects/{project_id}/studies/{study_uid}/unassign",
     responses(
         (status = 200, description = "Study 할당 해제 성공", body = UnassignStudyFromProjectResponse),
         (status = 404, description = "프로젝트 또는 Study를 찾을 수 없음"),
@@ -590,18 +633,18 @@ pub async fn unassign_series_from_project(
     ),
     params(
         ("project_id" = i32, Path, description = "프로젝트 ID"),
-        ("study_id" = i32, Path, description = "Study ID")
+        ("study_uid" = String, Path, description = "Study UID")
     ),
     tag = "project-data-assignment"
 )]
 pub async fn unassign_study_from_project(
-    path: web::Path<(i32, i32)>,
+    path: web::Path<(i32, String)>,
     use_case: web::Data<Arc<ProjectDataAccessUseCase>>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (project_id, study_id) = path.into_inner();
+    let (project_id, study_uid) = path.into_inner();
 
     match use_case
-        .unassign_study_from_project(project_id, study_id)
+        .unassign_study_from_project(project_id, &study_uid)
         .await
     {
         Ok(response) => Ok(HttpResponse::Ok().json(response)),

@@ -12,8 +12,8 @@ mod annotation_dto_tests {
             project_id: Some(1),
             user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
-            series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
-            sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
+            series_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string()),
+            sop_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
             annotation_data: json!({
                 "type": "circle",
                 "x": 100,
@@ -28,6 +28,8 @@ mod annotation_dto_tests {
             description: Some("Test annotation with new fields".to_string()),
             measurement_values: None,
             label: Some("Tumor".to_string()),
+            lesion_type: Some("TARGET".to_string()),
+            lesion_number: Some(1),
         };
 
         // Test serialization
@@ -61,8 +63,8 @@ mod annotation_dto_tests {
             project_id: Some(1),
             user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
-            series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
-            sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
+            series_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string()),
+            sop_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
             annotation_data: json!({"type": "point", "x": 150, "y": 150}),
             viewer_software: None,
             tool_name: None,
@@ -70,6 +72,8 @@ mod annotation_dto_tests {
             description: None,
             measurement_values: None,
             label: None,
+            lesion_type: None,
+            lesion_number: None,
         };
 
         // Test serialization with None values
@@ -108,6 +112,8 @@ mod annotation_dto_tests {
             measurement_values: None,
             base_version: Some(1),
             label: Some("Lesion".to_string()),
+            lesion_type: Some("TARGET".to_string()),
+            lesion_number: Some(1),
         };
 
         // Test serialization
@@ -159,9 +165,15 @@ mod annotation_dto_tests {
             description: Some("Polygon annotation".to_string()),
             measurement_values: None,
             label: Some("Normal".to_string()),
+            lesion_type: Some("TARGET".to_string()),
+            lesion_number: Some(1),
             version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         // Test serialization
@@ -216,9 +228,15 @@ mod annotation_dto_tests {
             description: None,
             measurement_values: None,
             label: None,
+            lesion_type: None,
+            lesion_number: None,
             version: 1,
             created_at: Utc.timestamp_opt(1704196800, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704197700, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         // Test serialization with None values
@@ -261,8 +279,8 @@ mod annotation_dto_tests {
             project_id: Some(1),
             user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
-            series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
-            sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
+            series_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string()),
+            sop_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
             annotation_data: circle_data,
             viewer_software: Some("OHIF Viewer".to_string()),
             tool_name: Some("Circle Tool".to_string()),
@@ -270,6 +288,8 @@ mod annotation_dto_tests {
             description: Some("Circle annotation test".to_string()),
             measurement_values: None,
             label: Some("Tumor".to_string()),
+            lesion_type: Some("TARGET".to_string()),
+            lesion_number: Some(1),
         };
 
         let circle_json =
@@ -292,8 +312,8 @@ mod annotation_dto_tests {
             project_id: Some(1),
             user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
-            series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
-            sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
+            series_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string()),
+            sop_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
             annotation_data: rectangle_data,
             viewer_software: Some("DICOM.js Viewer".to_string()),
             tool_name: Some("Rectangle Tool".to_string()),
@@ -301,6 +321,8 @@ mod annotation_dto_tests {
             description: Some("Rectangle annotation test".to_string()),
             measurement_values: None,
             label: Some("Lesion".to_string()),
+            lesion_type: Some("NON_TARGET".to_string()),
+            lesion_number: Some(2),
         };
 
         let rectangle_json =
@@ -322,8 +344,8 @@ mod annotation_dto_tests {
             project_id: Some(1),
             user_id: Some(1),
             study_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.1".to_string(),
-            series_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string(),
-            sop_instance_uid: "1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string(),
+            series_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.2".to_string()),
+            sop_instance_uid: Some("1.2.840.113619.2.55.3.604688119.868.1234567890.3".to_string()),
             annotation_data: point_data,
             viewer_software: Some("Cornerstone.js".to_string()),
             tool_name: Some("Point Tool".to_string()),
@@ -331,6 +353,8 @@ mod annotation_dto_tests {
             description: Some("Point annotation test".to_string()),
             measurement_values: None,
             label: Some("Normal".to_string()),
+            lesion_type: None,
+            lesion_number: None,
         };
 
         let point_json = serde_json::to_string(&point_request).expect("Failed to serialize point");
@@ -356,9 +380,15 @@ mod annotation_dto_tests {
             description: Some("Test".to_string()),
             measurement_values: None,
             label: Some("Tumor".to_string()),
+            lesion_type: Some("TARGET".to_string()),
+            lesion_number: Some(1),
             version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         let json_str = serde_json::to_string(&response_with_name).expect("Failed to serialize");
@@ -390,9 +420,15 @@ mod annotation_dto_tests {
             description: None,
             measurement_values: None,
             label: None,
+            lesion_type: None,
+            lesion_number: None,
             version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         let json_str2 = serde_json::to_string(&response_without_name).expect("Failed to serialize");
@@ -425,9 +461,15 @@ mod annotation_dto_tests {
             description: Some("Study level".to_string()),
             measurement_values: None,
             label: Some("Study Annotation".to_string()),
+            lesion_type: None,
+            lesion_number: None,
             version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         assert!(study_level.series_instance_uid.is_empty());
@@ -449,9 +491,15 @@ mod annotation_dto_tests {
             description: Some("Series level".to_string()),
             measurement_values: None,
             label: Some("Series Annotation".to_string()),
+            lesion_type: None,
+            lesion_number: None,
             version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         assert!(!series_level.series_instance_uid.is_empty());
@@ -473,9 +521,15 @@ mod annotation_dto_tests {
             description: Some("Instance level".to_string()),
             measurement_values: None,
             label: Some("Instance".to_string()),
+            lesion_type: None,
+            lesion_number: None,
             version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         assert!(!instance_level.series_instance_uid.is_empty());
@@ -500,9 +554,15 @@ mod annotation_dto_tests {
             description: Some("Test".to_string()),
             measurement_values: None,
             label: Some("Tumor".to_string()),
+            lesion_type: Some("TARGET".to_string()),
+            lesion_number: Some(1),
             version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         let json_str = serde_json::to_string(&response_with_role).expect("Failed to serialize");
@@ -532,9 +592,15 @@ mod annotation_dto_tests {
             description: None,
             measurement_values: None,
             label: None,
+            lesion_type: None,
+            lesion_number: None,
             version: 1,
             created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
             updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+            snapshot_image_key: None,
+            snapshot_image_url: None,
+            snapshot_status: None,
+            snapshot_uploaded_at: None,
         };
 
         let json_str2 = serde_json::to_string(&response_without_role).expect("Failed to serialize");
@@ -565,9 +631,15 @@ mod annotation_dto_tests {
                 description: None,
                 measurement_values: None,
                 label: None,
+                lesion_type: None,
+                lesion_number: None,
                 version: 1,
                 created_at: Utc.timestamp_opt(1704110400, 0).unwrap(),
                 updated_at: Utc.timestamp_opt(1704112200, 0).unwrap(),
+                snapshot_image_key: None,
+                snapshot_image_url: None,
+                snapshot_status: None,
+                snapshot_uploaded_at: None,
             };
 
             let json_str = serde_json::to_string(&response).expect("Failed to serialize");

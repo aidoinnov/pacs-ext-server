@@ -1,4 +1,7 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{
+    http::header::{EntityTag, CacheControl, CacheDirective, IF_NONE_MATCH},
+    web, HttpRequest, HttpResponse, Responder
+};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -129,15 +132,63 @@ pub async fn get_subject_detail<S: SubjectService + 'static>(
     ),
     responses(
         (status = 200, description = "Subjects retrieved successfully", body = Vec<Subject>),
+        (status = 304, description = "Not Modified (ETag matched)"),
         (status = 404, description = "Project not found"),
     )
 )]
 pub async fn get_subjects_by_project<S: SubjectService + 'static>(
+    http_req: HttpRequest,
     subject_service: web::Data<Arc<S>>,
     project_id: web::Path<i32>,
 ) -> impl Responder {
-    match subject_service.get_subjects_by_project(*project_id).await {
-        Ok(subjects) => HttpResponse::Ok().json(subjects),
+    let project_id = *project_id;
+
+    // 1. 먼저 subjects_updated_at 조회 (빠른 쿼리)
+    let subjects_updated_at = match subject_service.get_subjects_updated_at(project_id).await {
+        Ok(updated_at) => updated_at,
+        Err(e) => {
+            tracing::error!("Error getting subjects_updated_at: {:?}", e);
+            let mut status = match e {
+                ServiceError::NotFound(_) => HttpResponse::NotFound(),
+                _ => HttpResponse::InternalServerError(),
+            };
+            return status.json(json!({
+                "error": format!("{}", e)
+            }));
+        }
+    };
+
+    // 2. ETag 생성
+    let etag = subjects_updated_at.timestamp().to_string();
+    let entity_tag = EntityTag::new_weak(etag.clone());
+
+    // 3. If-None-Match 헤더 확인
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag_str) = if_none_match.to_str() {
+            if let Ok(client_entity_tag) = client_etag_str.parse::<EntityTag>() {
+                if client_entity_tag.weak_eq(&entity_tag) {
+                    tracing::debug!("Cache hit for get_subjects_by_project (project_id={})", project_id);
+                    return HttpResponse::NotModified()
+                        .insert_header(CacheControl(vec![
+                            CacheDirective::Private,
+                            CacheDirective::MaxAge(60),
+                        ]))
+                        .insert_header(actix_web::http::header::ETag(entity_tag))
+                        .finish();
+                }
+            }
+        }
+    }
+
+    // 4. ETag 불일치 시에만 실제 데이터 조회
+    match subject_service.get_subjects_by_project(project_id).await {
+        Ok(subjects) => HttpResponse::Ok()
+            .insert_header(CacheControl(vec![
+                CacheDirective::Private,
+                CacheDirective::MaxAge(60),
+            ]))
+            .insert_header(actix_web::http::header::ETag(entity_tag))
+            .json(subjects),
         Err(e) => {
             let mut status = match e {
                 ServiceError::NotFound(_) => HttpResponse::NotFound(),

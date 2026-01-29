@@ -1,6 +1,7 @@
 use crate::domain::entities::{Capability, NewCapability, Permission, Role, UpdateCapability};
 use crate::domain::ServiceError;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 
 #[async_trait]
 pub trait CapabilityService: Send + Sync {
@@ -89,4 +90,22 @@ pub trait CapabilityService: Send + Sync {
         &self,
         project_id: i32,
     ) -> Result<(Vec<Role>, Vec<Capability>, Vec<(i32, i32)>), ServiceError>;
+
+    /// Role-Capability 매트릭스의 최신 변경 시점 조회 (ETag용)
+    async fn get_matrix_updated_at(&self) -> Result<DateTime<Utc>, ServiceError>;
+
+    /// 모든 Capability 목록의 최신 변경 시점 조회 (ETag용)
+    async fn get_all_capabilities_updated_at(&self) -> Result<DateTime<Utc>, ServiceError>;
+
+    /// 특정 Capability 상세의 최신 변경 시점 조회 (ETag용)
+    async fn get_capability_detail_updated_at(
+        &self,
+        capability_id: i32,
+    ) -> Result<DateTime<Utc>, ServiceError>;
+
+    /// 카테고리별 Capability 목록의 최신 변경 시점 조회 (ETag용)
+    async fn get_capabilities_by_category_updated_at(
+        &self,
+        category: &str,
+    ) -> Result<DateTime<Utc>, ServiceError>;
 }

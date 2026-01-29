@@ -1,6 +1,7 @@
 //! Study List View API 컨트롤러
 
 use actix_web::{web, HttpRequest, HttpResponse, Result};
+use actix_web::http::header::{CacheControl, CacheDirective, EntityTag, IF_NONE_MATCH};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -53,6 +54,7 @@ fn handle_service_error(error: ServiceError) -> HttpResponse {
     path = "/api/study-list-views",
     responses(
         (status = 200, description = "View 목록 조회 성공", body = ViewListResponse),
+        (status = 304, description = "Not Modified (ETag 일치)"),
         (status = 401, description = "인증 실패"),
         (status = 500, description = "서버 내부 오류")
     ),
@@ -64,7 +66,7 @@ fn handle_service_error(error: ServiceError) -> HttpResponse {
 )]
 pub async fn list_views<R>(
     query: web::Query<ViewListQuery>,
-    req: HttpRequest,
+    http_req: HttpRequest,
     use_case: web::Data<Arc<StudyListViewUseCase<R>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
@@ -72,11 +74,49 @@ pub async fn list_views<R>(
 where
     R: StudyListViewRepository + 'static,
 {
-    let user_id = extract_user_id_from_request(&req, &jwt, &user_repo).await;
+    let user_id = extract_user_id_from_request(&http_req, &jwt, &user_repo).await;
     let user_id_str = user_id.map(|id| id.to_string());
 
+    // 1. 먼저 views_updated_at 조회 (빠른 쿼리)
+    let views_updated_at = match use_case.get_views_updated_at(&query, user_id_str.as_deref()).await {
+        Ok(updated_at) => updated_at,
+        Err(e) => {
+            tracing::error!("Failed to get views updated_at: {:?}", e);
+            return Ok(handle_service_error(e));
+        }
+    };
+
+    // 2. ETag 생성
+    let etag = views_updated_at.timestamp().to_string();
+    let entity_tag = EntityTag::new_weak(etag.clone());
+
+    // 3. If-None-Match 헤더 확인
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag_str) = if_none_match.to_str() {
+            if let Ok(client_entity_tag) = client_etag_str.parse::<EntityTag>() {
+                if client_entity_tag.weak_eq(&entity_tag) {
+                    tracing::debug!("ETag match - returning 304 Not Modified");
+                    return Ok(HttpResponse::NotModified()
+                        .insert_header(CacheControl(vec![
+                            CacheDirective::Private,
+                            CacheDirective::MaxAge(60),
+                        ]))
+                        .insert_header(actix_web::http::header::ETag(entity_tag))
+                        .finish());
+                }
+            }
+        }
+    }
+
+    // 4. ETag 불일치 시에만 실제 데이터 조회
     match use_case.list_views(&query, user_id_str.as_deref()).await {
-        Ok(response) => Ok(HttpResponse::Ok().json(response)),
+        Ok(response) => Ok(HttpResponse::Ok()
+            .insert_header(CacheControl(vec![
+                CacheDirective::Private,
+                CacheDirective::MaxAge(60),
+            ]))
+            .insert_header(actix_web::http::header::ETag(entity_tag))
+            .json(response)),
         Err(e) => Ok(handle_service_error(e)),
     }
 }

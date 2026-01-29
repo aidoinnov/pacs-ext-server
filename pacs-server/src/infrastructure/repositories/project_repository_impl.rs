@@ -2,6 +2,7 @@ use crate::application::dto::project_dto::ProjectListQuery;
 use crate::domain::entities::{NewProject, Project, UpdateProject};
 use crate::domain::repositories::ProjectRepository;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[derive(Clone)]
@@ -13,13 +14,17 @@ impl ProjectRepositoryImpl {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 }
 
 #[async_trait]
 impl ProjectRepository for ProjectRepositoryImpl {
     async fn find_by_id(&self, id: i32) -> Result<Option<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at
              FROM security_project
              WHERE id = $1"
         )
@@ -30,7 +35,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
 
     async fn find_by_name(&self, name: &str) -> Result<Option<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at
              FROM security_project
              WHERE name = $1"
         )
@@ -41,7 +46,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
 
     async fn find_all(&self) -> Result<Vec<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at
              FROM security_project
              ORDER BY created_at DESC"
         )
@@ -51,7 +56,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
 
     async fn find_active(&self) -> Result<Vec<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
-            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at
              FROM security_project
              WHERE is_active = true
              ORDER BY created_at DESC"
@@ -64,7 +69,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
         sqlx::query_as::<_, Project>(
             "INSERT INTO security_project (name, description, sponsor, start_date, end_date, auto_complete, status)
              VALUES ($1, $2, $3, $4, $5, $6, 'PREPARING'::project_status)
-             RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at"
+             RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at"
         )
         .bind(new_project.name)
         .bind(new_project.description)
@@ -125,7 +130,7 @@ impl ProjectRepository for ProjectRepositoryImpl {
         query.pop(); // Remove trailing space
 
         query.push_str(&format!(
-            " WHERE id = ${} RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at",
+            " WHERE id = ${} RETURNING id, name, description, sponsor, start_date, end_date, auto_complete, is_active, status, created_at, updated_at",
             param_count
         ));
 
@@ -209,8 +214,8 @@ impl ProjectRepository for ProjectRepositoryImpl {
         };
 
         let query = format!(
-            "SELECT id, name, description, sponsor, start_date, end_date, 
-                    auto_complete, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date,
+                    auto_complete, is_active, status, created_at, updated_at
              FROM security_project
              ORDER BY {} {}
              LIMIT $1 OFFSET $2",
@@ -243,8 +248,8 @@ impl ProjectRepository for ProjectRepositoryImpl {
         };
 
         let query = format!(
-            "SELECT id, name, description, sponsor, start_date, end_date, 
-                    auto_complete, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date,
+                    auto_complete, is_active, status, created_at, updated_at
              FROM security_project
              WHERE is_active = true
              ORDER BY {} {}
@@ -314,8 +319,8 @@ impl ProjectRepository for ProjectRepositoryImpl {
         };
 
         let sql = format!(
-            "SELECT id, name, description, sponsor, start_date, end_date, 
-                    auto_complete, is_active, status, created_at
+            "SELECT id, name, description, sponsor, start_date, end_date,
+                    auto_complete, is_active, status, created_at, updated_at
              FROM security_project
              {}
              ORDER BY {} {}
@@ -445,6 +450,51 @@ impl ProjectRepository for ProjectRepositoryImpl {
 
         let result = query_builder.fetch_one(&self.pool).await?;
         Ok(result.0)
+    }
+
+    async fn get_projects_etag_data(&self, query: &ProjectListQuery) -> Result<(DateTime<Utc>, i64), sqlx::Error> {
+        // 필터 조건에 맞는 프로젝트들의 MAX(updated_at) + COUNT(*) 조회
+        // COUNT 추가로 중간 항목 삭제도 감지 가능
+        let mut sql = String::from(
+            "SELECT COALESCE(MAX(updated_at), CURRENT_TIMESTAMP) as max_updated, COUNT(*) as count
+             FROM security_project WHERE 1=1"
+        );
+
+        if let Some(ref status) = query.status {
+            sql.push_str(&format!(" AND status = '{}'", status));
+        }
+        if let Some(ref sponsor) = query.sponsor {
+            sql.push_str(&format!(" AND sponsor ILIKE '%{}%'", sponsor));
+        }
+
+        let result: (DateTime<Utc>, i64) = sqlx::query_as(&sql)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(result)
+    }
+
+    async fn get_project_updated_at(&self, id: i32) -> Result<DateTime<Utc>, sqlx::Error> {
+        let result: (DateTime<Utc>,) = sqlx::query_as(
+            "SELECT updated_at FROM security_project WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(result.0)
+    }
+
+    async fn get_active_projects_etag_data(&self) -> Result<(DateTime<Utc>, i64), sqlx::Error> {
+        let result: (DateTime<Utc>, i64) = sqlx::query_as(
+            "SELECT COALESCE(MAX(updated_at), CURRENT_TIMESTAMP) as max_updated, COUNT(*) as count
+             FROM security_project
+             WHERE is_active = true"
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(result)
     }
 
     fn pool(&self) -> &PgPool {

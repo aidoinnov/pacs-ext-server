@@ -36,6 +36,7 @@ mod tests {
             async fn get_project_permissions(&self, project_id: i32) -> Result<Vec<Permission>, ServiceError>;
             async fn get_global_role_permission_matrix(&self) -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError>;
             async fn get_project_role_permission_matrix(&self, project_id: i32) -> Result<(Vec<Role>, Vec<Permission>, Vec<(i32, i32)>), ServiceError>;
+            async fn get_matrix_updated_at(&self) -> Result<chrono::NaiveDateTime, ServiceError>;
         }
     }
 
@@ -413,5 +414,10 @@ impl RolePermissionMatrixUseCase {
                 .remove_permission_from_role(role_id, permission_id)
                 .await
         }
+    }
+
+    /// 역할-권한 매트릭스 최종 수정 시간 조회 (ETag 캐싱용)
+    pub async fn get_matrix_updated_at(&self) -> Result<chrono::NaiveDateTime, ServiceError> {
+        self.permission_service.get_matrix_updated_at().await
     }
 }

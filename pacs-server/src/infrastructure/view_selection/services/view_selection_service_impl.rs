@@ -1,13 +1,12 @@
 use async_trait::async_trait;
-use crate::domain::view_selection::ViewSelection;
-use crate::domain::view_selection::SelectedSeries;
+use crate::domain::view_selection::{ViewSelection, SelectedSeries, ViewportLayout, InitialViewport};
 use crate::domain::view_selection::repositories::ViewSelectionRepository;
 use crate::domain::view_selection::services::ViewSelectionService;
 use crate::domain::ServiceError;
 use std::sync::Arc;
 
 /// ViewSelectionService 구현체
-pub struct ViewSelectionServiceImpl<R>
+pub struct ViewSelectionServiceImpl<R: ?Sized>
 where
     R: ViewSelectionRepository,
 {
@@ -15,7 +14,7 @@ where
     default_ttl_sec: u64,
 }
 
-impl<R> ViewSelectionServiceImpl<R>
+impl<R: ?Sized> ViewSelectionServiceImpl<R>
 where
     R: ViewSelectionRepository,
 {
@@ -44,13 +43,15 @@ where
 }
 
 #[async_trait]
-impl<R> ViewSelectionService for ViewSelectionServiceImpl<R>
+impl<R: ?Sized> ViewSelectionService for ViewSelectionServiceImpl<R>
 where
     R: ViewSelectionRepository + Send + Sync,
 {
     async fn create_selection(
         &self,
         series: Vec<SelectedSeries>,
+        layout: Option<ViewportLayout>,
+        initial_views: Option<Vec<InitialViewport>>,
         user_id: i32,
         ttl_sec: u64,
     ) -> Result<ViewSelection, ServiceError> {
@@ -58,7 +59,18 @@ where
         let selection_id = Self::generate_selection_id();
 
         // ViewSelection 생성
-        let selection = ViewSelection::new(selection_id, series, user_id, ttl_sec);
+        let selection = ViewSelection::new(
+            selection_id,
+            series,
+            layout,
+            initial_views,
+            user_id,
+            ttl_sec,
+        );
+
+        // 유효성 검증
+        selection.validate()
+            .map_err(|e| ServiceError::ValidationError(e))?;
 
         // 저장
         self.repository

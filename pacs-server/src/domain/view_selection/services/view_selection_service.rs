@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use crate::domain::view_selection::ViewSelection;
-use crate::domain::view_selection::SelectedSeries;
+use crate::domain::view_selection::{ViewSelection, SelectedSeries, ViewportLayout, InitialViewport};
 use crate::domain::ServiceError;
 
 /// ViewSelection 비즈니스 로직을 처리하는 Service 트레이트
@@ -13,6 +12,8 @@ pub trait ViewSelectionService: Send + Sync {
     ///
     /// # 매개변수
     /// - `series` - 선택된 Series 목록
+    /// - `layout` - Viewport 레이아웃 (선택적)
+    /// - `initial_views` - 초기 Viewport 설정 목록 (선택적)
     /// - `user_id` - 생성한 사용자 ID
     /// - `ttl_sec` - TTL (초 단위)
     ///
@@ -22,6 +23,8 @@ pub trait ViewSelectionService: Send + Sync {
     async fn create_selection(
         &self,
         series: Vec<SelectedSeries>,
+        layout: Option<ViewportLayout>,
+        initial_views: Option<Vec<InitialViewport>>,
         user_id: i32,
         ttl_sec: u64,
     ) -> Result<ViewSelection, ServiceError>;

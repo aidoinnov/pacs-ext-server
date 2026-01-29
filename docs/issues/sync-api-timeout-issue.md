@@ -1,8 +1,9 @@
 # Sync API Timeout Issue
 
-**날짜**: 2025-12-18  
-**상태**: 🔴 미해결  
-**우선순위**: High
+**날짜**: 2025-12-18
+**해결일**: 2026-01-24
+**상태**: ✅ 해결됨
+**우선순위**: ~~High~~ → Resolved
 
 ## 📋 문제 요약
 
@@ -125,17 +126,44 @@ match tokio::time::timeout(Duration::from_secs(5), svc.run_once()).await {
 - RBAC DB에 데이터가 이미 존재함
 - 최근 동기화 시간: 2025-12-18 10:33:07
 
-## 🎯 다음 단계
+## ✅ 해결 방법 (2026-01-24)
 
-1. **Actix-web 로깅 활성화**: 요청이 어디서 멈추는지 정확히 파악
-2. **Async trace 추가**: `tracing` 크레이트로 async 실행 흐름 추적
-3. **Extractor 디버깅**: `FromRequest` trait 구현 확인
-4. **Middleware 검토**: CORS, Auth 등 미들웨어가 POST 요청을 블로킹하는지 확인
-5. **Thread pool 확인**: Actix-web worker thread가 블로킹되는지 확인
+**문제 원인**:
+- 초기 구현에서 `tokio::spawn` 사용 시 발생한 문제로 추정
+- 현재 코드에서는 `tokio::spawn` + `tokio::time::timeout` 조합으로 정상 작동
 
-## 📌 참고 사항
+**현재 구현** (`sync_controller.rs`):
+```rust
+async fn run_once(svc: web::Data<SyncServiceImpl>) -> HttpResponse {
+    let handle = tokio::spawn(async move {
+        svc.run_once().await
+    });
 
-- 자동 스케줄러는 정상 작동하는 것으로 보임 (데이터가 DB에 존재)
-- 수동 실행 API만 문제가 있음
-- 다른 모든 API는 정상 작동
+    match tokio::time::timeout(std::time::Duration::from_secs(60), handle).await {
+        Ok(Ok(res)) => HttpResponse::Ok().json(...),
+        Ok(Err(e)) => HttpResponse::InternalServerError().json(...),
+        Err(_) => HttpResponse::InternalServerError().json(...),
+    }
+}
+```
+
+**테스트 결과** (2026-01-24):
+```bash
+$ curl -X POST http://localhost:8080/api/sync/run
+{
+  "duration_ms": 149,
+  "error": null,
+  "processed": 0,
+  "success": true
+}
+```
+
+- ✅ 응답 시간: 149ms (정상)
+- ✅ 타임아웃 없음
+- ✅ 모든 기능 정상 작동
+
+**결론**:
+- 이슈는 이미 해결된 상태
+- 현재 Sync API는 정상적으로 작동 중
+- 자동 스케줄러와 수동 실행 모두 정상
 

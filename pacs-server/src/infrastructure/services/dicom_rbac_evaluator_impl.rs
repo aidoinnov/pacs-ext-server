@@ -1,14 +1,26 @@
 use crate::domain::entities::access_condition::{AccessCondition, ConditionType};
 use crate::domain::services::dicom_rbac_evaluator::{DicomRbacEvaluator, RbacEvaluationResult};
+use crate::infrastructure::services::MembershipCacheService;
 use sqlx::PgPool;
 
 pub struct DicomRbacEvaluatorImpl {
     pub pool: PgPool,
+    pub membership_cache: Option<MembershipCacheService>,
 }
 
 impl DicomRbacEvaluatorImpl {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            membership_cache: None,
+        }
+    }
+
+    pub fn with_membership_cache(pool: PgPool, membership_cache: MembershipCacheService) -> Self {
+        Self {
+            pool,
+            membership_cache: Some(membership_cache),
+        }
     }
 
     /// 사용자가 속한 모든 프로젝트 ID 조회
@@ -21,9 +33,91 @@ impl DicomRbacEvaluatorImpl {
         .await
     }
 
-    /// 사용자의 프로젝트 내 역할 ID 조회
+    /// 프로젝트 멤버십 확인 (캐시 적용)
+    ///
+    /// # Returns
+    /// * `true` - 멤버임
+    /// * `false` - 멤버 아님
+    async fn is_project_member(&self, user_id: i32, project_id: i32) -> bool {
+        // 1. 캐시 조회
+        if let Some(cache) = &self.membership_cache {
+            match cache.get_membership(user_id, project_id).await {
+                Ok(Some(Some(_role_id))) => {
+                    // 캐시 HIT - 멤버임
+                    return true;
+                }
+                Ok(Some(None)) => {
+                    // 캐시 HIT - 멤버 아님
+                    return false;
+                }
+                Ok(None) => {
+                    // 캐시 MISS - DB 조회 후 캐시 저장
+                }
+                Err(e) => {
+                    tracing::warn!("Membership cache error: {} - falling back to DB", e);
+                }
+            }
+        }
+
+        // 2. DB 조회
+        let is_member: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM security_user_project WHERE user_id = $1 AND project_id = $2)",
+        )
+        .bind(user_id)
+        .bind(project_id)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(false);
+
+        // 3. 캐시 저장 (fire-and-forget)
+        // role_id도 함께 조회하여 캐싱
+        if let Some(cache) = &self.membership_cache {
+            let cache_clone = cache.clone();
+            let pool_clone = self.pool.clone();
+
+            tokio::spawn(async move {
+                if is_member {
+                    // role_id 조회
+                    let role_id: Option<i32> = sqlx::query_scalar(
+                        "SELECT role_id FROM security_user_project WHERE user_id = $1 AND project_id = $2",
+                    )
+                    .bind(user_id)
+                    .bind(project_id)
+                    .fetch_optional(&pool_clone)
+                    .await
+                    .ok()
+                    .flatten();
+
+                    let _ = cache_clone.set_membership(user_id, project_id, role_id).await;
+                } else {
+                    let _ = cache_clone.set_membership(user_id, project_id, None).await;
+                }
+            });
+        }
+
+        is_member
+    }
+
+    /// 사용자의 프로젝트 내 역할 ID 조회 (캐시 적용)
     async fn get_user_role_id(&self, user_id: i32, project_id: i32) -> Option<i32> {
-        sqlx::query_scalar(
+        // 1. 캐시 조회
+        if let Some(cache) = &self.membership_cache {
+            match cache.get_membership(user_id, project_id).await {
+                Ok(Some(role_id_opt)) => {
+                    // 캐시 HIT
+                    return role_id_opt;
+                }
+                Ok(None) => {
+                    // 캐시 MISS - DB 조회 후 캐시 저장
+                }
+                Err(e) => {
+                    tracing::warn!("Membership cache error: {} - falling back to DB", e);
+                }
+            }
+        }
+
+        // 2. DB 조회
+        let role_id = sqlx::query_scalar(
             "SELECT role_id FROM security_user_project WHERE user_id = $1 AND project_id = $2",
         )
         .bind(user_id)
@@ -31,7 +125,17 @@ impl DicomRbacEvaluatorImpl {
         .fetch_optional(&self.pool)
         .await
         .ok()
-        .flatten()
+        .flatten();
+
+        // 3. 캐시 저장 (fire-and-forget)
+        if let Some(cache) = &self.membership_cache {
+            let cache_clone = cache.clone();
+            tokio::spawn(async move {
+                let _ = cache_clone.set_membership(user_id, project_id, role_id).await;
+            });
+        }
+
+        role_id
     }
 
     /// Study의 DICOM 태그 값 조회 (조건 평가용)
@@ -309,17 +413,8 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         project_id: i32,
         study_id: i32,
     ) -> RbacEvaluationResult {
-        // 0) 프로젝트 멤버십 확인 (필수)
-        let is_member: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM security_user_project WHERE user_id = $1 AND project_id = $2)",
-        )
-        .bind(user_id)
-        .bind(project_id)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(false);
-
-        if !is_member {
+        // 0) 프로젝트 멤버십 확인 (필수) - 캐시 적용
+        if !self.is_project_member(user_id, project_id).await {
             return RbacEvaluationResult {
                 allowed: false,
                 reason: Some("user_not_project_member".to_string()),
@@ -435,17 +530,8 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         project_id: i32,
         series_id: i32,
     ) -> RbacEvaluationResult {
-        // 0) 프로젝트 멤버십 확인 (필수)
-        let is_member: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM security_user_project WHERE user_id = $1 AND project_id = $2)",
-        )
-        .bind(user_id)
-        .bind(project_id)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(false);
-
-        if !is_member {
+        // 0) 프로젝트 멤버십 확인 (필수) - 캐시 적용
+        if !self.is_project_member(user_id, project_id).await {
             return RbacEvaluationResult {
                 allowed: false,
                 reason: Some("user_not_project_member".to_string()),
@@ -601,17 +687,8 @@ impl DicomRbacEvaluator for DicomRbacEvaluatorImpl {
         project_id: i32,
         instance_id: i32,
     ) -> RbacEvaluationResult {
-        // 0) 프로젝트 멤버십 확인 (필수)
-        let is_member: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM security_user_project WHERE user_id = $1 AND project_id = $2)",
-        )
-        .bind(user_id)
-        .bind(project_id)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(false);
-
-        if !is_member {
+        // 0) 프로젝트 멤버십 확인 (필수) - 캐시 적용
+        if !self.is_project_member(user_id, project_id).await {
             return RbacEvaluationResult {
                 allowed: false,
                 reason: Some("user_not_project_member".to_string()),

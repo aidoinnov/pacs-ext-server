@@ -86,6 +86,15 @@ pub trait SubjectService: Send + Sync {
     /// - `Ok(())`: 삭제 성공
     /// - `Err(ServiceError)`: 비즈니스 규칙 위반 또는 데이터베이스 오류
     async fn delete_subject(&self, id: i32) -> Result<(), ServiceError>;
+
+    /// 프로젝트의 Subject 목록 최종 수정 시간 조회 (ETag 캐싱용)
+    ///
+    /// # 매개변수
+    /// - `project_id`: 프로젝트 ID
+    ///
+    /// # 반환값
+    /// - `Ok(chrono::NaiveDateTime)`: 최종 수정 시간
+    async fn get_subjects_updated_at(&self, project_id: i32) -> Result<chrono::NaiveDateTime, ServiceError>;
 }
 
 /// Subject 서비스 구현체
@@ -270,5 +279,9 @@ where
         }
 
         Ok(())
+    }
+
+    async fn get_subjects_updated_at(&self, project_id: i32) -> Result<chrono::NaiveDateTime, ServiceError> {
+        Ok(self.subject_repository.get_subjects_updated_at(project_id).await?)
     }
 }

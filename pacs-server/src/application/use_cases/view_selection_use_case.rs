@@ -69,13 +69,18 @@ where
             .map(SelectedSeries::from)
             .collect();
 
+        let layout = request.layout.map(|l| l.into());
+        let initial_views = request.initial_views.map(|views| {
+            views.into_iter().map(|v| v.into()).collect()
+        });
+
         // TTL 결정
         let ttl = ttl_sec.unwrap_or(self.default_ttl_sec);
 
         // Selection 생성
         let selection = self
             .selection_service
-            .create_selection(series, user_id, ttl)
+            .create_selection(series, layout, initial_views, user_id, ttl)
             .await?;
 
         Ok(CreateViewSelectionResponse {

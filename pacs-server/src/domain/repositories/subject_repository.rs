@@ -125,5 +125,15 @@ pub trait SubjectRepository: Send + Sync {
 
     /// 데이터베이스 연결 풀 반환
     fn pool(&self) -> &PgPool;
+
+    /// 프로젝트의 Subject 목록 최종 수정 시간 조회 (ETag 캐싱용)
+    ///
+    /// # Arguments
+    /// * `project_id` - 프로젝트 ID
+    ///
+    /// # Returns
+    /// * `Ok(chrono::NaiveDateTime)` - 최종 수정 시간
+    /// * `Err(sqlx::Error)` - 데이터베이스 오류
+    async fn get_subjects_updated_at(&self, project_id: i32) -> Result<chrono::NaiveDateTime, sqlx::Error>;
 }
 

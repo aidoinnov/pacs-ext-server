@@ -1,4 +1,7 @@
-use actix_web::{web, HttpResponse, Responder, Result};
+use actix_web::{
+    http::header::{CacheControl, CacheDirective, EntityTag, ETag, IF_NONE_MATCH},
+    web, HttpRequest, HttpResponse, Responder, Result,
+};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -63,6 +66,7 @@ fn handle_service_error(error: ServiceError) -> HttpResponse {
 pub async fn get_project_members<P, U, D>(
     path: web::Path<i32>,
     query: web::Query<PaginationQuery>,
+    http_req: HttpRequest,
     use_case: web::Data<Arc<ProjectUserUseCase<P, U, D>>>,
 ) -> impl Responder
 where
@@ -76,7 +80,36 @@ where
         .get_project_members_with_roles(project_id, query.page, query.page_size)
         .await
     {
-        Ok(response) => HttpResponse::Ok().json(response),
+        Ok(response) => {
+            // ETag 생성 (latest_updated_at 기반)
+            let etag = response.latest_updated_at.timestamp().to_string();
+            let etag_value = format!("\"{}\"", etag);
+
+            // If-None-Match 헤더 확인
+            if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+                if let Ok(client_etag) = if_none_match.to_str() {
+                    if client_etag == etag_value {
+                        // 변경 없음 - 304 Not Modified
+                        return HttpResponse::NotModified()
+                            .insert_header(CacheControl(vec![
+                                CacheDirective::Private,
+                                CacheDirective::MaxAge(1),
+                            ]))
+                            .insert_header(ETag(EntityTag::new_weak(etag)))
+                            .finish();
+                    }
+                }
+            }
+
+            // 200 OK + 캐시 헤더 + ETag
+            HttpResponse::Ok()
+                .insert_header(CacheControl(vec![
+                    CacheDirective::Private,
+                    CacheDirective::MaxAge(1),  // 1초 캐시
+                ]))
+                .insert_header(ETag(EntityTag::new_weak(etag)))
+                .json(response)
+        }
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": format!("Failed to get project members: {}", e)
         })),
@@ -141,6 +174,7 @@ where
 pub async fn assign_user_role<P, U, D>(
     path: web::Path<(i32, i32)>,
     req: web::Json<AssignRoleRequest>,
+    http_req: HttpRequest,
     use_case: web::Data<Arc<ProjectUserUseCase<P, U, D>>>,
 ) -> impl Responder
 where
@@ -154,7 +188,36 @@ where
         .assign_role_to_user(project_id, user_id, req.role_id)
         .await
     {
-        Ok(response) => HttpResponse::Ok().json(response),
+        Ok(response) => {
+            // ETag 생성 (updated_at 타임스탬프 기반)
+            let etag = response.updated_at.timestamp().to_string();
+            let etag_value = format!("\"{}\"", etag);
+
+            // If-None-Match 헤더 확인
+            if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+                if let Ok(client_etag) = if_none_match.to_str() {
+                    if client_etag == etag_value {
+                        // 변경 없음 - 304 Not Modified
+                        return HttpResponse::NotModified()
+                            .insert_header(CacheControl(vec![
+                                CacheDirective::Private,
+                                CacheDirective::MaxAge(1),
+                            ]))
+                            .insert_header(ETag(EntityTag::new_weak(etag)))
+                            .finish();
+                    }
+                }
+            }
+
+            // 200 OK + 캐시 헤더 + ETag
+            HttpResponse::Ok()
+                .insert_header(CacheControl(vec![
+                    CacheDirective::Private,
+                    CacheDirective::MaxAge(1),  // 1초 캐시 (중복 요청 방지)
+                ]))
+                .insert_header(ETag(EntityTag::new_weak(etag)))
+                .json(response)
+        }
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": format!("Failed to assign role: {}", e)
         })),
@@ -179,6 +242,7 @@ where
 pub async fn batch_assign_roles<P, U, D>(
     path: web::Path<i32>,
     req: web::Json<BatchAssignRolesRequest>,
+    http_req: HttpRequest,
     use_case: web::Data<Arc<ProjectUserUseCase<P, U, D>>>,
 ) -> impl Responder
 where
@@ -196,7 +260,36 @@ where
         .collect();
 
     match use_case.batch_assign_roles(project_id, assignments).await {
-        Ok(response) => HttpResponse::Ok().json(response),
+        Ok(response) => {
+            // ETag 생성 (updated_at 타임스탬프 기반)
+            let etag = response.updated_at.timestamp().to_string();
+            let etag_value = format!("\"{}\"", etag);
+
+            // If-None-Match 헤더 확인
+            if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+                if let Ok(client_etag) = if_none_match.to_str() {
+                    if client_etag == etag_value {
+                        // 변경 없음 - 304 Not Modified
+                        return HttpResponse::NotModified()
+                            .insert_header(CacheControl(vec![
+                                CacheDirective::Private,
+                                CacheDirective::MaxAge(1),
+                            ]))
+                            .insert_header(ETag(EntityTag::new_weak(etag)))
+                            .finish();
+                    }
+                }
+            }
+
+            // 200 OK + 캐시 헤더 + ETag
+            HttpResponse::Ok()
+                .insert_header(CacheControl(vec![
+                    CacheDirective::Private,
+                    CacheDirective::MaxAge(1),  // 1초 캐시 (중복 요청 방지)
+                ]))
+                .insert_header(ETag(EntityTag::new_weak(etag)))
+                .json(response)
+        }
         Err(e) => HttpResponse::InternalServerError().json(json!({
             "error": format!("Failed to batch assign roles: {}", e)
         })),

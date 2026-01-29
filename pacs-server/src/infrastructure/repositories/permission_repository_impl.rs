@@ -1,6 +1,7 @@
 use crate::domain::entities::{NewPermission, Permission};
 use crate::domain::repositories::PermissionRepository;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 #[derive(Clone)]
@@ -88,6 +89,19 @@ impl PermissionRepository for PermissionRepositoryImpl {
             .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    async fn get_all_permissions_updated_at(&self) -> Result<DateTime<Utc>, sqlx::Error> {
+        // 모든 권한의 최신 변경 시점 조회
+        // security_role_permission의 created_at을 사용 (권한 할당/제거 시점)
+        let updated_at: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT COALESCE(MAX(created_at), '1970-01-01'::timestamptz) as updated_at
+             FROM security_role_permission"
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(updated_at)
     }
 
     fn pool(&self) -> &PgPool {
