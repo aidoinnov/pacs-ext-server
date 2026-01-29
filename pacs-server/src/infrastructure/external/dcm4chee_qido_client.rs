@@ -16,12 +16,25 @@ pub struct Dcm4cheeQidoClient {
 
 impl Dcm4cheeQidoClient {
     pub fn new(config: Dcm4cheeConfig) -> Self {
+        // HTTP 클라이언트 연결 풀 설정
+        // - pool_max_idle_per_host: 호스트당 최대 유휴 연결 수 (기본값: 무제한 → 10으로 제한)
+        // - pool_idle_timeout: 유휴 연결 유지 시간 (90초)
+        // - tcp_keepalive: TCP Keep-Alive 활성화 (60초)
+        // - connect_timeout: 연결 타임아웃 (10초)
+        let http_client = Client::builder()
+            .pool_max_idle_per_host(10)
+            .pool_idle_timeout(Some(std::time::Duration::from_secs(90)))
+            .tcp_keepalive(Some(std::time::Duration::from_secs(60)))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|_| Client::new());
+
         Self {
             base_url: config.base_url,
             qido_path: config.qido_path,
             username: config.username,
             password: config.password,
-            http_client: Client::new(),
+            http_client,
             timeout_ms: config.timeout_ms,
         }
     }

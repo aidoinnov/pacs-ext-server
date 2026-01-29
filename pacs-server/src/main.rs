@@ -200,9 +200,17 @@ async fn main() -> std::io::Result<()> {
     // 데이터베이스 연결 풀 생성
     // max_connections: 최대 동시 연결 수
     // min_connections: 최소 유지 연결 수
+    // acquire_timeout: 연결 획득 타임아웃 (30초)
+    // idle_timeout: 유휴 연결 유지 시간 (10분)
+    // max_lifetime: 연결 최대 수명 (30분)
+    // test_before_acquire: 연결 사용 전 유효성 검사
     let pool = PgPoolOptions::new()
         .max_connections(settings.database.max_connections)
         .min_connections(settings.database.min_connections)
+        .acquire_timeout(std::time::Duration::from_secs(30))
+        .idle_timeout(Some(std::time::Duration::from_secs(600)))
+        .max_lifetime(Some(std::time::Duration::from_secs(1800)))
+        .test_before_acquire(true)
         .connect(&database_url)
         .await
         .expect("Failed to connect to database");
