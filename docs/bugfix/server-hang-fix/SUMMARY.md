@@ -16,7 +16,7 @@ annotation 목록 출력
 
 ---
 
-## 🔍 원인 (2단계 조사)
+## 🔍 원인 (3단계 조사)
 
 ### 1차 조사 결과
 1. **DB 연결 풀 타임아웃 미설정** → 무한 대기 가능
@@ -26,9 +26,12 @@ annotation 목록 출력
 3. **Redis 연결 누수** → 매번 새 연결 생성 (심각)
 4. **QIDO 무제한 병렬 호출** → 연결 풀 고갈 (심각)
 
+### 3차 조사 결과
+5. **tokio::spawn 모니터링 부족** → 백그라운드 작업 실패 추적 어려움
+
 ---
 
-## ✅ 해결 방법 (2단계 수정)
+## ✅ 해결 방법 (3단계 수정)
 
 ### 1차 수정 (커밋 `0f00fcb`)
 
@@ -81,6 +84,27 @@ let qido_results = stream::iter(qido_futures)
     .await;
 ```
 
+### 3차 수정 (커밋 `852b200`)
+
+#### 5. tokio::spawn 모니터링 개선
+```rust
+// Before: 에러 추적 어려움
+tokio::spawn(async move {
+    if let Err(e) = cache_clone.set_studies(...).await {
+        tracing::warn!("Failed to cache: {}", e);  // ❌ warn 레벨
+    }
+});
+
+// After: 명확한 에러 추적
+tokio::spawn(async move {
+    if let Err(e) = cache_clone.set_studies(...).await {
+        tracing::error!("Background cache storage failed for studies (project={}): {}", project_id, e);  // ✅
+    } else {
+        tracing::debug!("Background cache storage succeeded for studies (project={})", project_id);  // ✅
+    }
+});
+```
+
 ---
 
 ## 📊 성능 개선 결과
@@ -108,13 +132,17 @@ let qido_results = stream::iter(qido_futures)
 - `pacs-server/src/infrastructure/redis/client.rs` - Redis 연결 재사용
 - `pacs-server/src/presentation/controllers/dicom_gateway_controller.rs` - QIDO 병렬 제한
 
+### 3차 수정
+- `pacs-server/src/presentation/controllers/dicom_gateway_controller.rs` - tokio::spawn 모니터링 개선
+
 ---
 
 ## 📚 관련 문서
 
 1. **README.md** - 전체 개요 및 1차 수정 내용
-2. **PHASE2_REDIS_AND_QIDO.md** - 2차 수정 상세 문서 (이번 작업)
-3. **technical-details.md** - 기술적 세부사항
+2. **PHASE2_REDIS_AND_QIDO.md** - 2차 수정 상세 문서
+3. **PHASE3_TOKIO_SPAWN.md** - 3차 수정 상세 문서 (신규)
+4. **technical-details.md** - 기술적 세부사항
 
 ---
 
@@ -125,6 +153,7 @@ let qido_results = stream::iter(qido_futures)
 - ✅ HTTP 연결 풀 설정
 - ✅ Redis 연결 재사용
 - ✅ QIDO 병렬 호출 제한
+- ✅ tokio::spawn 모니터링 개선
 
 ### 성과
 - ✅ 서버 안정성 대폭 향상
@@ -137,6 +166,6 @@ let qido_results = stream::iter(qido_futures)
 
 ---
 
-**최종 업데이트:** 2026-01-29  
-**커밋:** `0f00fcb` (1차), `19b2503` (2차)
+**최종 업데이트:** 2026-01-29
+**커밋:** `0f00fcb` (1차), `19b2503` (2차), `852b200` (3차)
 
