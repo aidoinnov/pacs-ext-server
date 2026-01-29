@@ -35,11 +35,24 @@ where
         project_id: Option<i32>,
         request: CreateOrUpdateSeriesReportRequest,
     ) -> Result<SeriesReportResponse, ServiceError> {
+        // status 값 검증
+        let status = if let Some(s) = request.status {
+            let normalized = s.to_lowercase();
+            if !["unread", "approval", "unapproval"].contains(&normalized.as_str()) {
+                return Err(ServiceError::ValidationError(
+                    format!("Invalid status '{}'. Must be one of: unread, approval, unapproval", s)
+                ));
+            }
+            normalized
+        } else {
+            "unread".to_string()
+        };
+
         let new_report = NewSeriesUserReport {
             series_id,
             user_id,
             project_id,
-            status: request.status.unwrap_or_else(|| "unread".to_string()),
+            status,
             dictate_file_path: None,
             dictate_file_size: None,
             dictate_mime_type: None,
@@ -110,8 +123,21 @@ where
         project_id: Option<i32>,
         request: CreateOrUpdateSeriesReportRequest,
     ) -> Result<SeriesReportResponse, ServiceError> {
+        // status 값 검증
+        let validated_status = if let Some(s) = request.status {
+            let normalized = s.to_lowercase();
+            if !["unread", "approval", "unapproval"].contains(&normalized.as_str()) {
+                return Err(ServiceError::ValidationError(
+                    format!("Invalid status '{}'. Must be one of: unread, approval, unapproval", s)
+                ));
+            }
+            Some(normalized)
+        } else {
+            None
+        };
+
         let update = UpdateSeriesUserReport {
-            status: request.status,
+            status: validated_status,
             dictate_file_path: None,
             dictate_file_size: None,
             dictate_mime_type: None,

@@ -423,10 +423,11 @@ pub async fn get_studies(
 
     tracing::debug!("Gateway: check_assignment_project_id = {:?}", check_assignment_project_id);
 
-    // 전체 데이터 조회 권한이 없으면 project_id 필수
-    if !has_global_access && project_id_opt.is_none() {
+    // 전체 데이터 조회 권한이 없으면 project_id 또는 check_assignment_for_project 필수
+    // check_assignment_for_project가 있으면 전체 조회 후 할당 여부만 확인하므로 project_id 없어도 됨
+    if !has_global_access && project_id_opt.is_none() && check_assignment_project_id.is_none() {
         return HttpResponse::BadRequest().json(serde_json::json!({
-            "error": "project_id is required (no global access permission)"
+            "error": "project_id or check_assignment_for_project is required (no global access permission)"
         }));
     }
 
@@ -572,8 +573,16 @@ pub async fn get_studies(
         if let Some(array) = filtered.as_array() {
             tracing::debug!("Gateway: Processing {} studies for assignment check", array.len());
             let mut enriched_items = Vec::new();
+            let mut study_uids_seen = std::collections::HashSet::new();
             for item in array.iter() {
                 if let Some(study_uid) = extract_study_uid(item) {
+                    // 중복 제거 - 같은 Study UID는 한 번만 처리
+                    if study_uids_seen.contains(&study_uid) {
+                        tracing::debug!("Gateway: Skipping duplicate study_uid={}", study_uid);
+                        continue;
+                    }
+                    study_uids_seen.insert(study_uid.clone());
+
                     // DB에서 해당 Study가 프로젝트에 할당되어 있는지 확인
                     let is_assigned = check_study_assignment(
                         &study_uid,
@@ -4307,7 +4316,7 @@ impl<'a> StudyExtBuilder<'a> {
 mod tests {
     use super::{
         build_qido_params_from_conditions, build_qido_params_from_user_query,
-        decode_keycloak_token_sub, extract_instance_uid, extract_series_uid, extract_study_uid,
+        extract_instance_uid, extract_series_uid, extract_study_uid,
         is_valid_study_date, merge_qido_params, parse_report_status_filter,
     };
     use crate::domain::entities::access_condition::{
@@ -4322,7 +4331,7 @@ mod tests {
             resource_type: "study".to_string(),
             dicom_tag: tag.map(|s| s.to_string()),
             operator: op.to_string(),
-            vyalue: val.map(|s| s.to_string()),
+            value: val.map(|s| s.to_string()),
             condition_type: ConditionType::Allow,
             created_at: chrono::Utc::now(),
         }

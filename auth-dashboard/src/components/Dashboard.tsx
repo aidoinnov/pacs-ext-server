@@ -8,6 +8,7 @@ import ViewSelectionTests from './ApiScenarioTests/ViewSelectionTests';
 import QidoEnhancedTests from './ApiScenarioTests/QidoEnhancedTests';
 import AnnotationSnapshotTests from './ApiScenarioTests/AnnotationSnapshotTests';
 import E2ETests from './E2ETests';
+import SyncMonitor from './SyncMonitor';
 import Sidebar from './Sidebar';
 import {
   DEFAULT_API_URL,
@@ -311,6 +312,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, tokens: initialTokens, onLo
           {/* E2E 테스트 - All Studies */}
           {activeMenu === E2E_SUB_MENU.ALL_STUDIES && (
             <E2ETests testType="all-studies" />
+          )}
+
+          {/* 동기화 모니터링 */}
+          {activeMenu === SIDEBAR_MENU.SYNC_MONITOR.id && (
+            <SyncMonitor />
           )}
         </div>
       </div>

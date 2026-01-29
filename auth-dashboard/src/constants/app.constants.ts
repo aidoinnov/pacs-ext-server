@@ -78,6 +78,12 @@ export const SIDEBAR_MENU = {
       { id: 'e2e-all-studies', label: 'All Studies Access', icon: '📋' },
     ],
   },
+  SYNC_MONITOR: {
+    id: 'sync',
+    icon: '🔄',
+    label: '동기화 모니터링',
+    description: 'PACS 데이터 동기화',
+  },
 } as const;
 
 // 사이드바 메뉴 순서
@@ -85,6 +91,7 @@ export const SIDEBAR_MENU_ORDER = [
   SIDEBAR_MENU.AUTH_TEST,
   SIDEBAR_MENU.API_HEALTH,
   SIDEBAR_MENU.E2E_TESTS,
+  SIDEBAR_MENU.SYNC_MONITOR,
   // SIDEBAR_MENU.PROJECT_MANAGEMENT,  // 향후 추가
   // SIDEBAR_MENU.USER_MANAGEMENT,     // 향후 추가
 ] as const;

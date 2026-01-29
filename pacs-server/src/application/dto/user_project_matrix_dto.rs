@@ -7,6 +7,100 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// 쿼리 파라미터에서 단일 값 또는 배열을 모두 받을 수 있도록 하는 deserializer
+fn deserialize_optional_vec<'de, D>(deserializer: D) -> Result<Option<Vec<i32>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+    use std::fmt;
+
+    struct OptionalVecVisitor;
+
+    impl<'de> Visitor<'de> for OptionalVecVisitor {
+        type Value = Option<Vec<i32>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("an integer, a sequence of integers, or nothing")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_any(VecVisitor).map(Some)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+    }
+
+    struct VecVisitor;
+
+    impl<'de> Visitor<'de> for VecVisitor {
+        type Value = Vec<i32>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("an integer or a sequence of integers")
+        }
+
+        fn visit_i32<E>(self, value: i32) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(vec![value])
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(vec![value as i32])
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(vec![value as i32])
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            value
+                .parse::<i32>()
+                .map(|v| vec![v])
+                .map_err(|_| de::Error::custom(format!("invalid integer: {}", value)))
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            let mut vec = Vec::new();
+            while let Some(value) = seq.next_element()? {
+                vec.push(value);
+            }
+            Ok(vec)
+        }
+    }
+
+    deserializer.deserialize_option(OptionalVecVisitor)
+}
+
 /// 멤버십 정보
 ///
 /// 일괄 조회를 위한 멤버십 정보 구조체입니다.
@@ -125,8 +219,10 @@ pub struct UserProjectMatrixQueryParams {
     pub user_search: Option<String>,
     /// 역할 ID 필터
     pub role_id: Option<i32>,
-    /// 특정 프로젝트 ID 목록 (예: [1, 2, 3])
+    /// 특정 프로젝트 ID 목록 (예: [1, 2, 3] 또는 단일 값 2)
+    #[serde(default, deserialize_with = "deserialize_optional_vec")]
     pub project_ids: Option<Vec<i32>>,
-    /// 특정 유저 ID 목록 (예: [1, 2, 3])
+    /// 특정 유저 ID 목록 (예: [1, 2, 3] 또는 단일 값 2)
+    #[serde(default, deserialize_with = "deserialize_optional_vec")]
     pub user_ids: Option<Vec<i32>>,
 }
