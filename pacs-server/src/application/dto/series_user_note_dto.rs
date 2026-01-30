@@ -5,9 +5,15 @@ use chrono::{DateTime, Utc};
 /// Series User Note 생성/수정 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateOrUpdateSeriesNoteRequest {
-    /// 메모 텍스트
+    /// 메모 텍스트 (note 또는 content 필드 사용 가능)
+    #[serde(alias = "content")]
     #[schema(example = "이 시리즈는 프로젝트 A에서 분석 중입니다")]
     pub note: String,
+
+    /// 태그 (선택사항, 현재는 무시됨)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schema(example = json!(["tag1", "tag2"]))]
+    pub tags: Vec<String>,
 }
 
 /// Series User Note 응답 DTO
