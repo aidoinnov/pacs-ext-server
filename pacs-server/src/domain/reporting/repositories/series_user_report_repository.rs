@@ -19,6 +19,9 @@ pub trait SeriesUserReportRepository: Send + Sync {
         new_report: &NewSeriesUserReport,
     ) -> Result<SeriesUserReport, sqlx::Error>;
 
+    /// Report ID로 조회 (작성자 검증용)
+    async fn find_by_id(&self, report_id: i32) -> Result<Option<SeriesUserReport>, sqlx::Error>;
+
     /// Report 조회 (유저-시리즈-프로젝트 조합)
     async fn find_by_series_user_project(
         &self,
@@ -50,6 +53,14 @@ pub trait SeriesUserReportRepository: Send + Sync {
         user_id: i32,
         project_id: Option<i32>,
     ) -> Result<bool, sqlx::Error>;
+
+    /// Report의 템플릿 설정/해제 (template_id, custom_template_id)
+    async fn update_report_template(
+        &self,
+        report_id: i32,
+        template_id: Option<i32>,
+        custom_template_id: Option<i32>,
+    ) -> Result<(), sqlx::Error>;
 
     /// 데이터베이스 풀 참조
     fn pool(&self) -> &PgPool;

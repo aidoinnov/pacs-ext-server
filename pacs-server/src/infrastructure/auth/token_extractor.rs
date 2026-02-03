@@ -14,12 +14,14 @@
 //!   gateway, wire a proper Keycloak public-key verifier before using `sub`.
 //! - Always prefer the internal JWT path when available.
 
-use actix_web::HttpRequest;
+use actix_web::{HttpRequest, HttpResponse};
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use std::sync::Arc;
 use uuid::Uuid;
 #[allow(unused_imports)]
 use tracing::{debug, warn};
+
+use serde_json::json;
 
 use crate::infrastructure::auth::JwtService;
 use crate::domain::repositories::UserRepository; // bring trait into scope for method resolution
@@ -108,6 +110,21 @@ pub async fn extract_user_id_from_request(
     }
 
     None
+}
+
+/// 인증된 user_id를 추출. 실패 시 401 HttpResponse 반환.
+pub async fn extract_user_id_or_unauthorized(
+    req: &HttpRequest,
+    jwt: &Arc<JwtService>,
+    user_repo: &Arc<UserRepositoryImpl>,
+) -> Result<i32, HttpResponse> {
+    match extract_user_id_from_request(req, jwt, user_repo).await {
+        Some(id) if id > 0 => Ok(id),
+        _ => Err(HttpResponse::Unauthorized().json(json!({
+            "error": "Unauthorized",
+            "message": "Invalid or missing authorization token"
+        }))),
+    }
 }
 
 /// Decode Keycloak JWT payload and return the `sub` claim as `String`.

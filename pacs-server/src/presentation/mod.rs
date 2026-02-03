@@ -1,4 +1,5 @@
 pub mod controllers;
+pub mod error_handling;
 pub mod reporting;
 pub mod template;
 pub mod middleware;

@@ -7,8 +7,6 @@ use chrono::{DateTime, Utc};
 /// 원본 템플릿 생성 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateReportGuideTemplateRequest {
-    #[schema(example = "Chest CT Normal")]
-    pub name: String,
     #[schema(example = "정상 흉부 CT 소견")]
     pub description: Option<String>,
     #[schema(example = "추가 검사 불필요")]
@@ -20,17 +18,24 @@ pub struct CreateReportGuideTemplateRequest {
     /// 하나 이상의 모달리티
     #[schema(example = "CT")]
     pub modalities: Vec<String>,
+    /// 템플릿에 연결할 이미지 ID 목록
+    #[serde(default)]
+    pub image_ids: Vec<i32>,
 }
 
 /// 원본 템플릿 수정 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateReportGuideTemplateRequest {
-    pub name: Option<String>,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
     pub is_shared: Option<bool>,
     pub is_active: Option<bool>,
+    /// 모달리티 목록 (지정 시 기존 모달리티 대체)
+    #[serde(default)]
+    pub modalities: Option<Vec<String>>,
+    /// 템플릿에 연결할 이미지 ID 목록 (지정 시 기존 매핑 대체)
+    pub image_ids: Option<Vec<i32>>,
 }
 
 /// 원본 템플릿 응답 DTO
@@ -38,8 +43,6 @@ pub struct UpdateReportGuideTemplateRequest {
 pub struct ReportGuideTemplateResponse {
     #[schema(example = 1)]
     pub id: i32,
-    #[schema(example = "Chest CT Normal")]
-    pub name: String,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
@@ -62,6 +65,12 @@ pub struct ReportGuideTemplateResponse {
 pub struct TemplateImageResponse {
     #[schema(example = 1)]
     pub id: i32,
+    /// 이미지 출처. "guide" = guide_image(id로 DELETE /api/guide-images/{id}), "template" = report_guide_template_image(DELETE /api/report-guide-templates/{template_id}/images/{id})
+    #[schema(example = "guide")]
+    pub image_source: String,
+    /// image_source="template"일 때 삭제 API에 필요한 template_id
+    #[schema(example = 1)]
+    pub template_id: Option<i32>,
     #[schema(example = "templates/1/images/img1.png")]
     pub image_path: String,
     #[schema(example = "https://s3.example.com/templates/1/images/img1.png")]
@@ -153,6 +162,89 @@ pub struct TemplateImageUploadCompleteResponse {
     pub image: TemplateImageResponse,
 }
 
+// ========== 독립적인 가이드 이미지 DTO ==========
+
+/// 가이드 이미지 업로드 URL 요청 DTO
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct GuideImageUploadUrlRequest {
+    #[schema(example = "guide_image.png")]
+    pub file_name: String,
+    #[schema(example = "image/png")]
+    pub mime_type: Option<String>,
+    #[schema(example = 1024000)]
+    pub file_size: Option<i64>,
+}
+
+/// 가이드 이미지 업로드 URL 응답 DTO
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GuideImageUploadUrlResponse {
+    #[schema(example = true)]
+    pub success: bool,
+    #[schema(example = "https://s3.example.com/upload-url")]
+    pub upload_url: String,
+    #[schema(example = "guide-images/user123/guide_image.png")]
+    pub file_path: String,
+    #[schema(example = 600)]
+    pub expires_in: u64,
+}
+
+/// 가이드 이미지 업로드 완료 요청 DTO
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct GuideImageUploadCompleteRequest {
+    #[schema(example = "guide-images/user123/guide_image.png")]
+    pub file_path: String,
+    #[schema(example = 1024000)]
+    pub file_size: i64,
+    #[schema(example = "image/png")]
+    pub mime_type: Option<String>,
+    #[schema(example = true)]
+    pub is_shared: Option<bool>,
+}
+
+/// 가이드 이미지 응답 DTO
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GuideImageResponse {
+    #[schema(example = 1)]
+    pub id: i32,
+    /// 항상 "guide". DELETE /api/guide-images/{id} 사용
+    #[schema(example = "guide")]
+    pub image_source: String,
+    #[schema(example = "guide-images/user123/img1.png")]
+    pub image_path: String,
+    #[schema(example = "https://s3.example.com/guide-images/user123/img1.png")]
+    pub image_url: String,
+    #[schema(example = 102400)]
+    pub file_size: Option<i64>,
+    #[schema(example = "image/png")]
+    pub mime_type: Option<String>,
+    #[schema(example = true)]
+    pub is_shared: bool,
+    #[schema(example = 456)]
+    pub uploaded_by: i32,
+    #[schema(value_type = String, example = "2026-02-01T10:00:00Z")]
+    pub created_at: DateTime<Utc>,
+}
+
+/// 가이드 이미지 업로드 완료 응답 DTO
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GuideImageUploadCompleteResponse {
+    #[schema(example = true)]
+    pub success: bool,
+    #[schema(example = "Image uploaded successfully")]
+    pub message: String,
+    pub image: GuideImageResponse,
+}
+
+/// 가이드 이미지 목록 응답 DTO
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GuideImageListResponse {
+    #[schema(example = true)]
+    pub success: bool,
+    pub images: Vec<GuideImageResponse>,
+    #[schema(example = 42)]
+    pub total_count: i64,
+}
+
 // ========== 사용자 커스텀 템플릿 DTO ==========
 
 /// 커스텀 템플릿 생성 요청 DTO (원본 복사)
@@ -161,31 +253,34 @@ pub struct CreateCustomTemplateFromBaseRequest {
     /// 원본 템플릿 ID
     #[schema(example = 1)]
     pub base_template_id: i32,
-    #[schema(example = "My Custom Chest CT Template")]
-    pub name: String,
 }
 
 /// 커스텀 템플릿 생성 요청 DTO (원본 없이)
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct CreateCustomTemplateRequest {
-    #[schema(example = "My Custom Template")]
-    pub name: String,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
     /// 하나 이상의 모달리티
     #[schema(example = "CT")]
     pub modalities: Vec<String>,
+    /// 템플릿에 연결할 이미지 ID 목록
+    #[serde(default)]
+    pub image_ids: Vec<i32>,
 }
 
 /// 커스텀 템플릿 수정 요청 DTO
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct UpdateCustomTemplateRequest {
-    pub name: Option<String>,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
     pub is_active: Option<bool>,
+    /// 모달리티 목록 (지정 시 기존 모달리티 대체)
+    #[serde(default)]
+    pub modalities: Option<Vec<String>>,
+    /// 템플릿에 연결할 이미지 ID 목록 (지정 시 기존 매핑 대체)
+    pub image_ids: Option<Vec<i32>>,
 }
 
 /// 커스텀 템플릿 응답 DTO
@@ -197,8 +292,6 @@ pub struct UserCustomReportTemplateResponse {
     pub user_id: i32,
     #[schema(example = 1)]
     pub base_template_id: Option<i32>,
-    #[schema(example = "My Custom Template")]
-    pub name: String,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
@@ -217,6 +310,12 @@ pub struct UserCustomReportTemplateResponse {
 pub struct CustomTemplateImageResponse {
     #[schema(example = 1)]
     pub id: i32,
+    /// "guide" = guide_image, "custom_template" = user_custom_template_image(구조). 삭제 시 각각 /api/guide-images/{id}, /api/user/custom-report-templates/{custom_template_id}/images/{id}
+    #[schema(example = "guide")]
+    pub image_source: String,
+    /// image_source="custom_template"일 때 삭제 API에 필요한 custom_template_id
+    #[schema(example = 1)]
+    pub custom_template_id: Option<i32>,
     #[schema(example = "custom-templates/1/images/img1.png")]
     pub image_path: String,
     #[schema(example = "https://s3.example.com/custom-templates/1/images/img1.png")]
@@ -290,6 +389,40 @@ pub struct UserCustomTemplateListResponse {
     pub templates: Vec<UserCustomReportTemplateResponse>,
 }
 
+/// 사용자 기준 유효 템플릿 (원본/커스텀 병합) 응답 DTO
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct EffectiveReportTemplateResponse {
+    /// "original" | "custom"
+    #[schema(example = "original")]
+    pub source: String,
+    /// 원본 템플릿용 ID (Report-가이드 연결 시 template_id로 사용)
+    #[schema(example = 1)]
+    pub template_id: Option<i32>,
+    /// 커스텀 템플릿용 ID (Report-가이드 연결 시 custom_template_id로 사용)
+    #[schema(example = 5)]
+    pub custom_template_id: Option<i32>,
+    /// 원본 기준 ID (커스텀의 base_template_id, 원본은 None)
+    #[schema(example = 1)]
+    pub base_template_id: Option<i32>,
+    pub description: Option<String>,
+    pub conclusion: Option<String>,
+    pub bodypart: Option<String>,
+    pub modalities: Vec<String>,
+    pub images: Vec<TemplateImageResponse>,
+    #[schema(value_type = String, example = "2026-02-01T10:00:00Z")]
+    pub created_at: DateTime<Utc>,
+    #[schema(value_type = String, example = "2026-02-01T10:00:00Z")]
+    pub updated_at: DateTime<Utc>,
+}
+
+/// 사용자 기준 유효 템플릿 목록 응답 DTO
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct EffectiveReportTemplateListResponse {
+    #[schema(example = true)]
+    pub success: bool,
+    pub templates: Vec<EffectiveReportTemplateResponse>,
+}
+
 // ========== Report Guide Image 관리 DTO ==========
 
 /// Report Guide Image 추가 요청 DTO
@@ -319,6 +452,9 @@ pub struct ReportGuideResponse {
     pub custom_template_id: Option<i32>,
     #[schema(example = 0)]
     pub display_order: i32,
+    /// 리포트에 스냅샷된 가이드 이미지 목록
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub images: Option<Vec<TemplateImageResponse>>,
     #[schema(value_type = String, example = "2025-01-15T10:00:00Z")]
     pub created_at: DateTime<Utc>,
 }

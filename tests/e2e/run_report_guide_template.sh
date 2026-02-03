@@ -21,11 +21,11 @@ else
     exit 1
 fi
 
-# 테스트 실행
+# 테스트 실행 (Template + Guide Image 워크플로우 전체)
 echo "🧪 테스트 시작..."
 echo ""
 
-pytest test_report_guide_template.py -v -s
+pytest test_report_guide_template.py test_guide_image_workflow.py -v -s
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

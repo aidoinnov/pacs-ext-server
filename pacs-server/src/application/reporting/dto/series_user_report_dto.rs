@@ -103,6 +103,10 @@ pub struct SeriesReportListResponse {
 pub struct SeriesReportSingleResponse {
     #[schema(example = true)]
     pub success: bool,
+    /// Report ID (guides API 호출 시 사용, 없으면 null)
+    #[schema(example = 123)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<i32>,
     /// Report 설명 (없으면 빈 문자열)
     #[schema(example = "이 시리즈는 정상 소견입니다")]
     #[serde(default)]

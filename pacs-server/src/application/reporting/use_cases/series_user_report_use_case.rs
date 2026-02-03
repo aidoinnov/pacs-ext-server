@@ -138,6 +138,8 @@ where
 
         let update = UpdateSeriesUserReport {
             status: validated_status,
+            template_id: None,
+            custom_template_id: None,
             dictate_file_path: None,
             dictate_file_size: None,
             dictate_mime_type: None,

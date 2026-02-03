@@ -34,6 +34,10 @@ pub struct SeriesUserReport {
     pub user_id: i32,
     pub project_id: Option<i32>,
     pub status: String, // 'unread', 'approval', 'unapproval'
+    /// 적용된 원본 템플릿 ID (출처용, nullable)
+    pub template_id: Option<i32>,
+    /// 적용된 커스텀 템플릿 ID (출처용, nullable)
+    pub custom_template_id: Option<i32>,
     pub dictate_file_path: Option<String>,
     pub dictate_file_size: Option<i64>,
     pub dictate_mime_type: Option<String>,
@@ -90,6 +94,8 @@ impl NewSeriesUserReport {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateSeriesUserReport {
     pub status: Option<String>,
+    pub template_id: Option<i32>,
+    pub custom_template_id: Option<i32>,
     pub dictate_file_path: Option<String>,
     pub dictate_file_size: Option<i64>,
     pub dictate_mime_type: Option<String>,
@@ -102,6 +108,8 @@ impl UpdateSeriesUserReport {
     pub fn new() -> Self {
         Self {
             status: None,
+            template_id: None,
+            custom_template_id: None,
             dictate_file_path: None,
             dictate_file_size: None,
             dictate_mime_type: None,

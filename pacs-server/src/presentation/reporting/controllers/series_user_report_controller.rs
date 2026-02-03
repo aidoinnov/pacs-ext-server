@@ -96,6 +96,7 @@ where
     {
         Ok(report) => Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
             success: true,
+            id: Some(report.id),
             description: report.description,
             conclusion: report.conclusion,
         })),
@@ -147,11 +148,12 @@ where
         .await
     {
         Ok(report) => {
-            let (description, conclusion) = report
-                .map(|r| (r.description, r.conclusion))
-                .unwrap_or_default();
+            let (id, description, conclusion) = report
+                .map(|r| (Some(r.id), r.description, r.conclusion))
+                .unwrap_or((None, String::new(), String::new()));
             Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
                 success: true,
+                id,
                 description,
                 conclusion,
             }))
@@ -331,6 +333,7 @@ where
     {
         Ok(report) => Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
             success: true,
+            id: Some(report.id),
             description: report.description,
             conclusion: report.conclusion,
         })),
@@ -385,11 +388,12 @@ where
 
     match use_case.get_report(series_id, user_id, None).await {
         Ok(report) => {
-            let (description, conclusion) = report
-                .map(|r| (r.description, r.conclusion))
-                .unwrap_or_default();
+            let (id, description, conclusion) = report
+                .map(|r| (Some(r.id), r.description, r.conclusion))
+                .unwrap_or((None, String::new(), String::new()));
             Ok(HttpResponse::Ok().json(SeriesReportSingleResponse {
                 success: true,
+                id,
                 description,
                 conclusion,
             }))
@@ -678,16 +682,18 @@ where
     ),
     tag = "series-user-report"
 )]
-pub async fn apply_template_to_report<T>(
+pub async fn apply_template_to_report<T, R, SUS>(
     path: web::Path<i32>,
     request: web::Json<ApplyTemplateToReportRequest>,
     req: HttpRequest,
-    template_use_case: web::Data<Arc<ReportGuideTemplateUseCase<T>>>,
+    template_use_case: web::Data<Arc<ReportGuideTemplateUseCase<T, R, SUS>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     T: crate::domain::template::services::ReportGuideTemplateService + 'static,
+    R: crate::domain::reporting::repositories::SeriesUserReportRepository + 'static,
+    SUS: crate::application::services::SignedUrlService + 'static,
 {
     let report_id = path.into_inner();
     let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
@@ -728,18 +734,20 @@ where
     ),
     tag = "series-user-report"
 )]
-pub async fn get_report_guides<T>(
+pub async fn get_report_guides<T, R, SUS>(
     path: web::Path<i32>,
     req: HttpRequest,
-    template_use_case: web::Data<Arc<ReportGuideTemplateUseCase<T>>>,
+    template_use_case: web::Data<Arc<ReportGuideTemplateUseCase<T, R, SUS>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     T: crate::domain::template::services::ReportGuideTemplateService + 'static,
+    R: crate::domain::reporting::repositories::SeriesUserReportRepository + 'static,
+    SUS: crate::application::services::SignedUrlService + 'static,
 {
     let report_id = path.into_inner();
-    let _user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
+    let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
         _ => {
             return Ok(HttpResponse::Unauthorized().json(json!({
@@ -749,24 +757,11 @@ where
         }
     };
 
-    match template_use_case.get_report_guides(report_id).await {
-        Ok(guides) => {
-            let response: Vec<ReportGuideResponse> = guides
-                .into_iter()
-                .map(|g| ReportGuideResponse {
-                    id: g.id,
-                    report_id: g.report_id,
-                    template_id: g.template_id,
-                    custom_template_id: g.custom_template_id,
-                    display_order: g.display_order,
-                    created_at: g.created_at,
-                })
-                .collect();
-            Ok(HttpResponse::Ok().json(ReportGuideListResponse {
-                success: true,
-                guides: response,
-            }))
-        }
+    match template_use_case.get_report_guides(report_id, user_id).await {
+        Ok(guides) => Ok(HttpResponse::Ok().json(ReportGuideListResponse {
+            success: true,
+            guides,
+        })),
         Err(e) => Ok(handle_service_error(e)),
     }
 }
@@ -788,19 +783,21 @@ where
     ),
     tag = "series-user-report"
 )]
-pub async fn add_report_guide<T>(
+pub async fn add_report_guide<T, R, SUS>(
     path: web::Path<i32>,
     request: web::Json<AddReportGuideRequest>,
     req: HttpRequest,
-    template_use_case: web::Data<Arc<ReportGuideTemplateUseCase<T>>>,
+    template_use_case: web::Data<Arc<ReportGuideTemplateUseCase<T, R, SUS>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     T: crate::domain::template::services::ReportGuideTemplateService + 'static,
+    R: crate::domain::reporting::repositories::SeriesUserReportRepository + 'static,
+    SUS: crate::application::services::SignedUrlService + 'static,
 {
     let report_id = path.into_inner();
-    let _user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
+    let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
         _ => {
             return Ok(HttpResponse::Unauthorized().json(json!({
@@ -811,7 +808,7 @@ where
     };
 
     match template_use_case
-        .add_report_guide(report_id, request.into_inner())
+        .add_report_guide(report_id, user_id, request.into_inner())
         .await
     {
         Ok(guide) => Ok(HttpResponse::Ok().json(guide)),
@@ -835,18 +832,20 @@ where
     ),
     tag = "series-user-report"
 )]
-pub async fn delete_report_guide<T>(
+pub async fn delete_report_guide<T, R, SUS>(
     path: web::Path<(i32, i32)>,
     req: HttpRequest,
-    template_use_case: web::Data<Arc<ReportGuideTemplateUseCase<T>>>,
+    template_use_case: web::Data<Arc<ReportGuideTemplateUseCase<T, R, SUS>>>,
     jwt: web::Data<Arc<JwtService>>,
     user_repo: web::Data<Arc<UserRepositoryImpl>>,
 ) -> Result<HttpResponse, actix_web::Error>
 where
     T: crate::domain::template::services::ReportGuideTemplateService + 'static,
+    R: crate::domain::reporting::repositories::SeriesUserReportRepository + 'static,
+    SUS: crate::application::services::SignedUrlService + 'static,
 {
-    let (_report_id, guide_id) = path.into_inner();
-    let _user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
+    let (report_id, _guide_id) = path.into_inner();
+    let user_id = match extract_user_id_from_request(&req, &jwt, &user_repo).await {
         Some(id) if id > 0 => id,
         _ => {
             return Ok(HttpResponse::Unauthorized().json(json!({
@@ -856,7 +855,7 @@ where
         }
     };
 
-    match template_use_case.delete_report_guide(guide_id).await {
+    match template_use_case.delete_report_guide(report_id, user_id).await {
         Ok(_) => Ok(HttpResponse::Ok().json(json!({
             "success": true,
             "message": "Guide deleted successfully"
@@ -866,10 +865,10 @@ where
 }
 
 /// 오디오 파일 업로드 및 템플릿 적용 라우팅 설정
-pub fn configure_report_extension_routes<S, U, T, SUS>(
+pub fn configure_report_extension_routes<S, U, T, R, SUS>(
     cfg: &mut web::ServiceConfig,
     report_use_case: Arc<SeriesUserReportUseCase<S, U>>,
-    template_use_case: Arc<ReportGuideTemplateUseCase<T>>,
+    template_use_case: Arc<ReportGuideTemplateUseCase<T, R, SUS>>,
     signed_url_service: Arc<SUS>,
     jwt: Arc<JwtService>,
     user_repo: Arc<UserRepositoryImpl>,
@@ -877,6 +876,7 @@ pub fn configure_report_extension_routes<S, U, T, SUS>(
     S: crate::domain::reporting::services::SeriesUserReportService + 'static,
     U: crate::domain::repositories::UserRepository + 'static,
     T: crate::domain::template::services::ReportGuideTemplateService + 'static,
+    R: crate::domain::reporting::repositories::SeriesUserReportRepository + 'static,
     SUS: SignedUrlService + 'static,
 {
     cfg.app_data(web::Data::new(report_use_case))
@@ -888,10 +888,10 @@ pub fn configure_report_extension_routes<S, U, T, SUS>(
             web::scope("/reports")
                 .route("/{report_id}/dictate/upload-url", web::post().to(generate_dictate_upload_url::<S, U, SUS>))
                 .route("/{report_id}/dictate/complete", web::post().to(complete_dictate_upload::<S, U>))
-                .route("/{report_id}/apply-template", web::post().to(apply_template_to_report::<T>))
-                .route("/{report_id}/guides", web::get().to(get_report_guides::<T>))
-                .route("/{report_id}/guides", web::post().to(add_report_guide::<T>))
-                .route("/{report_id}/guides/{guide_id}", web::delete().to(delete_report_guide::<T>)),
+                .route("/{report_id}/apply-template", web::post().to(apply_template_to_report::<T, R, SUS>))
+                .route("/{report_id}/guides", web::get().to(get_report_guides::<T, R, SUS>))
+                .route("/{report_id}/guides", web::post().to(add_report_guide::<T, R, SUS>))
+                .route("/{report_id}/guides/{guide_id}", web::delete().to(delete_report_guide::<T, R, SUS>)),
         );
 }
 

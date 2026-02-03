@@ -11,7 +11,6 @@ use sqlx::FromRow;
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ReportGuideTemplate {
     pub id: i32,
-    pub name: String,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
@@ -25,7 +24,6 @@ pub struct ReportGuideTemplate {
 /// 새로운 원본 템플릿 생성용 구조체
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewReportGuideTemplate {
-    pub name: String,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
@@ -36,7 +34,6 @@ pub struct NewReportGuideTemplate {
 /// 원본 템플릿 업데이트용 구조체
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateReportGuideTemplate {
-    pub name: Option<String>,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
@@ -52,7 +49,67 @@ pub struct ReportGuideTemplateModality {
     pub modality: String,
 }
 
-/// 템플릿 이미지
+/// 독립적인 가이드 이미지 (템플릿과 무관)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct GuideImage {
+    pub id: i32,
+    pub image_path: String,
+    pub image_url: String,
+    pub file_size: Option<i64>,
+    pub mime_type: Option<String>,
+    pub is_shared: bool,
+    pub uploaded_by: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 새로운 가이드 이미지 생성용 구조체
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewGuideImage {
+    pub image_path: String,
+    pub image_url: String,
+    pub file_size: Option<i64>,
+    pub mime_type: Option<String>,
+    pub is_shared: bool,
+    pub uploaded_by: i32,
+}
+
+/// 템플릿-이미지 매핑
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct TemplateImageMapping {
+    pub id: i32,
+    pub template_id: i32,
+    pub image_id: i32,
+    pub display_order: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 새로운 템플릿-이미지 매핑 생성용 구조체
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewTemplateImageMapping {
+    pub template_id: i32,
+    pub image_id: i32,
+    pub display_order: i32,
+}
+
+/// 커스텀 템플릿-이미지 매핑
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct CustomTemplateImageMapping {
+    pub id: i32,
+    pub custom_template_id: i32,
+    pub image_id: i32,
+    pub display_order: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 새로운 커스텀 템플릿-이미지 매핑 생성용 구조체
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewCustomTemplateImageMapping {
+    pub custom_template_id: i32,
+    pub image_id: i32,
+    pub display_order: i32,
+}
+
+/// 템플릿 이미지 (기존 구조 - 하위 호환성 유지)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ReportGuideTemplateImage {
     pub id: i32,
@@ -67,7 +124,7 @@ pub struct ReportGuideTemplateImage {
     pub created_at: DateTime<Utc>,
 }
 
-/// 새로운 템플릿 이미지 생성용 구조체
+/// 새로운 템플릿 이미지 생성용 구조체 (기존 구조 - 하위 호환성 유지)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewReportGuideTemplateImage {
     pub template_id: i32,
@@ -86,7 +143,6 @@ pub struct UserCustomReportTemplate {
     pub id: i32,
     pub user_id: i32,
     pub base_template_id: Option<i32>,
-    pub name: String,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
@@ -100,7 +156,6 @@ pub struct UserCustomReportTemplate {
 pub struct NewUserCustomReportTemplate {
     pub user_id: i32,
     pub base_template_id: Option<i32>,
-    pub name: String,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
@@ -109,7 +164,6 @@ pub struct NewUserCustomReportTemplate {
 /// 커스텀 템플릿 업데이트용 구조체
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateUserCustomReportTemplate {
-    pub name: Option<String>,
     pub description: Option<String>,
     pub conclusion: Option<String>,
     pub bodypart: Option<String>,
@@ -152,7 +206,34 @@ pub struct NewUserCustomTemplateImage {
     pub uploaded_by: i32,
 }
 
-/// Report-가이드 매핑
+/// 리포트 이미지 스냅샷 (템플릿 변경과 무관하게 유지)
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ReportImage {
+    pub id: i32,
+    pub report_id: i32,
+    pub image_id: i32,
+    pub display_order: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+/// 새로운 리포트 이미지 생성용 구조체
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewReportImage {
+    pub report_id: i32,
+    pub image_id: i32,
+    pub display_order: i32,
+}
+
+/// 리포트 템플릿 정보 (가이드 1:1, API 응답용)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReportTemplateInfo {
+    pub report_id: i32,
+    pub template_id: Option<i32>,
+    pub custom_template_id: Option<i32>,
+    pub display_order: i32,
+}
+
+/// Report-가이드 매핑 (DEPRECATED: report_template + report_image 사용)
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SeriesUserReportGuide {
     pub id: i32,
@@ -163,7 +244,7 @@ pub struct SeriesUserReportGuide {
     pub created_at: DateTime<Utc>,
 }
 
-/// 새로운 Report-가이드 매핑 생성용 구조체
+/// 새로운 Report-가이드 매핑 생성용 구조체 (DEPRECATED)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewSeriesUserReportGuide {
     pub report_id: i32,

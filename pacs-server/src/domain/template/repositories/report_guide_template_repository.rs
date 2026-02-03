@@ -55,7 +55,93 @@ pub trait ReportGuideTemplateRepository: Send + Sync {
     /// 템플릿 모달리티 제거
     async fn remove_modality(&self, template_id: i32, modality: &str) -> Result<bool, sqlx::Error>;
 
-    // ========== 템플릿 이미지 ==========
+    /// 템플릿의 모든 모달리티 제거
+    async fn delete_template_modalities_by_template(
+        &self,
+        template_id: i32,
+    ) -> Result<u64, sqlx::Error>;
+
+    // ========== 독립적인 가이드 이미지 ==========
+
+    /// 가이드 이미지 생성
+    async fn create_guide_image(
+        &self,
+        new_image: &NewGuideImage,
+    ) -> Result<GuideImage, sqlx::Error>;
+
+    /// 가이드 이미지 조회
+    async fn find_guide_image_by_id(&self, id: i32) -> Result<Option<GuideImage>, sqlx::Error>;
+
+    /// 사용자가 업로드한 가이드 이미지 목록 조회
+    async fn find_guide_images_by_user(
+        &self,
+        user_id: i32,
+        is_shared: Option<bool>,
+    ) -> Result<Vec<GuideImage>, sqlx::Error>;
+
+    /// 가이드 이미지 공유 설정 변경
+    async fn update_guide_image_share_status(
+        &self,
+        image_id: i32,
+        is_shared: bool,
+    ) -> Result<GuideImage, sqlx::Error>;
+
+    /// 가이드 이미지 삭제
+    async fn delete_guide_image(&self, image_id: i32) -> Result<bool, sqlx::Error>;
+
+    // ========== 템플릿-이미지 매핑 ==========
+
+    /// 템플릿-이미지 매핑 생성
+    async fn create_template_image_mapping(
+        &self,
+        new_mapping: &NewTemplateImageMapping,
+    ) -> Result<TemplateImageMapping, sqlx::Error>;
+
+    /// 템플릿의 모든 이미지 매핑 삭제
+    async fn delete_template_image_mappings_by_template(
+        &self,
+        template_id: i32,
+    ) -> Result<u64, sqlx::Error>;
+
+    /// 템플릿의 이미지 매핑 목록 조회
+    async fn find_template_image_mappings(
+        &self,
+        template_id: i32,
+    ) -> Result<Vec<TemplateImageMapping>, sqlx::Error>;
+
+    /// 매핑을 통해 템플릿의 이미지 목록 조회
+    async fn find_guide_images_by_template(
+        &self,
+        template_id: i32,
+    ) -> Result<Vec<GuideImage>, sqlx::Error>;
+
+    // ========== 커스텀 템플릿-이미지 매핑 ==========
+
+    /// 커스텀 템플릿-이미지 매핑 생성
+    async fn create_custom_template_image_mapping(
+        &self,
+        new_mapping: &NewCustomTemplateImageMapping,
+    ) -> Result<CustomTemplateImageMapping, sqlx::Error>;
+
+    /// 커스텀 템플릿의 모든 이미지 매핑 삭제
+    async fn delete_custom_template_image_mappings_by_template(
+        &self,
+        custom_template_id: i32,
+    ) -> Result<u64, sqlx::Error>;
+
+    /// 커스텀 템플릿의 이미지 매핑 목록 조회
+    async fn find_custom_template_image_mappings(
+        &self,
+        custom_template_id: i32,
+    ) -> Result<Vec<CustomTemplateImageMapping>, sqlx::Error>;
+
+    /// 매핑을 통해 커스텀 템플릿의 이미지 목록 조회
+    async fn find_guide_images_by_custom_template(
+        &self,
+        custom_template_id: i32,
+    ) -> Result<Vec<GuideImage>, sqlx::Error>;
+
+    // ========== 템플릿 이미지 (기존 구조 - 하위 호환성) ==========
 
     /// 템플릿 이미지 추가
     async fn add_template_image(
@@ -67,6 +153,12 @@ pub trait ReportGuideTemplateRepository: Send + Sync {
     async fn find_template_images(
         &self,
         template_id: i32,
+    ) -> Result<Vec<ReportGuideTemplateImage>, sqlx::Error>;
+
+    /// 사용자가 업로드한 모든 템플릿 이미지 조회
+    async fn find_template_images_by_user(
+        &self,
+        user_id: i32,
     ) -> Result<Vec<ReportGuideTemplateImage>, sqlx::Error>;
 
     /// 템플릿 이미지 조회
@@ -137,6 +229,19 @@ pub trait ReportGuideTemplateRepository: Send + Sync {
         modality: &str,
     ) -> Result<bool, sqlx::Error>;
 
+    /// 커스텀 템플릿의 모든 모달리티 제거
+    async fn delete_custom_template_modalities_by_template(
+        &self,
+        custom_template_id: i32,
+    ) -> Result<u64, sqlx::Error>;
+
+    /// 커스텀 템플릿 모달리티 추가 (conflict 시 무시, execute 사용)
+    async fn insert_custom_modality_ignore_conflict(
+        &self,
+        custom_template_id: i32,
+        modality: &str,
+    ) -> Result<(), sqlx::Error>;
+
     // ========== 커스텀 템플릿 이미지 ==========
 
     /// 커스텀 템플릿 이미지 추가
@@ -154,25 +259,23 @@ pub trait ReportGuideTemplateRepository: Send + Sync {
     /// 커스텀 템플릿 이미지 삭제
     async fn delete_custom_template_image(&self, image_id: i32) -> Result<bool, sqlx::Error>;
 
-    // ========== Report-가이드 매핑 ==========
+    // ========== Report 이미지 스냅샷 ==========
 
-    /// Report-가이드 매핑 추가
-    async fn add_report_guide(
-        &self,
-        new_guide: &NewSeriesUserReportGuide,
-    ) -> Result<SeriesUserReportGuide, sqlx::Error>;
-
-    /// Report의 가이드 목록 조회
-    async fn find_report_guides(
+    /// Report 이미지 삽입 (템플릿 이미지 스냅샷)
+    async fn insert_report_images(
         &self,
         report_id: i32,
-    ) -> Result<Vec<SeriesUserReportGuide>, sqlx::Error>;
+        image_entries: &[(i32, i32)], // (image_id, display_order)
+    ) -> Result<(), sqlx::Error>;
 
-    /// Report-가이드 매핑 삭제
-    async fn delete_report_guide(&self, guide_id: i32) -> Result<bool, sqlx::Error>;
+    /// Report의 모든 이미지 삭제
+    async fn delete_report_images_by_report(&self, report_id: i32) -> Result<u64, sqlx::Error>;
 
-    /// Report의 모든 가이드 삭제
-    async fn delete_all_report_guides(&self, report_id: i32) -> Result<usize, sqlx::Error>;
+    /// Report의 이미지 목록 조회 (guide_image 조인, display_order 순)
+    async fn find_guide_images_by_report(
+        &self,
+        report_id: i32,
+    ) -> Result<Vec<(GuideImage, i32)>, sqlx::Error>;
 
     /// 데이터베이스 풀 참조
     fn pool(&self) -> &PgPool;

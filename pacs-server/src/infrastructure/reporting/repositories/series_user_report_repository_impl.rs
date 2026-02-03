@@ -44,6 +44,7 @@ impl SeriesUserReportRepository for SeriesUserReportRepositoryImpl {
                 bodypart = EXCLUDED.bodypart,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING id, series_id, user_id, project_id, status,
+                     template_id, custom_template_id,
                      dictate_file_path, dictate_file_size, dictate_mime_type,
                      description, conclusion, bodypart, created_at, updated_at
             "#,
@@ -62,6 +63,22 @@ impl SeriesUserReportRepository for SeriesUserReportRepositoryImpl {
         .await
     }
 
+    async fn find_by_id(&self, report_id: i32) -> Result<Option<SeriesUserReport>> {
+        sqlx::query_as::<_, SeriesUserReport>(
+            r#"
+            SELECT id, series_id, user_id, project_id, status,
+                   template_id, custom_template_id,
+                   dictate_file_path, dictate_file_size, dictate_mime_type,
+                   description, conclusion, bodypart, created_at, updated_at
+            FROM series_user_report
+            WHERE id = $1
+            "#,
+        )
+        .bind(report_id)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     async fn find_by_series_user_project(
         &self,
         series_id: i32,
@@ -71,6 +88,7 @@ impl SeriesUserReportRepository for SeriesUserReportRepositoryImpl {
         sqlx::query_as::<_, SeriesUserReport>(
             r#"
             SELECT id, series_id, user_id, project_id, status,
+                   template_id, custom_template_id,
                    dictate_file_path, dictate_file_size, dictate_mime_type,
                    description, conclusion, bodypart, created_at, updated_at
             FROM series_user_report
@@ -94,6 +112,7 @@ impl SeriesUserReportRepository for SeriesUserReportRepositoryImpl {
             sqlx::query_as::<_, SeriesUserReport>(
                 r#"
                 SELECT id, series_id, user_id, project_id, status,
+                       template_id, custom_template_id,
                        dictate_file_path, dictate_file_size, dictate_mime_type,
                        description, conclusion, bodypart, created_at, updated_at
                 FROM series_user_report
@@ -107,6 +126,7 @@ impl SeriesUserReportRepository for SeriesUserReportRepositoryImpl {
             sqlx::query_as::<_, SeriesUserReport>(
                 r#"
                 SELECT id, series_id, user_id, project_id, status,
+                       template_id, custom_template_id,
                        dictate_file_path, dictate_file_size, dictate_mime_type,
                        description, conclusion, bodypart, created_at, updated_at
                 FROM series_user_report
@@ -189,16 +209,19 @@ impl SeriesUserReportRepository for SeriesUserReportRepositoryImpl {
             UPDATE series_user_report
             SET
                 status = COALESCE($4, status),
-                dictate_file_path = COALESCE($5, dictate_file_path),
-                dictate_file_size = COALESCE($6, dictate_file_size),
-                dictate_mime_type = COALESCE($7, dictate_mime_type),
-                description = COALESCE($8, description),
-                conclusion = COALESCE($9, conclusion),
-                bodypart = COALESCE($10, bodypart),
+                template_id = COALESCE($5, template_id),
+                custom_template_id = COALESCE($6, custom_template_id),
+                dictate_file_path = COALESCE($7, dictate_file_path),
+                dictate_file_size = COALESCE($8, dictate_file_size),
+                dictate_mime_type = COALESCE($9, dictate_mime_type),
+                description = COALESCE($10, description),
+                conclusion = COALESCE($11, conclusion),
+                bodypart = COALESCE($12, bodypart),
                 updated_at = CURRENT_TIMESTAMP
             WHERE series_id = $1 AND user_id = $2 
               AND (project_id = $3 OR (project_id IS NULL AND $3 IS NULL))
             RETURNING id, series_id, user_id, project_id, status,
+                     template_id, custom_template_id,
                      dictate_file_path, dictate_file_size, dictate_mime_type,
                      description, conclusion, bodypart, created_at, updated_at
             "#,
@@ -207,6 +230,8 @@ impl SeriesUserReportRepository for SeriesUserReportRepositoryImpl {
         .bind(user_id)
         .bind(project_id)
         .bind(&update.status)
+        .bind(&update.template_id)
+        .bind(&update.custom_template_id)
         .bind(&update.dictate_file_path)
         .bind(&update.dictate_file_size)
         .bind(&update.dictate_mime_type)
@@ -215,6 +240,27 @@ impl SeriesUserReportRepository for SeriesUserReportRepositoryImpl {
         .bind(&update.bodypart)
         .fetch_one(&self.pool)
         .await
+    }
+
+    async fn update_report_template(
+        &self,
+        report_id: i32,
+        template_id: Option<i32>,
+        custom_template_id: Option<i32>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            UPDATE series_user_report
+            SET template_id = $2, custom_template_id = $3, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $1
+            "#,
+        )
+        .bind(report_id)
+        .bind(template_id)
+        .bind(custom_template_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     async fn delete(
