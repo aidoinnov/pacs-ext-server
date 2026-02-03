@@ -14,6 +14,7 @@ use crate::application::dto::user_dto::*;
 use crate::application::dto::user_project_matrix_dto::*;
 use crate::application::dto::series_user_note_dto::*;
 use crate::application::dto::user_registration_dto::*;
+use crate::application::dto::sw_information_dto::*;
 use crate::application::dto::view_selection_dto::*;
 use crate::application::dto::viewer_dto::*;
 use crate::presentation::controllers::annotation_controller::*;
@@ -25,6 +26,7 @@ use crate::presentation::controllers::project_user_matrix_controller::*;
 use crate::presentation::controllers::role_permission_matrix_controller::*;
 use crate::presentation::controllers::series_user_note_controller::*;
 use crate::presentation::controllers::subject_controller::*;
+use crate::presentation::controllers::sw_information_controller::*;
 use crate::presentation::controllers::timepoint_controller::*;
 use crate::presentation::controllers::user_project_matrix_controller;
 use crate::presentation::controllers::view_selection_controller::*;
@@ -91,6 +93,9 @@ use utoipa::OpenApi;
         get_studies_meta,
         get_series_meta,
         get_study_series_meta,
+        // SW Information endpoints
+        list_sw_information,
+        get_sw_information,
         // Subject endpoints
         create_subject,
         get_subjects_by_project,
@@ -222,6 +227,9 @@ use utoipa::OpenApi;
             ViewerStudySeriesMetaResponse,
             ViewerPaginationInfo,
             SeriesQuery,
+            // SW Information DTOs
+            SwInformationResponse,
+            SwInformationListResponse,
             // User Registration DTOs
             SignupRequest,
             VerifyEmailRequest,
@@ -270,6 +278,7 @@ use utoipa::OpenApi;
         (name = "series-user-note", description = "Series User Note endpoints - Series 사용자 메모 관리 API"),
         (name = "view-selection", description = "View Selection endpoints - Viewer Session 기반 멀티-Study/Series 선택 관리 API"),
         (name = "viewer", description = "Viewer BFF endpoints - Viewer 전용 Backend-for-Frontend API (Study/Series Meta Batch)"),
+        (name = "sw-information", description = "SW Information endpoints - 의료영상저장장치 소프트웨어 정보 조회 API"),
         (name = "subjects", description = "Subject management endpoints - 임상시험 Subject(환자) 관리 API"),
         (name = "timepoints", description = "TimePoint management endpoints - 임상시험 TimePoint(평가 시점) 관리 API"),
         (name = "recist-lesions", description = "RECIST Lesion management endpoints - RECIST 1.1 기준 병변 관리 API"),

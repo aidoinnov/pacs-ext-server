@@ -85,8 +85,8 @@ use presentation::controllers::{
     mask_controller, mask_group_controller, project_controller, project_data_access_controller,
     project_user_controller, project_user_matrix_controller, role_controller,
     role_permission_matrix_controller, series_user_note_controller, study_list_view_controller,
-    subject_controller, test_controller, timepoint_controller, user_controller,
-    user_project_matrix_controller,
+    subject_controller, sw_information_controller, test_controller, timepoint_controller,
+    user_controller, user_project_matrix_controller,
 };
 // OpenAPI 문서 생성
 use presentation::openapi::ApiDoc;
@@ -602,7 +602,7 @@ async fn main() -> std::io::Result<()> {
     
     let series_user_report_repo = SeriesUserReportRepositoryImpl::new(pool.clone());
     let series_user_report_service = Arc::new(SeriesUserReportServiceImpl::new(
-        series_user_report_repo,
+        series_user_report_repo.clone(),
         user_repo.clone(),
         project_repo.clone(),
         project_data_repo.clone(),
@@ -621,10 +621,21 @@ async fn main() -> std::io::Result<()> {
     let report_guide_template_repo = ReportGuideTemplateRepositoryImpl::new(pool.clone());
     let report_guide_template_service = Arc::new(ReportGuideTemplateServiceImpl::new(
         report_guide_template_repo,
+        series_user_report_repo.clone(),
     ));
     let report_guide_template_use_case = Arc::new(ReportGuideTemplateUseCase::new(
         report_guide_template_service.clone(),
+        Arc::new(series_user_report_repo.clone()),
+        signed_url_service.clone(),
     ));
+
+    // SW Information UseCase 초기화
+    use crate::domain::sw_information::SwInformationRepository;
+    use crate::infrastructure::sw_information::repositories::SwInformationRepositoryImpl;
+    use crate::application::use_cases::SwInformationUseCase;
+
+    let sw_information_repo = Arc::new(SwInformationRepositoryImpl::new(pool.clone()));
+    let sw_information_use_case = Arc::new(SwInformationUseCase::new(sw_information_repo));
     
     println!("✅ Done");
 
@@ -986,6 +997,18 @@ async fn main() -> std::io::Result<()> {
                                 cfg.app_data(web::Data::new(dicom_evaluator.clone()));
                                 cfg.app_data(web::Data::new(project_data_repo.clone()));
                             }
+                        }
+                    })
+                    // ========================================
+                    // 📋 SW Information API (/sw-information)
+                    // - 의료영상저장장치 소프트웨어 정보 조회
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            sw_information_controller::configure_routes(
+                                cfg,
+                                sw_information_use_case.clone(),
+                            )
                         }
                     })
                     // ========================================

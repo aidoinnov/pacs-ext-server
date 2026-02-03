@@ -17,6 +17,7 @@ pub mod role_permission_matrix_controller;
 pub mod series_user_note_controller;
 pub mod study_list_view_controller;
 pub mod subject_controller;
+pub mod sw_information_controller;
 pub mod sync_controller;
 pub mod test_controller;
 pub mod timepoint_controller;

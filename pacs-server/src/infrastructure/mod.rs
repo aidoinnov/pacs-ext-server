@@ -7,5 +7,6 @@ pub mod redis;
 pub mod reporting;
 pub mod repositories;
 pub mod services;
+pub mod sw_information;
 pub mod template;
 pub mod view_selection;

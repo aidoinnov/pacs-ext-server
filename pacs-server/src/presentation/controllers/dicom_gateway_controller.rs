@@ -4338,6 +4338,7 @@ mod tests {
         extract_instance_uid, extract_series_uid, extract_study_uid,
         is_valid_study_date, merge_qido_params, parse_report_status_filter,
     };
+    use crate::infrastructure::auth::decode_keycloak_token_sub;
     use crate::domain::entities::access_condition::{
         AccessCondition, ConditionType, ResourceLevel,
     };

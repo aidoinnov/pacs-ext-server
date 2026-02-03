@@ -3,6 +3,7 @@ pub mod errors;
 pub mod repositories;
 pub mod reporting;
 pub mod services;
+pub mod sw_information;
 pub mod template;
 pub mod view_selection;
 
