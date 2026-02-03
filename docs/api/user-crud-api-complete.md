@@ -428,19 +428,15 @@ curl -X GET "http://localhost:8080/api/users/1/projects?page=1&page_size=10" \
 
 자세한 내용은 `docs/api/user-registration-api.md` 참조
 
-### 7. 이메일 인증
+### 7. 사용자 승인 (관리자)
 
-**Endpoint**: `POST /api/auth/verify-email`
+> 이메일 인증 (`POST /api/auth/verify-email`) API는 2026-02 제거됨
 
-자세한 내용은 `docs/api/user-registration-api.md` 참조
-
-### 8. 사용자 승인 (관리자)
-
-**Endpoint**: `POST /api/admin/users/approve`
+**Endpoint**: `POST /api/auth/admin/users/approve`
 
 자세한 내용은 `docs/api/user-registration-api.md` 참조
 
-### 9. 사용자 계정 삭제
+### 8. 사용자 계정 삭제
 
 **Endpoint**: `DELETE /api/users/{user_id}`
 
@@ -474,7 +470,7 @@ curl -X DELETE "http://localhost:8080/api/users/1" \
 
 ---
 
-### 10. 사용자 상태 조회
+### 9. 사용자 상태 조회
 
 **Endpoint**: `GET /api/users/{user_id}/status`
 

@@ -201,7 +201,6 @@ pub fn configure_routes<S: UserRegistrationService + 'static>(
 ) {
     cfg.app_data(web::Data::new(use_case))
         .route("/auth/signup", web::post().to(signup::<S>))
-        .route("/auth/verify-email", web::post().to(verify_email::<S>))
         .route("/admin/users/approve", web::post().to(approve_user::<S>))
         .route("/users/{user_id}", web::delete().to(delete_account::<S>))
         .route(

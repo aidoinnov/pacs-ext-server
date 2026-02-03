@@ -119,9 +119,17 @@ impl<A: AuthService> AuthController<A> {
             .await
         {
             Ok(response) => HttpResponse::Ok().json(response),
-            Err(e) => HttpResponse::BadRequest().json(json!({
-                "error": format!("User approval failed: {}", e)
-            })),
+            Err(e) => match &e {
+                crate::domain::ServiceError::NotFound(_) => HttpResponse::NotFound().json(json!({
+                    "error": "User not found in identity provider. The user may have been deleted or never created via signup."
+                })),
+                crate::domain::ServiceError::Forbidden(_) => HttpResponse::Forbidden().json(json!({
+                    "error": e.to_string()
+                })),
+                _ => HttpResponse::BadRequest().json(json!({
+                    "error": format!("User approval failed: {}", e)
+                })),
+            },
         }
     }
 
@@ -316,10 +324,6 @@ pub fn configure_routes<A: AuthService + 'static, U: UserRepository + 'static>(
                     web::post().to(AuthController::<A>::refresh_token),
                 )
                 .route("/signup", web::post().to(AuthController::<A>::signup))
-                .route(
-                    "/verify-email",
-                    web::post().to(AuthController::<A>::verify_email),
-                )
                 .route(
                     "/find-username",
                     web::post().to(AuthController::<A>::find_username),

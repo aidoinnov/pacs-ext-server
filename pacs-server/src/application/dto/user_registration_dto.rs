@@ -53,12 +53,12 @@ pub struct SignupResponse {
     #[schema(example = "john@example.com")]
     pub email: String,
 
-    /// 계정 상태
-    #[schema(example = "PENDING_EMAIL")]
+    /// 계정 상태 (이메일 인증 비활성화: 가입 직후 PENDING_APPROVAL)
+    #[schema(example = "PENDING_APPROVAL")]
     pub account_status: String,
 
     /// 응답 메시지
-    #[schema(example = "회원가입이 완료되었습니다. 이메일 인증을 완료해주세요.")]
+    #[schema(example = "회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.")]
     pub message: String,
 }
 

@@ -76,7 +76,8 @@ cargo run &
 - **Project User Matrix API**: `/api/projects/{id}/users/matrix`
 - **Role Permission Matrix API**: `/api/roles/global/permissions/matrix`
 - **Project Data Access API**: `/api/projects/{id}/data-access`
-- **User Registration API**: `/api/auth/signup`
+- **User Management API (클라이언트 가이드)**: [USER_MANAGEMENT_API_CLIENT_GUIDE.md](./USER_MANAGEMENT_API_CLIENT_GUIDE.md) ⭐ 회원가입·수정·승인·삭제 통합 가이드
+- **User Registration API**: [user-registration-api.md](./user-registration-api.md) — 회원가입, 관리자 승인, 계정 삭제 (상세)
 - **Token Refresh API**: `/api/auth/refresh`
 
 ## 🎯 Capability API 특징

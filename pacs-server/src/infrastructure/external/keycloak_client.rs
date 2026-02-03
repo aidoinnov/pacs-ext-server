@@ -564,6 +564,12 @@ impl KeycloakClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
+            if status == StatusCode::NOT_FOUND {
+                return Err(ServiceError::NotFound(format!(
+                    "User not found in Keycloak (keycloak_id={}). The user may have been deleted from the identity provider or never created.",
+                    keycloak_user_id
+                )));
+            }
             return Err(ServiceError::ExternalServiceError(format!(
                 "Update user failed ({}): {}",
                 status, body

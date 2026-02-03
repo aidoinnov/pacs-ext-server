@@ -2,9 +2,28 @@
 
 ## 개요
 
-사용자 회원가입, 이메일 인증, 관리자 승인, 계정 삭제 등의 사용자 등록 프로세스를 관리하는 API입니다.
+사용자 회원가입, 관리자 승인, 계정 삭제 등의 사용자 등록 프로세스를 관리하는 API입니다.
+
+> **이메일 인증 비활성화**: `POST /api/auth/verify-email` API는 **제거**되었습니다. 회원가입 직후 계정은 `PENDING_APPROVAL` 상태이며, 관리자 승인만 필요합니다.
 
 **Base URL**: `/api`
+
+---
+
+## 현재 사용 가능한 API 요약
+
+| API | Endpoint | 설명 |
+|-----|----------|------|
+| 회원가입 | `POST /api/auth/signup` | 새 사용자 등록 |
+| 관리자 승인 | `POST /api/auth/admin/users/approve` | 관리자가 사용자 활성화 |
+| 계정 삭제 | `DELETE /api/users/{user_id}` | 사용자 계정 삭제 |
+| 사용자 상태 조회 | `GET /api/users/{user_id}/status` | 계정 상태 조회 |
+
+### 제거된 API (사용 불가)
+
+| API | Endpoint | 비고 |
+|-----|----------|------|
+| 이메일 인증 | `POST /api/auth/verify-email` | 2026-02 이메일 인증 비활성화로 제거 |
 
 ---
 
@@ -12,7 +31,7 @@
 
 ### 1. 회원가입
 
-새로운 사용자를 등록합니다. Keycloak과 데이터베이스에 원자적으로 사용자를 생성합니다.
+새로운 사용자를 등록합니다. Keycloak과 데이터베이스에 원자적으로 사용자를 생성합니다. 이메일 인증 없이 즉시 `PENDING_APPROVAL` 상태가 됩니다.
 
 **Endpoint**: `POST /api/auth/signup`
 
@@ -55,8 +74,8 @@
   "user_id": 123,
   "username": "john_doe",
   "email": "john@example.com",
-  "account_status": "PENDING_EMAIL",
-  "message": "회원가입이 완료되었습니다. 이메일 인증을 완료해주세요."
+  "account_status": "PENDING_APPROVAL",
+  "message": "회원가입이 완료되었습니다. 관리자 승인을 기다려주세요."
 }
 ```
 
@@ -67,7 +86,7 @@
 | `user_id` | integer | 생성된 사용자 ID |
 | `username` | string | 사용자명 |
 | `email` | string | 이메일 주소 |
-| `account_status` | string | 계정 상태 (PENDING_EMAIL) |
+| `account_status` | string | 계정 상태 (PENDING_APPROVAL, 이메일 인증 생략) |
 | `message` | string | 응답 메시지 |
 
 **Error Responses**
@@ -80,55 +99,11 @@
 
 ---
 
-### 2. 이메일 인증 완료
-
-사용자가 이메일 인증을 완료했을 때 호출됩니다. 계정 상태를 PENDING_EMAIL에서 PENDING_APPROVAL로 변경합니다.
-
-**Endpoint**: `POST /api/auth/verify-email`
-
-**Authentication**: Not Required (Public)
-
-**Content-Type**: `application/json`
-
-#### Request Body
-
-```json
-{
-  "user_id": 123
-}
-```
-
-#### Request Schema
-
-| Field | Type | Required | Description | Example |
-|-------|------|----------|-------------|---------|
-| `user_id` | integer | Yes | 사용자 ID | `123` |
-
-#### Response
-
-**Success Response** (200 OK)
-
-```json
-{
-  "message": "이메일 인증이 완료되었습니다. 관리자 승인을 기다려주세요."
-}
-```
-
-**Error Responses**
-
-| Status Code | Description | Response Body |
-|-------------|-------------|---------------|
-| 400 | Invalid request | `{"error": "..."}` |
-| 404 | User not found | `{"error": "User not found"}` |
-| 500 | Internal server error | `{"error": "..."}` |
-
----
-
-### 3. 사용자 승인 (관리자 전용)
+### 2. 사용자 승인 (관리자 전용)
 
 관리자가 사용자를 승인할 때 호출됩니다. Keycloak에서 사용자를 활성화하고 계정 상태를 ACTIVE로 변경합니다.
 
-**Endpoint**: `POST /api/admin/users/approve`
+**Endpoint**: `POST /api/auth/admin/users/approve`
 
 **Authentication**: Required (Admin JWT Token)
 
@@ -168,7 +143,7 @@
 
 ---
 
-### 4. 사용자 계정 삭제
+### 3. 사용자 계정 삭제
 
 사용자 계정을 삭제합니다. Keycloak과 데이터베이스에서 원자적으로 삭제합니다. 감사 로그는 별도 보관됩니다.
 
@@ -202,7 +177,7 @@
 
 ---
 
-### 5. 사용자 상태 조회
+### 4. 사용자 상태 조회
 
 사용자의 현재 계정 상태를 조회합니다.
 
@@ -248,11 +223,12 @@
 
 **계정 상태 (account_status)**
 
-- `PENDING_EMAIL`: 이메일 인증 대기 중
-- `PENDING_APPROVAL`: 관리자 승인 대기 중
+- `PENDING_APPROVAL`: 관리자 승인 대기 중 (회원가입 직후)
 - `ACTIVE`: 활성 계정
 - `SUSPENDED`: 정지된 계정
 - `DELETED`: 삭제된 계정
+
+> `PENDING_EMAIL`은 이메일 인증 비활성화로 더 이상 사용되지 않습니다.
 
 ---
 
@@ -273,16 +249,6 @@ curl -X POST "http://localhost:8080/api/auth/signup" \
     "organization": "Seoul National University Hospital",
     "department": "Radiology Department",
     "phone": "010-1234-5678"
-  }'
-```
-
-#### 이메일 인증 완료
-
-```bash
-curl -X POST "http://localhost:8080/api/auth/verify-email" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": 123
   }'
 ```
 
@@ -317,19 +283,13 @@ curl -X GET "http://localhost:8080/api/users/123/status" \
 
 ### 1단계: 회원가입 (POST /api/auth/signup)
 - 사용자가 회원가입 요청
-- Keycloak에 사용자 생성
+- Keycloak에 사용자 생성 (enabled=false)
 - 데이터베이스에 사용자 정보 저장
-- 계정 상태: `PENDING_EMAIL`
-- 이메일 인증 링크 전송
+- 계정 상태: `PENDING_APPROVAL` (이메일 인증 단계 없음)
 
-### 2단계: 이메일 인증 (POST /api/auth/verify-email)
-- 사용자가 이메일 인증 링크 클릭
-- 계정 상태: `PENDING_EMAIL` → `PENDING_APPROVAL`
-- 관리자 승인 대기 상태
-
-### 3단계: 관리자 승인 (POST /api/admin/users/approve)
+### 2단계: 관리자 승인 (POST /api/auth/admin/users/approve)
 - 관리자가 사용자 승인
-- Keycloak에서 사용자 활성화
+- Keycloak에서 사용자 활성화 (enabled=true)
 - 계정 상태: `PENDING_APPROVAL` → `ACTIVE`
 - 사용자가 로그인 가능
 
@@ -363,7 +323,6 @@ curl -X GET "http://localhost:8080/api/users/123/status" \
 
 모든 작업은 원자적으로 처리됩니다:
 - 회원가입 실패 시 Keycloak과 데이터베이스 모두 롤백
-- 이메일 인증 실패 시 상태 변경 없음
 - 승인 실패 시 Keycloak 활성화 실패 시 롤백
 - 계정 삭제 시 감사 로그는 영구 보관
 
@@ -371,7 +330,6 @@ curl -X GET "http://localhost:8080/api/users/123/status" \
 
 모든 작업이 감사 로그에 기록됩니다:
 - 회원가입 시간
-- 이메일 인증 시간
 - 승인 시간 및 승인자
 - 계정 삭제 시간 및 삭제자
 
@@ -383,7 +341,14 @@ curl -X GET "http://localhost:8080/api/users/123/status" \
 
 ---
 
-**최종 업데이트**: 2025-01-27
+## 변경 이력
+
+| 날짜 | 변경 내용 |
+|------|----------|
+| 2026-02 | 이메일 인증 비활성화: `POST /api/auth/verify-email` 제거, 회원가입 직후 `PENDING_APPROVAL` |
+| 2025-01-27 | 초기 문서 작성 |
+
+**최종 업데이트**: 2026-02
 
 
 

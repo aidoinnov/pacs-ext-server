@@ -4,10 +4,9 @@ Authentication Flow E2E Test
 
 회원가입부터 로그인까지 전체 인증 플로우를 테스트합니다:
 1. 회원가입 (Signup)
-2. 이메일 인증 (Email Verification)
-3. 관리자 승인 (Admin Approval)
-4. 로그인 (Login)
-5. 계정 삭제 (Account Deletion)
+2. 관리자 승인 (Admin Approval) — 이메일 인증 비활성화로 생략
+3. 로그인 (Login)
+4. 계정 삭제 (Account Deletion)
 """
 
 import requests
@@ -59,7 +58,7 @@ class AuthFlowE2ETest(BaseE2ETest):
                 TestPrinter.print_info(f"테스트 사용자 삭제 중 (ID: {self.test_user_id})...")
                 headers = {"Authorization": f"Bearer {self.admin_token}"}
                 response = requests.delete(
-                    f"{TestConfig.BASE_URL}/api/auth/users/{self.test_user_id}",
+                    f"{TestConfig.BASE_URL}/api/users/{self.test_user_id}",
                     headers=headers,
                     timeout=TestConfig.DEFAULT_TIMEOUT
                 )
@@ -131,32 +130,11 @@ class AuthFlowE2ETest(BaseE2ETest):
         
         TestPrinter.print_success("중복 회원가입 차단 확인")
 
-    def test_email_verification(self):
-        """테스트 2: 이메일 인증"""
-        TestPrinter.print_header("테스트 2: 이메일 인증")
-
-        if not self.test_user_id:
-            TestPrinter.print_warning("회원가입이 먼저 실행되어야 합니다")
-            return
-
-        print("\n1️⃣  이메일 인증 요청...")
-        response = requests.post(
-            f"{TestConfig.BASE_URL}/api/auth/verify-email",
-            json={"user_id": self.test_user_id},
-            timeout=TestConfig.DEFAULT_TIMEOUT
-        )
-
-        print(f"Status: {response.status_code}")
-
-        if response.status_code == 200:
-            data = response.json()
-            TestPrinter.print_success("이메일 인증 성공")
-            TestPrinter.print_info(f"계정 상태: {data.get('account_status', 'N/A')}", indent=1)
-            TestPrinter.print_info(f"메시지: {data.get('message', 'N/A')}", indent=1)
-        else:
-            # 이미 인증된 경우 또는 다른 이유로 실패할 수 있음
-            TestPrinter.print_warning(f"이메일 인증 응답: {response.status_code}")
-            TestPrinter.print_info(f"응답: {response.text[:200]}", indent=1)
+    def test_email_verification_skipped(self):
+        """테스트 2: 이메일 인증 (비활성화됨 — skip)"""
+        TestPrinter.print_header("테스트 2: 이메일 인증 (비활성화)")
+        TestPrinter.print_info("이메일 인증 API(POST /api/auth/verify-email)는 2026-02 제거됨")
+        TestPrinter.print_info("회원가입 직후 PENDING_APPROVAL 상태로 바로 진행", indent=1)
 
     def test_admin_approval(self):
         """테스트 3: 관리자 승인"""
@@ -273,7 +251,7 @@ class AuthFlowE2ETest(BaseE2ETest):
         print("\n1️⃣  계정 삭제 요청...")
         headers = {"Authorization": f"Bearer {self.admin_token}"}
         response = requests.delete(
-            f"{TestConfig.BASE_URL}/api/auth/users/{self.test_user_id}",
+            f"{TestConfig.BASE_URL}/api/users/{self.test_user_id}",
             headers=headers,
             timeout=TestConfig.DEFAULT_TIMEOUT
         )
@@ -342,7 +320,7 @@ class AuthFlowE2ETest(BaseE2ETest):
     def run_tests(self):
         """테스트 실행"""
         self.test_signup()
-        self.test_email_verification()
+        self.test_email_verification_skipped()
         self.test_admin_approval()
         # self.test_login_before_approval()  # 순서상 승인 후에 실행하면 의미 없음
         self.test_login_after_approval()

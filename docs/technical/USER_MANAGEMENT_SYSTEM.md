@@ -482,8 +482,8 @@ web::scope("/auth")
     .route("/verify/{token}", web::get().to(AuthController::<A>::verify_token))
     .route("/refresh", web::post().to(AuthController::<A>::refresh_token))
     .route("/signup", web::post().to(AuthController::<A>::signup))
-    .route("/verify-email", web::post().to(AuthController::<A>::verify_email))
     .route("/admin/users/approve", web::post().to(AuthController::<A>::approve_user))
+    // .route("/verify-email", ...) — 2026-02 이메일 인증 비활성화로 제거
     .route("/users/{user_id}", web::delete().to(AuthController::<A>::delete_account))
 ```
 

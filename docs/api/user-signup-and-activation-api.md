@@ -8,12 +8,12 @@
 
 1. **사용자 회원가입**: `POST /api/auth/signup`
    - Keycloak에 사용자 생성 (enabled=false, emailVerified=true)
-   - PACS DB에 사용자 생성 (account_status=ACTIVE)
-   - 즉시 활성화됨 (관리자 승인 필요 없음)
+   - PACS DB에 사용자 생성 (account_status=PENDING_APPROVAL)
+   - 이메일 인증 단계 없음 (비활성화됨)
 
-2. **관리자 승인** (선택): `POST /api/auth/admin/users/approve`
+2. **관리자 승인** (필수): `POST /api/auth/admin/users/approve`
    - Keycloak에서 사용자 활성화 (enabled=true)
-   - 이미 ACTIVE 상태이므로 상태 변경 없음
+   - 계정 상태 ACTIVE로 변경 후 로그인 가능
 
 ---
 
@@ -447,7 +447,7 @@ A: 아니요. 관리자 승인은 필수입니다. 관리자가 `POST /api/auth/
 A: 최소 8자 이상이며, 대문자, 소문자, 숫자를 각각 최소 1개씩 포함해야 합니다. 특수문자는 권장됩니다.
 
 ### Q: 이메일 인증은 필수인가요?
-A: 아니요. 회원가입 시 Keycloak에서 `emailVerified=true`로 설정되므로 별도의 이메일 인증 절차는 없습니다.
+A: 아니요. 이메일 인증 기능은 비활성화되었습니다. `POST /api/auth/verify-email` API는 제거되었으며, 회원가입 시 Keycloak에서 `emailVerified=true`로 설정됩니다.
 
 ### Q: 관리자 승인 시 어떤 권한이 필요한가요?
 A: 관리자 권한이 있는 JWT 토큰이 필요합니다. 현재는 실제 권한 검증이 TODO 상태입니다.

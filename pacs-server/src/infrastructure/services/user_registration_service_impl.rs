@@ -215,8 +215,9 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
             "SELECT keycloak_id FROM security_user WHERE id = $1",
             user_id
         )
-        .fetch_one(&mut *tx)
-        .await?;
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| ServiceError::NotFound(format!("User {} not found", user_id)))?;
 
         // Keycloak에서 사용자 활성화
         let keycloak_result = self
@@ -226,6 +227,30 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
 
         if let Err(e) = keycloak_result {
             let _ = tx.rollback().await;
+
+            // Keycloak 404: DB에만 있는 orphan → 양쪽 정리 후 404 반환
+            if let ServiceError::NotFound(_) = &e {
+                let kc_id = user.keycloak_id.to_string();
+                let _ = self.keycloak_client.delete_user(&kc_id).await; // 404면 이미 삭제됨
+                let _ = sqlx::query!("DELETE FROM security_user WHERE id = $1", user_id)
+                    .execute(&self.pool)
+                    .await;
+                let _ = self
+                    .log_audit(NewUserAuditLog {
+                        user_id: Some(user_id),
+                        action: "ORPHAN_CLEANUP".to_string(),
+                        actor_id: Some(admin_id),
+                        keycloak_sync_status: Some("KEYCLOAK_NOT_FOUND".to_string()),
+                        keycloak_user_id: Some(kc_id),
+                        error_message: Some("User not in Keycloak, removed orphan from DB".into()),
+                        metadata: None,
+                    })
+                    .await;
+                return Err(ServiceError::NotFound(format!(
+                    "User {} not found in identity provider. Orphan record removed from database.",
+                    user_id
+                )));
+            }
 
             let _ = self
                 .log_audit(NewUserAuditLog {
@@ -288,44 +313,29 @@ impl UserRegistrationService for UserRegistrationServiceImpl {
         // 사용자가 존재하지 않으면 에러 반환
         let user = user.ok_or_else(|| ServiceError::NotFound("User not found".into()))?;
 
-        // Keycloak에서 사용자 삭제
-        // 1. keycloak_id로 삭제 시도
+        // Keycloak에서 사용자 삭제 (best-effort: 실패해도 DB 삭제 진행)
         let keycloak_user_id = user.keycloak_id.to_string();
-        eprintln!(
-            "DEBUG: Attempting to delete user from Keycloak by ID: {}",
-            keycloak_user_id
-        );
-
         let mut keycloak_result = self.keycloak_client.delete_user(&keycloak_user_id).await;
-
-        // 2. ID로 삭제 실패 시 username으로 삭제 시도
         if keycloak_result.is_err() {
-            eprintln!(
-                "DEBUG: Delete by ID failed, trying by username: {}",
-                user.username
-            );
             keycloak_result = self.keycloak_client.delete_user_by_username(&user.username).await;
         }
-
         if let Err(e) = &keycloak_result {
-            let _ = tx.rollback().await;
-
             let _ = self
                 .log_audit(NewUserAuditLog {
                     user_id: Some(user_id),
-                    action: "DELETE_REQUESTED".to_string(),
+                    action: "DELETE_KEYCLOAK_FAILED".to_string(),
                     actor_id,
                     keycloak_sync_status: Some("FAILED".to_string()),
-                    keycloak_user_id: Some(user.keycloak_id.to_string()),
+                    keycloak_user_id: Some(keycloak_user_id.clone()),
                     error_message: Some(e.to_string()),
                     metadata: Some(serde_json::json!({
                         "username": user.username,
-                        "email": user.email
+                        "email": user.email,
+                        "note": "Proceeding with DB delete anyway"
                     })),
                 })
                 .await;
-
-            return Err(e.clone());
+            // Keycloak 실패해도 DB는 삭제 (양쪽 정리 원칙)
         }
 
         // DB에서 사용자 삭제 (감사 로그는 별도 보관됨)
