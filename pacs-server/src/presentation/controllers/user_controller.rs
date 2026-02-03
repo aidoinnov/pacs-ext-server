@@ -7,10 +7,12 @@ use crate::application::dto::user_dto::{
     CreateUserRequest, MeQuery, PaginationInfo, UpdateUserRequest, UserListQuery,
     UserListResponse, UserProjectQuery, UserQuery, UserResponse,
 };
+use crate::application::use_cases::user_registration_use_case::UserRegistrationUseCase;
 use crate::application::use_cases::user_use_case::UserUseCase;
 use crate::domain::services::user_service::UserService;
 use crate::infrastructure::auth::{extract_user_id_from_request, JwtService};
 use crate::infrastructure::repositories::UserRepositoryImpl;
+use crate::infrastructure::services::UserRegistrationServiceImpl;
 
 pub struct UserController<U: UserService> {
     user_use_case: Arc<UserUseCase<U>>,
@@ -292,13 +294,49 @@ pub async fn get_user_projects<U: UserService>(
     }
 }
 
+/// 사용자 계정 삭제 (Keycloak + DB)
+#[utoipa::path(
+    delete,
+    path = "/api/users/{user_id}",
+    params(("user_id" = i32, Path, description = "삭제할 사용자 ID")),
+    responses(
+        (status = 200, description = "삭제 성공"),
+        (status = 404, description = "사용자 없음"),
+        (status = 500, description = "서버 오류")
+    ),
+    tag = "users"
+)]
+pub async fn delete_user(
+    path: web::Path<i32>,
+    user_registration_use_case: web::Data<
+        Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
+    >,
+) -> impl Responder {
+    let user_id = path.into_inner();
+    match user_registration_use_case
+        .delete_account(user_id, None)
+        .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            let body = json!({ "error": format!("Account deletion failed: {}", e) });
+            match &e {
+                crate::domain::ServiceError::NotFound(_) => HttpResponse::NotFound().json(body),
+                _ => HttpResponse::InternalServerError().json(body),
+            }
+        }
+    }
+}
+
 pub fn configure_routes<U: UserService + 'static>(
     cfg: &mut web::ServiceConfig,
     user_use_case: Arc<UserUseCase<U>>,
     user_service: Arc<U>,
+    user_registration_use_case: Arc<UserRegistrationUseCase<UserRegistrationServiceImpl>>,
 ) {
     cfg.app_data(web::Data::new(user_use_case))
         .app_data(web::Data::new(user_service))
+        .app_data(web::Data::new(user_registration_use_case))
         .service(
             web::scope("/users")
                 .route("", web::get().to(UserController::<U>::list_users))
@@ -311,6 +349,7 @@ pub fn configure_routes<U: UserService + 'static>(
                 )
                 .route("/{user_id}/projects", web::get().to(get_user_projects::<U>))
                 .route("/{user_id}", web::get().to(get_user::<U>))
-                .route("/{user_id}", web::put().to(update_user::<U>)),
+                .route("/{user_id}", web::put().to(update_user::<U>))
+                .route("/{user_id}", web::delete().to(delete_user)),
         );
 }

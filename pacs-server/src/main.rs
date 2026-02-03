@@ -789,7 +789,7 @@ async fn main() -> std::io::Result<()> {
                     .app_data(web::Data::from(sync_service.clone()))
                     .app_data(web::Data::from(sync_service_trait.clone()))
                     // ========================================
-                    // 🔐 인증 관련 API (가장 먼저 등록)
+                    // 🔐 인증 관련 API
                     // ========================================
                     .configure(|cfg| {
                         auth_controller::configure_routes(
@@ -799,6 +799,19 @@ async fn main() -> std::io::Result<()> {
                             jwt_service.clone(),
                             Arc::new(user_repo.clone()),
                         )
+                    })
+                    // ========================================
+                    // 👥 사용자 관리 API (/users/*) — 단일 scope (GET/POST/PUT/DELETE 통합)
+                    // ========================================
+                    .configure(|cfg| {
+                        if settings.server.mode != ServerMode::SyncOnly {
+                            user_controller::configure_routes(
+                                cfg,
+                                user_use_case.clone(),
+                                Arc::new(user_service.clone()),
+                                user_registration_use_case.clone(),
+                            )
+                        }
                     })
                     .configure(|cfg| {
                         presentation::controllers::dicom_gateway_controller::configure_routes(
@@ -829,16 +842,6 @@ async fn main() -> std::io::Result<()> {
                                 sync_state.clone(),
                                 sync_service.clone(),
                             );
-                        }
-                    })
-                    // ========================================
-                    // 👥 사용자 관리 API (/users/*)
-                    // - 사용자 CRUD
-                    // - /me, /username/{username} 등
-                    // ========================================
-                    .configure(|cfg| {
-                        if settings.server.mode != ServerMode::SyncOnly {
-                            user_controller::configure_routes(cfg, user_use_case.clone(), Arc::new(user_service.clone()))
                         }
                     })
                     // ========================================

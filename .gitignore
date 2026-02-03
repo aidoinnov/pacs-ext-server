@@ -28,3 +28,7 @@ frontend.log
 
 # Node modules
 node_modules/
+
+# Python
+__pycache__/
+*.pyc

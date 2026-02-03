@@ -339,10 +339,6 @@ pub fn configure_routes<A: AuthService + 'static, U: UserRepository + 'static>(
                 .route(
                     "/admin/users/approve",
                     web::post().to(AuthController::<A>::approve_user),
-        )
-        .route(
-            "/users/{user_id}",
-            web::delete().to(AuthController::<A>::delete_account),
-                ),
+                )
         );
 }
