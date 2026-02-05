@@ -154,7 +154,7 @@ Role → Capability → Permission
         "id": 46,
         "name": "ANNOTATION_READ_OWN",
         "display_name": "본인 어노테이션 읽기",
-        "description": "자신이 작성한 어노테이션 조회 권한",
+        "description": "자신이 작성한 어노테이션·마스크(AI) 조회 권한",
         "category": "어노테이션 관리",
         "permission_count": 1
       },
@@ -162,7 +162,7 @@ Role → Capability → Permission
         "id": 47,
         "name": "ANNOTATION_READ_ALL",
         "display_name": "모든 어노테이션 읽기",
-        "description": "모든 사용자의 어노테이션 조회 권한",
+        "description": "모든 사용자의 어노테이션·마스크(AI) 조회 권한",
         "category": "어노테이션 관리",
         "permission_count": 1
       },
@@ -170,7 +170,7 @@ Role → Capability → Permission
         "id": 48,
         "name": "ANNOTATION_WRITE",
         "display_name": "어노테이션 작성",
-        "description": "어노테이션 생성 및 수정 권한",
+        "description": "어노테이션·마스크(AI) 생성 및 수정 권한",
         "category": "어노테이션 관리",
         "permission_count": 2
       },
@@ -178,7 +178,7 @@ Role → Capability → Permission
         "id": 49,
         "name": "ANNOTATION_DELETE",
         "display_name": "어노테이션 삭제",
-        "description": "어노테이션 삭제 권한",
+        "description": "어노테이션·마스크(AI) 삭제 권한",
         "category": "어노테이션 관리",
         "permission_count": 1
       },
@@ -188,32 +188,6 @@ Role → Capability → Permission
         "display_name": "어노테이션 공유",
         "description": "어노테이션 공유 권한",
         "category": "어노테이션 관리",
-        "permission_count": 1
-      }
-    ],
-    "마스크 관리": [
-      {
-        "id": 51,
-        "name": "MASK_READ",
-        "display_name": "마스크 읽기",
-        "description": "마스크 조회 및 다운로드 권한",
-        "category": "마스크 관리",
-        "permission_count": 2
-      },
-      {
-        "id": 52,
-        "name": "MASK_WRITE",
-        "display_name": "마스크 작성",
-        "description": "마스크 생성 및 수정 권한",
-        "category": "마스크 관리",
-        "permission_count": 2
-      },
-      {
-        "id": 53,
-        "name": "MASK_DELETE",
-        "display_name": "마스크 삭제",
-        "description": "마스크 삭제 권한",
-        "category": "마스크 관리",
         "permission_count": 1
       }
     ],

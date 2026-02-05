@@ -33,15 +33,17 @@ GET /api/roles/global/capabilities/matrix
   "roles": [
     {
       "id": 1,
-      "name": "ADMIN",
-      "description": "시스템 관리자",
-      "scope": "GLOBAL"
+      "name": "SUPER_ADMIN",
+      "description": "시스템 전체 관리자",
+      "scope": "GLOBAL",
+      "display_order": 0
     },
     {
       "id": 2,
-      "name": "USER",
-      "description": "일반 사용자",
-      "scope": "GLOBAL"
+      "name": "ADMIN",
+      "description": "관리자",
+      "scope": "GLOBAL",
+      "display_order": 1
     }
   ],
   "capabilities_by_category": {
@@ -141,7 +143,7 @@ GET /api/roles/global/capabilities/matrix/all?scope=PROJECT
 
 #### 요청
 ```http
-GET /api/projects/{project_id}/roles/capabilities/matrix
+GET /api/roles/projects/{project_id}/capabilities/matrix
 ```
 
 #### 경로 파라미터
@@ -149,7 +151,82 @@ GET /api/projects/{project_id}/roles/capabilities/matrix
 |---------|------|------|------|
 | `project_id` | integer | 예 | 프로젝트 ID |
 
-### 4. 모든 Capability 조회
+### 4. 역할 표시 순서 변경 (단일)
+
+#### 요청
+```http
+PATCH /api/roles/{role_id}/display-order
+```
+
+#### 경로 파라미터
+| 파라미터 | 타입 | 필수 | 설명 |
+|---------|------|------|------|
+| `role_id` | integer | 예 | Role ID |
+
+#### 요청 본문
+```json
+{
+  "display_order": 5
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| display_order | integer | 예 | 표시 순서 (작을수록 위) |
+
+#### 응답 예시 (200 OK)
+```json
+{
+  "id": 1,
+  "name": "ADMIN",
+  "description": "관리자",
+  "scope": "GLOBAL",
+  "display_order": 5
+}
+```
+
+#### HTTP 상태 코드
+- `200 OK`: 성공
+- `404 Not Found`: 역할 없음
+- `401 Unauthorized`: 인증 필요
+- `403 Forbidden`: 권한 부족 (관리자 필요)
+
+### 5. 역할 표시 순서 일괄 변경
+
+#### 요청
+```http
+PUT /api/roles/display-order
+```
+
+#### 요청 본문
+```json
+{
+  "role_orders": [
+    { "role_id": 1, "display_order": 0 },
+    { "role_id": 2, "display_order": 1 },
+    { "role_id": 3, "display_order": 2 }
+  ]
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| role_orders | array | 예 | role_id와 display_order 쌍 배열 |
+
+#### 응답 예시 (200 OK)
+```json
+{
+  "message": "Display orders updated successfully"
+}
+```
+
+#### HTTP 상태 코드
+- `200 OK`: 성공
+- `400 Bad Request`: 잘못된 요청
+- `401 Unauthorized`: 인증 필요
+- `403 Forbidden`: 권한 부족 (관리자 필요)
+
+### 6. 모든 Capability 조회
 
 #### 요청
 ```http
@@ -178,7 +255,7 @@ GET /api/capabilities
 ]
 ```
 
-### 5. 특정 Capability 상세 조회
+### 7. 특정 Capability 상세 조회
 
 #### 요청
 ```http
@@ -190,7 +267,7 @@ GET /api/capabilities/{capability_id}
 |---------|------|------|------|
 | `capability_id` | integer | 예 | Capability ID |
 
-### 6. 카테고리별 Capability 조회
+### 8. 카테고리별 Capability 조회
 
 #### 요청
 ```http
@@ -202,7 +279,7 @@ GET /api/capabilities/category/{category}
 |---------|------|------|------|
 | `category` | string | 예 | 카테고리명 (예: "관리", "DICOM") |
 
-### 7. Role-Capability 할당 업데이트
+### 9. Role-Capability 할당 업데이트
 
 #### 요청
 ```http
@@ -218,9 +295,13 @@ PUT /api/roles/{role_id}/capabilities/{capability_id}
 #### 요청 본문
 ```json
 {
-  "assigned": true
+  "assign": true
 }
 ```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| assign | boolean | 예 | true=할당, false=제거 |
 
 #### 응답 예시
 ```json
@@ -265,10 +346,26 @@ curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix/all?scop
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-### 4. 복합 검색 (페이지네이션 + 검색 + 범위)
+### 5. 복합 검색 (페이지네이션 + 검색 + 범위)
 ```bash
 curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix?page=1&size=10&search=user&scope=GLOBAL" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### 6. 역할 표시 순서 변경 (단일)
+```bash
+curl -X PATCH "http://localhost:8080/api/roles/1/display-order" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"display_order": 0}'
+```
+
+### 7. 역할 표시 순서 일괄 변경
+```bash
+curl -X PUT "http://localhost:8080/api/roles/display-order" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"role_orders":[{"role_id":1,"display_order":0},{"role_id":2,"display_order":1}]}'
 ```
 
 ## 데이터 모델
@@ -278,10 +375,19 @@ curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix?page=1&s
 {
   "id": 1,
   "name": "ADMIN",
-  "description": "시스템 관리자",
-  "scope": "GLOBAL"
+  "description": "관리자",
+  "scope": "GLOBAL",
+  "display_order": 1
 }
 ```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | integer | 역할 ID |
+| name | string | 역할 이름 |
+| description | string? | 역할 설명 |
+| scope | string | GLOBAL 또는 PROJECT |
+| display_order | integer | UI 표시 순서 (작을수록 위) |
 
 ### Capability (역량)
 ```json
@@ -341,9 +447,14 @@ curl -X GET "http://localhost:8080/api/roles/global/capabilities/matrix?page=1&s
 2. **검색 기능**: `search` 파라미터는 역할 이름과 설명에서 대소문자 구분 없이 검색합니다.
 3. **범위 필터**: `scope` 파라미터는 "GLOBAL" 또는 "PROJECT" 값만 허용됩니다.
 4. **인증**: 모든 API 호출에는 유효한 JWT 토큰이 필요합니다.
+5. **display_order**: 역할은 `display_order` 기준 오름차순으로 정렬됩니다. 수정 시 관리자 권한 필요.
 
 ## 버전 정보
 
 - **API 버전**: v1.0
-- **최종 업데이트**: 2024년 1월
+- **최종 업데이트**: 2026년 2월
 - **호환성**: 하위 호환성 유지 (기존 `/all` 엔드포인트 지원)
+- **display_order**: 2026-02 Role Capability Matrix UI 표시 순서 기능 추가
+- **2026-02-07 MASK 통합**: MASK_READ/WRITE/DELETE capability 제거, ANNOTATION_* 가 어노테이션+마스크(AI) 모두 커버
+- **2026-02-07 PROJECT 통합**: PROJECT_CREATE/EDIT/ASSIGN/DATA_ASSIGN/DELETE 제거, PROJECT_MANAGEMENT 하나로 통합
+- **2026-02-07 DICOM_SHARE 제거**: DICOM_SHARE_ACCESS capability 제거
